@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3:*)",
+      "Bash(source venv/bin/activate)",
+      "Bash(pip install:*)",
+      "Bash(alembic revision:*)",
+      "Bash(alembic upgrade:*)",
+      "Bash(uvicorn:*)",
+      "Bash(curl:*)",
+      "Bash(npm install)",
+      "Bash(npm run dev:*)",
+      "Bash(lsof:*)",
+      "Bash(xargs kill -9)",
+      "Bash(git init:*)",
+      "Bash(git add:*)"
+    ]
+  }
+}
