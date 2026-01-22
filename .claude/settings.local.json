@@ -13,7 +13,20 @@
       "Bash(lsof:*)",
       "Bash(xargs kill -9)",
       "Bash(git init:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(python -m alembic revision:*)",
+      "Bash(./venv/bin/alembic revision:*)",
+      "Bash(./venv/bin/alembic upgrade:*)",
+      "Bash(./venv/bin/alembic:*)",
+      "Bash(python -c:*)",
+      "Bash(kill:*)",
+      "Bash(npm install:*)",
+      "Bash(npx shadcn-ui@latest add:*)",
+      "Bash(npx shadcn@latest add button card input label dialog select checkbox badge separator table tabs alert skeleton radio-group alert-dialog --yes)",
+      "Bash(npx shadcn@latest init:*)",
+      "Bash(npx shadcn@latest add:*)",
+      "Bash(npm run build:*)"
     ]
   }
 }

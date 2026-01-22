@@ -11,6 +11,9 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
 
+    # AI/ML
+    ANTHROPIC_API_KEY: str = "your-api-key-here"
+
     # Application
     APP_NAME: str = "CRE Platform"
     DEBUG: bool = False

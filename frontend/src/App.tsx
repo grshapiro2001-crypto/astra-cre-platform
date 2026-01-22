@@ -7,8 +7,10 @@ import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { MainLayout } from './components/layout/MainLayout';
 import { Dashboard } from './pages/Dashboard';
 import { Library } from './pages/Library';
+import { FolderDetail } from './pages/FolderDetail';
+import { PropertyDetail } from './pages/PropertyDetail';
 import { Upload } from './pages/Upload';
-import { Comparison } from './pages/Comparison';
+import { ComparisonPage } from './pages/ComparisonPage';
 
 function App() {
   const checkAuth = useAuthStore((state) => state.checkAuth);
@@ -29,8 +31,10 @@ function App() {
           <Route element={<MainLayout />}>
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/library" element={<Library />} />
+            <Route path="/folders/:folderId" element={<FolderDetail />} />
+            <Route path="/library/:id" element={<PropertyDetail />} />
             <Route path="/upload" element={<Upload />} />
-            <Route path="/comparison" element={<Comparison />} />
+            <Route path="/compare" element={<ComparisonPage />} />
           </Route>
         </Route>
 

@@ -1,0 +1,263 @@
+"""
+Property schemas for request/response handling
+"""
+from pydantic import BaseModel, validator
+from typing import Optional, List
+from datetime import datetime
+
+
+# ==================== FINANCIAL PERIOD SCHEMAS ====================
+
+class FinancialPeriodData(BaseModel):
+    """Financial data for a single period (T12, T3, Y1, etc.)"""
+    period_label: str
+    gsr: Optional[float] = None
+    vacancy: Optional[float] = None
+    concessions: Optional[float] = None
+    bad_debt: Optional[float] = None
+    non_revenue_units: Optional[float] = None
+    total_opex: Optional[float] = None
+    noi: Optional[float] = None
+    opex_ratio: Optional[float] = None
+
+
+# ==================== BOV SCHEMAS ====================
+
+class BOVCapRateData(BaseModel):
+    """Cap rate data for a BOV pricing tier"""
+    cap_rate_type: str
+    cap_rate_value: Optional[float] = None
+    noi_basis: Optional[int] = None
+    qualifier: Optional[str] = None
+
+
+class BOVLoanAssumptions(BaseModel):
+    """Loan assumptions for a BOV pricing tier"""
+    leverage: Optional[float] = None
+    loan_amount: Optional[int] = None
+    interest_rate: Optional[float] = None
+    io_period_months: Optional[int] = None
+    amortization_years: Optional[int] = None
+
+
+class BOVReturnMetrics(BaseModel):
+    """Return metrics for a BOV pricing tier"""
+    unlevered_irr: Optional[float] = None
+    levered_irr: Optional[float] = None
+    equity_multiple: Optional[float] = None
+    avg_cash_on_cash: Optional[float] = None
+
+
+class BOVTerminalAssumptions(BaseModel):
+    """Terminal assumptions for a BOV pricing tier"""
+    terminal_cap_rate: Optional[float] = None
+    hold_period_years: Optional[int] = None
+
+
+class BOVPricingTierData(BaseModel):
+    """Complete BOV pricing tier data"""
+    pricing_tier_id: str
+    tier_label: Optional[str] = None
+    tier_type: Optional[str] = None
+    pricing: Optional[int] = None
+    price_per_unit: Optional[int] = None
+    price_per_sf: Optional[float] = None
+    cap_rates: List[BOVCapRateData] = []
+    loan_assumptions: Optional[BOVLoanAssumptions] = None
+    return_metrics: Optional[BOVReturnMetrics] = None
+    terminal_assumptions: Optional[BOVTerminalAssumptions] = None
+
+
+# ==================== SAVE PROPERTY REQUEST ====================
+
+class PropertyCreate(BaseModel):
+    """Request model for saving a property to the library"""
+    # Required
+    deal_name: str
+    uploaded_filename: str
+    document_type: str
+    deal_folder_id: int  # Phase 3A - REQUIRED folder association
+    document_subtype: Optional[str] = None  # Phase 3A - "OM", "BOV", "Rent Roll", etc.
+
+    # Property info
+    property_address: Optional[str] = None
+    property_type: Optional[str] = None
+    submarket: Optional[str] = None
+    year_built: Optional[int] = None
+    total_units: Optional[int] = None
+    total_residential_sf: Optional[int] = None
+    average_market_rent: Optional[float] = None
+    average_inplace_rent: Optional[float] = None
+
+    # Financial periods (as structured data)
+    t12_financials: Optional[FinancialPeriodData] = None
+    t3_financials: Optional[FinancialPeriodData] = None
+    y1_financials: Optional[FinancialPeriodData] = None
+
+    # BOV pricing tiers (Phase 3A - only for BOV documents)
+    bov_pricing_tiers: Optional[List[BOVPricingTierData]] = None
+
+    # Metadata
+    raw_pdf_path: str
+    analysis_model: str
+
+
+# ==================== PROPERTY RESPONSES ====================
+
+class PropertyListItem(BaseModel):
+    """Summary for property list view (library page)"""
+    id: int
+    deal_name: str
+    property_type: Optional[str]
+    property_address: Optional[str]
+    submarket: Optional[str]
+    upload_date: datetime
+    t3_noi: Optional[float]
+    y1_noi: Optional[float]
+    t12_noi: Optional[float]
+    document_type: Optional[str]
+    deal_folder_id: Optional[int] = None  # Phase 3A
+    document_subtype: Optional[str] = None  # Phase 3A
+
+    class Config:
+        from_attributes = True
+
+
+class PropertyDetail(BaseModel):
+    """Full property detail for detail page"""
+    # Core identifiers
+    id: int
+    deal_name: str
+    uploaded_filename: Optional[str]
+    upload_date: datetime
+    document_type: Optional[str]
+    deal_folder_id: Optional[int] = None  # Phase 3A
+    document_subtype: Optional[str] = None  # Phase 3A
+
+    # Property info
+    property_address: Optional[str]
+    property_type: Optional[str]
+    submarket: Optional[str]
+    year_built: Optional[int]
+    total_units: Optional[int]
+    total_residential_sf: Optional[int]
+    average_market_rent: Optional[float]
+    average_inplace_rent: Optional[float]
+
+    # Financials (parsed from JSON)
+    t12_financials: Optional[FinancialPeriodData] = None
+    t3_financials: Optional[FinancialPeriodData] = None
+    y1_financials: Optional[FinancialPeriodData] = None
+
+    # BOV pricing tiers (Phase 3A - only for BOV documents)
+    bov_pricing_tiers: Optional[List[BOVPricingTierData]] = None
+
+    # Metadata
+    analysis_date: Optional[datetime]
+    last_viewed_date: Optional[datetime]
+    analysis_count: Optional[int]
+    last_analyzed_at: Optional[datetime]
+    analysis_model: Optional[str]
+    analysis_status: Optional[str]
+
+    class Config:
+        from_attributes = True
+
+
+# ==================== FILTER/SEARCH PARAMETERS ====================
+
+class PropertyFilters(BaseModel):
+    """Query parameters for filtering/searching properties"""
+    search: Optional[str] = None
+    property_type: Optional[str] = None
+    upload_date_start: Optional[datetime] = None
+    upload_date_end: Optional[datetime] = None
+    noi_min: Optional[float] = None
+    noi_max: Optional[float] = None
+    sort_by: str = "upload_date"
+    sort_direction: str = "desc"
+
+
+class PropertyListResponse(BaseModel):
+    """Response for property list endpoint"""
+    properties: List[PropertyListItem]
+    total: int
+
+
+# ==================== COMPARISON SCHEMAS (Phase 3B) ====================
+
+class ComparisonPricing(BaseModel):
+    price: Optional[int] = None
+    price_per_unit: Optional[int] = None
+    price_per_sf: Optional[float] = None
+
+
+class ComparisonCapRates(BaseModel):
+    going_in: Optional[float] = None
+    stabilized: Optional[float] = None
+
+
+class ComparisonBOVReturns(BaseModel):
+    tier_name: Optional[str] = None
+    levered_irr: Optional[float] = None
+    unlevered_irr: Optional[float] = None
+    equity_multiple: Optional[float] = None
+
+
+class ComparisonFinancials(BaseModel):
+    t12_noi: Optional[int] = None
+    y1_noi: Optional[int] = None
+    noi_growth_pct: Optional[float] = None
+
+
+class ComparisonOperations(BaseModel):
+    opex_ratio: Optional[float] = None
+    opex_per_unit: Optional[int] = None
+
+
+class PropertyComparisonItem(BaseModel):
+    id: int
+    property_name: str
+    document_type: str
+    property_type: Optional[str] = None
+    property_address: Optional[str] = None
+    submarket: Optional[str] = None
+    total_units: Optional[int] = None
+    total_sf: Optional[int] = None
+    year_built: Optional[int] = None
+
+    pricing: ComparisonPricing
+    cap_rates: ComparisonCapRates
+    bov_returns: Optional[ComparisonBOVReturns] = None
+    financials: ComparisonFinancials
+    operations: ComparisonOperations
+
+
+class BestValues(BaseModel):
+    best_price_per_unit: Optional[int] = None
+    best_price_per_sf: Optional[int] = None
+    best_going_in_cap: Optional[int] = None
+    best_stabilized_cap: Optional[int] = None
+    best_levered_irr: Optional[int] = None
+    best_unlevered_irr: Optional[int] = None
+    best_equity_multiple: Optional[int] = None
+    best_noi_growth: Optional[int] = None
+    lowest_opex_ratio: Optional[int] = None
+    lowest_opex_per_unit: Optional[int] = None
+
+
+class ComparisonRequest(BaseModel):
+    property_ids: List[int]
+
+    @validator('property_ids')
+    def validate_property_ids(cls, v):
+        if len(v) < 2:
+            raise ValueError('Must select at least 2 properties')
+        if len(v) > 5:
+            raise ValueError('Cannot compare more than 5 properties')
+        return v
+
+
+class ComparisonResponse(BaseModel):
+    properties: List[PropertyComparisonItem]
+    best_values: BestValues
