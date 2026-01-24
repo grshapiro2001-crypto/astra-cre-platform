@@ -9,7 +9,7 @@ export const Sidebar = () => {
   ];
 
   return (
-    <aside className="w-64 bg-gradient-to-b from-emerald-900 via-emerald-950 to-canopy-950 min-h-screen">
+    <aside className="w-64 bg-gradient-to-b from-emerald-800 via-emerald-900 to-green-950 min-h-screen relative">
       <div className="px-4 py-6">
         <div className="flex items-center gap-2 px-4 mb-2">
           <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
@@ -25,8 +25,8 @@ export const Sidebar = () => {
               className={({ isActive }) =>
                 `flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
                   isActive
-                    ? 'bg-emerald-500/20 text-emerald-100 shadow-forest-sm border border-emerald-500/30'
-                    : 'text-emerald-300/80 hover:bg-emerald-800/40 hover:text-emerald-100'
+                    ? 'bg-emerald-500/20 text-white border border-emerald-400/30 shadow-sm'
+                    : 'text-emerald-200 hover:bg-emerald-700/40 hover:text-white'
                 }`
               }
             >
@@ -44,9 +44,6 @@ export const Sidebar = () => {
           ))}
         </div>
       </nav>
-
-      {/* Forest floor decoration */}
-      <div className="absolute bottom-0 left-0 w-64 h-32 bg-gradient-to-t from-canopy-950/50 to-transparent pointer-events-none" />
     </aside>
   );
 };

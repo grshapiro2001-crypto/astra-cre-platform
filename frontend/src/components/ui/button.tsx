@@ -9,18 +9,18 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground shadow-forest-sm hover:bg-emerald-600 active:bg-emerald-700",
+        default: "bg-emerald-500 text-white shadow-sm hover:bg-emerald-600 active:bg-emerald-700",
         destructive:
-          "bg-destructive text-destructive-foreground shadow-forest-sm hover:bg-destructive/90",
+          "bg-red-500 text-white shadow-sm hover:bg-red-600",
         outline:
-          "border border-input bg-background hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300",
+          "border border-emerald-300 bg-white hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-400",
         secondary:
-          "bg-secondary text-secondary-foreground hover:bg-emerald-100",
+          "bg-emerald-100 text-emerald-800 hover:bg-emerald-200",
         ghost: "hover:bg-emerald-50 hover:text-emerald-700",
-        link: "text-primary underline-offset-4 hover:underline",
-        success: "bg-success text-success-foreground shadow-forest-sm hover:bg-success/90",
-        warning: "bg-warning text-warning-foreground shadow-forest-sm hover:bg-warning/90",
-        forest: "bg-gradient-to-r from-emerald-600 to-canopy-600 text-white shadow-forest hover:from-emerald-700 hover:to-canopy-700 active:from-emerald-800 active:to-canopy-800",
+        link: "text-emerald-600 underline-offset-4 hover:underline",
+        success: "bg-green-500 text-white shadow-sm hover:bg-green-600",
+        warning: "bg-amber-500 text-white shadow-sm hover:bg-amber-600",
+        forest: "bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-md hover:from-emerald-600 hover:to-green-700",
       },
       size: {
         default: "h-10 px-4 py-2",

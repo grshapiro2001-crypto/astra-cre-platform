@@ -9,26 +9,22 @@ const badgeVariants = cva(
     variants: {
       variant: {
         default:
-          "border-transparent bg-primary text-primary-foreground hover:bg-emerald-600",
+          "border-transparent bg-emerald-500 text-white hover:bg-emerald-600",
         secondary:
-          "border-transparent bg-secondary text-secondary-foreground hover:bg-emerald-100",
+          "border-transparent bg-emerald-100 text-emerald-800 hover:bg-emerald-200",
         destructive:
-          "border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/80",
+          "border-transparent bg-red-500 text-white hover:bg-red-600",
         success:
-          "border-transparent bg-success text-success-foreground hover:bg-success/80",
+          "border-transparent bg-green-500 text-white hover:bg-green-600",
         warning:
-          "border-transparent bg-warning text-warning-foreground hover:bg-warning/80",
-        outline: "text-foreground border-border",
+          "border-transparent bg-amber-500 text-white hover:bg-amber-600",
+        outline: "text-emerald-700 border-emerald-300",
         emerald:
           "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100",
-        canopy:
-          "border-canopy-200 bg-canopy-50 text-canopy-700 hover:bg-canopy-100",
-        sunlight:
-          "border-sunlight-200 bg-sunlight-50 text-sunlight-700 hover:bg-sunlight-100",
-        bark:
-          "border-bark-200 bg-bark-50 text-bark-700 hover:bg-bark-100",
-        moss:
-          "border-moss-200 bg-moss-50 text-moss-700 hover:bg-moss-100",
+        forest:
+          "border-green-200 bg-green-50 text-green-700 hover:bg-green-100",
+        amber:
+          "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100",
       },
     },
     defaultVariants: {
