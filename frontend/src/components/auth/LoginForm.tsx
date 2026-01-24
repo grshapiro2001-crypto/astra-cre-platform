@@ -26,13 +26,13 @@ export const LoginForm = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center forest-gradient-subtle py-12 px-4 sm:px-6 lg:px-8">
-      <Card className="max-w-md w-full forest-card-hover">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-900 via-canopy-800 to-emerald-950 py-12 px-4 sm:px-6 lg:px-8">
+      <Card className="max-w-md w-full forest-glass shadow-forest-xl">
         <CardHeader className="text-center pb-2">
           <div className="flex justify-center mb-4">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-canopy-600 flex items-center justify-center shadow-forest">
+            <div className="w-14 h-14 rounded-xl bg-emerald-500 flex items-center justify-center shadow-forest-md">
               <svg
-                className="w-7 h-7 text-white"
+                className="w-8 h-8 text-white"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -43,11 +43,11 @@ export const LoginForm = () => {
             </div>
           </div>
           <h2 className="text-2xl font-bold text-foreground">
-            Sign in to <span className="forest-text-gradient">Astra CRE</span>
+            Sign in to <span className="text-emerald-600">Astra CRE</span>
           </h2>
           <p className="mt-2 text-sm text-muted-foreground">
             Or{' '}
-            <Link to="/register" className="font-medium text-primary hover:text-emerald-600 transition-colors">
+            <Link to="/register" className="font-medium text-emerald-500 hover:text-emerald-600 transition-colors">
               create a new account
             </Link>
           </p>
@@ -63,7 +63,7 @@ export const LoginForm = () => {
 
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">Email address</Label>
+                <Label htmlFor="email" className="text-emerald-800">Email address</Label>
                 <Input
                   id="email"
                   name="email"
@@ -71,12 +71,13 @@ export const LoginForm = () => {
                   autoComplete="email"
                   required
                   placeholder="Enter your email"
+                  className="border-emerald-200 focus:border-emerald-500 focus:ring-emerald-500"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password" className="text-emerald-800">Password</Label>
                 <Input
                   id="password"
                   name="password"
@@ -84,6 +85,7 @@ export const LoginForm = () => {
                   autoComplete="current-password"
                   required
                   placeholder="Enter your password"
+                  className="border-emerald-200 focus:border-emerald-500 focus:ring-emerald-500"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                 />
@@ -93,12 +95,17 @@ export const LoginForm = () => {
             <Button
               type="submit"
               disabled={isLoading}
-              variant="forest"
               size="lg"
-              className="w-full"
+              className="w-full bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 text-white shadow-forest-md"
             >
               {isLoading ? 'Signing in...' : 'Sign in'}
             </Button>
+
+            <div className="text-center">
+              <span className="inline-block px-3 py-1 rounded-full bg-sunlight-100 text-sunlight-700 text-xs font-medium">
+                Powered by Emerald Forest
+              </span>
+            </div>
           </form>
         </CardContent>
       </Card>
