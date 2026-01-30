@@ -110,10 +110,10 @@ export const Library = () => {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">
+          <h1 className="text-3xl font-bold text-emerald-900">
             {comparisonMode ? 'Select Properties to Compare' : 'Deal Folders'}
           </h1>
-          <p className="mt-1 text-sm text-gray-600">
+          <p className="mt-1 text-sm text-emerald-600">
             {comparisonMode ? `${selectedPropertyIds.length} selected (max 5)` : 'Organize your properties by deal'}
           </p>
         </div>

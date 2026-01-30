@@ -5,12 +5,12 @@ export const Dashboard = () => {
 
   return (
     <div>
-      <h1 className="text-3xl font-bold text-gray-900 mb-6">Dashboard</h1>
+      <h1 className="text-3xl font-bold text-emerald-900 mb-6">Dashboard</h1>
       <div className="bg-white shadow-md rounded-xl border border-emerald-100 p-6">
         <h2 className="text-xl font-semibold text-emerald-900 mb-4">
           Welcome, {user?.full_name || user?.email}!
         </h2>
-        <p className="text-gray-600">
+        <p className="text-emerald-700/70">
           This is your CRE Platform dashboard. You can upload Offering Memorandums,
           manage your property library, and compare properties.
         </p>

@@ -51,7 +51,7 @@ export const BOVPricingTiers = ({ tiers }: BOVPricingTiersProps) => {
             onClick={() => setSelectedTier(idx)}
             className={`px-4 py-2 font-medium border-b-2 transition-colors ${
               selectedTier === idx
-                ? 'border-primary-600 text-primary-600'
+                ? 'border-emerald-600 text-emerald-600'
                 : 'border-transparent text-gray-600 hover:text-gray-900'
             }`}
           >
@@ -64,7 +64,7 @@ export const BOVPricingTiers = ({ tiers }: BOVPricingTiersProps) => {
       <div className="space-y-6">
         {/* Pricing Summary */}
         {(tier.pricing || tier.price_per_unit || tier.price_per_sf) && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
             <h3 className="font-semibold text-gray-900 mb-3">Pricing Summary</h3>
             <div className="grid grid-cols-3 gap-4">
               {tier.pricing && <div><span className="text-sm text-gray-600">Valuation:</span><div className="font-bold text-lg">${(tier.pricing / 1000000).toFixed(2)}M</div></div>}

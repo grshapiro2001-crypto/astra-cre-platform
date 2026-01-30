@@ -20,13 +20,11 @@ export const RegisterForm = () => {
     clearError();
     setValidationError('');
 
-    // Validate passwords match
     if (password !== confirmPassword) {
       setValidationError('Passwords do not match');
       return;
     }
 
-    // Validate password length
     if (password.length < 8) {
       setValidationError('Password must be at least 8 characters');
       return;
@@ -41,43 +39,51 @@ export const RegisterForm = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Create your account
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-900 via-green-800 to-emerald-950 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full bg-white/90 backdrop-blur-md rounded-xl shadow-2xl border border-emerald-100 p-8">
+        <div className="text-center mb-6">
+          <div className="flex justify-center mb-4">
+            <div className="w-14 h-14 rounded-xl bg-emerald-500 flex items-center justify-center shadow-lg">
+              <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+              </svg>
+            </div>
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900">
+            Create your <span className="text-emerald-600">account</span>
           </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
+          <p className="mt-2 text-sm text-gray-500">
             Or{' '}
-            <Link to="/login" className="font-medium text-primary-600 hover:text-primary-500">
+            <Link to="/login" className="font-medium text-emerald-500 hover:text-emerald-600 transition-colors">
               sign in to existing account
             </Link>
           </p>
         </div>
 
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+        <form className="space-y-5" onSubmit={handleSubmit}>
           {(error || validationError) && (
-            <div className="rounded-md bg-red-50 p-4">
-              <div className="text-sm text-red-800">{error || validationError}</div>
+            <div className="rounded-lg bg-red-50 border border-red-200 p-4">
+              <div className="text-sm text-red-700">{error || validationError}</div>
             </div>
           )}
 
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="fullName">Full Name (Optional)</Label>
+              <Label htmlFor="fullName" className="text-emerald-800 font-medium">Full Name (Optional)</Label>
               <Input
                 id="fullName"
                 name="fullName"
                 type="text"
                 autoComplete="name"
                 placeholder="John Doe"
+                className="border-emerald-200 focus:border-emerald-500 focus:ring-emerald-500/20"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="email">Email address *</Label>
+              <Label htmlFor="email" className="text-emerald-800 font-medium">Email address *</Label>
               <Input
                 id="email"
                 name="email"
@@ -85,13 +91,14 @@ export const RegisterForm = () => {
                 autoComplete="email"
                 required
                 placeholder="you@example.com"
+                className="border-emerald-200 focus:border-emerald-500 focus:ring-emerald-500/20"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Password *</Label>
+              <Label htmlFor="password" className="text-emerald-800 font-medium">Password *</Label>
               <Input
                 id="password"
                 name="password"
@@ -99,13 +106,14 @@ export const RegisterForm = () => {
                 autoComplete="new-password"
                 required
                 placeholder="At least 8 characters"
+                className="border-emerald-200 focus:border-emerald-500 focus:ring-emerald-500/20"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirm Password *</Label>
+              <Label htmlFor="confirmPassword" className="text-emerald-800 font-medium">Confirm Password *</Label>
               <Input
                 id="confirmPassword"
                 name="confirmPassword"
@@ -113,21 +121,20 @@ export const RegisterForm = () => {
                 autoComplete="new-password"
                 required
                 placeholder="Confirm your password"
+                className="border-emerald-200 focus:border-emerald-500 focus:ring-emerald-500/20"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
               />
             </div>
           </div>
 
-          <div>
-            <Button
-              type="submit"
-              disabled={isLoading}
-              className="w-full"
-            >
-              {isLoading ? 'Creating account...' : 'Create account'}
-            </Button>
-          </div>
+          <Button
+            type="submit"
+            disabled={isLoading}
+            className="w-full h-11 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 text-white font-semibold rounded-lg shadow-md shadow-emerald-500/25 transition-all duration-200"
+          >
+            {isLoading ? 'Creating account...' : 'Create account'}
+          </Button>
         </form>
       </div>
     </div>

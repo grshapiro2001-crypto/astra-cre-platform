@@ -291,9 +291,9 @@ export const PropertyDetail = () => {
               <CardContent>
                 <div className="grid grid-cols-2 gap-4">
                   {property.average_market_rent && (
-                    <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
-                      <div className="text-sm font-medium text-purple-800">Market Rent</div>
-                      <div className="text-2xl font-bold text-purple-900 mt-1">
+                    <div className="bg-emerald-50 p-4 rounded-lg border border-emerald-200">
+                      <div className="text-sm font-medium text-emerald-800">Market Rent</div>
+                      <div className="text-2xl font-bold text-emerald-900 mt-1">
                         {formatCurrency(property.average_market_rent)}/unit/month
                       </div>
                     </div>

@@ -22,10 +22,10 @@ export const Upload = () => {
 
   return (
     <div className="max-w-5xl mx-auto">
-      <h1 className="text-3xl font-bold text-gray-900 mb-6">Upload Property Document</h1>
+      <h1 className="text-3xl font-bold text-emerald-900 mb-6">Upload Property Document</h1>
 
       {!uploadResult ? (
-        <div className="bg-white shadow rounded-lg p-8">
+        <div className="bg-white shadow-md rounded-xl border border-emerald-100 p-8">
           <PDFUploader onUploadComplete={handleUploadComplete} />
         </div>
       ) : (

@@ -194,12 +194,12 @@ const FinancialPeriodSection = ({
                 Formula: {calculatedMetrics.formula_econ_occ}
               </div>
             </div>
-            <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-              <div className="text-sm font-medium text-blue-800">OpEx Ratio</div>
-              <div className="text-3xl font-bold text-blue-900 mt-1">
+            <div className="bg-emerald-50 p-4 rounded-lg border border-emerald-200">
+              <div className="text-sm font-medium text-emerald-800">OpEx Ratio</div>
+              <div className="text-3xl font-bold text-emerald-900 mt-1">
                 {formatPercentage(calculatedMetrics.opex_ratio)}
               </div>
-              <div className="text-xs text-blue-600 mt-2 font-mono">
+              <div className="text-xs text-emerald-600 mt-2 font-mono">
                 Formula: {calculatedMetrics.formula_opex}
               </div>
             </div>
@@ -238,13 +238,13 @@ export const ExtractionPreview = ({ result, filename, pdfPath, onUploadAnother }
   return (
     <div className="space-y-6">
       {/* Document Type Header */}
-      <div className="bg-primary-50 border-l-4 border-primary-500 p-4 rounded">
+      <div className="bg-emerald-50 border-l-4 border-emerald-500 p-4 rounded">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="font-semibold text-primary-900 text-lg">
+            <h3 className="font-semibold text-emerald-900 text-lg">
               Document Type: {document_type}
             </h3>
-            <p className="text-sm text-primary-700">
+            <p className="text-sm text-emerald-700">
               Confidence: <span className="font-medium">{confidence.toUpperCase()}</span>
             </p>
           </div>
@@ -428,7 +428,7 @@ export const ExtractionPreview = ({ result, filename, pdfPath, onUploadAnother }
       <div className="flex space-x-4">
         <button
           onClick={() => setIsModalOpen(true)}
-          className="flex-1 py-3 px-4 rounded-lg font-medium transition-colors bg-primary-600 text-white hover:bg-primary-700"
+          className="flex-1 py-3 px-4 rounded-lg font-semibold transition-all duration-200 bg-emerald-500 text-white hover:bg-emerald-600 shadow-md shadow-emerald-500/25"
         >
           Save to Folder
         </button>

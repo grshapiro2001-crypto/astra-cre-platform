@@ -67,15 +67,15 @@ export const PDFUploader = ({ onUploadComplete }: PDFUploaderProps) => {
       {/* Dropzone */}
       <div
         {...getRootProps()}
-        className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors
-          ${isDragActive ? 'border-primary-500 bg-primary-50' : 'border-gray-300 hover:border-primary-400'}
+        className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors
+          ${isDragActive ? 'border-emerald-500 bg-emerald-50' : 'border-emerald-300 hover:border-emerald-400'}
           ${isUploading ? 'pointer-events-none opacity-50' : ''}`}
       >
         <input {...getInputProps()} />
         <div className="space-y-2">
           {/* PDF Icon */}
           <svg
-            className="mx-auto h-12 w-12 text-gray-400"
+            className="mx-auto h-12 w-12 text-emerald-400"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -87,19 +87,19 @@ export const PDFUploader = ({ onUploadComplete }: PDFUploaderProps) => {
               d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
             />
           </svg>
-          <p className="text-lg text-gray-600">
+          <p className="text-lg text-emerald-700">
             {isDragActive ? 'Drop PDF here' : 'Drag & drop PDF here, or click to browse'}
           </p>
-          <p className="text-sm text-gray-500">Only PDF files up to 25MB</p>
+          <p className="text-sm text-emerald-500">Only PDF files up to 25MB</p>
         </div>
       </div>
 
       {/* Selected File Display */}
       {selectedFile && (
-        <div className="flex items-center justify-between bg-blue-50 p-4 rounded-lg">
+        <div className="flex items-center justify-between bg-emerald-50 p-4 rounded-xl border border-emerald-200">
           <div className="flex items-center space-x-3">
             <svg
-              className="h-8 w-8 text-blue-600"
+              className="h-8 w-8 text-emerald-600"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -112,8 +112,8 @@ export const PDFUploader = ({ onUploadComplete }: PDFUploaderProps) => {
               />
             </svg>
             <div>
-              <p className="font-medium text-gray-900">{selectedFile.name}</p>
-              <p className="text-sm text-gray-500">
+              <p className="font-medium text-emerald-900">{selectedFile.name}</p>
+              <p className="text-sm text-emerald-600">
                 {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
               </p>
             </div>
@@ -155,11 +155,11 @@ export const PDFUploader = ({ onUploadComplete }: PDFUploaderProps) => {
       <button
         onClick={handleAnalyze}
         disabled={!selectedFile || isUploading}
-        className={`w-full py-3 px-4 rounded-lg font-medium transition-colors
+        className={`w-full py-3 px-4 rounded-lg font-semibold transition-all duration-200
           ${
             !selectedFile || isUploading
-              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-              : 'bg-primary-600 text-white hover:bg-primary-700'
+              ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+              : 'bg-emerald-500 text-white hover:bg-emerald-600 active:bg-emerald-700 shadow-md shadow-emerald-500/25'
           }`}
       >
         {isUploading ? (

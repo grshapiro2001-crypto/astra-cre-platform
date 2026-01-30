@@ -4,7 +4,7 @@ import { Sidebar } from './Sidebar';
 
 export const MainLayout = () => {
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-emerald-50/30">
       <Header />
       <div className="flex">
         <Sidebar />

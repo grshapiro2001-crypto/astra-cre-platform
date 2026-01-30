@@ -151,7 +151,7 @@ export const FolderDetail = () => {
       <div className="mb-6">
         <Link
           to="/library"
-          className="inline-flex items-center text-sm font-medium text-primary-600 hover:text-primary-700 mb-4"
+          className="inline-flex items-center text-sm font-medium text-emerald-600 hover:text-emerald-700 mb-4"
         >
           <svg className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
