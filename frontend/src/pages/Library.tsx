@@ -1,417 +1,968 @@
 /**
- * Library Page - Shows deal folders in grid layout
- * Phase 3A Priority 2
+ * Library Page - Deal Pipeline Command Center
+ * Shows property deal cards in grid/list layout with filtering, search, sort, and batch comparison.
+ * Integrates with real API via propertyService and dealFolderService.
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { dealFolderService, type DealFolder } from '../services/dealFolderService';
-import { propertyService, type PropertyListItem } from '../services/propertyService';
-import { CreateFolderModal } from '../components/library/CreateFolderModal';
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import {
+  Search,
+  Plus,
+  LayoutGrid,
+  List,
+  ArrowUpDown,
+  ChevronDown,
+  Check,
+  MapPin,
+  Building2,
+  BarChart3,
+  Upload,
+  FolderPlus,
+  X,
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { propertyService } from '@/services/propertyService';
+import { dealFolderService, type DealFolder } from '@/services/dealFolderService';
+import type { PropertyListItem } from '@/types/property';
+import { CreateFolderModal } from '@/components/library/CreateFolderModal';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+/** Extended property type including financial fields the backend returns */
+interface PropertyWithFinancials extends PropertyListItem {
+  t12_noi?: number | null;
+  y1_noi?: number | null;
+  t3_noi?: number | null;
+  total_sf?: number | null;
+  status?: string;
+}
+
+type DealStatus = 'all' | 'active' | 'new' | 'review' | 'passed' | 'closed';
+type ViewMode = 'grid' | 'list';
+type SortOption = 'dateAdded' | 'name' | 'noi' | 'capRate';
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+const STATUS_CONFIG: Record<
+  string,
+  { label: string; badgeClass: string; dotClass: string }
+> = {
+  new: {
+    label: 'NEW',
+    badgeClass:
+      'bg-blue-500/10 text-blue-600 dark:bg-blue-500/15 dark:text-blue-400',
+    dotClass: 'bg-blue-500',
+  },
+  active: {
+    label: 'ACTIVE',
+    badgeClass:
+      'bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400',
+    dotClass: 'bg-emerald-500',
+  },
+  review: {
+    label: 'REVIEW',
+    badgeClass:
+      'bg-amber-500/10 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400',
+    dotClass: 'bg-amber-500',
+  },
+  passed: {
+    label: 'PASSED',
+    badgeClass:
+      'bg-slate-500/10 text-slate-500 dark:bg-slate-500/15 dark:text-slate-400',
+    dotClass: 'bg-slate-400',
+  },
+  closed: {
+    label: 'CLOSED',
+    badgeClass:
+      'bg-purple-500/10 text-purple-600 dark:bg-purple-500/15 dark:text-purple-400',
+    dotClass: 'bg-purple-500',
+  },
+};
+
+const SORT_OPTIONS: { id: SortOption; label: string }[] = [
+  { id: 'dateAdded', label: 'Most Recent' },
+  { id: 'name', label: 'Name (A-Z)' },
+  { id: 'noi', label: 'Highest NOI' },
+  { id: 'capRate', label: 'Cap Rate' },
+];
+
+const FILTER_TABS: { id: DealStatus; label: string }[] = [
+  { id: 'all', label: 'All Deals' },
+  { id: 'active', label: 'Active' },
+  { id: 'new', label: 'New' },
+  { id: 'review', label: 'In Review' },
+  { id: 'passed', label: 'Passed' },
+];
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function formatPrice(num: number | null | undefined): string {
+  if (!num) return '\u2014';
+  if (num >= 1_000_000) return `$${(num / 1_000_000).toFixed(1)}M`;
+  if (num >= 1_000) return `$${(num / 1_000).toFixed(0)}K`;
+  return `$${num.toLocaleString()}`;
+}
+
+function formatDate(dateString?: string): string {
+  if (!dateString) return 'N/A';
+  return new Date(dateString).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
 
 export const Library = () => {
   const navigate = useNavigate();
 
-  // State
+  // ---- Data state ----
+  const [properties, setProperties] = useState<PropertyWithFinancials[]>([]);
   const [folders, setFolders] = useState<DealFolder[]>([]);
-  const [properties, setProperties] = useState<PropertyListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // ---- UI state ----
+  const [viewMode, setViewMode] = useState<ViewMode>('grid');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchFocused, setSearchFocused] = useState(false);
+  const [selectedFilter, setSelectedFilter] = useState<DealStatus>('all');
+  const [selectedPropertyIds, setSelectedPropertyIds] = useState<number[]>([]);
+  const [hoveredDealId, setHoveredDealId] = useState<number | null>(null);
+  const [sortBy, setSortBy] = useState<SortOption>('dateAdded');
+  const [showSortMenu, setShowSortMenu] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
-  // Comparison mode
-  const [comparisonMode, setComparisonMode] = useState(false);
-  const [selectedPropertyIds, setSelectedPropertyIds] = useState<number[]>([]);
-
-  // Fetch folders (NO LLM - just reads from database)
-  const fetchFolders = async () => {
+  // ---- Data fetching ----
+  const fetchData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
-
     try {
-      const result = await dealFolderService.listFolders('active');
-      setFolders(result);
-    } catch (err: any) {
-      const errorMessage = err.response?.data?.detail || 'Failed to load folders. Please try again.';
-      setError(errorMessage);
+      const [propertiesResult, foldersResult] = await Promise.all([
+        propertyService.listProperties({}),
+        dealFolderService.listFolders('active'),
+      ]);
+      setProperties(
+        propertiesResult.properties as PropertyWithFinancials[],
+      );
+      setFolders(foldersResult);
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : 'Failed to load data. Please try again.';
+      setError(message);
     } finally {
       setIsLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchFolders();
   }, []);
 
-  // Handle folder creation success
-  const handleFolderCreated = () => {
-    console.log('✅ Folder created, refreshing list');
-    fetchFolders();
-  };
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
-  // Fetch properties for comparison mode
-  const fetchProperties = async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const result = await propertyService.listProperties({});
-      setProperties(result.properties);
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to load properties');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  // ---- Folder status map ----
+  const folderStatusMap = useMemo(() => {
+    const map = new Map<number, string>();
+    folders.forEach((f) => map.set(f.id, f.status || 'active'));
+    return map;
+  }, [folders]);
 
-  // Toggle comparison mode
-  const toggleComparisonMode = () => {
-    const newMode = !comparisonMode;
-    setComparisonMode(newMode);
-    setSelectedPropertyIds([]);
-    if (newMode) {
-      fetchProperties();
-    } else {
-      fetchFolders();
-    }
-  };
-
-  // Toggle property selection
-  const togglePropertySelection = (propertyId: number) => {
-    setSelectedPropertyIds(prev => {
-      if (prev.includes(propertyId)) {
-        return prev.filter(id => id !== propertyId);
-      } else if (prev.length < 5) {
-        return [...prev, propertyId];
+  // Derive a status for each property based on its folder
+  const getPropertyStatus = useCallback(
+    (property: PropertyWithFinancials): string => {
+      if (property.status) return property.status;
+      if (property.deal_folder_id) {
+        return folderStatusMap.get(property.deal_folder_id) || 'active';
       }
-      return prev;
+      return 'active';
+    },
+    [folderStatusMap],
+  );
+
+  // ---- Filtering & sorting ----
+  const filteredProperties = useMemo(() => {
+    return properties
+      .filter((p) => {
+        // Status filter
+        if (selectedFilter !== 'all') {
+          const status = getPropertyStatus(p);
+          if (status !== selectedFilter) return false;
+        }
+        // Search filter
+        if (searchQuery) {
+          const q = searchQuery.toLowerCase();
+          return (
+            p.deal_name?.toLowerCase().includes(q) ||
+            p.property_name?.toLowerCase().includes(q) ||
+            p.property_address?.toLowerCase().includes(q) ||
+            p.submarket?.toLowerCase().includes(q) ||
+            p.property_type?.toLowerCase().includes(q)
+          );
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        switch (sortBy) {
+          case 'noi':
+            return (
+              (b.t12_noi ?? b.y1_noi ?? 0) - (a.t12_noi ?? a.y1_noi ?? 0)
+            );
+          case 'name':
+            return (a.deal_name || '').localeCompare(b.deal_name || '');
+          case 'capRate':
+          case 'dateAdded':
+          default:
+            return (
+              new Date(b.upload_date || 0).getTime() -
+              new Date(a.upload_date || 0).getTime()
+            );
+        }
+      });
+  }, [properties, selectedFilter, searchQuery, sortBy, getPropertyStatus]);
+
+  // ---- Pipeline stats ----
+  const pipelineStats = useMemo(
+    () => ({
+      totalDeals: properties.length,
+      totalUnits: properties.reduce(
+        (sum, p) => sum + (p.total_units || 0),
+        0,
+      ),
+      activeDeals: properties.filter(
+        (p) => getPropertyStatus(p) === 'active',
+      ).length,
+    }),
+    [properties, getPropertyStatus],
+  );
+
+  // ---- Status counts for filter badges ----
+  const statusCounts = useMemo(() => {
+    const counts: Record<string, number> = { all: properties.length };
+    properties.forEach((p) => {
+      const s = getPropertyStatus(p);
+      counts[s] = (counts[s] || 0) + 1;
     });
+    return counts;
+  }, [properties, getPropertyStatus]);
+
+  // ---- Selection helpers ----
+  const togglePropertySelection = (propertyId: number) => {
+    setSelectedPropertyIds((prev) =>
+      prev.includes(propertyId)
+        ? prev.filter((id) => id !== propertyId)
+        : prev.length < 5
+          ? [...prev, propertyId]
+          : prev,
+    );
   };
 
-  // Handle compare
   const handleCompare = () => {
     if (selectedPropertyIds.length >= 2) {
       navigate(`/compare?ids=${selectedPropertyIds.join(',')}`);
     }
   };
 
-  const formatDate = (dateString?: string): string => {
-    if (!dateString) return 'N/A';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+  const handleFolderCreated = () => {
+    fetchData();
   };
 
+  // ---------- Render ----------
   return (
-    <div>
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-emerald-900">
-            {comparisonMode ? 'Select Properties to Compare' : 'Deal Folders'}
-          </h1>
-          <p className="mt-1 text-sm text-emerald-600">
-            {comparisonMode ? `${selectedPropertyIds.length} selected (max 5)` : 'Organize your properties by deal'}
-          </p>
-        </div>
-        <div className="flex space-x-3">
-          {!comparisonMode ? (
-            <>
-              <Button
-                variant="outline"
-                onClick={toggleComparisonMode}
+    <div className="min-h-full -m-4 lg:-m-6">
+      {/* ================================================================ */}
+      {/* STICKY HEADER / TOOLBAR                                          */}
+      {/* ================================================================ */}
+      <div className="sticky top-16 z-20 bg-background/85 backdrop-blur-xl border-b border-border">
+        <div className="px-6 lg:px-8 py-5">
+          {/* Top row: title + actions */}
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+            {/* Title block */}
+            <div>
+              <h1 className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+                Deal Library
+              </h1>
+              <p className="mt-1 text-sm text-muted-foreground">
+                <span className="font-mono text-primary">
+                  {filteredProperties.length}
+                </span>{' '}
+                deals
+                {pipelineStats.totalUnits > 0 && (
+                  <>
+                    {' \u00b7 '}
+                    <span className="font-mono">
+                      {pipelineStats.totalUnits.toLocaleString()}
+                    </span>{' '}
+                    units
+                  </>
+                )}
+              </p>
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex items-center gap-3 flex-wrap">
+              {/* Search */}
+              <div
+                className={cn(
+                  'relative transition-all duration-300',
+                  searchFocused ? 'w-full sm:w-[300px]' : 'w-full sm:w-[220px]',
+                )}
               >
-                Compare Properties
-              </Button>
-              <Button
-                variant="outline"
+                <input
+                  type="text"
+                  placeholder="Search deals..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onFocus={() => setSearchFocused(true)}
+                  onBlur={() => setSearchFocused(false)}
+                  className={cn(
+                    'w-full py-2.5 pl-10 pr-4 rounded-xl text-sm outline-none transition-all duration-300',
+                    'bg-card border text-foreground placeholder:text-muted-foreground',
+                    searchFocused ? 'border-primary/40 ring-1 ring-primary/20' : 'border-border',
+                  )}
+                />
+                <Search
+                  className={cn(
+                    'w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 transition-colors',
+                    searchFocused ? 'text-primary' : 'text-muted-foreground',
+                  )}
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Compare button (appears when 2+ selected) */}
+              <div
+                className={cn(
+                  'transition-all duration-300 overflow-hidden',
+                  selectedPropertyIds.length >= 2
+                    ? 'max-w-[200px] opacity-100'
+                    : 'max-w-0 opacity-0',
+                )}
+              >
+                <button
+                  onClick={handleCompare}
+                  className="px-5 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2 whitespace-nowrap text-white bg-gradient-to-r from-emerald-500 to-emerald-600 shadow-lg shadow-emerald-500/20 transition-all duration-300 hover:shadow-emerald-500/30"
+                >
+                  <BarChart3 className="w-4 h-4" />
+                  Compare ({selectedPropertyIds.length})
+                </button>
+              </div>
+
+              {/* New Folder */}
+              <button
                 onClick={() => setIsCreateModalOpen(true)}
+                className="px-4 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2 whitespace-nowrap border border-border bg-card text-foreground hover:bg-accent transition-all duration-200"
               >
-                + New Deal Folder
-              </Button>
-              <Button asChild>
-                <Link to="/upload">
-                  + Upload Document
-                </Link>
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button
-                onClick={handleCompare}
-                disabled={selectedPropertyIds.length < 2}
+                <FolderPlus className="w-4 h-4" />
+                <span className="hidden sm:inline">New Folder</span>
+              </button>
+
+              {/* Upload */}
+              <Link
+                to="/upload"
+                className="px-4 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2 whitespace-nowrap text-white bg-gradient-to-r from-primary to-violet-700 dark:from-violet-500 dark:to-purple-600 shadow-lg shadow-primary/20 transition-all duration-300"
               >
-                Compare Selected
-              </Button>
-              <Button
-                variant="outline"
-                onClick={toggleComparisonMode}
-              >
-                Cancel
-              </Button>
-            </>
-          )}
+                <Plus className="w-4 h-4" />
+                <span className="hidden sm:inline">New Deal</span>
+              </Link>
+            </div>
+          </div>
+
+          {/* Toolbar row */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mt-5">
+            <div className="flex items-center gap-3 flex-wrap">
+              {/* Filter tabs */}
+              <div className="flex items-center gap-0.5 rounded-lg bg-muted/50 p-1 overflow-x-auto">
+                {FILTER_TABS.map((filter) => (
+                  <button
+                    key={filter.id}
+                    onClick={() => setSelectedFilter(filter.id)}
+                    className={cn(
+                      'px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-all duration-200 whitespace-nowrap',
+                      selectedFilter === filter.id
+                        ? 'bg-background text-foreground shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground',
+                    )}
+                  >
+                    {filter.label}
+                    <span className="ml-1 font-mono text-[10px] text-muted-foreground">
+                      {statusCounts[filter.id] ?? 0}
+                    </span>
+                  </button>
+                ))}
+              </div>
+
+              {/* View mode toggle */}
+              <div className="flex items-center rounded-lg bg-muted/50 p-1">
+                <button
+                  onClick={() => setViewMode('grid')}
+                  className={cn(
+                    'p-2 rounded-md transition-all duration-200',
+                    viewMode === 'grid'
+                      ? 'bg-primary/10 text-primary'
+                      : 'text-muted-foreground hover:text-foreground',
+                  )}
+                  title="Grid view"
+                >
+                  <LayoutGrid className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={cn(
+                    'p-2 rounded-md transition-all duration-200',
+                    viewMode === 'list'
+                      ? 'bg-primary/10 text-primary'
+                      : 'text-muted-foreground hover:text-foreground',
+                  )}
+                  title="List view"
+                >
+                  <List className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Sort dropdown */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowSortMenu((v) => !v)}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50 text-sm text-muted-foreground hover:text-foreground transition-all duration-200"
+                >
+                  <ArrowUpDown className="w-4 h-4" />
+                  <span className="hidden sm:inline">
+                    Sort:{' '}
+                    {SORT_OPTIONS.find((o) => o.id === sortBy)?.label}
+                  </span>
+                  <ChevronDown
+                    className={cn(
+                      'w-3.5 h-3.5 transition-transform duration-200',
+                      showSortMenu && 'rotate-180',
+                    )}
+                  />
+                </button>
+
+                {showSortMenu && (
+                  <div className="absolute top-full left-0 mt-2 w-44 rounded-xl overflow-hidden z-50 bg-card border border-border shadow-xl">
+                    {SORT_OPTIONS.map((option) => (
+                      <button
+                        key={option.id}
+                        onClick={() => {
+                          setSortBy(option.id);
+                          setShowSortMenu(false);
+                        }}
+                        className={cn(
+                          'w-full px-4 py-2.5 text-left text-sm transition-colors duration-150',
+                          sortBy === option.id
+                            ? 'bg-primary/10 text-primary'
+                            : 'text-foreground hover:bg-muted',
+                        )}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Selection info */}
+            {selectedPropertyIds.length > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">
+                  {selectedPropertyIds.length} selected
+                  <span className="text-xs ml-1">(max 5)</span>
+                </span>
+                <button
+                  onClick={() => setSelectedPropertyIds([])}
+                  className="text-sm font-medium text-primary hover:text-primary/80 transition-colors"
+                >
+                  Clear
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Error Message */}
-      {error && (
-        <Alert variant="destructive" className="mb-6">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
+      {/* ================================================================ */}
+      {/* MAIN CONTENT                                                     */}
+      {/* ================================================================ */}
+      <div className="p-6 lg:p-8">
+        {/* Error banner */}
+        {error && (
+          <Alert variant="destructive" className="mb-6">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
 
-      {/* Loading State */}
-      {isLoading && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[...Array(6)].map((_, i) => (
-            <Card key={i}>
-              <CardHeader>
-                <Skeleton className="h-6 w-3/4 mb-2" />
-                <Skeleton className="h-4 w-1/2" />
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Skeleton className="h-4 w-full" />
-                <Skeleton className="h-4 w-2/3" />
-                <Skeleton className="h-4 w-1/2" />
-              </CardContent>
-              <CardFooter className="justify-between">
-                <Skeleton className="h-4 w-24" />
-                <Skeleton className="h-4 w-20" />
-              </CardFooter>
-            </Card>
-          ))}
-        </div>
-      )}
-
-      {/* Empty State */}
-      {!isLoading && folders.length === 0 && !error && (
-        <Card className="p-12">
-          <div className="text-center">
-            <svg
-              className="mx-auto h-12 w-12 text-muted-foreground"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
-              />
-            </svg>
-            <h3 className="mt-4 text-lg font-semibold">No deal folders yet</h3>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Get started by uploading your first property document
-            </p>
-            <Button asChild className="mt-6">
-              <Link to="/upload">
-                Upload Document
-              </Link>
-            </Button>
+        {/* Loading skeleton */}
+        {isLoading && (
+          <div
+            className={cn(
+              viewMode === 'grid'
+                ? 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-5'
+                : 'space-y-3',
+            )}
+          >
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div
+                key={i}
+                className="border border-border rounded-2xl bg-card overflow-hidden"
+              >
+                <Skeleton className="h-32 w-full" />
+                <div className="p-4 space-y-3">
+                  <Skeleton className="h-5 w-3/4" />
+                  <Skeleton className="h-4 w-1/2" />
+                  <div className="flex gap-2">
+                    <Skeleton className="h-4 w-16" />
+                    <Skeleton className="h-4 w-16" />
+                    <Skeleton className="h-4 w-16" />
+                  </div>
+                  <Skeleton className="h-4 w-full" />
+                </div>
+              </div>
+            ))}
           </div>
-        </Card>
-      )}
+        )}
 
-      {/* Folder Grid */}
-      {!isLoading && !comparisonMode && folders.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {folders.map((folder) => (
-            <Link key={folder.id} to={`/folders/${folder.id}`}>
-              <Card className="hover:shadow-lg transition-all cursor-pointer hover:border-primary">
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <svg
-                        className="h-8 w-8 text-primary flex-shrink-0"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
+        {/* ============================================================ */}
+        {/* GRID VIEW                                                     */}
+        {/* ============================================================ */}
+        {!isLoading && viewMode === 'grid' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-5">
+            {filteredProperties.map((property) => {
+              const isSelected = selectedPropertyIds.includes(property.id);
+              const isHovered = hoveredDealId === property.id;
+              const status = getPropertyStatus(property);
+              const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.active;
+              const displayName =
+                property.property_name || property.deal_name;
+
+              return (
+                <div
+                  key={property.id}
+                  className="relative group"
+                  onMouseEnter={() => setHoveredDealId(property.id)}
+                  onMouseLeave={() => setHoveredDealId(null)}
+                >
+                  {/* Hover glow */}
+                  <div className="absolute -inset-1.5 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-primary/5 dark:bg-primary/10 blur-xl pointer-events-none" />
+
+                  {/* Card */}
+                  <div
+                    className={cn(
+                      'relative rounded-2xl overflow-hidden transition-all duration-300 cursor-pointer',
+                      'border bg-card',
+                      isSelected
+                        ? 'border-primary ring-2 ring-primary/30'
+                        : isHovered
+                          ? 'border-primary/30 shadow-lg shadow-primary/5 -translate-y-1'
+                          : 'border-border',
+                    )}
+                  >
+                    {/* Top gradient area */}
+                    <div className="relative h-32 bg-gradient-to-br from-primary/20 via-primary/10 to-accent/20 dark:from-primary/10 dark:via-primary/5 dark:to-accent/10 overflow-hidden">
+                      {/* Decorative pattern */}
+                      <div className="absolute inset-0 opacity-[0.04] dark:opacity-[0.06]">
+                        <div className="absolute top-4 right-4 w-24 h-24 border border-current rounded-full" />
+                        <div className="absolute top-8 right-8 w-16 h-16 border border-current rounded-full" />
+                        <div className="absolute -bottom-4 -left-4 w-20 h-20 border border-current rounded-full" />
+                      </div>
+
+                      {/* Checkbox */}
+                      <button
+                        className="absolute top-3 left-3 z-10"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          togglePropertySelection(property.id);
+                        }}
+                        aria-label={
+                          isSelected
+                            ? 'Deselect property'
+                            : 'Select property'
+                        }
                       >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
-                        />
-                      </svg>
-                      <div className="flex-1 min-w-0">
-                        <CardTitle className="truncate">{folder.folder_name}</CardTitle>
-                        {folder.property_type && (
-                          <CardDescription className="mt-1">{folder.property_type}</CardDescription>
-                        )}
+                        <div
+                          className={cn(
+                            'w-6 h-6 rounded-lg flex items-center justify-center transition-all duration-200 border',
+                            isSelected
+                              ? 'bg-primary border-primary'
+                              : 'bg-background/80 dark:bg-background/50 backdrop-blur-sm border-border hover:border-primary/40',
+                          )}
+                        >
+                          {isSelected && (
+                            <Check className="w-3.5 h-3.5 text-white" />
+                          )}
+                        </div>
+                      </button>
+
+                      {/* Status badge */}
+                      <div className="absolute top-3 right-3 z-10">
+                        <span
+                          className={cn(
+                            'px-2.5 py-1 rounded-lg text-[10px] font-bold tracking-wider',
+                            cfg.badgeClass,
+                          )}
+                        >
+                          {cfg.label}
+                        </span>
+                      </div>
+
+                      {/* Property type label */}
+                      <div className="absolute bottom-3 left-3">
+                        <span className="text-[10px] font-bold tracking-[0.15em] text-primary dark:text-primary uppercase">
+                          {(
+                            property.property_type ||
+                            property.document_type ||
+                            'PROPERTY'
+                          ).toUpperCase()}
+                        </span>
+                      </div>
+
+                      {/* Document type indicator */}
+                      <div className="absolute bottom-3 right-3">
+                        <div className="px-2.5 py-1 rounded-lg bg-background/80 dark:bg-background/50 backdrop-blur-sm border border-border/50">
+                          <span className="font-mono text-[11px] font-semibold text-foreground">
+                            {property.document_type || '\u2014'}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                    {folder.status && folder.status !== 'active' && (
-                      <Badge variant="secondary" className="ml-2">{folder.status}</Badge>
-                    )}
+
+                    {/* Card body */}
+                    <div
+                      className="p-4 pt-3"
+                      onClick={() =>
+                        navigate(`/library/${property.id}`)
+                      }
+                    >
+                      {/* Title */}
+                      <h3
+                        className={cn(
+                          'font-display text-lg font-bold tracking-tight transition-colors duration-200 line-clamp-1',
+                          isHovered
+                            ? 'text-primary'
+                            : 'text-foreground',
+                        )}
+                      >
+                        {displayName}
+                      </h3>
+
+                      {/* Location */}
+                      {(property.submarket ||
+                        property.property_address) && (
+                        <p className="text-sm mt-1 flex items-center gap-1.5 text-muted-foreground">
+                          <MapPin className="w-3.5 h-3.5 shrink-0" />
+                          <span className="truncate">
+                            {[property.submarket, property.property_address]
+                              .filter(Boolean)
+                              .join(' \u00b7 ')}
+                          </span>
+                        </p>
+                      )}
+
+                      {/* Tags */}
+                      <div className="flex gap-1.5 mt-3 flex-wrap">
+                        {property.document_subtype && (
+                          <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                            {property.document_subtype}
+                          </span>
+                        )}
+                        {property.property_type && (
+                          <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                            {property.property_type}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Key metrics */}
+                      <div className="grid grid-cols-3 gap-3 mt-4 pt-4 border-t border-border">
+                        <div>
+                          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                            Units
+                          </p>
+                          <p className="font-mono text-sm font-semibold mt-0.5 text-foreground">
+                            {property.total_units?.toLocaleString() ||
+                              '\u2014'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                            T12 NOI
+                          </p>
+                          <p className="font-mono text-sm font-semibold mt-0.5 text-emerald-600 dark:text-emerald-400">
+                            {formatPrice(property.t12_noi)}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                            Y1 NOI
+                          </p>
+                          <p className="font-mono text-sm font-semibold mt-0.5 text-foreground">
+                            {formatPrice(property.y1_noi)}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Footer */}
+                      <div className="flex items-center justify-between mt-4 pt-4 border-t border-border">
+                        <p className="text-xs text-muted-foreground">
+                          Added {formatDate(property.upload_date)}
+                        </p>
+                        {property.deal_folder_id && (
+                          <span className="text-xs text-muted-foreground flex items-center gap-1">
+                            <Building2 className="w-3 h-3" />
+                            Folder
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Hover CTA */}
+                      <div
+                        className={cn(
+                          'overflow-hidden transition-all duration-200',
+                          isHovered
+                            ? 'max-h-14 opacity-100 mt-3'
+                            : 'max-h-0 opacity-0',
+                        )}
+                      >
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/library/${property.id}`);
+                          }}
+                          className="w-full py-2.5 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-primary to-violet-700 dark:from-violet-500 dark:to-purple-600 transition-all duration-200 hover:opacity-90"
+                        >
+                          View Analysis &rarr;
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                </CardHeader>
+                </div>
+              );
+            })}
 
-                <CardContent className="space-y-2">
-                  {folder.property_address && (
-                    <div className="flex items-start text-sm text-muted-foreground">
-                      <svg className="h-4 w-4 mr-2 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
-                      <span className="truncate">{folder.property_address}</span>
-                    </div>
-                  )}
-
-                  {folder.submarket && (
-                    <div className="flex items-center text-sm text-muted-foreground">
-                      <svg className="h-4 w-4 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-                      </svg>
-                      <span className="truncate">{folder.submarket}</span>
-                    </div>
-                  )}
-
-                  {folder.total_units && (
-                    <div className="flex items-center text-sm text-muted-foreground">
-                      <svg className="h-4 w-4 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                      </svg>
-                      <span>{folder.total_units.toLocaleString()} units</span>
-                    </div>
-                  )}
-                </CardContent>
-
-                <CardFooter className="flex justify-between text-sm text-muted-foreground">
-                  <div className="flex items-center">
-                    <svg className="h-4 w-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    <span>{folder.document_count} {folder.document_count === 1 ? 'doc' : 'docs'}</span>
-                  </div>
-                  <span className="text-xs">{formatDate(folder.last_updated)}</span>
-                </CardFooter>
-              </Card>
+            {/* Add New Deal card */}
+            <Link
+              to="/upload"
+              className={cn(
+                'min-h-[380px] rounded-2xl border-2 border-dashed border-border',
+                'flex flex-col items-center justify-center cursor-pointer',
+                'transition-all duration-300 group',
+                'hover:border-primary/30 hover:bg-primary/5 dark:hover:bg-primary/5',
+              )}
+            >
+              <div className="w-16 h-16 rounded-2xl bg-muted border border-border flex items-center justify-center mb-4 transition-transform duration-300 group-hover:scale-110">
+                <Upload className="w-7 h-7 text-muted-foreground" />
+              </div>
+              <p className="font-display text-lg font-semibold text-foreground">
+                Add New Deal
+              </p>
+              <p className="text-sm mt-1 text-muted-foreground">
+                Upload an OM or create manually
+              </p>
             </Link>
-          ))}
-        </div>
-      )}
+          </div>
+        )}
 
-      {/* Property List (Comparison Mode) */}
-      {!isLoading && comparisonMode && properties.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {properties.map((property) => {
-            const isSelected = selectedPropertyIds.includes(property.id);
-            const isMaxSelected = selectedPropertyIds.length >= 5;
-            const isDisabled = !isSelected && isMaxSelected;
+        {/* ============================================================ */}
+        {/* LIST VIEW                                                     */}
+        {/* ============================================================ */}
+        {!isLoading && viewMode === 'list' && filteredProperties.length > 0 && (
+          <div className="border border-border rounded-2xl bg-card overflow-hidden">
+            {/* Table header */}
+            <div
+              className="grid items-center px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground bg-muted/50 border-b border-border"
+              style={{
+                gridTemplateColumns:
+                  '40px 2fr 1.2fr 90px 100px 100px 90px 110px',
+              }}
+            >
+              <div />
+              <div>Property</div>
+              <div>Location</div>
+              <div className="text-right">Units</div>
+              <div className="text-right">T12 NOI</div>
+              <div className="text-right">Y1 NOI</div>
+              <div className="text-center">Type</div>
+              <div className="text-center">Status</div>
+            </div>
 
-            return (
-              <Card
-                key={property.id}
-                className={`transition-all cursor-pointer ${
-                  isSelected
-                    ? 'border-primary bg-primary/5'
-                    : isDisabled
-                    ? 'opacity-50 cursor-not-allowed'
-                    : 'hover:border-primary/50 hover:shadow-md'
-                }`}
-                onClick={() => !isDisabled && togglePropertySelection(property.id)}
-              >
-                <CardHeader>
-                  <div className="flex items-start space-x-3">
-                    <Checkbox
-                      checked={isSelected}
-                      disabled={isDisabled}
-                      onCheckedChange={() => togglePropertySelection(property.id)}
-                      onClick={(e) => e.stopPropagation()}
-                      className="mt-1"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <CardTitle className="text-lg truncate">
-                        {property.property_name}
-                      </CardTitle>
-                      <CardDescription className="mt-1">
-                        {property.document_type}
-                        {property.property_type && ` • ${property.property_type}`}
-                      </CardDescription>
+            {/* Table rows */}
+            {filteredProperties.map((property, index) => {
+              const isSelected = selectedPropertyIds.includes(property.id);
+              const isHovered = hoveredDealId === property.id;
+              const status = getPropertyStatus(property);
+              const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.active;
+              const displayName =
+                property.property_name || property.deal_name;
+
+              return (
+                <div
+                  key={property.id}
+                  className={cn(
+                    'grid items-center px-4 py-3.5 cursor-pointer transition-colors duration-150 border-b border-border last:border-b-0',
+                    isHovered
+                      ? 'bg-accent/50'
+                      : index % 2 === 0
+                        ? 'bg-transparent'
+                        : 'bg-muted/20',
+                  )}
+                  style={{
+                    gridTemplateColumns:
+                      '40px 2fr 1.2fr 90px 100px 100px 90px 110px',
+                  }}
+                  onMouseEnter={() => setHoveredDealId(property.id)}
+                  onMouseLeave={() => setHoveredDealId(null)}
+                  onClick={() => navigate(`/library/${property.id}`)}
+                >
+                  {/* Checkbox */}
+                  <div
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      togglePropertySelection(property.id);
+                    }}
+                  >
+                    <div
+                      className={cn(
+                        'w-5 h-5 rounded-md flex items-center justify-center transition-all duration-200 border',
+                        isSelected
+                          ? 'bg-primary border-primary'
+                          : 'bg-transparent border-border hover:border-primary/40',
+                      )}
+                    >
+                      {isSelected && (
+                        <Check className="w-3 h-3 text-white" />
+                      )}
                     </div>
                   </div>
-                </CardHeader>
 
-                <CardContent className="space-y-2">
-                  {property.property_address && (
-                    <div className="flex items-start text-sm text-muted-foreground">
-                      <svg
-                        className="h-4 w-4 mr-2 mt-0.5 flex-shrink-0"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
-                        />
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
-                        />
-                      </svg>
-                      <span className="truncate">{property.property_address}</span>
+                  {/* Property name */}
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-primary/20 to-accent/20 dark:from-primary/10 dark:to-accent/10 flex items-center justify-center shrink-0">
+                      <Building2 className="w-4 h-4 text-primary" />
                     </div>
-                  )}
-
-                  {property.submarket && (
-                    <div className="flex items-center text-sm text-muted-foreground">
-                      <svg
-                        className="h-4 w-4 mr-2 flex-shrink-0"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
+                    <div className="min-w-0">
+                      <p
+                        className={cn(
+                          'font-semibold text-sm truncate transition-colors duration-200',
+                          isHovered
+                            ? 'text-primary'
+                            : 'text-foreground',
+                        )}
                       >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"
-                        />
-                      </svg>
-                      <span className="truncate">{property.submarket}</span>
+                        {displayName}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground truncate">
+                        {property.property_type ||
+                          property.document_type}
+                      </p>
                     </div>
-                  )}
+                  </div>
 
-                  {property.total_units && (
-                    <div className="flex items-center text-sm text-muted-foreground">
-                      <svg
-                        className="h-4 w-4 mr-2 flex-shrink-0"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
-                        />
-                      </svg>
-                      <span>{property.total_units.toLocaleString()} units</span>
-                    </div>
-                  )}
-                </CardContent>
+                  {/* Location */}
+                  <div className="min-w-0">
+                    <p className="text-sm text-foreground truncate">
+                      {property.property_address || '\u2014'}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground truncate">
+                      {property.submarket || ''}
+                    </p>
+                  </div>
 
-                {isSelected && (
-                  <CardFooter className="border-t border-primary/20">
-                    <span className="text-sm font-medium text-primary">✓ Selected</span>
-                  </CardFooter>
-                )}
-              </Card>
-            );
-          })}
-        </div>
+                  {/* Units */}
+                  <div className="text-right font-mono text-sm text-foreground">
+                    {property.total_units?.toLocaleString() || '\u2014'}
+                  </div>
+
+                  {/* T12 NOI */}
+                  <div className="text-right font-mono text-sm text-emerald-600 dark:text-emerald-400">
+                    {formatPrice(property.t12_noi)}
+                  </div>
+
+                  {/* Y1 NOI */}
+                  <div className="text-right font-mono text-sm text-foreground">
+                    {formatPrice(property.y1_noi)}
+                  </div>
+
+                  {/* Type */}
+                  <div className="flex justify-center">
+                    <span className="font-mono font-semibold text-[11px] px-2 py-0.5 rounded-md bg-muted text-muted-foreground">
+                      {property.document_type || '\u2014'}
+                    </span>
+                  </div>
+
+                  {/* Status */}
+                  <div className="flex justify-center">
+                    <span
+                      className={cn(
+                        'px-2.5 py-1 rounded-lg text-[10px] font-bold tracking-wider',
+                        cfg.badgeClass,
+                      )}
+                    >
+                      {cfg.label}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* ============================================================ */}
+        {/* EMPTY STATE                                                   */}
+        {/* ============================================================ */}
+        {!isLoading && filteredProperties.length === 0 && !error && (
+          <div className="text-center py-20">
+            <div className="w-20 h-20 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
+              <Search className="w-10 h-10 text-muted-foreground" />
+            </div>
+            <p className="text-lg font-display font-semibold text-foreground">
+              No deals found
+            </p>
+            <p className="text-sm mt-1 text-muted-foreground max-w-md mx-auto">
+              {searchQuery || selectedFilter !== 'all'
+                ? 'Try adjusting your search or filters'
+                : 'Get started by uploading your first property document'}
+            </p>
+            {!searchQuery && selectedFilter === 'all' && (
+              <Link
+                to="/upload"
+                className="inline-flex items-center gap-2 mt-6 px-5 py-3 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-primary to-violet-700 dark:from-violet-500 dark:to-purple-600 shadow-lg shadow-primary/20 transition-all duration-300"
+              >
+                <Upload className="w-4 h-4" />
+                Upload Document
+              </Link>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ================================================================ */}
+      {/* OVERLAYS                                                         */}
+      {/* ================================================================ */}
+
+      {/* Sort menu backdrop */}
+      {showSortMenu && (
+        <div
+          className="fixed inset-0 z-40"
+          onClick={() => setShowSortMenu(false)}
+        />
       )}
 
       {/* Create Folder Modal */}
