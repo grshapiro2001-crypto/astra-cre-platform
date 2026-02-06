@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import type { FinancialPeriodData } from '../../types/property';
+import type { FinancialPeriod } from '../../types/property';
 
 interface PricingAnalysisProps {
   financials_by_period: {
-    t12?: FinancialPeriodData | null;
-    t3?: FinancialPeriodData | null;
-    y1?: FinancialPeriodData | null;
+    t12?: FinancialPeriod | null;
+    t3?: FinancialPeriod | null;
+    y1?: FinancialPeriod | null;
   };
   initialPricingGuidance?: number;
 }

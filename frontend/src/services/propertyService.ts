@@ -3,6 +3,7 @@
  */
 import { api } from './api';
 import type { UploadResponse, PropertyDetail, PropertyListItem } from '../types/property';
+export type { PropertyDetail, PropertyListItem } from '../types/property';
 
 export const propertyService = {
   /**

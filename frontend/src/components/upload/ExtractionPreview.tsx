@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { SaveToFolderModal } from '../library/SaveToFolderModal';
 import { PricingAnalysis } from '../property/PricingAnalysis';
 import type { UploadResponse, FinancialPeriod, CalculatedMetrics } from '../../types/property';
@@ -32,21 +31,6 @@ const formatYear = (value?: number | null): string => {
 const formatPercentage = (value?: number | null): string => {
   if (value == null) return 'N/A';
   return `${value.toFixed(2)}%`;
-};
-
-const formatCurrencyInput = (value: string): string => {
-  // Remove all non-numeric characters
-  const numericValue = value.replace(/[^0-9]/g, '');
-  if (!numericValue) return '';
-
-  // Convert to number and format with commas
-  const num = parseInt(numericValue, 10);
-  return `$${num.toLocaleString('en-US')}`;
-};
-
-const parseCurrencyInput = (value: string): number | null => {
-  const numericValue = value.replace(/[^0-9]/g, '');
-  return numericValue ? parseInt(numericValue, 10) : null;
 };
 
 // ==================== METRIC CARD COMPONENT ====================
@@ -213,7 +197,6 @@ const FinancialPeriodSection = ({
 // ==================== MAIN COMPONENT ====================
 
 export const ExtractionPreview = ({ result, filename, pdfPath, onUploadAnother }: ExtractionPreviewProps) => {
-  const navigate = useNavigate();
   const { extraction_result } = result;
   const {
     document_type,
@@ -222,7 +205,6 @@ export const ExtractionPreview = ({ result, filename, pdfPath, onUploadAnother }
     average_rents,
     financials_by_period,
     calculated_metrics,
-    bov_specific,
     source_notes,
     missing_fields
   } = extraction_result;
@@ -378,21 +360,19 @@ export const ExtractionPreview = ({ result, filename, pdfPath, onUploadAnother }
         />
       )}
 
-      {/* BOV Specific Data */}
-      {document_type === 'BOV' && bov_specific && (
+      {/* BOV Pricing Tiers */}
+      {document_type === 'BOV' && extraction_result.bov_pricing_tiers && extraction_result.bov_pricing_tiers.length > 0 && (
         <div className="bg-white shadow rounded-lg p-6">
-          <h3 className="text-xl font-semibold mb-4 text-gray-900">BOV Specific</h3>
+          <h3 className="text-xl font-semibold mb-4 text-gray-900">BOV Pricing Tiers</h3>
           <div className="grid grid-cols-2 gap-4">
-            <MetricCard label="Cap Rate" value={bov_specific.cap_rate} format="percentage" />
-            {bov_specific.cap_rate_qualifier && (
-              <div className="border-b border-gray-200 pb-2">
-                <label className="text-sm font-medium text-gray-600">Cap Rate Qualifier</label>
-                <p className="text-lg text-gray-900">{bov_specific.cap_rate_qualifier}</p>
+            {extraction_result.bov_pricing_tiers.map((tier, i) => (
+              <div key={i} className="border rounded-lg p-4">
+                <h4 className="font-semibold text-gray-800 mb-2">{tier.tier_label || `Tier ${i + 1}`}</h4>
+                <MetricCard label="Pricing" value={tier.pricing} format="currency" isBold />
+                <MetricCard label="Price per Unit" value={tier.price_per_unit} format="currency" />
+                <MetricCard label="Price per SF" value={tier.price_per_sf} format="currency" />
               </div>
-            )}
-            <MetricCard label="Valuation" value={bov_specific.valuation} format="currency" isBold />
-            <MetricCard label="Price per Unit" value={bov_specific.price_per_unit} format="currency" />
-            <MetricCard label="Price per SF" value={bov_specific.price_per_sf} format="currency" />
+            ))}
           </div>
         </div>
       )}

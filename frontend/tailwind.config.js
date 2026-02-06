@@ -56,20 +56,12 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        // Emerald Forest - use Tailwind's built-in emerald palette (no override needed)
-        // Custom forest palette with direct hex values
-        forest: {
-          50: "#f0fdf6",
-          100: "#dcfce8",
-          200: "#bbf7d1",
-          300: "#86efad",
-          400: "#4ade7f",
-          500: "#22c55e",
-          600: "#16a34a",
-          700: "#15803c",
-          800: "#166534",
-          900: "#14532d",
-          950: "#052e16",
+        sidebar: {
+          bg: "hsl(var(--sidebar-bg))",
+          hover: "hsl(var(--sidebar-hover))",
+          border: "hsl(var(--sidebar-border))",
+          foreground: "hsl(var(--sidebar-foreground))",
+          muted: "hsl(var(--sidebar-muted))",
         },
       },
       borderRadius: {
@@ -77,17 +69,9 @@ export default {
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
-      boxShadow: {
-        "forest-sm": "0 1px 2px 0 rgba(5, 46, 22, 0.05)",
-        "forest": "0 1px 3px 0 rgba(5, 46, 22, 0.1), 0 1px 2px -1px rgba(5, 46, 22, 0.1)",
-        "forest-md": "0 4px 6px -1px rgba(5, 46, 22, 0.1), 0 2px 4px -2px rgba(5, 46, 22, 0.1)",
-        "forest-lg": "0 10px 15px -3px rgba(5, 46, 22, 0.1), 0 4px 6px -4px rgba(5, 46, 22, 0.1)",
-        "forest-xl": "0 20px 25px -5px rgba(5, 46, 22, 0.15), 0 8px 10px -6px rgba(5, 46, 22, 0.1)",
-        "forest-glow": "0 0 15px rgba(16, 185, 129, 0.2)",
-        "forest-inner": "inset 0 2px 4px 0 rgba(5, 46, 22, 0.05)",
-      },
       fontFamily: {
-        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+        sans: ['Instrument Sans', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+        display: ['Syne', 'sans-serif'],
         mono: ['JetBrains Mono', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
       },
       fontSize: {
@@ -114,6 +98,10 @@ export default {
           "0%": { backgroundPosition: "-200% 0" },
           "100%": { backgroundPosition: "200% 0" },
         },
+        "float": {
+          "0%, 100%": { transform: "translateY(0) scale(1)" },
+          "50%": { transform: "translateY(-20px) scale(1.05)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -121,6 +109,8 @@ export default {
         "fade-in": "fade-in 0.2s ease-out",
         "scale-in": "scale-in 0.15s ease-out",
         "shimmer": "shimmer 2s linear infinite",
+        "float": "float 6s ease-in-out infinite",
+        "float-slow": "float 8s ease-in-out infinite",
       },
     },
   },

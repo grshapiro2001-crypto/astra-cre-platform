@@ -115,3 +115,55 @@ export interface UploadResponse {
   file_path: string;
   extraction_result: ExtractionResult;
 }
+
+/** Alias for backwards compatibility */
+export type FinancialPeriodData = FinancialPeriod;
+
+/** Property detail as returned from the API */
+export interface PropertyDetail {
+  id: number;
+  deal_folder_id?: number | null;
+  deal_name: string;
+  uploaded_filename?: string;
+  document_type: string;
+  document_subtype?: string;
+  property_address?: string | null;
+  property_type?: string | null;
+  submarket?: string | null;
+  year_built?: number | null;
+  total_units?: number | null;
+  total_residential_sf?: number | null;
+  average_market_rent?: number | null;
+  average_inplace_rent?: number | null;
+  t12_financials?: FinancialPeriod | null;
+  t3_financials?: FinancialPeriod | null;
+  y1_financials?: FinancialPeriod | null;
+  calculated_metrics?: {
+    t12?: CalculatedMetrics;
+    t3?: CalculatedMetrics;
+    y1?: CalculatedMetrics;
+  };
+  bov_pricing_tiers?: BOVPricingTier[];
+  source_notes?: SourceNotes;
+  missing_fields?: string[];
+  upload_date?: string;
+  last_analyzed_at?: string;
+  analysis_count?: number;
+  raw_pdf_path?: string;
+  user_id?: string;
+}
+
+/** Property list item for library views */
+export interface PropertyListItem {
+  id: number;
+  deal_folder_id?: number | null;
+  deal_name: string;
+  property_name?: string;
+  document_type: string;
+  document_subtype?: string;
+  property_type?: string | null;
+  property_address?: string | null;
+  submarket?: string | null;
+  total_units?: number | null;
+  upload_date?: string;
+}

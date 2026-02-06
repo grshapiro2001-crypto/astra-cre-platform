@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { propertyService } from '../services/propertyService';
 import { PricingAnalysis } from '../components/property/PricingAnalysis';
 import { BOVPricingTiers } from '../components/property/BOVPricingTiers';
-import type { PropertyDetail as PropertyDetailType, FinancialPeriodData } from '../types/property';
+import type { PropertyDetail as PropertyDetailType } from '../types/property';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -315,11 +315,11 @@ export const PropertyDetail = () => {
         {/* Financials Tab */}
         <TabsContent value="financials" className="space-y-6">
           {/* Financials */}
-          {[
-            { key: 't12', data: property.t12_financials, label: 'T12' },
-            { key: 't3', data: property.t3_financials, label: 'T3' },
-            { key: 'y1', data: property.y1_financials, label: 'Y1' },
-          ].map(
+          {([
+            { key: 't12' as const, data: property.t12_financials, label: 'T12' },
+            { key: 't3' as const, data: property.t3_financials, label: 'T3' },
+            { key: 'y1' as const, data: property.y1_financials, label: 'Y1' },
+          ]).map(
             ({ key, data }) =>
               data && (
                 <Card key={key}>
@@ -358,10 +358,10 @@ export const PropertyDetail = () => {
                         <label className="text-sm font-medium text-muted-foreground">NOI</label>
                         <p className="text-lg font-bold">{formatCurrency(data.noi)}</p>
                       </div>
-                      {data.opex_ratio && (
+                      {property.calculated_metrics?.[key]?.opex_ratio != null && (
                         <div className="border-b pb-2">
                           <label className="text-sm font-medium text-muted-foreground">OpEx Ratio</label>
-                          <p className="text-lg font-medium">{formatPercentage(data.opex_ratio)}</p>
+                          <p className="text-lg font-medium">{formatPercentage(property.calculated_metrics[key]!.opex_ratio)}</p>
                         </div>
                       )}
                     </div>

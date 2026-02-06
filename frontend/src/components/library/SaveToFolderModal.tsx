@@ -110,13 +110,14 @@ export const SaveToFolderModal = ({
 
         console.log('🔵 Creating new folder...', newFolderName);
         // Create new folder first
+        const pInfo = extractionResult.extraction_result.property_info;
         const newFolder = await dealFolderService.createFolder({
           folder_name: newFolderName.trim(),
-          property_type: extractionResult.extraction_result.property_info.property_type,
-          property_address: extractionResult.extraction_result.property_info.property_address,
-          submarket: extractionResult.extraction_result.property_info.submarket,
-          total_units: extractionResult.extraction_result.property_info.total_units,
-          total_sf: extractionResult.extraction_result.property_info.total_sf,
+          property_type: pInfo.property_type ?? undefined,
+          property_address: pInfo.property_address ?? undefined,
+          submarket: pInfo.submarket ?? undefined,
+          total_units: pInfo.total_units ?? undefined,
+          total_sf: pInfo.total_sf ?? undefined,
           status: 'active',
         });
 

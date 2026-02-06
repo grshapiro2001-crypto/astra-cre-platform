@@ -1,49 +1,327 @@
 import { NavLink } from 'react-router-dom';
+import {
+  LayoutDashboard,
+  FolderOpen,
+  Upload,
+  BarChart3,
+  Sun,
+  Moon,
+  ChevronsLeft,
+  ChevronsRight,
+  TrendingUp,
+} from 'lucide-react';
+import { useUIStore } from '@/store/uiStore';
+import { useAuthStore } from '@/store/authSlice';
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+
+const navItems = [
+  { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+  { name: 'Library', path: '/library', icon: FolderOpen },
+  { name: 'Upload', path: '/upload', icon: Upload },
+  { name: 'Comparisons', path: '/compare', icon: BarChart3 },
+];
 
 export const Sidebar = () => {
-  const navItems = [
-    { name: 'Dashboard', path: '/dashboard', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
-    { name: 'Library', path: '/library', icon: 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10' },
-    { name: 'Upload', path: '/upload', icon: 'M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12' },
-    { name: 'Comparison', path: '/comparison', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
-  ];
+  const { theme, toggleTheme, sidebarCollapsed, toggleSidebar } = useUIStore();
+  const user = useAuthStore((s) => s.user);
+
+  const initials = user?.full_name
+    ? user.full_name
+        .split(' ')
+        .map((n) => n[0])
+        .join('')
+        .toUpperCase()
+        .slice(0, 2)
+    : user?.email?.slice(0, 2).toUpperCase() ?? 'U';
 
   return (
-    <aside className="w-64 bg-gradient-to-b from-emerald-800 via-emerald-900 to-green-950 min-h-screen relative">
-      <div className="px-4 py-6">
-        <div className="flex items-center gap-2 px-4 mb-2">
-          <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          <span className="text-emerald-300 text-xs font-medium uppercase tracking-wider">Navigation</span>
+    <aside
+      className={cn(
+        'fixed top-0 left-0 z-40 h-screen flex flex-col',
+        'bg-gradient-to-b from-violet-950 via-purple-950 to-indigo-950',
+        'border-r border-white/5 transition-all duration-300',
+        'hidden lg:flex',
+        sidebarCollapsed ? 'w-[72px]' : 'w-64'
+      )}
+    >
+      {/* Logo */}
+      <div
+        className={cn(
+          'flex items-center h-16 border-b border-white/5',
+          sidebarCollapsed ? 'justify-center px-2' : 'px-5'
+        )}
+      >
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shrink-0">
+            <TrendingUp className="w-4 h-4 text-white" />
+          </div>
+          {!sidebarCollapsed && (
+            <h1 className="text-lg font-bold font-display tracking-tight">
+              <span className="text-white">Astra</span>
+              <span className="text-purple-300/70 ml-1 font-normal text-xs">CRE</span>
+            </h1>
+          )}
         </div>
       </div>
-      <nav className="px-4">
-        <div className="space-y-1">
-          {navItems.map((item) => (
+
+      {/* Nav Items */}
+      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+        <div
+          className={cn(
+            'flex items-center gap-2 mb-3',
+            sidebarCollapsed ? 'justify-center px-0' : 'px-3'
+          )}
+        >
+          <div className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
+          {!sidebarCollapsed && (
+            <span className="text-purple-300/60 text-[10px] font-medium uppercase tracking-widest">
+              Navigation
+            </span>
+          )}
+        </div>
+
+        {navItems.map((item) => {
+          const Icon = item.icon;
+          return (
             <NavLink
               key={item.path}
               to={item.path}
               className={({ isActive }) =>
-                `flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+                cn(
+                  'flex items-center gap-3 rounded-xl text-sm font-medium transition-all duration-200',
+                  sidebarCollapsed
+                    ? 'justify-center px-0 py-2.5 mx-auto w-11 h-11'
+                    : 'px-3 py-2.5',
                   isActive
-                    ? 'bg-emerald-500/20 text-white border border-emerald-400/30 shadow-sm'
-                    : 'text-emerald-200 hover:bg-emerald-700/40 hover:text-white'
-                }`
+                    ? 'bg-white/10 text-white shadow-sm border border-white/10'
+                    : 'text-purple-200/70 hover:bg-white/5 hover:text-white'
+                )
               }
+              title={sidebarCollapsed ? item.name : undefined}
             >
-              <svg
-                className="w-5 h-5 shrink-0"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={1.5}
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" d={item.icon} />
-              </svg>
-              {item.name}
+              <Icon className="w-5 h-5 shrink-0" strokeWidth={1.5} />
+              {!sidebarCollapsed && item.name}
             </NavLink>
-          ))}
-        </div>
+          );
+        })}
       </nav>
+
+      {/* Pipeline Stats (mock) */}
+      {!sidebarCollapsed && (
+        <div className="px-4 py-3 mx-3 mb-3 rounded-xl bg-white/5 border border-white/5">
+          <div className="text-[10px] font-medium uppercase tracking-widest text-purple-300/50 mb-2">
+            Pipeline
+          </div>
+          <div className="flex justify-between items-baseline">
+            <div>
+              <span className="text-white text-lg font-bold font-mono">$24.5M</span>
+              <p className="text-purple-300/50 text-[10px] mt-0.5">Total Value</p>
+            </div>
+            <div className="text-right">
+              <span className="text-white text-lg font-bold font-mono">12</span>
+              <p className="text-purple-300/50 text-[10px] mt-0.5">Active Deals</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Theme Toggle */}
+      <div
+        className={cn(
+          'px-3 pb-2',
+          sidebarCollapsed ? 'flex justify-center' : ''
+        )}
+      >
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={toggleTheme}
+          className={cn(
+            'text-purple-200/70 hover:text-white hover:bg-white/5',
+            sidebarCollapsed ? 'w-11 h-11 p-0' : 'w-full justify-start gap-3 px-3'
+          )}
+          title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+        >
+          {theme === 'dark' ? (
+            <Sun className="w-4 h-4 shrink-0" />
+          ) : (
+            <Moon className="w-4 h-4 shrink-0" />
+          )}
+          {!sidebarCollapsed && (
+            <span className="text-sm">
+              {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+            </span>
+          )}
+        </Button>
+      </div>
+
+      {/* User Section */}
+      <div
+        className={cn(
+          'px-3 pb-2 border-t border-white/5 pt-3',
+          sidebarCollapsed ? 'flex justify-center' : ''
+        )}
+      >
+        <div
+          className={cn(
+            'flex items-center gap-3 rounded-xl',
+            sidebarCollapsed ? 'justify-center' : 'px-3 py-2'
+          )}
+        >
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shrink-0">
+            <span className="text-white text-xs font-bold">{initials}</span>
+          </div>
+          {!sidebarCollapsed && (
+            <div className="overflow-hidden">
+              <p className="text-white text-sm font-medium truncate">
+                {user?.full_name || 'User'}
+              </p>
+              <p className="text-purple-300/50 text-[11px] truncate">
+                {user?.email || ''}
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Collapse Toggle */}
+      <div
+        className={cn(
+          'px-3 pb-3',
+          sidebarCollapsed ? 'flex justify-center' : ''
+        )}
+      >
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={toggleSidebar}
+          className={cn(
+            'text-purple-200/70 hover:text-white hover:bg-white/5',
+            sidebarCollapsed ? 'w-11 h-11 p-0' : 'w-full justify-start gap-3 px-3'
+          )}
+          title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        >
+          {sidebarCollapsed ? (
+            <ChevronsRight className="w-4 h-4 shrink-0" />
+          ) : (
+            <ChevronsLeft className="w-4 h-4 shrink-0" />
+          )}
+          {!sidebarCollapsed && <span className="text-sm">Collapse</span>}
+        </Button>
+      </div>
     </aside>
+  );
+};
+
+/** Mobile sidebar overlay */
+export const MobileSidebar = () => {
+  const { mobileSidebarOpen, setMobileSidebarOpen, theme, toggleTheme } =
+    useUIStore();
+  const user = useAuthStore((s) => s.user);
+
+  const initials = user?.full_name
+    ? user.full_name
+        .split(' ')
+        .map((n) => n[0])
+        .join('')
+        .toUpperCase()
+        .slice(0, 2)
+    : user?.email?.slice(0, 2).toUpperCase() ?? 'U';
+
+  if (!mobileSidebarOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 lg:hidden">
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={() => setMobileSidebarOpen(false)}
+      />
+
+      {/* Sidebar */}
+      <aside className="absolute top-0 left-0 h-full w-64 flex flex-col bg-gradient-to-b from-violet-950 via-purple-950 to-indigo-950 border-r border-white/5 shadow-2xl">
+        {/* Logo */}
+        <div className="flex items-center h-16 px-5 border-b border-white/5">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+              <TrendingUp className="w-4 h-4 text-white" />
+            </div>
+            <h1 className="text-lg font-bold font-display tracking-tight">
+              <span className="text-white">Astra</span>
+              <span className="text-purple-300/70 ml-1 font-normal text-xs">CRE</span>
+            </h1>
+          </div>
+        </div>
+
+        {/* Nav */}
+        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+          <div className="flex items-center gap-2 px-3 mb-3">
+            <div className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
+            <span className="text-purple-300/60 text-[10px] font-medium uppercase tracking-widest">
+              Navigation
+            </span>
+          </div>
+
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            return (
+              <NavLink
+                key={item.path}
+                to={item.path}
+                onClick={() => setMobileSidebarOpen(false)}
+                className={({ isActive }) =>
+                  cn(
+                    'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200',
+                    isActive
+                      ? 'bg-white/10 text-white shadow-sm border border-white/10'
+                      : 'text-purple-200/70 hover:bg-white/5 hover:text-white'
+                  )
+                }
+              >
+                <Icon className="w-5 h-5 shrink-0" strokeWidth={1.5} />
+                {item.name}
+              </NavLink>
+            );
+          })}
+        </nav>
+
+        {/* Theme Toggle */}
+        <div className="px-3 pb-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={toggleTheme}
+            className="w-full justify-start gap-3 px-3 text-purple-200/70 hover:text-white hover:bg-white/5"
+          >
+            {theme === 'dark' ? (
+              <Sun className="w-4 h-4 shrink-0" />
+            ) : (
+              <Moon className="w-4 h-4 shrink-0" />
+            )}
+            <span className="text-sm">
+              {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+            </span>
+          </Button>
+        </div>
+
+        {/* User */}
+        <div className="px-3 pb-4 border-t border-white/5 pt-3">
+          <div className="flex items-center gap-3 px-3 py-2">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shrink-0">
+              <span className="text-white text-xs font-bold">{initials}</span>
+            </div>
+            <div className="overflow-hidden">
+              <p className="text-white text-sm font-medium truncate">
+                {user?.full_name || 'User'}
+              </p>
+              <p className="text-purple-300/50 text-[11px] truncate">
+                {user?.email || ''}
+              </p>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
   );
 };

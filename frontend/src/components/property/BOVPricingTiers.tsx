@@ -1,32 +1,5 @@
 import { useState } from 'react';
-
-interface BOVCapRate {
-  cap_rate_type: string;
-  cap_rate_value: number;
-  noi_basis?: number;
-  qualifier?: string;
-}
-
-interface BOVPricingTier {
-  tier_number: number;
-  tier_label?: string;
-  tier_type?: string;
-  pricing?: number;
-  price_per_unit?: number;
-  price_per_sf?: number;
-  leverage_pct?: number;
-  loan_amount?: number;
-  interest_rate?: number;
-  io_period_months?: number;
-  amortization_years?: number;
-  unlevered_irr?: number;
-  levered_irr?: number;
-  equity_multiple?: number;
-  avg_cash_on_cash?: number;
-  terminal_cap_rate?: number;
-  hold_period_years?: number;
-  cap_rates?: BOVCapRate[];
-}
+import type { BOVPricingTier } from '../../types/property';
 
 interface BOVPricingTiersProps {
   tiers: BOVPricingTier[];
@@ -38,6 +11,9 @@ export const BOVPricingTiers = ({ tiers }: BOVPricingTiersProps) => {
   if (!tiers || tiers.length === 0) return null;
 
   const tier = tiers[selectedTier];
+  const rm = tier.return_metrics;
+  const la = tier.loan_assumptions;
+  const ta = tier.terminal_assumptions;
 
   return (
     <div className="bg-white shadow rounded-lg p-6">
@@ -55,7 +31,7 @@ export const BOVPricingTiers = ({ tiers }: BOVPricingTiersProps) => {
                 : 'border-transparent text-gray-600 hover:text-gray-900'
             }`}
           >
-            {t.tier_label || `Tier ${t.tier_number}`}
+            {t.tier_label || `Tier ${idx + 1}`}
           </button>
         ))}
       </div>
@@ -92,30 +68,30 @@ export const BOVPricingTiers = ({ tiers }: BOVPricingTiersProps) => {
         )}
 
         {/* Return Metrics */}
-        {(tier.unlevered_irr || tier.levered_irr || tier.equity_multiple || tier.avg_cash_on_cash) && (
+        {rm && (rm.unlevered_irr || rm.levered_irr || rm.equity_multiple || rm.avg_cash_on_cash) && (
           <div>
             <h3 className="font-semibold text-gray-900 mb-3">Return Metrics</h3>
             <div className="grid grid-cols-4 gap-3">
-              {tier.unlevered_irr && <div className="text-center bg-green-50 p-3 rounded"><div className="text-sm text-gray-600">Unlevered IRR</div><div className="text-xl font-bold text-green-900">{tier.unlevered_irr}%</div></div>}
-              {tier.levered_irr && <div className="text-center bg-green-50 p-3 rounded"><div className="text-sm text-gray-600">Levered IRR</div><div className="text-xl font-bold text-green-900">{tier.levered_irr}%</div></div>}
-              {tier.equity_multiple && <div className="text-center bg-green-50 p-3 rounded"><div className="text-sm text-gray-600">Equity Multiple</div><div className="text-xl font-bold text-green-900">{tier.equity_multiple}x</div></div>}
-              {tier.avg_cash_on_cash && <div className="text-center bg-green-50 p-3 rounded"><div className="text-sm text-gray-600">Avg CoC</div><div className="text-xl font-bold text-green-900">{tier.avg_cash_on_cash}%</div></div>}
+              {rm.unlevered_irr && <div className="text-center bg-green-50 p-3 rounded"><div className="text-sm text-gray-600">Unlevered IRR</div><div className="text-xl font-bold text-green-900">{rm.unlevered_irr}%</div></div>}
+              {rm.levered_irr && <div className="text-center bg-green-50 p-3 rounded"><div className="text-sm text-gray-600">Levered IRR</div><div className="text-xl font-bold text-green-900">{rm.levered_irr}%</div></div>}
+              {rm.equity_multiple && <div className="text-center bg-green-50 p-3 rounded"><div className="text-sm text-gray-600">Equity Multiple</div><div className="text-xl font-bold text-green-900">{rm.equity_multiple}x</div></div>}
+              {rm.avg_cash_on_cash && <div className="text-center bg-green-50 p-3 rounded"><div className="text-sm text-gray-600">Avg CoC</div><div className="text-xl font-bold text-green-900">{rm.avg_cash_on_cash}%</div></div>}
             </div>
           </div>
         )}
 
         {/* Loan & Terminal Assumptions */}
-        {(tier.leverage_pct || tier.terminal_cap_rate || tier.hold_period_years) && (
+        {(la || ta) && (
           <div>
             <h3 className="font-semibold text-gray-900 mb-3">Loan & Terminal Assumptions</h3>
             <div className="grid grid-cols-3 gap-4 text-sm">
-              {tier.leverage_pct && <div><span className="text-gray-600">LTV:</span> <span className="font-semibold">{tier.leverage_pct}%</span></div>}
-              {tier.loan_amount && <div><span className="text-gray-600">Loan Amount:</span> <span className="font-semibold">${(tier.loan_amount / 1000000).toFixed(2)}M</span></div>}
-              {tier.interest_rate && <div><span className="text-gray-600">Rate:</span> <span className="font-semibold">{tier.interest_rate}%</span></div>}
-              {tier.io_period_months && <div><span className="text-gray-600">I/O Period:</span> <span className="font-semibold">{tier.io_period_months} months</span></div>}
-              {tier.amortization_years && <div><span className="text-gray-600">Amortization:</span> <span className="font-semibold">{tier.amortization_years} years</span></div>}
-              {tier.terminal_cap_rate && <div><span className="text-gray-600">Terminal Cap:</span> <span className="font-semibold">{tier.terminal_cap_rate}%</span></div>}
-              {tier.hold_period_years && <div><span className="text-gray-600">Hold Period:</span> <span className="font-semibold">{tier.hold_period_years} years</span></div>}
+              {la?.leverage && <div><span className="text-gray-600">LTV:</span> <span className="font-semibold">{la.leverage}%</span></div>}
+              {la?.loan_amount && <div><span className="text-gray-600">Loan Amount:</span> <span className="font-semibold">${(la.loan_amount / 1000000).toFixed(2)}M</span></div>}
+              {la?.interest_rate && <div><span className="text-gray-600">Rate:</span> <span className="font-semibold">{la.interest_rate}%</span></div>}
+              {la?.io_period_months && <div><span className="text-gray-600">I/O Period:</span> <span className="font-semibold">{la.io_period_months} months</span></div>}
+              {la?.amortization_years && <div><span className="text-gray-600">Amortization:</span> <span className="font-semibold">{la.amortization_years} years</span></div>}
+              {ta?.terminal_cap_rate && <div><span className="text-gray-600">Terminal Cap:</span> <span className="font-semibold">{ta.terminal_cap_rate}%</span></div>}
+              {ta?.hold_period_years && <div><span className="text-gray-600">Hold Period:</span> <span className="font-semibold">{ta.hold_period_years} years</span></div>}
             </div>
           </div>
         )}
