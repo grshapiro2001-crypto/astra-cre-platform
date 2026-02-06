@@ -11,6 +11,7 @@ import { FolderDetail } from './pages/FolderDetail';
 import { PropertyDetail } from './pages/PropertyDetail';
 import { Upload } from './pages/Upload';
 import { ComparisonPage } from './pages/ComparisonPage';
+import { Settings } from './pages/Settings';
 
 function App() {
   const checkAuth = useAuthStore((state) => state.checkAuth);
@@ -35,6 +36,7 @@ function App() {
             <Route path="/library/:id" element={<PropertyDetail />} />
             <Route path="/upload" element={<Upload />} />
             <Route path="/compare" element={<ComparisonPage />} />
+            <Route path="/settings" element={<Settings />} />
           </Route>
         </Route>
 

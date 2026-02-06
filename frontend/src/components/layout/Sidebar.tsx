@@ -4,6 +4,7 @@ import {
   FolderOpen,
   Upload,
   BarChart3,
+  Settings,
   Sun,
   Moon,
   ChevronsLeft,
@@ -20,6 +21,7 @@ const navItems = [
   { name: 'Library', path: '/library', icon: FolderOpen },
   { name: 'Upload', path: '/upload', icon: Upload },
   { name: 'Comparisons', path: '/compare', icon: BarChart3 },
+  { name: 'Settings', path: '/settings', icon: Settings },
 ];
 
 export const Sidebar = () => {

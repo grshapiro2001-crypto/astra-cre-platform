@@ -1,7 +1,7 @@
 # Codebase Inventory - Astra CRE Platform
 
-**Purpose:** Quick reference of what EXISTS. Check this BEFORE building anything new.  
-**Update:** Add new files/components as you create them.  
+**Purpose:** Quick reference of what EXISTS. Check this BEFORE building anything new.
+**Update:** Add new files/components as you create them.
 **Length:** Keep concise - just names and one-line descriptions.
 
 ---
@@ -11,12 +11,15 @@
 ### ✅ Core Features (Working)
 - **Document Upload & Extraction** - Upload PDF, Claude extracts metrics
 - **Deal Folders** - Organize properties into folders
-- **Property Detail View** - Display extracted data for single property
-- **Side-by-Side Comparison** - Compare 2-5 properties in table
+- **Property Detail View** - Full property analysis with financials, BOV tiers, cap sensitivity, AI panel
+- **Side-by-Side Comparison** - Quick/deep analysis with scoring templates, radar chart, sensitivity slider
 - **Investment Criteria Filtering** - Highlight rows based on user-selected metrics
 - **BOV Multi-Tier Pricing** - Display 2-5 pricing scenarios from BOV documents
 - **CSV Export** - Export comparison data to CSV
-- **Dark/Light Mode** - Theme toggle with persistence
+- **Dark/Light Mode** - Theme toggle with persistence (Zustand + localStorage)
+- **Dashboard** - Configurable command center with kanban pipeline, metrics, charts, AI summary
+- **Deal Library** - Grid/list views with search, status filters, sort, batch comparison selection
+- **Navigation System** - Collapsible sidebar, dynamic header with breadcrumbs, ambient orbs
 
 ### ✅ Data Management
 - **Duplicate Detection** - Warns when saving duplicate property
@@ -26,14 +29,41 @@
 
 ---
 
+## Design System
+
+### Theme
+- **CSS Variables** - `bg-background`, `text-foreground`, `bg-card`, `border-border`, `bg-muted`, etc.
+- **Dark mode** - `dark:` Tailwind prefix, toggled via `useUIStore`
+- **Primary** - Purple/violet gradient (`from-violet-500 to-purple-600`)
+
+### Typography
+- `font-display` - Syne (headings, section titles)
+- Default sans - Instrument Sans (body text)
+- `font-mono` - JetBrains Mono (numbers, metrics, financial data)
+
+### Components
+- **Card pattern** - `border border-border rounded-2xl bg-card`
+- **Status colors** - NEW=blue, ACTIVE=emerald, REVIEW=amber, PASSED=slate, CLOSED=purple
+- **Icons** - lucide-react only (no inline SVGs)
+- **Transitions** - Tailwind transitions only (no framer-motion)
+
+---
+
 ## Frontend File Structure
 
 ### Pages (`frontend/src/pages/`)
-- `Library.tsx` - Deal folder grid (main page)
+- `Dashboard.tsx` - Deal command center: greeting, tag filtering, metrics grid, kanban pipeline, charts, AI panel
+- `Library.tsx` - Deal pipeline: grid/list views, search, status filters, sort, batch compare selection
+- `ComparisonPage.tsx` - Quick/deep comparison: scoring presets, bar race, radar chart, sensitivity, CSV export
+- `PropertyDetail.tsx` - Full property analysis: financials waterfall, BOV tiers, cap sensitivity, AI insights
 - `FolderDetail.tsx` - Properties within a folder
-- `PropertyDetail.tsx` - Single property view with all metrics
-- `ComparisonPage.tsx` - Side-by-side comparison table
 - `Upload.tsx` - Document upload and extraction preview
+- `Settings.tsx` - Settings placeholder (profile, appearance, notifications, integrations)
+
+### Components - Layout (`frontend/src/components/layout/`)
+- `MainLayout.tsx` - App shell: sidebar + header + outlet + ambient orbs
+- `Sidebar.tsx` - Collapsible purple-gradient nav with pipeline stats, theme toggle, user section
+- `Header.tsx` - Dynamic page title + breadcrumbs + mobile menu toggle
 
 ### Components - Library (`frontend/src/components/library/`)
 - `CreateFolderModal.tsx` - Create new deal folder
@@ -58,24 +88,29 @@
 - `select.tsx`, `table.tsx`, `tabs.tsx`, `badge.tsx`, `checkbox.tsx`
 - `alert.tsx`, `alert-dialog.tsx`, `radio-group.tsx`, `separator.tsx`, `skeleton.tsx`
 
+### Store (`frontend/src/store/`)
+- `authSlice.ts` - Auth state (user, token, login/logout/checkAuth)
+- `uiStore.ts` - UI state with persist (theme, sidebarCollapsed, mobileSidebarOpen)
+
 ### Services (`frontend/src/services/`)
 - `dealFolderService.ts` - Folder CRUD operations
-- `propertyService.ts` - Property operations
-- `comparisonService.ts` - Comparison data fetching
+- `propertyService.ts` - Property operations (listProperties, getProperty)
+- `comparisonService.ts` - Comparison data fetching (compareProperties)
 
 ### Utils (`frontend/src/utils/`)
-- `criteriaEvaluation.ts` - Calculate gradient colors for criteria filtering
+- `criteriaEvaluation.ts` - Calculate gradient colors for criteria filtering, rankProperties
 - `csvExport.ts` - Export comparison data to CSV
 
 ### Types (`frontend/src/types/`)
-- `property.ts` - TypeScript interfaces for property data
+- `property.ts` - TypeScript interfaces (PropertyDetail, PropertyListItem, FinancialPeriod, BOVPricingTier)
 
 ### Other Frontend Files
 - `App.tsx` - Main app component with routing
-- `index.css` - Global Tailwind imports
+- `index.css` - Purple palette CSS variables + Google Fonts imports
 - `main.tsx` - React entry point
+- `lib/utils.ts` - `cn()` utility (clsx + tailwind-merge)
 - `components.json` - shadcn/ui configuration
-- `tailwind.config.js` - Tailwind configuration
+- `tailwind.config.js` - Extended design system (fonts, colors, animations)
 
 ---
 
@@ -87,12 +122,12 @@
   - `POST /deal-folders` - Create folder
   - `GET /deal-folders/{id}` - Get folder with properties
   - `DELETE /deal-folders/{id}` - Delete folder
-  
+
 - `properties.py` - Property endpoints
   - `GET /properties/{id}` - Get property details
   - `GET /properties` - List properties (with filters)
   - `DELETE /properties/{id}` - Delete property
-  
+
 - `upload.py` - Upload and extraction endpoints
   - `POST /upload` - Upload PDF and extract data
   - `POST /upload/save-to-folder` - Save extracted property to folder
@@ -209,6 +244,7 @@
 - `vite` - Build tool
 - `tailwindcss` - Utility-first CSS
 - `lucide-react` - Icons
+- `zustand` - State management (with persist middleware)
 - `recharts` - Charts (for future analytics)
 
 ### Backend
@@ -306,11 +342,10 @@ export function getGradientColor(
 - Team collaboration
 - Comments on properties
 - Activity feed
-- Advanced analytics dashboard
+- Settings panels (profile, appearance, notifications, API keys)
 
 ### Known Gaps
 - No pagination (shows all items)
-- No search functionality
 - No bulk operations
 - No undo/redo
 - No keyboard shortcuts
@@ -345,6 +380,6 @@ export function getGradientColor(
 
 ---
 
-**Last Updated:** January 21, 2026  
-**Keep this updated:** Add new files/components as you create them.  
-**Token Count:** ~2,000 (optimized for context)
+**Last Updated:** February 6, 2026
+**Keep this updated:** Add new files/components as you create them.
+**Token Count:** ~2,200 (optimized for context)
