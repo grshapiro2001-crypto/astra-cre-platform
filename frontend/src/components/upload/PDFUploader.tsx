@@ -1,6 +1,6 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { FileText, AlertCircle, Loader2, Upload, X } from 'lucide-react';
+import { FileText, AlertCircle, Upload, X } from 'lucide-react';
 import { propertyService } from '../../services/propertyService';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,78 @@ interface PDFUploaderProps {
   onUploadComplete: (result: UploadResponse, filename: string, pdfPath: string) => void;
 }
 
+// ============================================================
+// Progress messages that cycle during upload
+// ============================================================
+const PROGRESS_MESSAGES = [
+  'Uploading document...',
+  'AI is reading your document...',
+  'Extracting financial metrics...',
+  'Almost done...',
+];
+
+// ============================================================
+// Upload Progress Bar
+// ============================================================
+const UploadProgress = ({ isUploading }: { isUploading: boolean }) => {
+  const [progress, setProgress] = useState(0);
+  const [messageIndex, setMessageIndex] = useState(0);
+  const startTimeRef = useRef(0);
+
+  useEffect(() => {
+    if (!isUploading) {
+      setProgress(0);
+      setMessageIndex(0);
+      return;
+    }
+
+    startTimeRef.current = Date.now();
+
+    // Progress animation: 0% → 90% over ~15 seconds
+    const progressInterval = setInterval(() => {
+      const elapsed = Date.now() - startTimeRef.current;
+      const target = Math.min(90, (elapsed / 15000) * 90);
+      setProgress(target);
+    }, 200);
+
+    // Cycle messages every 3 seconds
+    const messageInterval = setInterval(() => {
+      setMessageIndex((prev) => (prev + 1) % PROGRESS_MESSAGES.length);
+    }, 3000);
+
+    return () => {
+      clearInterval(progressInterval);
+      clearInterval(messageInterval);
+    };
+  }, [isUploading]);
+
+  if (!isUploading) return null;
+
+  return (
+    <div className="space-y-3">
+      {/* Progress bar */}
+      <div className="h-2 rounded-full bg-primary/20 overflow-hidden">
+        <div
+          className="h-full rounded-full bg-primary transition-all duration-1000 ease-out"
+          style={{ width: `${progress}%` }}
+        />
+      </div>
+      {/* Status message */}
+      <p className="text-sm text-muted-foreground text-center animate-pulse">
+        {PROGRESS_MESSAGES[messageIndex]}
+      </p>
+    </div>
+  );
+};
+
+// ============================================================
+// Document type pills
+// ============================================================
+const DOC_TYPES = ['Offering Memorandums', 'BOV Reports', 'Rent Rolls'];
+
+// ============================================================
+// PDFUploader Component
+// ============================================================
 export const PDFUploader = ({ onUploadComplete }: PDFUploaderProps) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -71,20 +143,37 @@ export const PDFUploader = ({ onUploadComplete }: PDFUploaderProps) => {
       <div
         {...getRootProps()}
         className={cn(
-          'border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors',
+          'border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all duration-200 min-h-48 flex items-center justify-center',
           isDragActive
-            ? 'border-primary bg-primary/5'
+            ? 'border-primary bg-primary/5 ring-2 ring-primary/30 shadow-lg shadow-primary/10'
             : 'border-border hover:border-primary/50 bg-card',
           isUploading && 'pointer-events-none opacity-50'
         )}
       >
         <input {...getInputProps()} />
-        <div className="space-y-2">
-          <Upload className="mx-auto h-12 w-12 text-muted-foreground" />
+        <div className="space-y-3">
+          <Upload
+            className={cn(
+              'mx-auto w-10 h-10 transition-colors',
+              isDragActive ? 'text-primary' : 'text-muted-foreground'
+            )}
+          />
           <p className="text-lg text-foreground">
             {isDragActive ? 'Drop PDF here' : 'Drag & drop PDF here, or click to browse'}
           </p>
           <p className="text-sm text-muted-foreground">Only PDF files up to 25MB</p>
+
+          {/* Document type pills */}
+          <div className="flex items-center justify-center gap-2 pt-1">
+            {DOC_TYPES.map((type) => (
+              <span
+                key={type}
+                className="inline-flex text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary/70"
+              >
+                {type}
+              </span>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -111,6 +200,9 @@ export const PDFUploader = ({ onUploadComplete }: PDFUploaderProps) => {
         </div>
       )}
 
+      {/* Upload Progress */}
+      <UploadProgress isUploading={isUploading} />
+
       {/* Error Display */}
       {error && (
         <div className="bg-destructive/10 border border-destructive/20 p-4 rounded-xl">
@@ -128,14 +220,7 @@ export const PDFUploader = ({ onUploadComplete }: PDFUploaderProps) => {
         className="w-full py-3 text-base font-semibold shadow-md shadow-primary/25"
         size="lg"
       >
-        {isUploading ? (
-          <span className="flex items-center justify-center">
-            <Loader2 className="animate-spin h-5 w-5 mr-3" />
-            Analyzing Document...
-          </span>
-        ) : (
-          'Analyze Document'
-        )}
+        {isUploading ? 'Analyzing...' : 'Analyze Document'}
       </Button>
     </div>
   );
