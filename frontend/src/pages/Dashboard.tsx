@@ -6,9 +6,11 @@
  * - Key metrics cards (customizable selection)
  * - Pipeline kanban board with customizable stages
  * - Tag-based filtering across all dashboard data
- * - Status donut chart, geographic bars, score dot plot
+ * - Status donut chart, geographic bars, NOI distribution plot
  * - AI pipeline summary simulation panel
  * - Widget visibility toggling
+ *
+ * Data is fetched from /api/v1/properties and /api/v1/deal-folders.
  */
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -21,10 +23,6 @@ import {
   Building2,
   Folder,
   Zap,
-  Trophy,
-  Percent,
-  Tag,
-  Scale,
   CheckCircle2,
   ArrowUp,
   ArrowDown,
@@ -37,6 +35,9 @@ import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/authSlice';
 import { Button } from '@/components/ui/button';
 import { DashboardSkeleton } from '@/components/ui/PageSkeleton';
+import { propertyService } from '@/services/propertyService';
+import { dealFolderService, type DealFolder } from '@/services/dealFolderService';
+import type { PropertyListItem } from '@/types/property';
 
 // ============================================================
 // TYPES
@@ -44,21 +45,27 @@ import { DashboardSkeleton } from '@/components/ui/PageSkeleton';
 
 type IconComponent = typeof DollarSign;
 
+/** Extended property type including financial fields the backend returns */
+interface PropertyWithFinancials extends PropertyListItem {
+  t12_noi?: number | null;
+  y1_noi?: number | null;
+  t3_noi?: number | null;
+  total_sf?: number | null;
+  status?: string;
+}
+
 interface DashboardDeal {
   id: number;
   name: string;
-  city: string;
+  address: string;
   submarket: string;
-  state: string;
   units: number;
-  totalPrice: number;
-  pricePerUnit: number;
-  capRateT12: number | null;
-  capRateY1: number | null;
-  score: number;
+  noiT12: number | null;
+  noiY1: number | null;
+  propertyType: string | null;
+  documentType: string;
   stage: string;
   tags: string[];
-  thumbnail: string;
 }
 
 interface PipelineStage {
@@ -82,22 +89,19 @@ interface MetricDefinition {
   label: string;
   format: (value: number | string | null) => string;
   icon: IconComponent;
-  scoreColored?: boolean;
 }
 
 interface MetricsData {
-  totalValue: number;
+  totalNOI: number;
   totalUnits: number;
   dealCount: number;
   activeDeals: number;
-  avgScore: number;
-  avgCapRate: string | null;
-  avgCapRateY1: string | null;
-  avgPricePerUnit: number;
-  avgDealSize: number;
+  avgNOI: number;
+  totalNOIY1: number;
+  avgNOIY1: number;
   closedDeals: number;
-  highestScore: number;
-  lowestScore: number;
+  highestNOI: number;
+  lowestNOI: number;
 }
 
 type MetricId = keyof MetricsData;
@@ -108,7 +112,7 @@ interface StatusChartDatum extends PipelineStage {
 }
 
 interface GeoChartDatum {
-  state: string;
+  submarket: string;
   count: number;
   value: number;
 }
@@ -121,169 +125,17 @@ interface AIResponse {
 }
 
 // ============================================================
-// MOCK DATA
+// CONSTANTS
 // ============================================================
-
-const ALL_TAGS: string[] = [
-  'Georgia',
-  'Texas',
-  'Florida',
-  'Value-Add',
-  'Core-Plus',
-  'Core',
-  'Lease-Up',
-  'Sunbelt',
-  '200+ Units',
-  'Under $50M',
-];
-
-const DEALS: DashboardDeal[] = [
-  {
-    id: 1,
-    name: 'The Overlook',
-    city: 'Lawrenceville, GA',
-    submarket: 'Gwinnett County',
-    state: 'Georgia',
-    units: 410,
-    totalPrice: 90_800_000,
-    pricePerUnit: 221_500,
-    capRateT12: 4.75,
-    capRateY1: 5.15,
-    score: 76,
-    stage: 'dueDiligence',
-    tags: ['Georgia', 'Value-Add', 'Sunbelt', '200+ Units'],
-    thumbnail:
-      'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=400&h=300&fit=crop',
-  },
-  {
-    id: 2,
-    name: 'Beacon Station',
-    city: 'Augusta, GA',
-    submarket: 'Central Savannah',
-    state: 'Georgia',
-    units: 221,
-    totalPrice: 53_600_000,
-    pricePerUnit: 242_500,
-    capRateT12: 5.15,
-    capRateY1: 5.42,
-    score: 82,
-    stage: 'closing',
-    tags: ['Georgia', 'Core-Plus', 'Sunbelt', '200+ Units'],
-    thumbnail:
-      'https://images.unsplash.com/photo-1460317442991-0ec209397118?w=400&h=300&fit=crop',
-  },
-  {
-    id: 3,
-    name: 'Creekview Vista',
-    city: 'LaGrange, GA',
-    submarket: 'West Georgia',
-    state: 'Georgia',
-    units: 279,
-    totalPrice: 55_100_000,
-    pricePerUnit: 197_500,
-    capRateT12: null,
-    capRateY1: 5.42,
-    score: 68,
-    stage: 'screening',
-    tags: ['Georgia', 'Lease-Up', 'Sunbelt', '200+ Units'],
-    thumbnail:
-      'https://images.unsplash.com/photo-1574362848149-11496d93a7c7?w=400&h=300&fit=crop',
-  },
-  {
-    id: 4,
-    name: 'Carmel Vista',
-    city: 'McDonough, GA',
-    submarket: 'Henry County',
-    state: 'Georgia',
-    units: 228,
-    totalPrice: 45_700_000,
-    pricePerUnit: 200_400,
-    capRateT12: 4.12,
-    capRateY1: 4.85,
-    score: 71,
-    stage: 'screening',
-    tags: ['Georgia', 'Value-Add', 'Sunbelt', 'Under $50M'],
-    thumbnail:
-      'https://images.unsplash.com/photo-1567496898669-ee935f5f647a?w=400&h=300&fit=crop',
-  },
-  {
-    id: 5,
-    name: 'The Edison',
-    city: 'Atlanta, GA',
-    submarket: 'Midtown',
-    state: 'Georgia',
-    units: 185,
-    totalPrice: 72_500_000,
-    pricePerUnit: 391_892,
-    capRateT12: 4.25,
-    capRateY1: 4.65,
-    score: 79,
-    stage: 'sourced',
-    tags: ['Georgia', 'Core-Plus', 'Sunbelt'],
-    thumbnail:
-      'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=400&h=300&fit=crop',
-  },
-  {
-    id: 6,
-    name: 'Palms at Riverside',
-    city: 'Macon, GA',
-    submarket: 'Central Georgia',
-    state: 'Georgia',
-    units: 312,
-    totalPrice: 52_000_000,
-    pricePerUnit: 166_667,
-    capRateT12: 5.45,
-    capRateY1: 5.85,
-    score: 64,
-    stage: 'closed',
-    tags: ['Georgia', 'Core', 'Sunbelt', '200+ Units'],
-    thumbnail:
-      'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=400&h=300&fit=crop',
-  },
-  {
-    id: 7,
-    name: 'Lone Star Commons',
-    city: 'Austin, TX',
-    submarket: 'North Austin',
-    state: 'Texas',
-    units: 340,
-    totalPrice: 78_000_000,
-    pricePerUnit: 229_412,
-    capRateT12: 4.95,
-    capRateY1: 5.35,
-    score: 77,
-    stage: 'dueDiligence',
-    tags: ['Texas', 'Value-Add', 'Sunbelt', '200+ Units'],
-    thumbnail:
-      'https://images.unsplash.com/photo-1460317442991-0ec209397118?w=400&h=300&fit=crop',
-  },
-  {
-    id: 8,
-    name: 'Riverside Flats',
-    city: 'San Antonio, TX',
-    submarket: 'Downtown',
-    state: 'Texas',
-    units: 198,
-    totalPrice: 41_500_000,
-    pricePerUnit: 209_596,
-    capRateT12: 5.25,
-    capRateY1: 5.65,
-    score: 73,
-    stage: 'sourced',
-    tags: ['Texas', 'Core-Plus', 'Sunbelt', 'Under $50M'],
-    thumbnail:
-      'https://images.unsplash.com/photo-1574362848149-11496d93a7c7?w=400&h=300&fit=crop',
-  },
-];
 
 const STAGE_TEMPLATES: Record<string, StageTemplate> = {
   acquisitions: {
     label: 'Acquisitions Pipeline',
     stages: [
-      { id: 'sourced', label: 'Sourced', color: '#60A5FA' },
-      { id: 'screening', label: 'Screening', color: '#A78BFA' },
-      { id: 'dueDiligence', label: 'Due Diligence', color: '#FBBF24' },
-      { id: 'closing', label: 'Closing', color: '#34D399' },
+      { id: 'new', label: 'New', color: '#60A5FA' },
+      { id: 'active', label: 'Active', color: '#A78BFA' },
+      { id: 'review', label: 'In Review', color: '#FBBF24' },
+      { id: 'passed', label: 'Passed', color: '#94A3B8' },
       { id: 'closed', label: 'Closed', color: '#10B981' },
     ],
   },
@@ -312,9 +164,9 @@ const STAGE_TEMPLATES: Record<string, StageTemplate> = {
 
 const AI_QUICK_PROMPTS = [
   'Summarize my pipeline',
-  'Best value-add opportunities',
-  'Highest risk deals',
-  'Compare Georgia vs Texas',
+  'Top NOI performers',
+  'Deals in review',
+  'Pipeline breakdown by submarket',
 ];
 
 // ============================================================
@@ -329,28 +181,14 @@ const formatPrice = (num: number | null): string => {
   return `$${num}`;
 };
 
-/** Returns a hex color string for a deal score (for use in inline SVG/styles) */
-const getScoreColor = (score: number): string => {
-  if (score >= 80) return '#10b981';
-  if (score >= 70) return '#8b5cf6';
-  if (score >= 60) return '#f59e0b';
+/** Returns a hex color for NOI relative to the max NOI (for SVG/inline styles) */
+const getNOIColor = (noi: number, maxNOI: number): string => {
+  if (maxNOI === 0) return '#94a3b8';
+  const ratio = noi / maxNOI;
+  if (ratio >= 0.75) return '#10b981';
+  if (ratio >= 0.5) return '#8b5cf6';
+  if (ratio >= 0.25) return '#f59e0b';
   return '#f43f5e';
-};
-
-/** Returns a Tailwind text color class for a deal score */
-const getScoreTextClass = (score: number): string => {
-  if (score >= 80) return 'text-emerald-500';
-  if (score >= 70) return 'text-primary';
-  if (score >= 60) return 'text-amber-500';
-  return 'text-rose-500';
-};
-
-/** Returns a Tailwind bg color class for a deal score badge */
-const getScoreBgClass = (score: number): string => {
-  if (score >= 80) return 'bg-emerald-500/20';
-  if (score >= 70) return 'bg-violet-400/20';
-  if (score >= 60) return 'bg-amber-500/20';
-  return 'bg-rose-500/20';
 };
 
 const getGreeting = (): string => {
@@ -361,8 +199,8 @@ const getGreeting = (): string => {
 };
 
 const METRICS_LIBRARY: Record<MetricId, MetricDefinition> = {
-  totalValue: {
-    label: 'Total Pipeline Value',
+  totalNOI: {
+    label: 'Total NOI (T12)',
     format: (v) => formatPrice(v as number),
     icon: DollarSign,
   },
@@ -381,45 +219,34 @@ const METRICS_LIBRARY: Record<MetricId, MetricDefinition> = {
     format: (v) => String(v),
     icon: Zap,
   },
-  avgScore: {
-    label: 'Avg Deal Score',
-    format: (v) => String(v),
-    icon: Trophy,
-    scoreColored: true,
-  },
-  avgCapRate: {
-    label: 'Avg Cap (T12)',
-    format: (v) => (v ? `${v}%` : '\u2014'),
-    icon: Percent,
-  },
-  avgCapRateY1: {
-    label: 'Avg Cap (Y1)',
-    format: (v) => (v ? `${v}%` : '\u2014'),
-    icon: Percent,
-  },
-  avgPricePerUnit: {
-    label: 'Avg $/Unit',
+  avgNOI: {
+    label: 'Avg NOI (T12)',
     format: (v) => formatPrice(v as number),
-    icon: Tag,
+    icon: DollarSign,
   },
-  avgDealSize: {
-    label: 'Avg Deal Size',
+  totalNOIY1: {
+    label: 'Total NOI (Y1)',
     format: (v) => formatPrice(v as number),
-    icon: Scale,
+    icon: DollarSign,
+  },
+  avgNOIY1: {
+    label: 'Avg NOI (Y1)',
+    format: (v) => formatPrice(v as number),
+    icon: DollarSign,
   },
   closedDeals: {
     label: 'Closed Deals',
     format: (v) => String(v),
     icon: CheckCircle2,
   },
-  highestScore: {
-    label: 'Highest Score',
-    format: (v) => String(v),
+  highestNOI: {
+    label: 'Highest NOI',
+    format: (v) => formatPrice(v as number),
     icon: ArrowUp,
   },
-  lowestScore: {
-    label: 'Lowest Score',
-    format: (v) => String(v),
+  lowestNOI: {
+    label: 'Lowest NOI',
+    format: (v) => formatPrice(v as number),
     icon: ArrowDown,
   },
 };
@@ -433,6 +260,12 @@ export const Dashboard = () => {
   const user = useAuthStore((state) => state.user);
   const firstName =
     user?.full_name?.split(' ')[0] || user?.email?.split('@')[0] || 'there';
+
+  // --- Data State ---
+  const [properties, setProperties] = useState<PropertyWithFinancials[]>([]);
+  const [folders, setFolders] = useState<DealFolder[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // --- UI State ---
   const [mounted, setMounted] = useState(false);
@@ -454,14 +287,12 @@ export const Dashboard = () => {
 
   // Selected metrics (user customizable)
   const [selectedMetrics, setSelectedMetrics] = useState<MetricId[]>([
-    'totalValue',
+    'totalNOI',
     'totalUnits',
     'activeDeals',
-    'avgScore',
-    'avgCapRate',
-    'avgPricePerUnit',
-    'avgDealSize',
     'dealCount',
+    'avgNOI',
+    'closedDeals',
   ]);
 
   // Kanban stages
@@ -470,72 +301,139 @@ export const Dashboard = () => {
     STAGE_TEMPLATES.acquisitions.stages,
   );
 
-  // Mount animation trigger
-  useEffect(() => {
-    const timer = setTimeout(() => setMounted(true), 50);
-    return () => clearTimeout(timer);
+  // --- Data Fetching ---
+  const fetchData = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const [propertiesResult, foldersResult] = await Promise.all([
+        propertyService.listProperties({}),
+        dealFolderService.listFolders('active'),
+      ]);
+      setProperties(
+        propertiesResult.properties as PropertyWithFinancials[],
+      );
+      setFolders(foldersResult);
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : 'Failed to load dashboard data. Please try again.';
+      setError(message);
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // Mount animation trigger (after loading completes)
+  useEffect(() => {
+    if (!isLoading) {
+      const timer = setTimeout(() => setMounted(true), 50);
+      return () => clearTimeout(timer);
+    }
+    setMounted(false);
+  }, [isLoading]);
+
+  // --- Folder status map ---
+  const folderStatusMap = useMemo(() => {
+    const map = new Map<number, string>();
+    folders.forEach((f) => map.set(f.id, f.status || 'active'));
+    return map;
+  }, [folders]);
+
+  // --- Transform API data to DashboardDeal ---
+  const deals = useMemo((): DashboardDeal[] => {
+    return properties.map((p) => {
+      const stage =
+        p.status ||
+        (p.deal_folder_id
+          ? folderStatusMap.get(p.deal_folder_id) || 'active'
+          : 'active');
+
+      const tags: string[] = [];
+      if (p.property_type) tags.push(p.property_type);
+      if (p.submarket) tags.push(p.submarket);
+      if (p.document_type) tags.push(p.document_type);
+      if ((p.total_units || 0) >= 200) tags.push('200+ Units');
+
+      return {
+        id: p.id,
+        name: p.property_name || p.deal_name,
+        address: p.property_address || '',
+        submarket: p.submarket || '',
+        units: p.total_units || 0,
+        noiT12: p.t12_noi ?? null,
+        noiY1: p.y1_noi ?? null,
+        propertyType: p.property_type || null,
+        documentType: p.document_type,
+        stage,
+        tags,
+      };
+    });
+  }, [properties, folderStatusMap]);
+
+  // --- Derive tags dynamically from real data ---
+  const allTags = useMemo(() => {
+    const tagSet = new Set<string>();
+    deals.forEach((d) => d.tags.forEach((t) => tagSet.add(t)));
+    return Array.from(tagSet).sort();
+  }, [deals]);
 
   // --- Filtered Data ---
   const filteredDeals = useMemo(() => {
-    if (selectedTags.length === 0) return DEALS;
-    return DEALS.filter((deal) =>
+    if (selectedTags.length === 0) return deals;
+    return deals.filter((deal) =>
       selectedTags.every((tag) => deal.tags.includes(tag)),
     );
-  }, [selectedTags]);
+  }, [deals, selectedTags]);
 
   // --- Metrics ---
   const metrics = useMemo((): MetricsData => {
-    const active = filteredDeals.filter((d) => d.stage !== 'closed');
-    const dealsWithCap = filteredDeals.filter((d) => d.capRateT12 !== null);
-    const dealsWithCapY1 = filteredDeals.filter((d) => d.capRateY1 !== null);
+    const active = filteredDeals.filter(
+      (d) => d.stage !== 'closed' && d.stage !== 'passed',
+    );
+    const dealsWithNOI = filteredDeals.filter(
+      (d) => d.noiT12 !== null && d.noiT12 > 0,
+    );
+    const dealsWithNOIY1 = filteredDeals.filter(
+      (d) => d.noiY1 !== null && d.noiY1 > 0,
+    );
 
     return {
-      totalValue: filteredDeals.reduce((sum, d) => sum + d.totalPrice, 0),
+      totalNOI: dealsWithNOI.reduce((sum, d) => sum + (d.noiT12 || 0), 0),
       totalUnits: filteredDeals.reduce((sum, d) => sum + d.units, 0),
       dealCount: filteredDeals.length,
       activeDeals: active.length,
-      avgScore:
-        filteredDeals.length > 0
+      avgNOI:
+        dealsWithNOI.length > 0
           ? Math.round(
-              filteredDeals.reduce((sum, d) => sum + d.score, 0) /
-                filteredDeals.length,
+              dealsWithNOI.reduce((sum, d) => sum + (d.noiT12 || 0), 0) /
+                dealsWithNOI.length,
             )
           : 0,
-      avgCapRate:
-        dealsWithCap.length > 0
-          ? (
-              dealsWithCap.reduce((sum, d) => sum + (d.capRateT12 ?? 0), 0) /
-              dealsWithCap.length
-            ).toFixed(2)
-          : null,
-      avgCapRateY1:
-        dealsWithCapY1.length > 0
-          ? (
-              dealsWithCapY1.reduce((sum, d) => sum + (d.capRateY1 ?? 0), 0) /
-              dealsWithCapY1.length
-            ).toFixed(2)
-          : null,
-      avgPricePerUnit:
-        filteredDeals.length > 0
+      totalNOIY1: dealsWithNOIY1.reduce(
+        (sum, d) => sum + (d.noiY1 || 0),
+        0,
+      ),
+      avgNOIY1:
+        dealsWithNOIY1.length > 0
           ? Math.round(
-              filteredDeals.reduce((sum, d) => sum + d.pricePerUnit, 0) /
-                filteredDeals.length,
+              dealsWithNOIY1.reduce((sum, d) => sum + (d.noiY1 || 0), 0) /
+                dealsWithNOIY1.length,
             )
-          : 0,
-      avgDealSize:
-        filteredDeals.length > 0
-          ? filteredDeals.reduce((sum, d) => sum + d.totalPrice, 0) /
-            filteredDeals.length
           : 0,
       closedDeals: filteredDeals.filter((d) => d.stage === 'closed').length,
-      highestScore:
-        filteredDeals.length > 0
-          ? Math.max(...filteredDeals.map((d) => d.score))
+      highestNOI:
+        dealsWithNOI.length > 0
+          ? Math.max(...dealsWithNOI.map((d) => d.noiT12 || 0))
           : 0,
-      lowestScore:
-        filteredDeals.length > 0
-          ? Math.min(...filteredDeals.map((d) => d.score))
+      lowestNOI:
+        dealsWithNOI.length > 0
+          ? Math.min(...dealsWithNOI.map((d) => d.noiT12 || 0))
           : 0,
     };
   }, [filteredDeals]);
@@ -547,21 +445,35 @@ export const Dashboard = () => {
       count: filteredDeals.filter((d) => d.stage === stage.id).length,
       value: filteredDeals
         .filter((d) => d.stage === stage.id)
-        .reduce((sum, d) => sum + d.totalPrice, 0),
+        .reduce((sum, d) => sum + (d.noiT12 || 0), 0),
     }));
   }, [filteredDeals, stages]);
 
   const geoChartData = useMemo((): GeoChartDatum[] => {
-    const byState: Record<string, { count: number; value: number }> = {};
+    const bySubmarket: Record<string, { count: number; value: number }> = {};
     filteredDeals.forEach((deal) => {
-      if (!byState[deal.state]) byState[deal.state] = { count: 0, value: 0 };
-      byState[deal.state].count++;
-      byState[deal.state].value += deal.totalPrice;
+      const key = deal.submarket || 'Other';
+      if (!bySubmarket[key]) bySubmarket[key] = { count: 0, value: 0 };
+      bySubmarket[key].count++;
+      bySubmarket[key].value += deal.noiT12 || 0;
     });
-    return Object.entries(byState)
-      .map(([state, data]) => ({ state, ...data }))
+    return Object.entries(bySubmarket)
+      .map(([submarket, data]) => ({ submarket, ...data }))
       .sort((a, b) => b.value - a.value);
   }, [filteredDeals]);
+
+  // Deals with NOI data for the distribution chart
+  const dealsWithNOIData = useMemo(
+    () => filteredDeals.filter((d) => d.noiT12 !== null && d.noiT12 > 0),
+    [filteredDeals],
+  );
+  const maxNOI = useMemo(
+    () =>
+      dealsWithNOIData.length > 0
+        ? Math.max(...dealsWithNOIData.map((d) => d.noiT12 || 0))
+        : 0,
+    [dealsWithNOIData],
+  );
 
   // --- Handlers ---
   const toggleTag = (tag: string) => {
@@ -601,24 +513,33 @@ export const Dashboard = () => {
           ? `for ${selectedTags.join(' + ')} deals`
           : 'across your entire pipeline';
 
+      const noiDeals = filteredDeals.filter(
+        (d) => d.noiT12 !== null && d.noiT12 > 0,
+      );
+
       const response: AIResponse = {
-        summary: `Your pipeline ${tagContext} contains ${filteredDeals.length} deals totaling ${formatPrice(metrics.totalValue)} across ${metrics.totalUnits.toLocaleString()} units.`,
+        summary: `Your pipeline ${tagContext} contains ${filteredDeals.length} deals totaling ${formatPrice(metrics.totalNOI)} in T12 NOI across ${metrics.totalUnits.toLocaleString()} units.`,
         insights: [
-          `Average deal score is ${metrics.avgScore}/100, indicating ${metrics.avgScore >= 75 ? 'strong' : metrics.avgScore >= 65 ? 'moderate' : 'mixed'} overall quality.`,
-          metrics.avgCapRate
-            ? `T12 cap rates average ${metrics.avgCapRate}%, ${parseFloat(metrics.avgCapRate) >= 5 ? 'above' : 'below'} the typical 5% threshold for value-add.`
-            : 'Several deals are in lease-up with no stabilized cap rate yet.',
-          `${filteredDeals.filter((d) => d.stage === 'dueDiligence' || d.stage === 'closing').length} deals are in active pursuit (Due Diligence or Closing).`,
+          metrics.avgNOI > 0
+            ? `Average T12 NOI is ${formatPrice(metrics.avgNOI)} across ${noiDeals.length} deals with financial data.`
+            : 'Financial data is still being populated for your pipeline deals.',
+          `${filteredDeals.filter((d) => d.stage === 'review').length} deal(s) are currently in review.`,
+          `Your pipeline includes ${metrics.totalUnits.toLocaleString()} total units across ${filteredDeals.length} properties.`,
         ],
-        topDeal: filteredDeals.reduce<DashboardDeal | null>(
-          (best, deal) => (deal.score > (best?.score ?? 0) ? deal : best),
-          null,
-        ),
-        recommendation: query.toLowerCase().includes('value-add')
-          ? 'Focus on The Overlook and Carmel Vista for value-add opportunities with renovation upside.'
-          : query.toLowerCase().includes('core')
-            ? 'Beacon Station offers the strongest stabilized returns in your Core-Plus segment.'
-            : 'Consider moving Creekview Vista forward - lease-up risk is offset by strong submarket fundamentals.',
+        topDeal:
+          noiDeals.length > 0
+            ? noiDeals.reduce((best, deal) =>
+                (deal.noiT12 || 0) > (best.noiT12 || 0) ? deal : best,
+              )
+            : null,
+        recommendation:
+          filteredDeals.length > 0
+            ? query.toLowerCase().includes('noi')
+              ? `Your top NOI performer is ${noiDeals.length > 0 ? noiDeals.reduce((best, d) => ((d.noiT12 || 0) > (best.noiT12 || 0) ? d : best)).name : 'N/A'} with ${formatPrice(metrics.highestNOI)} T12 NOI.`
+              : query.toLowerCase().includes('review')
+                ? `You have ${filteredDeals.filter((d) => d.stage === 'review').length} deal(s) in review. Advancing these will strengthen your pipeline velocity.`
+                : `Focus on the ${filteredDeals.filter((d) => d.stage === 'active' || d.stage === 'review').length} deals in active/review stages to advance your pipeline.`
+            : 'Upload new deal documents to get started with your pipeline analysis.',
       };
 
       setAiResponse(response);
@@ -633,13 +554,20 @@ export const Dashboard = () => {
 
   return (
     <AnimatePresence mode="wait">
-      {!mounted ? (
+      {isLoading ? (
         <motion.div key="skeleton" initial={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
           <DashboardSkeleton />
         </motion.div>
       ) : (
         <motion.div key="content" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}>
     <div className="space-y-6">
+      {/* ============== ERROR BANNER ============== */}
+      {error && (
+        <div className="p-4 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+          {error}
+        </div>
+      )}
+
       {/* ============== PAGE HEADER ============== */}
       <div
         className={cn(
@@ -702,7 +630,7 @@ export const Dashboard = () => {
         <span className="text-xs font-medium shrink-0 text-muted-foreground">
           Filter:
         </span>
-        {ALL_TAGS.map((tag) => (
+        {allTags.map((tag) => (
           <button
             key={tag}
             onClick={() => toggleTag(tag)}
@@ -751,7 +679,7 @@ export const Dashboard = () => {
               </button>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
               {selectedMetrics.map((metricId, index) => {
                 const metricDef = METRICS_LIBRARY[metricId];
                 if (!metricDef) return null;
@@ -775,14 +703,7 @@ export const Dashboard = () => {
                         {metricDef.label}
                       </span>
                     </div>
-                    <p
-                      className={cn(
-                        'font-mono text-2xl font-bold',
-                        metricDef.scoreColored
-                          ? getScoreTextClass(value as number)
-                          : 'text-foreground',
-                      )}
-                    >
+                    <p className="font-mono text-2xl font-bold text-foreground">
                       {metricDef.format(value)}
                     </p>
                   </div>
@@ -823,8 +744,8 @@ export const Dashboard = () => {
                 const stageDeals = filteredDeals.filter(
                   (d) => d.stage === stage.id,
                 );
-                const stageValue = stageDeals.reduce(
-                  (sum, d) => sum + d.totalPrice,
+                const stageNOI = stageDeals.reduce(
+                  (sum, d) => sum + (d.noiT12 || 0),
                   0,
                 );
 
@@ -863,7 +784,7 @@ export const Dashboard = () => {
                         </span>
                       </div>
                       <span className="text-xs font-mono text-muted-foreground">
-                        {formatPrice(stageValue)}
+                        {formatPrice(stageNOI)}
                       </span>
                     </div>
 
@@ -875,36 +796,33 @@ export const Dashboard = () => {
                           draggable
                           onDragStart={() => setDraggedDeal(deal.id)}
                           onDragEnd={() => setDraggedDeal(null)}
+                          onClick={() => navigate(`/library/${deal.id}`)}
                           className={cn(
                             'rounded-xl p-3 cursor-grab active:cursor-grabbing transition-all duration-200 hover:scale-[1.02] hover:shadow-md border border-border bg-muted',
                             draggedDeal === deal.id && 'opacity-50',
                           )}
                         >
                           <div className="flex items-start justify-between mb-2">
-                            <div>
-                              <p className="font-semibold text-sm text-foreground">
+                            <div className="min-w-0">
+                              <p className="font-semibold text-sm text-foreground truncate">
                                 {deal.name}
                               </p>
-                              <p className="text-xs text-muted-foreground">
-                                {deal.city}
+                              <p className="text-xs text-muted-foreground truncate">
+                                {deal.submarket || deal.address || '\u2014'}
                               </p>
                             </div>
-                            <div
-                              className={cn(
-                                'text-xs font-mono font-bold px-2 py-1 rounded-lg',
-                                getScoreBgClass(deal.score),
-                                getScoreTextClass(deal.score),
-                              )}
-                            >
-                              {deal.score}
-                            </div>
+                            {deal.documentType && (
+                              <span className="text-[10px] font-mono font-bold px-2 py-1 rounded-lg bg-primary/10 text-primary shrink-0 ml-2">
+                                {deal.documentType}
+                              </span>
+                            )}
                           </div>
                           <div className="flex items-center justify-between text-xs">
                             <span className="text-muted-foreground">
-                              {deal.units} units
+                              {deal.units > 0 ? `${deal.units} units` : '\u2014'}
                             </span>
-                            <span className="font-mono font-semibold text-foreground">
-                              {formatPrice(deal.totalPrice)}
+                            <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400">
+                              {formatPrice(deal.noiT12)}
                             </span>
                           </div>
                         </div>
@@ -1008,127 +926,150 @@ export const Dashboard = () => {
               </div>
             </div>
 
-            {/* --- Geographic Bar Chart --- */}
+            {/* --- Submarket Bar Chart --- */}
             <div className="border border-border rounded-2xl bg-card p-6">
               <h3 className="font-display text-base font-bold text-foreground mb-4">
-                By Geography
+                By Submarket
               </h3>
 
-              <div className="space-y-3">
-                {geoChartData.map((geo, index) => {
-                  const maxValue = Math.max(
-                    ...geoChartData.map((g) => g.value),
-                  );
-                  const barWidth = (geo.value / maxValue) * 100;
-
-                  return (
-                    <div key={geo.state}>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm font-medium text-foreground">
-                          {geo.state}
-                        </span>
-                        <span className="text-xs font-mono text-muted-foreground">
-                          {geo.count} deals
-                        </span>
-                      </div>
-                      <div className="h-6 rounded-lg overflow-hidden bg-muted">
-                        <div
-                          className="h-full rounded-lg flex items-center justify-end px-2 bg-primary transition-all duration-700 ease-out"
-                          style={{
-                            width: mounted ? `${barWidth}%` : '0%',
-                            transitionDelay: `${500 + index * 100}ms`,
-                          }}
-                        >
-                          <span className="text-xs font-mono text-primary-foreground font-semibold">
-                            {formatPrice(geo.value)}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* --- Deal Score Dot Plot --- */}
-            <div className="border border-border rounded-2xl bg-card p-6">
-              <h3 className="font-display text-base font-bold text-foreground mb-4">
-                Deal Score Distribution
-              </h3>
-
-              <div className="relative h-48 mt-6">
-                {/* Y-axis labels */}
-                <div className="absolute left-0 top-0 bottom-8 w-8 flex flex-col justify-between text-xs text-muted-foreground">
-                  <span>100</span>
-                  <span>75</span>
-                  <span>50</span>
-                </div>
-
-                {/* Chart area */}
-                <div className="ml-10 h-full relative border-l border-b border-border">
-                  {/* Grid lines */}
-                  {[75, 50].map((line) => (
-                    <div
-                      key={line}
-                      className="absolute w-full border-t border-dashed border-border"
-                      style={{ top: `${100 - line}%` }}
-                    />
-                  ))}
-
-                  {/* Dots */}
-                  {filteredDeals.map((deal, index) => {
-                    const x =
-                      (index / (filteredDeals.length - 1 || 1)) * 90 + 5;
-                    const y = 100 - deal.score;
+              {geoChartData.length > 0 ? (
+                <div className="space-y-3">
+                  {geoChartData.map((geo, index) => {
+                    const maxValue = Math.max(
+                      ...geoChartData.map((g) => g.value),
+                    );
+                    const barWidth = maxValue > 0 ? (geo.value / maxValue) * 100 : 0;
 
                     return (
-                      <div
-                        key={deal.id}
-                        className={cn(
-                          'absolute w-4 h-4 rounded-full cursor-pointer transition-all duration-300 hover:scale-150 group -translate-x-1/2 -translate-y-1/2',
-                          mounted
-                            ? 'scale-100 opacity-100'
-                            : 'scale-0 opacity-0',
-                        )}
-                        style={{
-                          left: `${x}%`,
-                          top: `${y}%`,
-                          backgroundColor: getScoreColor(deal.score),
-                          boxShadow: `0 2px 8px ${getScoreColor(deal.score)}40`,
-                          transitionDelay: `${600 + index * 60}ms`,
-                        }}
-                      >
-                        {/* Tooltip */}
-                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 rounded-lg text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none bg-card border border-border text-foreground shadow-lg z-10">
-                          {deal.name}: {deal.score}
+                      <div key={geo.submarket}>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-sm font-medium text-foreground truncate">
+                            {geo.submarket}
+                          </span>
+                          <span className="text-xs font-mono text-muted-foreground shrink-0 ml-2">
+                            {geo.count} {geo.count === 1 ? 'deal' : 'deals'}
+                          </span>
+                        </div>
+                        <div className="h-6 rounded-lg overflow-hidden bg-muted">
+                          <div
+                            className="h-full rounded-lg flex items-center justify-end px-2 bg-primary transition-all duration-700 ease-out"
+                            style={{
+                              width: mounted ? `${barWidth}%` : '0%',
+                              transitionDelay: `${500 + index * 100}ms`,
+                            }}
+                          >
+                            {barWidth > 20 && (
+                              <span className="text-xs font-mono text-primary-foreground font-semibold">
+                                {formatPrice(geo.value)}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     );
                   })}
                 </div>
-              </div>
+              ) : (
+                <div className="flex items-center justify-center h-32 text-sm text-muted-foreground">
+                  No submarket data available
+                </div>
+              )}
+            </div>
 
-              {/* Summary */}
-              <div className="flex items-center justify-between mt-4 pt-4 border-t border-border">
-                <div className="text-center">
-                  <p className="text-xs text-muted-foreground">Low</p>
-                  <p className="font-mono font-bold text-destructive">
-                    {metrics.lowestScore}
-                  </p>
+            {/* --- NOI Distribution Plot --- */}
+            <div className="border border-border rounded-2xl bg-card p-6">
+              <h3 className="font-display text-base font-bold text-foreground mb-4">
+                NOI Distribution (T12)
+              </h3>
+
+              {dealsWithNOIData.length > 0 ? (
+                <>
+                  <div className="relative h-48 mt-6">
+                    {/* Y-axis labels */}
+                    <div className="absolute left-0 top-0 bottom-8 w-12 flex flex-col justify-between text-xs text-muted-foreground">
+                      <span>{formatPrice(maxNOI)}</span>
+                      <span>{formatPrice(maxNOI * 0.5)}</span>
+                      <span>$0</span>
+                    </div>
+
+                    {/* Chart area */}
+                    <div className="ml-14 h-full relative border-l border-b border-border">
+                      {/* Grid lines */}
+                      {[50].map((line) => (
+                        <div
+                          key={line}
+                          className="absolute w-full border-t border-dashed border-border"
+                          style={{ top: `${100 - line}%` }}
+                        />
+                      ))}
+
+                      {/* Dots */}
+                      {dealsWithNOIData.map((deal, index) => {
+                        const x =
+                          (index / (dealsWithNOIData.length - 1 || 1)) * 90 + 5;
+                        const normalizedNOI =
+                          maxNOI > 0
+                            ? ((deal.noiT12 || 0) / maxNOI) * 100
+                            : 50;
+                        const y = 100 - normalizedNOI;
+
+                        return (
+                          <div
+                            key={deal.id}
+                            className={cn(
+                              'absolute w-4 h-4 rounded-full cursor-pointer transition-all duration-300 hover:scale-150 group -translate-x-1/2 -translate-y-1/2',
+                              mounted
+                                ? 'scale-100 opacity-100'
+                                : 'scale-0 opacity-0',
+                            )}
+                            style={{
+                              left: `${x}%`,
+                              top: `${y}%`,
+                              backgroundColor: getNOIColor(
+                                deal.noiT12 || 0,
+                                maxNOI,
+                              ),
+                              boxShadow: `0 2px 8px ${getNOIColor(deal.noiT12 || 0, maxNOI)}40`,
+                              transitionDelay: `${600 + index * 60}ms`,
+                            }}
+                          >
+                            {/* Tooltip */}
+                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 rounded-lg text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none bg-card border border-border text-foreground shadow-lg z-10">
+                              {deal.name}: {formatPrice(deal.noiT12)}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Summary */}
+                  <div className="flex items-center justify-between mt-4 pt-4 border-t border-border">
+                    <div className="text-center">
+                      <p className="text-xs text-muted-foreground">Low</p>
+                      <p className="font-mono font-bold text-destructive">
+                        {formatPrice(metrics.lowestNOI)}
+                      </p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-xs text-muted-foreground">Average</p>
+                      <p className="font-mono font-bold text-primary">
+                        {formatPrice(metrics.avgNOI)}
+                      </p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-xs text-muted-foreground">High</p>
+                      <p className="font-mono font-bold text-success">
+                        {formatPrice(metrics.highestNOI)}
+                      </p>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="flex items-center justify-center h-48 text-sm text-muted-foreground">
+                  No NOI data available yet
                 </div>
-                <div className="text-center">
-                  <p className="text-xs text-muted-foreground">Average</p>
-                  <p className="font-mono font-bold text-primary">
-                    {metrics.avgScore}
-                  </p>
-                </div>
-                <div className="text-center">
-                  <p className="text-xs text-muted-foreground">High</p>
-                  <p className="font-mono font-bold text-success">
-                    {metrics.highestScore}
-                  </p>
-                </div>
-              </div>
+              )}
             </div>
           </section>
         )}
@@ -1268,33 +1209,25 @@ export const Dashboard = () => {
                 {aiResponse.topDeal && (
                   <div className="p-4 rounded-xl bg-muted">
                     <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-                      Top Opportunity
+                      Top NOI Performer
                     </p>
                     <div className="flex items-center gap-3">
-                      <div
-                        className="w-12 h-12 rounded-lg bg-cover bg-center shrink-0"
-                        style={{
-                          backgroundImage: `url(${aiResponse.topDeal.thumbnail})`,
-                        }}
-                      />
+                      <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center shrink-0">
+                        <Building2 className="w-5 h-5 text-primary" />
+                      </div>
                       <div className="min-w-0">
                         <p className="font-semibold text-foreground truncate">
                           {aiResponse.topDeal.name}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {aiResponse.topDeal.city}
+                          {aiResponse.topDeal.submarket || aiResponse.topDeal.address || '\u2014'}
                         </p>
                       </div>
                       <div className="ml-auto text-right shrink-0">
-                        <p
-                          className={cn(
-                            'font-mono font-bold',
-                            getScoreTextClass(aiResponse.topDeal.score),
-                          )}
-                        >
-                          {aiResponse.topDeal.score}
+                        <p className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                          {formatPrice(aiResponse.topDeal.noiT12)}
                         </p>
-                        <p className="text-xs text-muted-foreground">Score</p>
+                        <p className="text-xs text-muted-foreground">T12 NOI</p>
                       </div>
                     </div>
                   </div>
