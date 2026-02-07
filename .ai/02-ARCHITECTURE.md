@@ -295,37 +295,45 @@ PropertyDetail.tsx (Page)
 
 ### State Management
 
-**Decision:** React hooks only, no Redux.
+**Decision:** Zustand for global state, React hooks for local state.
 
 **Why:**
-- Simple app, no complex global state
-- Context API sufficient for auth (future)
-- Props drilling acceptable for now
+- ✅ Zustand implemented for auth state (authSlice)
+- ✅ Zustand with persist middleware for UI state (theme, sidebar)
+- Simpler than Redux, no boilerplate
+- TypeScript support excellent
+- Props drilling avoided for auth/UI state
 
 **When to Add Redux:**
-- 5+ components need same data
-- Complex state updates (undo/redo)
+- 5+ complex stores with heavy middleware
+- Need Redux DevTools integration
 - Real-time collaboration (future)
 
 **Current State:**
+- Global state: Zustand (auth, UI preferences)
 - Local state: `useState` in components
-- Server state: React Query (future optimization)
+- Server state: Direct API calls (React Query for future optimization)
 
 ---
 
 ## Security Considerations
 
-### Current (MVP):
-- No authentication (single-user local app)
-- No authorization (all data belongs to one user)
-- API keys in `.env` (not committed)
+### Current (Implemented):
+- ✅ JWT authentication with httpOnly cookies
+- ✅ User registration with email validation
+- ✅ Password hashing with bcrypt (cost factor 12)
+- ✅ Protected API routes requiring authentication
+- ✅ Row-level security (users see only their data via user_id)
+- ✅ API keys in `.env` (not committed to git)
+- ✅ CORS configuration for development
 
-### Future (Production):
-- JWT authentication
-- User table with hashed passwords
-- Row-level security (users see only their data)
-- HTTPS only
-- Rate limiting on API endpoints
+### Future (Production Hardening):
+- HTTPS only (enforce in production)
+- Rate limiting on auth endpoints
+- Password reset flow via email
+- Email verification on registration
+- Session management (logout all devices)
+- API key rotation system
 
 ---
 
@@ -417,5 +425,5 @@ File Storage: Cloudflare R2 (PDF uploads)
 
 ---
 
-**Last Updated:** January 21, 2026  
-**Token Count:** ~1,800 (optimized for context)
+**Last Updated:** February 7, 2026
+**Token Count:** ~1,850 (optimized for context)

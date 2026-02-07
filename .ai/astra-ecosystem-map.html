@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Astra CRE - Ecosystem Map</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #1a0b2e 0%, #2d1b4e 50%, #1a0b2e 100%);
+            color: #ffffff;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        #container {
+            width: 100%;
+            height: 100vh;
+            position: relative;
+            overflow: hidden;
+        }
+
+        #canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        #controls {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            background: rgba(30, 20, 50, 0.9);
+            backdrop-filter: blur(10px);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid rgba(168, 85, 247, 0.3);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        }
+
+        #controls h3 {
+            color: #a855f7;
+            margin-bottom: 15px;
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        .control-group label {
+            display: block;
+            font-size: 12px;
+            color: #c4b5fd;
+            margin-bottom: 8px;
+        }
+
+        .control-group button {
+            width: 100%;
+            padding: 10px;
+            background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+            border: none;
+            border-radius: 6px;
+            color: white;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            margin-bottom: 8px;
+        }
+
+        .control-group button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(168, 85, 247, 0.4);
+        }
+
+        .control-group button.active {
+            background: linear-gradient(135deg, #a855f7 0%, #c084fc 100%);
+            box-shadow: 0 0 20px rgba(168, 85, 247, 0.6);
+        }
+
+        #info-panel {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            z-index: 1000;
+            background: rgba(30, 20, 50, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 25px;
+            border-radius: 12px;
+            border: 1px solid rgba(168, 85, 247, 0.3);
+            max-width: 400px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+
+        #info-panel h2 {
+            color: #a855f7;
+            margin-bottom: 12px;
+            font-size: 20px;
+        }
+
+        #info-panel h3 {
+            color: #c084fc;
+            margin-top: 15px;
+            margin-bottom: 8px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        #info-panel p, #info-panel li {
+            color: #e9d5ff;
+            line-height: 1.6;
+            font-size: 13px;
+            margin-bottom: 8px;
+        }
+
+        #info-panel ul {
+            margin-left: 20px;
+            margin-top: 8px;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-top: 8px;
+        }
+
+        .status-complete {
+            background: rgba(34, 197, 94, 0.2);
+            color: #86efac;
+            border: 1px solid rgba(34, 197, 94, 0.3);
+        }
+
+        .status-planning {
+            background: rgba(251, 191, 36, 0.2);
+            color: #fde047;
+            border: 1px solid rgba(251, 191, 36, 0.3);
+        }
+
+        .status-priority {
+            background: rgba(239, 68, 68, 0.2);
+            color: #fca5a5;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        #header {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 1000;
+        }
+
+        #header h1 {
+            font-size: 28px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #a855f7 0%, #c084fc 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        #header p {
+            color: #c4b5fd;
+            font-size: 13px;
+            margin-top: 4px;
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(30, 20, 50, 0.5);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(168, 85, 247, 0.5);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(168, 85, 247, 0.7);
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <canvas id="canvas"></canvas>
+    </div>
+
+    <div id="header">
+        <h1>Astra CRE</h1>
+        <p>Investment Analysis Platform Ecosystem</p>
+    </div>
+
+    <div id="controls">
+        <h3>Navigate</h3>
+        <div class="control-group">
+            <button onclick="resetView()">Reset View</button>
+            <button onclick="expandAll()">Expand All</button>
+            <button onclick="collapseAll()">Collapse All</button>
+        </div>
+        <div class="control-group">
+            <label>Quick Jump</label>
+            <button onclick="focusNode('core-features')">Core Features</button>
+            <button onclick="focusNode('future-planning')">Future Planning</button>
+            <button onclick="focusNode('automation')">Automation</button>
+            <button onclick="focusNode('research')">Research</button>
+        </div>
+    </div>
+
+    <div id="info-panel">
+        <h2>Astra CRE Platform</h2>
+        <p>Click on any node to explore features, planning, and automation details.</p>
+        <span class="status-badge status-complete">Production Ready</span>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const infoPanel = document.getElementById('info-panel');
+
+        let width = window.innerWidth;
+        let height = window.innerHeight;
+        canvas.width = width;
+        canvas.height = height;
+
+        let offsetX = 0;
+        let offsetY = 0;
+        let scale = 1;
+        let isDragging = false;
+        let dragStartX = 0;
+        let dragStartY = 0;
+
+        const nodeData = {
+            id: 'root',
+            label: 'Astra CRE',
+            description: 'All-In-One Commercial Real Estate Investment Analysis Platform',
+            status: 'complete',
+            children: [
+                {
+                    id: 'core-features',
+                    label: 'Core Features',
+                    description: 'Production-ready features currently live in application',
+                    status: 'complete',
+                    children: [
+                        {
+                            id: 'pipeline-mgmt',
+                            label: 'Pipeline Management',
+                            description: 'Track opportunities through stages: Sourcing → Underwriting → Due Diligence → Closing. Drag-and-drop Kanban board with real-time updates.',
+                            status: 'complete',
+                            details: ['Stage-based workflow', 'Drag & drop interface', 'Real-time sync', 'Deal cards with key metrics']
+                        },
+                        {
+                            id: 'document-parsing',
+                            label: 'AI Document Parser',
+                            description: 'Extract key financial metrics from OMs, BOVs, and rent rolls using Claude API.',
+                            status: 'complete',
+                            details: ['Upload PDF/Excel', 'Auto-extract metrics', 'Cap rates, NOI, unit count', 'Rent roll parsing']
+                        },
+                        {
+                            id: 'comp-analysis',
+                            label: 'Comp Analysis',
+                            description: 'Side-by-side property comparison with visual charts and financial benchmarking.',
+                            status: 'complete',
+                            details: ['Multi-property comparison', 'Interactive charts', 'Benchmark against portfolio', 'Export to Excel']
+                        },
+                        {
+                            id: 'auth',
+                            label: 'Authentication',
+                            description: 'Secure user authentication with JWT tokens and bcrypt password hashing.',
+                            status: 'complete',
+                            details: ['JWT tokens', 'Bcrypt hashing', 'Protected routes', 'Session management']
+                        },
+                        {
+                            id: 'dashboard',
+                            label: 'Analytics Dashboard',
+                            description: 'Portfolio overview with key metrics, recent activity, and deal velocity tracking.',
+                            status: 'complete',
+                            details: ['Portfolio metrics', 'Deal velocity', 'Recent activity feed', 'Quick actions']
+                        }
+                    ]
+                },
+                {
+                    id: 'future-planning',
+                    label: 'Future Planning',
+                    description: 'Roadmap for next-generation features',
+                    status: 'planning',
+                    children: [
+                        {
+                            id: 'scoring-system',
+                            label: '0-100 Property Scoring',
+                            description: 'AI-powered proprietary scoring system with deep market research. PRIORITY 9-10.',
+                            status: 'priority',
+                            details: [
+                                'Financial Score (35%): IRR, Cash-on-Cash, Cap Rates',
+                                'Market Score (25%): AI web research, supply/demand',
+                                'Asset Score (25%): Quality, location, condition',
+                                'Operational Score (15%): DSCR, occupancy, expenses',
+                                'Multi-strategy support: Core, Core-Plus, Value-Add, Opportunistic',
+                                'User-customizable weights',
+                                'Real-time market intelligence'
+                            ]
+                        },
+                        {
+                            id: 'ai-chatbot',
+                            label: 'AI Chatbot Assistant',
+                            description: 'Persistent chatbot accessible from anywhere in app. Animated icon, context-aware.',
+                            status: 'priority',
+                            details: [
+                                'Animated icon in header/corner',
+                                'Access from any page',
+                                'Context-aware of current view',
+                                'Answer questions about deals',
+                                'Run portfolio queries',
+                                'Market research via web search',
+                                'Natural language interface'
+                            ]
+                        },
+                        {
+                            id: 'portfolio-analysis',
+                            label: 'Portfolio Analysis',
+                            description: 'For principals/owners to analyze aggregate holdings, performance trends, and diversification.',
+                            status: 'planning',
+                            details: ['Aggregate metrics', 'Performance trends', 'Geographic heat maps', 'Risk analysis']
+                        },
+                        {
+                            id: 'loi-mgmt',
+                            label: 'LOI Management',
+                            description: 'For brokers to track Letter of Intent submissions, terms, and negotiations.',
+                            status: 'planning',
+                            details: ['LOI templates', 'Term tracking', 'Negotiation timeline', 'Status updates']
+                        },
+                        {
+                            id: 'market-reports',
+                            label: 'Market Reports',
+                            description: 'Auto-generate market analysis reports with AI-powered insights and visualizations.',
+                            status: 'planning',
+                            details: ['Submarket analysis', 'Supply/demand trends', 'Comp sets', 'AI-generated insights']
+                        }
+                    ]
+                },
+                {
+                    id: 'automation',
+                    label: 'Automation & Workflows',
+                    description: 'Free automation tools and integrations',
+                    status: 'planning',
+                    children: [
+                        {
+                            id: 'n8n-workflows',
+                            label: 'n8n Workflows',
+                            description: 'Self-hosted automation platform for connecting CRE data sources.',
+                            status: 'planning',
+                            details: [
+                                'Email parsing (new OMs)',
+                                'Auto-populate properties',
+                                'Slack notifications',
+                                'Scheduled reports',
+                                'Data sync workflows'
+                            ]
+                        },
+                        {
+                            id: 'cowork-skills',
+                            label: 'Cowork Skills',
+                            description: 'Leverage installed Cowork plugins for document processing and analysis.',
+                            status: 'complete',
+                            details: [
+                                'XLSX: Excel proforma analysis',
+                                'DOCX: OM document parsing',
+                                'PDF: Extract financial data',
+                                'Data: Analytics & visualization',
+                                'Finance: Underwriting workflows'
+                            ]
+                        },
+                        {
+                            id: 'api-integration',
+                            label: 'API Integration Layer',
+                            description: 'Connect to free data sources and internal systems.',
+                            status: 'planning',
+                            details: ['Census data API', 'BLS employment data', 'Internal CRM sync', 'Property data feeds']
+                        }
+                    ]
+                },
+                {
+                    id: 'research',
+                    label: 'Research & Analysis',
+                    description: 'Deep dive research completed to inform feature development',
+                    status: 'complete',
+                    children: [
+                        {
+                            id: 'institutional-underwriting',
+                            label: 'Institutional Underwriting',
+                            description: 'Analyzed Alliance Residential proforma (Prose Gainesville) to understand institutional metrics.',
+                            status: 'complete',
+                            details: [
+                                'Levered IRR: Premium (15%+), Market (12%+)',
+                                'Cap Rates: T12, Y1, Terminal',
+                                'DSCR thresholds',
+                                'Multi-scenario modeling',
+                                'Renovation budget analysis',
+                                'Rollover schedules'
+                            ]
+                        },
+                        {
+                            id: 'investment-strategies',
+                            label: 'Investment Strategies',
+                            description: 'Research on Core, Core-Plus, Value-Add, and Opportunistic strategies.',
+                            status: 'complete',
+                            details: [
+                                'Core: 7-10% IRR, stabilized assets',
+                                'Core-Plus: 10-13% IRR, light repositioning',
+                                'Value-Add: 13-18% IRR, active management',
+                                'Opportunistic: 18%+ IRR, development/heavy lift'
+                            ]
+                        },
+                        {
+                            id: 'ai-proptech',
+                            label: 'AI & PropTech',
+                            description: 'Surveyed AI capabilities in CRE: NLP, predictive analytics, market intelligence.',
+                            status: 'complete',
+                            details: ['Document parsing', 'Market sentiment analysis', 'Predictive modeling', 'Web scraping for intel']
+                        }
+                    ]
+                },
+                {
+                    id: 'use-cases',
+                    label: 'Target Users',
+                    description: 'Three primary user types served by platform',
+                    status: 'complete',
+                    children: [
+                        {
+                            id: 'acquisitions',
+                            label: 'Acquisitions Teams',
+                            description: 'Track pipeline, analyze deals, collaborate on underwriting.',
+                            status: 'complete',
+                            details: [
+                                'Pipeline management',
+                                'Deal scoring',
+                                'Underwriting tools',
+                                'Team collaboration',
+                                'Multi-strategy support'
+                            ]
+                        },
+                        {
+                            id: 'brokers',
+                            label: 'Brokers',
+                            description: 'Centralized hub for tracking listings, buyer prospects, and LOIs.',
+                            status: 'complete',
+                            details: [
+                                'Listing management',
+                                'Buyer tracking',
+                                'LOI workflow (planned)',
+                                'Comp analysis',
+                                'Market reports (planned)'
+                            ]
+                        },
+                        {
+                            id: 'principals',
+                            label: 'Principals/Owners',
+                            description: 'Portfolio-level insights, performance tracking, strategic planning.',
+                            status: 'planning',
+                            details: [
+                                'Portfolio analysis (planned)',
+                                'Performance dashboards',
+                                'Asset allocation',
+                                'Risk management',
+                                'Executive reporting'
+                            ]
+                        }
+                    ]
+                },
+                {
+                    id: 'tech-stack',
+                    label: 'Technology Stack',
+                    description: 'Modern, production-grade architecture',
+                    status: 'complete',
+                    children: [
+                        {
+                            id: 'frontend',
+                            label: 'Frontend',
+                            description: 'React 18 + TypeScript + Vite with shadcn/ui components and Tailwind CSS.',
+                            status: 'complete',
+                            details: ['React 18', 'TypeScript', 'Vite', 'shadcn/ui', 'Tailwind CSS', 'Zustand state']
+                        },
+                        {
+                            id: 'backend',
+                            label: 'Backend',
+                            description: 'Python FastAPI with SQLAlchemy ORM and SQLite database.',
+                            status: 'complete',
+                            details: ['FastAPI', 'SQLAlchemy', 'SQLite', 'Pydantic validation', 'JWT auth']
+                        },
+                        {
+                            id: 'ai',
+                            label: 'AI Integration',
+                            description: 'Claude API (Sonnet 4) for document parsing and analysis.',
+                            status: 'complete',
+                            details: ['Claude Sonnet 4', 'Document parsing', 'Natural language queries', 'Market research']
+                        }
+                    ]
+                }
+            ]
+        };
+
+        class Node {
+            constructor(data, parent = null, depth = 0, index = 0) {
+                this.data = data;
+                this.parent = parent;
+                this.depth = depth;
+                this.index = index;
+                this.children = [];
+                this.x = 0;
+                this.y = 0;
+                this.collapsed = depth > 1; // Collapse nodes beyond first level by default
+                this.radius = depth === 0 ? 45 : 35;
+                this.hovered = false;
+
+                if (data.children) {
+                    data.children.forEach((child, i) => {
+                        this.children.push(new Node(child, this, depth + 1, i));
+                    });
+                }
+            }
+
+            getVisibleChildren() {
+                return this.collapsed ? [] : this.children;
+            }
+
+            toggleCollapse() {
+                this.collapsed = !this.collapsed;
+            }
+
+            expandAll() {
+                this.collapsed = false;
+                this.children.forEach(child => child.expandAll());
+            }
+
+            collapseAll() {
+                if (this.depth > 0) {
+                    this.collapsed = true;
+                }
+                this.children.forEach(child => child.collapseAll());
+            }
+        }
+
+        const rootNode = new Node(nodeData);
+
+        function calculateLayout(node, x, y, horizontalSpacing = 250, verticalSpacing = 150) {
+            node.x = x;
+            node.y = y;
+
+            const children = node.getVisibleChildren();
+            if (children.length === 0) return;
+
+            const totalHeight = (children.length - 1) * verticalSpacing;
+            let currentY = y - totalHeight / 2;
+
+            children.forEach(child => {
+                calculateLayout(child, x + horizontalSpacing, currentY, horizontalSpacing, verticalSpacing);
+                currentY += verticalSpacing;
+            });
+        }
+
+        function drawConnection(fromNode, toNode) {
+            const startX = (fromNode.x + fromNode.radius) * scale + offsetX;
+            const startY = fromNode.y * scale + offsetY;
+            const endX = (toNode.x - toNode.radius) * scale + offsetX;
+            const endY = toNode.y * scale + offsetY;
+
+            const controlPointOffset = 80 * scale;
+
+            ctx.beginPath();
+            ctx.moveTo(startX, startY);
+            ctx.bezierCurveTo(
+                startX + controlPointOffset, startY,
+                endX - controlPointOffset, endY,
+                endX, endY
+            );
+            ctx.strokeStyle = 'rgba(168, 85, 247, 0.3)';
+            ctx.lineWidth = 2 * scale;
+            ctx.stroke();
+        }
+
+        function getStatusColor(status) {
+            switch(status) {
+                case 'complete': return { bg: '#22c55e', border: '#86efac', glow: 'rgba(34, 197, 94, 0.4)' };
+                case 'planning': return { bg: '#fbbf24', border: '#fde047', glow: 'rgba(251, 191, 36, 0.4)' };
+                case 'priority': return { bg: '#ef4444', border: '#fca5a5', glow: 'rgba(239, 68, 68, 0.4)' };
+                default: return { bg: '#a855f7', border: '#c084fc', glow: 'rgba(168, 85, 247, 0.4)' };
+            }
+        }
+
+        function drawNode(node) {
+            const x = node.x * scale + offsetX;
+            const y = node.y * scale + offsetY;
+            const radius = node.radius * scale;
+
+            const colors = getStatusColor(node.data.status);
+
+            // Glow effect when hovered
+            if (node.hovered) {
+                ctx.beginPath();
+                ctx.arc(x, y, radius + 10 * scale, 0, Math.PI * 2);
+                ctx.fillStyle = colors.glow;
+                ctx.fill();
+            }
+
+            // Node circle with gradient
+            const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
+            gradient.addColorStop(0, colors.bg);
+            gradient.addColorStop(1, colors.border);
+
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, Math.PI * 2);
+            ctx.fillStyle = gradient;
+            ctx.fill();
+            ctx.strokeStyle = colors.border;
+            ctx.lineWidth = 3 * scale;
+            ctx.stroke();
+
+            // Label
+            ctx.fillStyle = '#ffffff';
+            ctx.font = `${node.depth === 0 ? 14 : 11} * scale}px Inter, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(node.data.label, x, y);
+
+            // Collapse/expand indicator
+            if (node.children.length > 0) {
+                const indicatorRadius = 8 * scale;
+                const indicatorX = x + radius - indicatorRadius;
+                const indicatorY = y - radius + indicatorRadius;
+
+                ctx.beginPath();
+                ctx.arc(indicatorX, indicatorY, indicatorRadius, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+                ctx.fill();
+
+                ctx.fillStyle = colors.bg;
+                ctx.font = `${10 * scale}px Inter, sans-serif`;
+                ctx.fillText(node.collapsed ? '+' : '−', indicatorX, indicatorY);
+            }
+        }
+
+        function renderTree(node) {
+            const children = node.getVisibleChildren();
+            children.forEach(child => {
+                drawConnection(node, child);
+                renderTree(child);
+            });
+            drawNode(node);
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, width, height);
+            calculateLayout(rootNode, width * 0.15, height / 2);
+            renderTree(rootNode);
+        }
+
+        function findNodeAt(node, mouseX, mouseY) {
+            const x = node.x * scale + offsetX;
+            const y = node.y * scale + offsetY;
+            const radius = node.radius * scale;
+
+            const distance = Math.sqrt((mouseX - x) ** 2 + (mouseY - y) ** 2);
+            if (distance <= radius) {
+                return node;
+            }
+
+            const children = node.getVisibleChildren();
+            for (let child of children) {
+                const found = findNodeAt(child, mouseX, mouseY);
+                if (found) return found;
+            }
+
+            return null;
+        }
+
+        function updateInfoPanel(node) {
+            const data = node.data;
+            let html = `<h2>${data.label}</h2>`;
+            html += `<p>${data.description}</p>`;
+
+            if (data.status) {
+                const statusClass = `status-${data.status}`;
+                const statusText = data.status.charAt(0).toUpperCase() + data.status.slice(1);
+                html += `<span class="status-badge ${statusClass}">${statusText}</span>`;
+            }
+
+            if (data.details && data.details.length > 0) {
+                html += '<h3>Details</h3><ul>';
+                data.details.forEach(detail => {
+                    html += `<li>${detail}</li>`;
+                });
+                html += '</ul>';
+            }
+
+            if (node.children.length > 0) {
+                html += '<h3>Sub-Components</h3><ul>';
+                node.children.forEach(child => {
+                    html += `<li>${child.data.label}</li>`;
+                });
+                html += '</ul>';
+            }
+
+            infoPanel.innerHTML = html;
+        }
+
+        // Event Listeners
+        canvas.addEventListener('click', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            const clickedNode = findNodeAt(rootNode, mouseX, mouseY);
+            if (clickedNode) {
+                if (clickedNode.children.length > 0) {
+                    clickedNode.toggleCollapse();
+                }
+                updateInfoPanel(clickedNode);
+                draw();
+            }
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            let needsRedraw = false;
+            const hoveredNode = findNodeAt(rootNode, mouseX, mouseY);
+
+            function updateHover(node) {
+                const wasHovered = node.hovered;
+                node.hovered = node === hoveredNode;
+                if (wasHovered !== node.hovered) needsRedraw = true;
+                node.children.forEach(updateHover);
+            }
+
+            updateHover(rootNode);
+
+            if (hoveredNode) {
+                canvas.style.cursor = 'pointer';
+            } else {
+                canvas.style.cursor = isDragging ? 'grabbing' : 'grab';
+            }
+
+            if (needsRedraw) draw();
+        });
+
+        canvas.addEventListener('mousedown', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            const clickedNode = findNodeAt(rootNode, mouseX, mouseY);
+            if (!clickedNode) {
+                isDragging = true;
+                dragStartX = mouseX - offsetX;
+                dragStartY = mouseY - offsetY;
+                canvas.style.cursor = 'grabbing';
+            }
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (isDragging) {
+                const rect = canvas.getBoundingClientRect();
+                offsetX = (e.clientX - rect.left) - dragStartX;
+                offsetY = (e.clientY - rect.top) - dragStartY;
+                draw();
+            }
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            isDragging = false;
+            canvas.style.cursor = 'grab';
+        });
+
+        canvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+            const newScale = Math.max(0.3, Math.min(3, scale * zoomFactor));
+
+            offsetX = mouseX - (mouseX - offsetX) * (newScale / scale);
+            offsetY = mouseY - (mouseY - offsetY) * (newScale / scale);
+            scale = newScale;
+
+            draw();
+        });
+
+        window.addEventListener('resize', () => {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+            draw();
+        });
+
+        // Control functions
+        function resetView() {
+            offsetX = 0;
+            offsetY = 0;
+            scale = 1;
+            draw();
+        }
+
+        function expandAll() {
+            rootNode.expandAll();
+            draw();
+        }
+
+        function collapseAll() {
+            rootNode.collapseAll();
+            draw();
+        }
+
+        function focusNode(nodeId) {
+            function findNode(node) {
+                if (node.data.id === nodeId) return node;
+                for (let child of node.children) {
+                    const found = findNode(child);
+                    if (found) return found;
+                }
+                return null;
+            }
+
+            const targetNode = findNode(rootNode);
+            if (targetNode) {
+                calculateLayout(rootNode, width * 0.15, height / 2);
+                offsetX = width / 2 - targetNode.x * scale;
+                offsetY = height / 2 - targetNode.y * scale;
+                updateInfoPanel(targetNode);
+                draw();
+            }
+        }
+
+        // Initial render
+        draw();
+        updateInfoPanel(rootNode);
+    </script>
+</body>
+</html>
