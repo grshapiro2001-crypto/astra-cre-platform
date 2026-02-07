@@ -31,9 +31,11 @@ import {
   X,
   Check,
 } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/authSlice';
 import { Button } from '@/components/ui/button';
+import { DashboardSkeleton } from '@/components/ui/PageSkeleton';
 
 // ============================================================
 // TYPES
@@ -628,6 +630,13 @@ export const Dashboard = () => {
     widgets.find((w) => w.id === widgetId)?.visible ?? false;
 
   return (
+    <AnimatePresence mode="wait">
+      {!mounted ? (
+        <motion.div key="skeleton" initial={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
+          <DashboardSkeleton />
+        </motion.div>
+      ) : (
+        <motion.div key="content" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}>
     <div className="space-y-6">
       {/* ============== PAGE HEADER ============== */}
       <div
@@ -1470,5 +1479,8 @@ export const Dashboard = () => {
         </div>
       </div>
     </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 };

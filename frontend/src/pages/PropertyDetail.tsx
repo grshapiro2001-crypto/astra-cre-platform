@@ -27,6 +27,7 @@ import type {
   FinancialPeriod,
   BOVPricingTier,
 } from '@/types/property';
+import { AnimatePresence, motion } from 'framer-motion';
 import { PropertyDetailSkeleton } from '@/components/ui/PageSkeleton';
 import {
   Dialog,
@@ -428,47 +429,40 @@ export const PropertyDetail = () => {
   }, [pricingGuidance, property, totalUnits, totalSF]);
 
   // -----------------------------------------------------------------------
-  // Loading skeleton
-  // -----------------------------------------------------------------------
-
-  if (isLoading) {
-    return <PropertyDetailSkeleton />;
-  }
-
-  // -----------------------------------------------------------------------
-  // Error state
-  // -----------------------------------------------------------------------
-
-  if (error || !property) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="text-center space-y-4 max-w-md">
-          <div className="w-16 h-16 rounded-2xl bg-destructive/10 flex items-center justify-center mx-auto">
-            <AlertTriangle className="w-8 h-8 text-destructive" />
-          </div>
-          <h2 className="font-display text-xl font-bold text-foreground">
-            Error Loading Property
-          </h2>
-          <p className="text-muted-foreground">
-            {error || 'Property not found.'}
-          </p>
-          <button
-            onClick={() => navigate('/library')}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Library
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // -----------------------------------------------------------------------
   // Render
   // -----------------------------------------------------------------------
 
   return (
+    <AnimatePresence mode="wait">
+      {isLoading ? (
+        <motion.div key="skeleton" initial={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
+          <PropertyDetailSkeleton />
+        </motion.div>
+      ) : error || !property ? (
+        <motion.div key="error" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}>
+          <div className="flex items-center justify-center min-h-[60vh]">
+            <div className="text-center space-y-4 max-w-md">
+              <div className="w-16 h-16 rounded-2xl bg-destructive/10 flex items-center justify-center mx-auto">
+                <AlertTriangle className="w-8 h-8 text-destructive" />
+              </div>
+              <h2 className="font-display text-xl font-bold text-foreground">
+                Error Loading Property
+              </h2>
+              <p className="text-muted-foreground">
+                {error || 'Property not found.'}
+              </p>
+              <button
+                onClick={() => navigate('/library')}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Back to Library
+              </button>
+            </div>
+          </div>
+        </motion.div>
+      ) : (
+        <motion.div key="content" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}>
     <div className="min-h-full -m-4 lg:-m-6">
       {/* ================================================================= */}
       {/* STICKY TOOLBAR                                                     */}
@@ -1860,5 +1854,8 @@ export const PropertyDetail = () => {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 };

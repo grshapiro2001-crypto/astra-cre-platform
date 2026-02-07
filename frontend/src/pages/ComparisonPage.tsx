@@ -15,6 +15,7 @@
  */
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
   ArrowLeft,
   ArrowRight,
@@ -914,44 +915,38 @@ export const ComparisonPage = () => {
     [criteria, rankings, data]
   );
 
-  // ============================================================
-  // Loading
-  // ============================================================
-  if (isLoading) {
-    return <ComparisonSkeleton />;
-  }
+  // These are only used in the content branch (guarded by `!data ? null :`)
+  const properties = data?.properties ?? [];
+  const bestValues = data?.best_values as NonNullable<ComparisonResponse['best_values']>;
 
   // ============================================================
-  // Error
-  // ============================================================
-  if (error) {
-    return (
-      <div className="max-w-4xl mx-auto">
-        <div className="border border-rose-200 dark:border-rose-800 rounded-2xl bg-rose-50 dark:bg-rose-950/30 p-6">
-          <h2 className="text-lg font-display font-semibold text-rose-900 dark:text-rose-200 mb-2">
-            Error
-          </h2>
-          <p className="text-sm text-rose-800 dark:text-rose-300">{error}</p>
-          <button
-            onClick={() => navigate('/library')}
-            className="mt-4 px-4 py-2.5 rounded-xl bg-primary text-white text-sm font-medium hover:bg-primary/90 transition-colors"
-          >
-            Back to Library
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (!data) return null;
-
-  const properties = data.properties;
-  const bestValues = data.best_values;
-
-  // ============================================================
-  // Main Render
+  // Render
   // ============================================================
   return (
+    <AnimatePresence mode="wait">
+      {isLoading ? (
+        <motion.div key="skeleton" initial={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
+          <ComparisonSkeleton />
+        </motion.div>
+      ) : error ? (
+        <motion.div key="error" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}>
+          <div className="max-w-4xl mx-auto">
+            <div className="border border-rose-200 dark:border-rose-800 rounded-2xl bg-rose-50 dark:bg-rose-950/30 p-6">
+              <h2 className="text-lg font-display font-semibold text-rose-900 dark:text-rose-200 mb-2">
+                Error
+              </h2>
+              <p className="text-sm text-rose-800 dark:text-rose-300">{error}</p>
+              <button
+                onClick={() => navigate('/library')}
+                className="mt-4 px-4 py-2.5 rounded-xl bg-primary text-white text-sm font-medium hover:bg-primary/90 transition-colors"
+              >
+                Back to Library
+              </button>
+            </div>
+          </div>
+        </motion.div>
+      ) : !data ? null : (
+        <motion.div key="content" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}>
     <div className="min-h-full -m-4 lg:-m-6">
       {/* ===== TOOLBAR ===== */}
       <div className="sticky top-16 z-20 bg-background/85 backdrop-blur-xl border-b border-border">
@@ -1898,5 +1893,8 @@ export const ComparisonPage = () => {
         </div>
       )}
     </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 };
