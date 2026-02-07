@@ -1,6 +1,9 @@
 import { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
+import { FileText, AlertCircle, Loader2, Upload, X } from 'lucide-react';
 import { propertyService } from '../../services/propertyService';
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 import type { UploadResponse } from '../../types/property';
 
 interface PDFUploaderProps {
@@ -67,53 +70,32 @@ export const PDFUploader = ({ onUploadComplete }: PDFUploaderProps) => {
       {/* Dropzone */}
       <div
         {...getRootProps()}
-        className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors
-          ${isDragActive ? 'border-emerald-500 bg-emerald-50' : 'border-emerald-300 hover:border-emerald-400'}
-          ${isUploading ? 'pointer-events-none opacity-50' : ''}`}
+        className={cn(
+          'border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors',
+          isDragActive
+            ? 'border-primary bg-primary/5'
+            : 'border-border hover:border-primary/50 bg-card',
+          isUploading && 'pointer-events-none opacity-50'
+        )}
       >
         <input {...getInputProps()} />
         <div className="space-y-2">
-          {/* PDF Icon */}
-          <svg
-            className="mx-auto h-12 w-12 text-emerald-400"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
-            />
-          </svg>
-          <p className="text-lg text-emerald-700">
+          <Upload className="mx-auto h-12 w-12 text-muted-foreground" />
+          <p className="text-lg text-foreground">
             {isDragActive ? 'Drop PDF here' : 'Drag & drop PDF here, or click to browse'}
           </p>
-          <p className="text-sm text-emerald-500">Only PDF files up to 25MB</p>
+          <p className="text-sm text-muted-foreground">Only PDF files up to 25MB</p>
         </div>
       </div>
 
       {/* Selected File Display */}
       {selectedFile && (
-        <div className="flex items-center justify-between bg-emerald-50 p-4 rounded-xl border border-emerald-200">
+        <div className="flex items-center justify-between bg-primary/5 p-4 rounded-xl border border-primary/20">
           <div className="flex items-center space-x-3">
-            <svg
-              className="h-8 w-8 text-emerald-600"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
-              />
-            </svg>
+            <FileText className="h-8 w-8 text-primary" />
             <div>
-              <p className="font-medium text-emerald-900">{selectedFile.name}</p>
-              <p className="text-sm text-emerald-600">
+              <p className="font-medium text-foreground">{selectedFile.name}</p>
+              <p className="text-sm text-muted-foreground">
                 {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
               </p>
             </div>
@@ -121,9 +103,9 @@ export const PDFUploader = ({ onUploadComplete }: PDFUploaderProps) => {
           {!isUploading && (
             <button
               onClick={handleRemove}
-              className="text-red-600 hover:text-red-700 font-medium transition-colors"
+              className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
             >
-              Remove
+              <X className="h-5 w-5" />
             </button>
           )}
         </div>
@@ -131,64 +113,30 @@ export const PDFUploader = ({ onUploadComplete }: PDFUploaderProps) => {
 
       {/* Error Display */}
       {error && (
-        <div className="bg-red-50 border border-red-200 p-4 rounded-lg">
+        <div className="bg-destructive/10 border border-destructive/20 p-4 rounded-xl">
           <div className="flex items-start">
-            <svg
-              className="h-5 w-5 text-red-600 mt-0.5 mr-3"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-            <p className="text-sm text-red-800">{error}</p>
+            <AlertCircle className="h-5 w-5 text-destructive mt-0.5 mr-3 shrink-0" />
+            <p className="text-sm text-destructive">{error}</p>
           </div>
         </div>
       )}
 
       {/* Analyze Button */}
-      <button
+      <Button
         onClick={handleAnalyze}
         disabled={!selectedFile || isUploading}
-        className={`w-full py-3 px-4 rounded-lg font-semibold transition-all duration-200
-          ${
-            !selectedFile || isUploading
-              ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-              : 'bg-emerald-500 text-white hover:bg-emerald-600 active:bg-emerald-700 shadow-md shadow-emerald-500/25'
-          }`}
+        className="w-full py-3 text-base font-semibold shadow-md shadow-primary/25"
+        size="lg"
       >
         {isUploading ? (
           <span className="flex items-center justify-center">
-            <svg
-              className="animate-spin h-5 w-5 mr-3"
-              fill="none"
-              viewBox="0 0 24 24"
-            >
-              <circle
-                className="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                strokeWidth="4"
-              />
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-              />
-            </svg>
+            <Loader2 className="animate-spin h-5 w-5 mr-3" />
             Analyzing Document...
           </span>
         ) : (
           'Analyze Document'
         )}
-      </button>
+      </Button>
     </div>
   );
 };
