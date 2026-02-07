@@ -20,13 +20,14 @@ import {
   FolderPlus,
   X,
 } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { propertyService } from '@/services/propertyService';
 import { dealFolderService, type DealFolder } from '@/services/dealFolderService';
 import type { PropertyListItem } from '@/types/property';
 import { CreateFolderModal } from '@/components/library/CreateFolderModal';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Skeleton } from '@/components/ui/skeleton';
+import { LibrarySkeleton } from '@/components/ui/PageSkeleton';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -510,40 +511,17 @@ export const Library = () => {
           </Alert>
         )}
 
-        {/* Loading skeleton */}
-        {isLoading && (
-          <div
-            className={cn(
-              viewMode === 'grid'
-                ? 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-5'
-                : 'space-y-3',
-            )}
-          >
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div
-                key={i}
-                className="border border-border rounded-2xl bg-card overflow-hidden"
-              >
-                <Skeleton className="h-32 w-full" />
-                <div className="p-4 space-y-3">
-                  <Skeleton className="h-5 w-3/4" />
-                  <Skeleton className="h-4 w-1/2" />
-                  <div className="flex gap-2">
-                    <Skeleton className="h-4 w-16" />
-                    <Skeleton className="h-4 w-16" />
-                    <Skeleton className="h-4 w-16" />
-                  </div>
-                  <Skeleton className="h-4 w-full" />
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
+        <AnimatePresence mode="wait">
+        {isLoading ? (
+          <motion.div key="skeleton" initial={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
+            <LibrarySkeleton />
+          </motion.div>
+        ) : (
+          <motion.div key="content" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}>
         {/* ============================================================ */}
         {/* GRID VIEW                                                     */}
         {/* ============================================================ */}
-        {!isLoading && viewMode === 'grid' && (
+        {viewMode === 'grid' && (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-5">
             {filteredProperties.map((property) => {
               const isSelected = selectedPropertyIds.includes(property.id);
@@ -783,7 +761,7 @@ export const Library = () => {
         {/* ============================================================ */}
         {/* LIST VIEW                                                     */}
         {/* ============================================================ */}
-        {!isLoading && viewMode === 'list' && filteredProperties.length > 0 && (
+        {viewMode === 'list' && filteredProperties.length > 0 && (
           <div className="border border-border rounded-2xl bg-card overflow-hidden">
             {/* Table header */}
             <div
@@ -927,7 +905,7 @@ export const Library = () => {
         {/* ============================================================ */}
         {/* EMPTY STATE                                                   */}
         {/* ============================================================ */}
-        {!isLoading && filteredProperties.length === 0 && !error && (
+        {filteredProperties.length === 0 && !error && (
           <div className="text-center py-20">
             <div className="w-20 h-20 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
               <Search className="w-10 h-10 text-muted-foreground" />
@@ -951,6 +929,9 @@ export const Library = () => {
             )}
           </div>
         )}
+          </motion.div>
+        )}
+        </AnimatePresence>
       </div>
 
       {/* ================================================================ */}

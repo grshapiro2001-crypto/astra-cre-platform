@@ -27,7 +27,7 @@ import type {
   FinancialPeriod,
   BOVPricingTier,
 } from '@/types/property';
-import { Skeleton } from '@/components/ui/skeleton';
+import { PropertyDetailSkeleton } from '@/components/ui/PageSkeleton';
 import {
   Dialog,
   DialogContent,
@@ -432,22 +432,7 @@ export const PropertyDetail = () => {
   // -----------------------------------------------------------------------
 
   if (isLoading) {
-    return (
-      <div>
-        <div className="max-w-6xl mx-auto space-y-8">
-          <div className="flex items-center gap-4">
-            <Skeleton className="h-10 w-10 rounded-xl" />
-            <div className="space-y-2">
-              <Skeleton className="h-6 w-64" />
-              <Skeleton className="h-4 w-40" />
-            </div>
-          </div>
-          <Skeleton className="h-72 w-full rounded-2xl" />
-          <Skeleton className="h-72 w-full rounded-2xl" />
-          <Skeleton className="h-96 w-full rounded-2xl" />
-        </div>
-      </div>
-    );
+    return <PropertyDetailSkeleton />;
   }
 
   // -----------------------------------------------------------------------

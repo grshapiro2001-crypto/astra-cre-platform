@@ -27,7 +27,6 @@ import {
   Sparkles,
   Star,
   Check,
-  Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -45,6 +44,7 @@ import {
   rankProperties,
   getGradientColor,
 } from '@/utils/criteriaEvaluation';
+import { ComparisonSkeleton } from '@/components/ui/PageSkeleton';
 
 // ============================================================
 // Types
@@ -918,16 +918,7 @@ export const ComparisonPage = () => {
   // Loading
   // ============================================================
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 mx-auto text-primary animate-spin" />
-          <p className="mt-3 text-sm text-muted-foreground">
-            Loading comparison...
-          </p>
-        </div>
-      </div>
-    );
+    return <ComparisonSkeleton />;
   }
 
   // ============================================================

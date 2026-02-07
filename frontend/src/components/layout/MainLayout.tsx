@@ -1,7 +1,9 @@
 import { useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
+import { AnimatePresence } from 'framer-motion';
 import { Header } from './Header';
 import { Sidebar, MobileSidebar } from './Sidebar';
+import { PageTransition } from './PageTransition';
 import { useUIStore } from '@/store/uiStore';
 import { cn } from '@/lib/utils';
 
@@ -48,7 +50,11 @@ export const MainLayout = () => {
       >
         <Header />
         <main className="flex-1 p-4 lg:p-6 relative">
-          <Outlet />
+          <AnimatePresence mode="wait">
+            <PageTransition key={location.pathname}>
+              <Outlet />
+            </PageTransition>
+          </AnimatePresence>
         </main>
       </div>
     </div>
