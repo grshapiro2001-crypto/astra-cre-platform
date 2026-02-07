@@ -9,18 +9,17 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-emerald-500 text-white shadow-sm hover:bg-emerald-600 active:bg-emerald-700",
+        default: "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 active:bg-primary/80",
         destructive:
-          "bg-red-500 text-white shadow-sm hover:bg-red-600",
+          "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90",
         outline:
-          "border border-emerald-300 bg-white hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-400",
+          "border border-border bg-card hover:bg-muted hover:text-foreground",
         secondary:
-          "bg-emerald-100 text-emerald-800 hover:bg-emerald-200",
-        ghost: "hover:bg-emerald-50 hover:text-emerald-700",
-        link: "text-emerald-600 underline-offset-4 hover:underline",
+          "bg-primary/10 text-primary hover:bg-primary/20",
+        ghost: "hover:bg-muted hover:text-foreground",
+        link: "text-primary underline-offset-4 hover:underline",
         success: "bg-green-500 text-white shadow-sm hover:bg-green-600",
         warning: "bg-amber-500 text-white shadow-sm hover:bg-amber-600",
-        forest: "bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-md hover:from-emerald-600 hover:to-green-700",
       },
       size: {
         default: "h-10 px-4 py-2",

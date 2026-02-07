@@ -3,7 +3,6 @@ import { useDropzone } from 'react-dropzone';
 import { FileText, AlertCircle, Upload, X } from 'lucide-react';
 import { propertyService } from '../../services/propertyService';
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
 import type { UploadResponse } from '../../types/property';
 
 interface PDFUploaderProps {
@@ -143,28 +142,17 @@ export const PDFUploader = ({ onUploadComplete }: PDFUploaderProps) => {
       <div
         {...getRootProps()}
         className={cn(
-          'border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all duration-200 min-h-48 flex items-center justify-center',
+          'border border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all duration-300 min-h-48 flex items-center justify-center',
           isDragActive
-            ? 'border-primary bg-primary/5 ring-2 ring-primary/30 shadow-lg shadow-primary/10'
-            : 'border-border hover:border-primary/50 bg-card',
+            ? 'border-primary border-solid bg-primary/5 ring-2 ring-primary/20 shadow-lg shadow-primary/10'
+            : 'border-border/60 bg-card/50 hover:border-primary/40 hover:bg-primary/5',
           isUploading && 'pointer-events-none opacity-50'
         )}
       >
         <input {...getInputProps()} />
-        <div className="space-y-3">
-          <Upload
-            className={cn(
-              'mx-auto w-10 h-10 transition-colors',
-              isDragActive ? 'text-primary' : 'text-muted-foreground'
-            )}
-          />
-          <p className="text-lg text-foreground">
-            {isDragActive ? 'Drop PDF here' : 'Drag & drop PDF here, or click to browse'}
-          </p>
-          <p className="text-sm text-muted-foreground">Only PDF files up to 25MB</p>
-
-          {/* Document type pills */}
-          <div className="flex items-center justify-center gap-2 pt-1">
+        <div className="space-y-4">
+          {/* Document type pills header */}
+          <div className="flex items-center justify-center gap-2">
             {DOC_TYPES.map((type) => (
               <span
                 key={type}
@@ -173,6 +161,26 @@ export const PDFUploader = ({ onUploadComplete }: PDFUploaderProps) => {
                 {type}
               </span>
             ))}
+          </div>
+
+          {/* Upload icon in circle */}
+          <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto">
+            <Upload
+              className={cn(
+                'w-7 h-7 transition-colors',
+                isDragActive ? 'text-primary' : 'text-primary'
+              )}
+            />
+          </div>
+
+          {/* Text */}
+          <div className="space-y-1">
+            <p className="text-foreground font-medium">
+              {isDragActive ? 'Drop PDF here' : 'Drag & drop your document here'}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              or click to browse &middot; PDF files up to 25MB
+            </p>
           </div>
         </div>
       </div>
@@ -214,14 +222,18 @@ export const PDFUploader = ({ onUploadComplete }: PDFUploaderProps) => {
       )}
 
       {/* Analyze Button */}
-      <Button
+      <button
         onClick={handleAnalyze}
         disabled={!selectedFile || isUploading}
-        className="w-full py-3 text-base font-semibold shadow-md shadow-primary/25"
-        size="lg"
+        className={cn(
+          'w-full h-12 text-base font-semibold rounded-xl transition-all',
+          selectedFile && !isUploading
+            ? 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20'
+            : 'bg-muted text-muted-foreground cursor-not-allowed'
+        )}
       >
         {isUploading ? 'Analyzing...' : 'Analyze Document'}
-      </Button>
+      </button>
     </div>
   );
 };

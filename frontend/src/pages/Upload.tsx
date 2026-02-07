@@ -30,13 +30,10 @@ const STEPS = [
 ];
 
 const HowItWorks = () => (
-  <div className="relative flex items-start justify-center gap-8 py-8">
-    {/* Connecting line behind circles */}
-    <div className="absolute top-[2.35rem] left-1/2 -translate-x-1/2 w-[calc(100%-10rem)] h-px bg-border" />
-
+  <div className="flex items-start justify-center gap-8 py-8">
     {STEPS.map((step) => (
-      <div key={step.title} className="relative flex flex-col items-center text-center w-44">
-        <div className="relative z-10 w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-3">
+      <div key={step.title} className="flex flex-col items-center text-center w-44">
+        <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-3">
           <step.icon className="w-5 h-5 text-primary" />
         </div>
         <h4 className="text-sm font-semibold text-foreground mb-0.5">{step.title}</h4>
@@ -76,8 +73,10 @@ const RecentUploads = ({
     return (
       <div className="space-y-3">
         <h3 className="font-display text-lg font-semibold text-foreground">Recent Uploads</h3>
-        <div className="flex items-center justify-center py-8 rounded-xl border border-dashed border-border bg-card">
+        <div className="flex flex-col items-center justify-center py-10 rounded-xl border border-dashed border-border bg-card gap-2">
+          <FileText className="w-8 h-8 text-muted-foreground/50" />
           <p className="text-sm text-muted-foreground">No documents uploaded yet</p>
+          <p className="text-xs text-muted-foreground/70">Upload your first offering memorandum to get started</p>
         </div>
       </div>
     );
@@ -91,7 +90,7 @@ const RecentUploads = ({
           <button
             key={prop.id}
             onClick={() => navigate(`/library/${prop.id}`)}
-            className="w-full flex items-center gap-4 px-4 py-3 text-left hover:bg-muted/50 transition-colors group"
+            className="w-full flex items-center gap-4 px-4 py-3 text-left cursor-pointer hover:bg-primary/5 transition-colors group"
           >
             <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
               <FileText className="w-4 h-4 text-primary" />
@@ -108,8 +107,8 @@ const RecentUploads = ({
               className={cn(
                 'text-xs font-medium px-2 py-0.5 rounded-full shrink-0',
                 prop.document_type === 'OM'
-                  ? 'bg-primary/10 text-primary'
-                  : 'bg-violet-500/10 text-violet-500'
+                  ? 'bg-blue-500/10 text-blue-400'
+                  : 'bg-primary/10 text-primary'
               )}
             >
               {prop.document_type}
