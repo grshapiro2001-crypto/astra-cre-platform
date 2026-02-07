@@ -145,8 +145,8 @@ export const SaveToFolderModal = ({
       );
 
       console.log('✅ Property saved successfully!', savedProperty);
-      // Success! Navigate to folder detail page
-      navigate(`/folders/${folderId}`);
+      // Navigate to the saved property's detail page
+      navigate(`/library/${savedProperty.id}`);
     } catch (err: any) {
       console.error('❌ Save error caught:', err);
       console.error('Error response:', err.response);
@@ -217,8 +217,8 @@ export const SaveToFolderModal = ({
       );
 
       console.log('✅ New property saved successfully!', savedProperty);
-      // Success! Navigate to folder detail page
-      navigate(`/folders/${pendingSaveFolderId}`);
+      // Navigate to the saved property's detail page
+      navigate(`/library/${savedProperty.id}`);
     } catch (err: any) {
       console.error('❌ Replace failed:', err);
       const errorMessage = err.response?.data?.detail || 'Failed to replace property. Please try again.';
@@ -251,8 +251,8 @@ export const SaveToFolderModal = ({
       );
 
       console.log('✅ Property saved successfully (kept both)!', savedProperty);
-      // Success! Navigate to folder detail page
-      navigate(`/folders/${pendingSaveFolderId}`);
+      // Navigate to the saved property's detail page
+      navigate(`/library/${savedProperty.id}`);
     } catch (err: any) {
       console.error('❌ Keep both failed:', err);
       const errorMessage = err.response?.data?.detail || 'Failed to save property. Please try again.';

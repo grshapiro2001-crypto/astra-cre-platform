@@ -158,7 +158,17 @@ export const Upload = () => {
     };
   }, [uploadResult]); // re-fetch after a successful upload
 
+  const navigate = useNavigate();
+
   const handleUploadComplete = (result: UploadResponse, filename: string, pdfPath: string) => {
+    // If the API ever returns a property ID directly, navigate straight to it
+    const propertyId = (result as any).property_id ?? (result as any).id;
+    if (propertyId) {
+      navigate(`/library/${propertyId}`);
+      return;
+    }
+
+    // Otherwise, show ExtractionPreview for the save-to-folder flow
     setUploadResult(result);
     setUploadedFilename(filename);
     setPdfPath(pdfPath);
@@ -173,6 +183,13 @@ export const Upload = () => {
   if (uploadResult) {
     return (
       <div className="max-w-5xl mx-auto">
+        {/* Brief transition header */}
+        <div className="flex items-center gap-2 mb-6 px-1">
+          <CheckCircle2 className="w-5 h-5 text-primary" />
+          <p className="text-sm text-muted-foreground">
+            Extraction complete! Review the data below and save to your library.
+          </p>
+        </div>
         <ExtractionPreview
           result={uploadResult}
           filename={uploadedFilename}
