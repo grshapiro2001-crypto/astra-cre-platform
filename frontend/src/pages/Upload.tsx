@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Upload as UploadIcon, Sparkles, CheckCircle2, FileText, ArrowRight } from 'lucide-react';
+import { Upload as UploadIcon, Sparkles, CheckCircle2, FileText, ArrowRight, Loader2 } from 'lucide-react';
 import { PDFUploader } from '../components/upload/PDFUploader';
-import { ExtractionPreview } from '../components/upload/ExtractionPreview';
 import { propertyService } from '../services/propertyService';
+import { dealFolderService } from '../services/dealFolderService';
 import { cn } from '@/lib/utils';
 import type { UploadResponse, PropertyListItem } from '../types/property';
 
@@ -134,11 +134,11 @@ const RecentUploads = ({
 // ============================================================
 
 export const Upload = () => {
-  const [uploadResult, setUploadResult] = useState<UploadResponse | null>(null);
-  const [uploadedFilename, setUploadedFilename] = useState<string>('');
-  const [pdfPath, setPdfPath] = useState<string>('');
+  const navigate = useNavigate();
   const [recentProperties, setRecentProperties] = useState<PropertyListItem[]>([]);
   const [recentLoading, setRecentLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -156,11 +156,9 @@ export const Upload = () => {
     return () => {
       cancelled = true;
     };
-  }, [uploadResult]); // re-fetch after a successful upload
+  }, []);
 
-  const navigate = useNavigate();
-
-  const handleUploadComplete = (result: UploadResponse, filename: string, pdfPath: string) => {
+  const handleUploadComplete = async (result: UploadResponse, filename: string, pdfPath: string) => {
     // If the API ever returns a property ID directly, navigate straight to it
     const propertyId = (result as any).property_id ?? (result as any).id;
     if (propertyId) {
@@ -168,34 +166,56 @@ export const Upload = () => {
       return;
     }
 
-    // Otherwise, show ExtractionPreview for the save-to-folder flow
-    setUploadResult(result);
-    setUploadedFilename(filename);
-    setPdfPath(pdfPath);
+    // Auto-save: create a folder and save the property, then navigate to detail
+    setIsSaving(true);
+    setSaveError(null);
+
+    try {
+      const pInfo = result.extraction_result.property_info;
+      const dealName = pInfo.deal_name || filename.replace('.pdf', '');
+      const docType = result.extraction_result.document_type;
+
+      // Create a deal folder named after the property
+      const folder = await dealFolderService.createFolder({
+        folder_name: dealName,
+        property_type: pInfo.property_type ?? undefined,
+        property_address: pInfo.property_address ?? undefined,
+        submarket: pInfo.submarket ?? undefined,
+        total_units: pInfo.total_units ?? undefined,
+        total_sf: pInfo.total_sf ?? undefined,
+        status: 'active',
+      });
+
+      // Save the property to the new folder
+      const savedProperty = await propertyService.saveToLibrary(
+        result,
+        filename,
+        pdfPath,
+        folder.id,
+        docType === 'OM' || docType === 'BOV' ? docType : undefined,
+        true // force=true to skip duplicate check on auto-save
+      );
+
+      // Navigate to the property detail page
+      navigate(`/library/${savedProperty.id}`);
+    } catch (err: any) {
+      console.error('Auto-save failed:', err);
+      setSaveError(err.response?.data?.detail || 'Failed to save property. Please try again.');
+      setIsSaving(false);
+    }
   };
 
-  const handleUploadAnother = () => {
-    setUploadResult(null);
-    setUploadedFilename('');
-    setPdfPath('');
-  };
-
-  if (uploadResult) {
+  // Saving transition state
+  if (isSaving) {
     return (
-      <div className="max-w-5xl mx-auto">
-        {/* Brief transition header */}
-        <div className="flex items-center gap-2 mb-6 px-1">
-          <CheckCircle2 className="w-5 h-5 text-primary" />
-          <p className="text-sm text-muted-foreground">
-            Extraction complete! Review the data below and save to your library.
-          </p>
+      <div className="max-w-2xl mx-auto flex flex-col items-center justify-center py-32 gap-4">
+        <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center">
+          <Loader2 className="w-7 h-7 text-primary animate-spin" />
         </div>
-        <ExtractionPreview
-          result={uploadResult}
-          filename={uploadedFilename}
-          pdfPath={pdfPath}
-          onUploadAnother={handleUploadAnother}
-        />
+        <div className="text-center space-y-1">
+          <p className="text-lg font-medium text-foreground">Extraction complete!</p>
+          <p className="text-sm text-muted-foreground">Saving to your library and loading property details...</p>
+        </div>
       </div>
     );
   }
@@ -211,6 +231,13 @@ export const Upload = () => {
           Upload an Offering Memorandum or BOV for AI-powered extraction
         </p>
       </div>
+
+      {/* Save Error */}
+      {saveError && (
+        <div className="max-w-2xl mx-auto bg-destructive/10 border border-destructive/20 p-4 rounded-xl">
+          <p className="text-sm text-destructive">{saveError}</p>
+        </div>
+      )}
 
       {/* Upload Card */}
       <div className="relative max-w-2xl mx-auto">
