@@ -11,6 +11,7 @@
  * - Widget visibility toggling
  */
 import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Sparkles,
   Plus,
@@ -428,6 +429,7 @@ const METRICS_LIBRARY: Record<MetricId, MetricDefinition> = {
 // ============================================================
 
 export const Dashboard = () => {
+  const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
   const firstName =
     user?.full_name?.split(' ')[0] || user?.email?.split('@')[0] || 'there';
@@ -673,6 +675,7 @@ export const Dashboard = () => {
           <Button
             variant="outline"
             className="border-border text-muted-foreground hover:text-foreground"
+            onClick={() => navigate('/upload')}
           >
             <Plus className="w-4 h-4" />
             New Deal
