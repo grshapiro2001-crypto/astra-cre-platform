@@ -339,7 +339,7 @@ async def extract_with_claude(
 
     try:
         # Initialize Anthropic client
-        client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+        client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY, base_url="https://api.anthropic.com")
 
         # Truncate PDF text if too long (Claude has 200k context but let's be conservative)
         max_text_length = 100000
