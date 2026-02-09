@@ -8,6 +8,9 @@ from alembic import context
 # Import Base and models
 from app.database import Base
 from app.models.user import User  # Import all models here
+from app.models.property import Property, AnalysisLog
+from app.models.deal_folder import DealFolder, BOVPricingTier, BOVCapRate
+from app.models.scoring import UserScoringWeights
 from app.config import settings
 
 # this is the Alembic Config object, which provides

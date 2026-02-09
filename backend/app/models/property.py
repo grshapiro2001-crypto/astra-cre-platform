@@ -40,6 +40,11 @@ class Property(Base):
     t3_noi = Column(Float)
     y1_noi = Column(Float)
 
+    # Market sentiment (Phase 4 - AI populated, nullable until then)
+    market_sentiment_score = Column(Float, nullable=True)  # 0-100
+    market_sentiment_rationale = Column(Text, nullable=True)
+    market_sentiment_updated_at = Column(DateTime(timezone=True), nullable=True)
+
     # Metadata
     raw_pdf_path = Column(Text)  # Relative path like "uploads/user123/file.pdf"
     analysis_date = Column(DateTime(timezone=True))
