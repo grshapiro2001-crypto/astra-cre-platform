@@ -3,6 +3,7 @@ import {
   LayoutDashboard,
   FolderOpen,
   Upload,
+  Database,
   BarChart3,
   Settings,
   Sun,
@@ -20,6 +21,7 @@ const navItems = [
   { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
   { name: 'Library', path: '/library', icon: FolderOpen },
   { name: 'Upload', path: '/upload', icon: Upload },
+  { name: 'Data Bank', path: '/data-bank', icon: Database },
   { name: 'Comparisons', path: '/compare', icon: BarChart3 },
   { name: 'Settings', path: '/settings', icon: Settings },
 ];
