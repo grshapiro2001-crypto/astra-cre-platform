@@ -8,6 +8,7 @@
  * - API & Integrations (placeholder masked key)
  */
 import { useState } from 'react';
+import { toast } from 'sonner';
 import {
   User,
   Palette,
@@ -132,12 +133,18 @@ const ProfileSection = () => {
           className="bg-muted/50 border-border"
         />
       </div>
-      <Button variant="outline" size="sm" disabled className="mt-2">
+      <Button
+        variant="outline"
+        size="sm"
+        className="mt-2"
+        onClick={() => {
+          toast.info('Coming soon', {
+            description: 'Profile editing will be available in a future update.'
+          });
+        }}
+      >
         Save Changes
       </Button>
-      <p className="text-xs text-muted-foreground">
-        Profile editing will be available in a future update.
-      </p>
     </div>
   );
 };
@@ -258,13 +265,18 @@ const ApiSection = () => {
         )}
       </div>
 
-      <Button variant="outline" size="sm" disabled>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => {
+          toast.info('Coming soon', {
+            description: 'API access is not yet available. Keys shown are placeholders.'
+          });
+        }}
+      >
         <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
         Regenerate Key
       </Button>
-      <p className="text-xs text-muted-foreground">
-        API access is not yet available. Keys shown are placeholders.
-      </p>
     </div>
   );
 };

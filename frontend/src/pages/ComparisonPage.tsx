@@ -16,6 +16,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
+import { toast } from 'sonner';
 import {
   ArrowLeft,
   ArrowRight,
@@ -1983,7 +1984,12 @@ export const ComparisonPage = () => {
                 Cancel
               </button>
               <button
-                onClick={() => setShowSaveModal(false)}
+                onClick={() => {
+                  toast.info('Coming soon', {
+                    description: 'Comparison saving will be available in a future update.'
+                  });
+                  setShowSaveModal(false);
+                }}
                 className="flex-1 py-3 rounded-xl text-sm font-semibold text-white bg-primary hover:bg-primary/90 shadow-md shadow-primary/30 transition-colors"
               >
                 Save Comparison

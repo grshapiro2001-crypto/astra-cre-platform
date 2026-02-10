@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { toast } from 'sonner';
 import {
   Menu,
   Bell,
@@ -148,7 +149,14 @@ export const Header = () => {
         {/* Right: Notification + User */}
         <div className="flex items-center gap-2">
           {/* Notification bell */}
-          <button className="relative p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+          <button
+            onClick={() => {
+              toast.info('Coming soon', {
+                description: 'Notifications will be available in a future update.'
+              });
+            }}
+            className="relative p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          >
             <Bell className="w-5 h-5" />
             <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-primary" />
           </button>

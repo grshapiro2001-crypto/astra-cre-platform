@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Toaster } from 'sonner';
 import { useAuthStore } from './store/authSlice';
 import { LoginForm } from './components/auth/LoginForm';
 import { RegisterForm } from './components/auth/RegisterForm';
@@ -23,6 +24,7 @@ function App() {
 
   return (
     <BrowserRouter>
+      <Toaster position="top-right" />
       <Routes>
         {/* Public routes */}
         <Route path="/login" element={<LoginForm />} />
