@@ -32,12 +32,7 @@ import {
   Check,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import {
-  comparisonService,
-  type ComparisonResponse,
-  type PropertyComparisonItem,
-  type BestValues,
-} from '@/services/comparisonService';
+import { propertyService, type PropertyDetail } from '@/services/propertyService';
 import { scoringService } from '@/services/scoringService';
 import type { DealScoreResult } from '@/services/scoringService';
 import { DealScoreBadge } from '@/components/scoring/DealScoreBadge';
@@ -56,6 +51,72 @@ import { ComparisonSkeleton } from '@/components/ui/PageSkeleton';
 // ============================================================
 // Types
 // ============================================================
+
+interface ComparisonPricing {
+  price?: number;
+  price_per_unit?: number;
+  price_per_sf?: number;
+}
+
+interface ComparisonCapRates {
+  going_in?: number;
+  stabilized?: number;
+}
+
+interface ComparisonBOVReturns {
+  tier_name?: string;
+  levered_irr?: number;
+  unlevered_irr?: number;
+  equity_multiple?: number;
+}
+
+interface ComparisonFinancials {
+  t12_noi?: number;
+  y1_noi?: number;
+  noi_growth_pct?: number;
+}
+
+interface ComparisonOperations {
+  opex_ratio?: number;
+  opex_per_unit?: number;
+  economic_occupancy?: number;  // Added for economic occupancy display
+}
+
+interface PropertyComparisonItem {
+  id: number;
+  property_name: string;
+  document_type: string;
+  property_type?: string;
+  property_address?: string;
+  submarket?: string;
+  total_units?: number;
+  total_sf?: number;
+  year_built?: number;
+  pricing: ComparisonPricing;
+  cap_rates: ComparisonCapRates;
+  bov_returns?: ComparisonBOVReturns;
+  financials: ComparisonFinancials;
+  operations: ComparisonOperations;
+}
+
+interface BestValues {
+  best_price_per_unit?: number;
+  best_price_per_sf?: number;
+  best_going_in_cap?: number;
+  best_stabilized_cap?: number;
+  best_levered_irr?: number;
+  best_unlevered_irr?: number;
+  best_equity_multiple?: number;
+  best_noi_growth?: number;
+  lowest_opex_ratio?: number;
+  lowest_opex_per_unit?: number;
+  best_economic_occupancy?: number;  // Added for economic occupancy
+}
+
+interface ComparisonResponse {
+  properties: PropertyComparisonItem[];
+  best_values: BestValues;
+}
 
 type ViewMode = 'quick' | 'deep';
 type ScoringDirection = 'higher' | 'lower' | 'neutral';
@@ -287,6 +348,18 @@ function isBestApiValue(
     default:
       return false;
   }
+}
+
+// Check if property has best economic occupancy (not used as metricKey but available)
+function isBestEconomicOccupancy(
+  property: PropertyComparisonItem,
+  bestValues: BestValues
+): boolean {
+  return (
+    property.operations.economic_occupancy != null &&
+    bestValues.best_economic_occupancy != null &&
+    property.operations.economic_occupancy === bestValues.best_economic_occupancy
+  );
 }
 
 // ============================================================
@@ -542,6 +615,11 @@ const TABLE_SECTIONS: TableSectionDef[] = [
     title: 'OPERATIONS',
     rows: [
       {
+        label: 'Economic Occupancy',
+        getValue: (p) => p.operations.economic_occupancy != null ? `${p.operations.economic_occupancy.toFixed(1)}%` : 'N/A',
+        metricKey: undefined,
+      },
+      {
         label: 'OpEx Ratio',
         getValue: (p) => METRIC_DEFS.opex_ratio.format(p.operations.opex_ratio),
         metricKey: 'opex_ratio',
@@ -554,6 +632,230 @@ const TABLE_SECTIONS: TableSectionDef[] = [
     ],
   },
 ];
+
+// ============================================================
+// Helper Functions
+// ============================================================
+
+/**
+ * Calculate economic occupancy for a property's T12 financials
+ */
+function calculateEconomicOccupancy(property: PropertyDetail): number | undefined {
+  // Try to use pre-calculated metric first
+  const t12Metrics = property.calculated_metrics?.t12;
+  if (t12Metrics?.economic_occupancy != null) {
+    return t12Metrics.economic_occupancy;
+  }
+
+  // Fallback: calculate from financials
+  const t12 = property.t12_financials;
+  if (!t12?.gsr || t12.gsr === 0) return undefined;
+
+  const deductions =
+    (t12.vacancy ?? 0) +
+    (t12.concessions ?? 0) +
+    (t12.bad_debt ?? 0) +
+    (t12.non_revenue_units ?? 0);
+
+  const economicRent = t12.gsr - deductions;
+  return (economicRent / t12.gsr) * 100;
+}
+
+/**
+ * Transform PropertyDetail[] from individual API calls to ComparisonResponse
+ */
+function transformToComparisonData(properties: PropertyDetail[]): ComparisonResponse {
+  const comparisonItems: PropertyComparisonItem[] = properties.map(prop => {
+    // Calculate going-in and stabilized cap rates
+    let goingInCap: number | undefined;
+    let stabilizedCap: number | undefined;
+
+    if (prop.bov_pricing_tiers?.length) {
+      const firstTier = prop.bov_pricing_tiers[0];
+      const goingInCapRate = firstTier.cap_rates.find(cr =>
+        cr.cap_rate_type.toLowerCase().includes('going') ||
+        cr.cap_rate_type.toLowerCase().includes('trailing')
+      );
+      const stabilizedCapRate = firstTier.cap_rates.find(cr =>
+        cr.cap_rate_type.toLowerCase().includes('stabilized')
+      );
+      goingInCap = goingInCapRate?.cap_rate_value ?? undefined;
+      stabilizedCap = stabilizedCapRate?.cap_rate_value ?? undefined;
+    }
+
+    // If no BOV data, calculate from financials
+    if (!goingInCap && prop.t12_financials?.noi && prop.bov_pricing_tiers?.[0]?.pricing) {
+      goingInCap = (prop.t12_financials.noi / prop.bov_pricing_tiers[0].pricing) * 100;
+    }
+
+    // Calculate NOI growth
+    let noiGrowthPct: number | undefined;
+    if (prop.t12_financials?.noi && prop.y1_financials?.noi) {
+      noiGrowthPct = ((prop.y1_financials.noi - prop.t12_financials.noi) / prop.t12_financials.noi) * 100;
+    }
+
+    // Get pricing from first BOV tier or leave undefined
+    const firstTier = prop.bov_pricing_tiers?.[0];
+    const pricing: ComparisonPricing = {
+      price: firstTier?.pricing ?? undefined,
+      price_per_unit: firstTier?.price_per_unit ?? undefined,
+      price_per_sf: firstTier?.price_per_sf ?? undefined,
+    };
+
+    // Get return metrics from first BOV tier
+    const bovReturns: ComparisonBOVReturns | undefined = firstTier?.return_metrics ? {
+      tier_name: firstTier.tier_label ?? undefined,
+      levered_irr: firstTier.return_metrics.levered_irr ?? undefined,
+      unlevered_irr: firstTier.return_metrics.unlevered_irr ?? undefined,
+      equity_multiple: firstTier.return_metrics.equity_multiple ?? undefined,
+    } : undefined;
+
+    // Get OpEx ratio from calculated metrics or calculate it
+    let opexRatio: number | undefined;
+    if (prop.calculated_metrics?.t12?.opex_ratio != null) {
+      opexRatio = prop.calculated_metrics.t12.opex_ratio;
+    } else if (prop.t12_financials?.total_opex && prop.t12_financials?.gsr) {
+      opexRatio = (prop.t12_financials.total_opex / prop.t12_financials.gsr) * 100;
+    }
+
+    // Calculate OpEx per unit
+    let opexPerUnit: number | undefined;
+    if (prop.t12_financials?.total_opex && prop.total_units) {
+      opexPerUnit = prop.t12_financials.total_opex / prop.total_units;
+    }
+
+    // Calculate economic occupancy
+    const economicOccupancy = calculateEconomicOccupancy(prop);
+
+    return {
+      id: prop.id,
+      property_name: prop.deal_name,
+      document_type: prop.document_type,
+      property_type: prop.property_type ?? undefined,
+      property_address: prop.property_address ?? undefined,
+      submarket: prop.submarket ?? undefined,
+      total_units: prop.total_units ?? undefined,
+      total_sf: prop.total_residential_sf ?? undefined,
+      year_built: prop.year_built ?? undefined,
+      pricing,
+      cap_rates: {
+        going_in: goingInCap,
+        stabilized: stabilizedCap,
+      },
+      bov_returns: bovReturns,
+      financials: {
+        t12_noi: prop.t12_financials?.noi ?? undefined,
+        y1_noi: prop.y1_financials?.noi ?? undefined,
+        noi_growth_pct: noiGrowthPct,
+      },
+      operations: {
+        opex_ratio: opexRatio,
+        opex_per_unit: opexPerUnit,
+        economic_occupancy: economicOccupancy,
+      },
+    };
+  });
+
+  // Calculate best values
+  const bestValues: BestValues = {
+    best_price_per_unit: undefined,
+    best_price_per_sf: undefined,
+    best_going_in_cap: undefined,
+    best_stabilized_cap: undefined,
+    best_levered_irr: undefined,
+    best_unlevered_irr: undefined,
+    best_equity_multiple: undefined,
+    best_noi_growth: undefined,
+    lowest_opex_ratio: undefined,
+    lowest_opex_per_unit: undefined,
+    best_economic_occupancy: undefined,
+  };
+
+  // Find best values
+  comparisonItems.forEach(item => {
+    // Lowest price per unit is best
+    if (item.pricing.price_per_unit != null) {
+      if (bestValues.best_price_per_unit == null || item.pricing.price_per_unit < bestValues.best_price_per_unit) {
+        bestValues.best_price_per_unit = item.pricing.price_per_unit;
+      }
+    }
+
+    // Lowest price per SF is best
+    if (item.pricing.price_per_sf != null) {
+      if (bestValues.best_price_per_sf == null || item.pricing.price_per_sf < bestValues.best_price_per_sf) {
+        bestValues.best_price_per_sf = item.pricing.price_per_sf;
+      }
+    }
+
+    // Highest going-in cap is best
+    if (item.cap_rates.going_in != null) {
+      if (bestValues.best_going_in_cap == null || item.cap_rates.going_in > bestValues.best_going_in_cap) {
+        bestValues.best_going_in_cap = item.cap_rates.going_in;
+      }
+    }
+
+    // Highest stabilized cap is best
+    if (item.cap_rates.stabilized != null) {
+      if (bestValues.best_stabilized_cap == null || item.cap_rates.stabilized > bestValues.best_stabilized_cap) {
+        bestValues.best_stabilized_cap = item.cap_rates.stabilized;
+      }
+    }
+
+    // Highest levered IRR is best
+    if (item.bov_returns?.levered_irr != null) {
+      if (bestValues.best_levered_irr == null || item.bov_returns.levered_irr > bestValues.best_levered_irr) {
+        bestValues.best_levered_irr = item.bov_returns.levered_irr;
+      }
+    }
+
+    // Highest unlevered IRR is best
+    if (item.bov_returns?.unlevered_irr != null) {
+      if (bestValues.best_unlevered_irr == null || item.bov_returns.unlevered_irr > bestValues.best_unlevered_irr) {
+        bestValues.best_unlevered_irr = item.bov_returns.unlevered_irr;
+      }
+    }
+
+    // Highest equity multiple is best
+    if (item.bov_returns?.equity_multiple != null) {
+      if (bestValues.best_equity_multiple == null || item.bov_returns.equity_multiple > bestValues.best_equity_multiple) {
+        bestValues.best_equity_multiple = item.bov_returns.equity_multiple;
+      }
+    }
+
+    // Highest NOI growth is best
+    if (item.financials.noi_growth_pct != null) {
+      if (bestValues.best_noi_growth == null || item.financials.noi_growth_pct > bestValues.best_noi_growth) {
+        bestValues.best_noi_growth = item.financials.noi_growth_pct;
+      }
+    }
+
+    // Lowest OpEx ratio is best
+    if (item.operations.opex_ratio != null) {
+      if (bestValues.lowest_opex_ratio == null || item.operations.opex_ratio < bestValues.lowest_opex_ratio) {
+        bestValues.lowest_opex_ratio = item.operations.opex_ratio;
+      }
+    }
+
+    // Lowest OpEx per unit is best
+    if (item.operations.opex_per_unit != null) {
+      if (bestValues.lowest_opex_per_unit == null || item.operations.opex_per_unit < bestValues.lowest_opex_per_unit) {
+        bestValues.lowest_opex_per_unit = item.operations.opex_per_unit;
+      }
+    }
+
+    // Highest economic occupancy is best
+    if (item.operations.economic_occupancy != null) {
+      if (bestValues.best_economic_occupancy == null || item.operations.economic_occupancy > bestValues.best_economic_occupancy) {
+        bestValues.best_economic_occupancy = item.operations.economic_occupancy;
+      }
+    }
+  });
+
+  return {
+    properties: comparisonItems,
+    best_values: bestValues,
+  };
+}
 
 // ============================================================
 // RadarChart Sub-component
@@ -758,8 +1060,13 @@ export const ComparisonPage = () => {
       setError(null);
 
       try {
-        const result = await comparisonService.compareProperties(propertyIds);
-        setData(result);
+        // Fetch individual property data for each ID
+        const propertyPromises = propertyIds.map(id => propertyService.getProperty(id));
+        const properties = await Promise.all(propertyPromises);
+
+        // Transform PropertyDetail[] to ComparisonResponse
+        const comparisonData = transformToComparisonData(properties);
+        setData(comparisonData);
       } catch (err: unknown) {
         if (err && typeof err === 'object' && 'response' in err) {
           const axiosErr = err as { response?: { data?: { detail?: string } } };
@@ -1869,15 +2176,15 @@ export const ComparisonPage = () => {
 
                       {tableSortedScoredProperties.map((sp) => {
                         const value = row.getValue(sp.property);
-                        const isBest =
-                          row.metricKey != null &&
-                          isBestApiValue(
-                            sp.property,
-                            row.metricKey,
-                            bestValues
-                          );
-                        const isHovered =
-                          hoveredPropertyId === sp.property.id;
+                        // Check if this is the best value (either via metricKey or special case for economic occupancy)
+                        let isBest = false;
+                        if (row.metricKey != null) {
+                          isBest = isBestApiValue(sp.property, row.metricKey, bestValues);
+                        } else if (row.label === 'Economic Occupancy') {
+                          isBest = isBestEconomicOccupancy(sp.property, bestValues);
+                        }
+
+                        const isHovered = hoveredPropertyId === sp.property.id;
                         const gradientClass = getCellGradient(
                           sp.property.id,
                           row.criteriaKey
