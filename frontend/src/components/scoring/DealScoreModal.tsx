@@ -185,17 +185,18 @@ function CompTable({ comps }: { comps: CompUsed[] }) {
 
   return (
     <div className="rounded-xl border border-border overflow-hidden">
-      <div className="grid grid-cols-[1.5fr_0.8fr_0.6fr_0.6fr_0.5fr] gap-2 px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground bg-muted/50 border-b border-border">
+      <div className="grid grid-cols-[1.5fr_0.8fr_0.6fr_0.7fr_0.6fr_0.4fr] gap-2 px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground bg-muted/50 border-b border-border">
         <div>Property</div>
         <div>Submarket</div>
         <div className="text-right">Cap Rate</div>
+        <div className="text-right">Sale Price</div>
         <div className="text-right">$/Unit</div>
-        <div className="text-right">Relevance</div>
+        <div className="text-right">Rel.</div>
       </div>
       {comps.slice(0, 8).map((comp) => (
         <div
           key={comp.id}
-          className="grid grid-cols-[1.5fr_0.8fr_0.6fr_0.6fr_0.5fr] gap-2 px-3 py-2 text-xs border-b border-border last:border-b-0 hover:bg-accent/30 transition-colors"
+          className="grid grid-cols-[1.5fr_0.8fr_0.6fr_0.7fr_0.6fr_0.4fr] gap-2 px-3 py-2 text-xs border-b border-border last:border-b-0 hover:bg-accent/30 transition-colors"
         >
           <div className="truncate text-foreground font-medium">
             {comp.property_name || '\u2014'}
@@ -205,6 +206,11 @@ function CompTable({ comps }: { comps: CompUsed[] }) {
           </div>
           <div className="text-right font-mono text-foreground">
             {comp.cap_rate != null ? `${(comp.cap_rate * 100).toFixed(1)}%` : '\u2014'}
+          </div>
+          <div className="text-right font-mono text-foreground">
+            {comp.sale_price != null
+              ? `$${(Math.round(comp.sale_price / 1_000_000 * 10) / 10).toFixed(1)}M`
+              : '\u2014'}
           </div>
           <div className="text-right font-mono text-foreground">
             {comp.price_per_unit != null

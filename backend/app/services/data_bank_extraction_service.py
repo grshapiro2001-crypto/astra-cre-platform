@@ -580,7 +580,11 @@ _PIPELINE_HEADER_MAP = {
 
 
 def _fallback_column_mapping(headers: List[str], doc_type: str) -> Dict[str, str]:
-    """Fuzzy match headers to known CRE field names."""
+    """Fuzzy match headers to known CRE field names.
+
+    Uses longest-key-wins strategy for substring matching so that specific
+    keys like ``price per sf`` beat generic keys like ``price``.
+    """
     header_map = _COMP_HEADER_MAP if doc_type == "sales_comps" else _PIPELINE_HEADER_MAP
     mapping = {}
 
@@ -594,15 +598,18 @@ def _fallback_column_mapping(headers: List[str], doc_type: str) -> Dict[str, str
             mapping[h] = header_map[h_lower]
             continue
 
-        # Substring match
-        matched = False
+        # Substring match — pick the longest (most specific) matching key
+        best_field: Optional[str] = None
+        best_len = 0
         for key, field in header_map.items():
             if key in h_lower or h_lower in key:
-                mapping[h] = field
-                matched = True
-                break
+                if len(key) > best_len:
+                    best_len = len(key)
+                    best_field = field
 
-        if not matched:
+        if best_field is not None:
+            mapping[h] = best_field
+        else:
             mapping[h] = "SKIP"
 
     return mapping
@@ -789,6 +796,90 @@ def _fallback_normalize(
 
 
 # ---------------------------------------------------------------------------
+# Post-normalization validation and cross-field derivation
+# ---------------------------------------------------------------------------
+
+# Reasonable default for average unit SF when not provided
+_DEFAULT_AVG_UNIT_SF = 900.0
+
+
+def _validate_and_derive_comp_fields(record: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str]]:
+    """
+    Validate and fix cross-field consistency for a single sales comp record.
+
+    Detects the common extraction error where price_per_sf values end up in
+    the sale_price column.  Derives missing fields where possible.
+
+    Returns the (possibly-modified) record and a list of warning strings.
+    """
+    warnings: List[str] = []
+    sale_price = record.get("sale_price")
+    units = record.get("units")
+    price_per_unit = record.get("price_per_unit")
+    price_per_sf = record.get("price_per_sf")
+    avg_unit_sf = record.get("avg_unit_sf")
+    prop_name = record.get("property_name") or "unknown"
+
+    # ------------------------------------------------------------------
+    # 1. Detect misplaced price_per_sf in sale_price field
+    #    Real multifamily sale_price should be > $1M.
+    #    Price/SF is typically $100–$600.
+    # ------------------------------------------------------------------
+    if sale_price is not None and units is not None and units > 10:
+        if sale_price < 10_000:
+            warnings.append(
+                f"{prop_name}: sale_price={sale_price} looks like $/SF — correcting"
+            )
+            # Preserve the value as price_per_sf if not already set
+            if price_per_sf is None:
+                record["price_per_sf"] = sale_price
+                price_per_sf = sale_price
+
+            # Derive total sale price from $/SF × unit SF × units
+            effective_sf = avg_unit_sf if avg_unit_sf and avg_unit_sf > 0 else _DEFAULT_AVG_UNIT_SF
+            record["sale_price"] = round(sale_price * effective_sf * units, 2)
+            sale_price = record["sale_price"]
+
+    # ------------------------------------------------------------------
+    # 2. Derive price_per_unit if missing or nonsensical
+    # ------------------------------------------------------------------
+    if (price_per_unit is None or price_per_unit < 1_000) and sale_price and units and units > 0 and sale_price > 100_000:
+        record["price_per_unit"] = round(sale_price / units, 2)
+        price_per_unit = record["price_per_unit"]
+
+    # ------------------------------------------------------------------
+    # 3. Derive price_per_sf if missing
+    # ------------------------------------------------------------------
+    if price_per_sf is None and sale_price and units and avg_unit_sf:
+        total_sf = units * avg_unit_sf
+        if total_sf > 0:
+            record["price_per_sf"] = round(sale_price / total_sf, 2)
+
+    # ------------------------------------------------------------------
+    # 4. Sanity-check final values
+    # ------------------------------------------------------------------
+    if sale_price is not None and sale_price > 0 and units and units > 10:
+        ppu = record.get("price_per_unit")
+        if ppu is not None and (ppu < 20_000 or ppu > 2_000_000):
+            warnings.append(
+                f"{prop_name}: derived price_per_unit={ppu} outside expected range $20K–$2M"
+            )
+
+    return record, warnings
+
+
+def _validate_all_comp_records(records: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], List[str]]:
+    """Run validation/derivation on every normalised comp record."""
+    all_warnings: List[str] = []
+    out: List[Dict[str, Any]] = []
+    for rec in records:
+        fixed, w = _validate_and_derive_comp_fields(rec)
+        all_warnings.extend(w)
+        out.append(fixed)
+    return out, all_warnings
+
+
+# ---------------------------------------------------------------------------
 # Phase 3+4: Full extraction pipelines — extract, classify, normalize, store
 # ---------------------------------------------------------------------------
 
@@ -834,6 +925,10 @@ def extract_sales_comps(
     normalized = _normalize_records(client, raw_rows, column_mapping, "sales_comps")
     if client is None:
         warnings.append("Claude API unavailable — used fallback normalization")
+
+    # Phase 3b: Validate and derive cross-field values
+    normalized, validation_warnings = _validate_all_comp_records(normalized)
+    warnings.extend(validation_warnings)
 
     # Phase 4: Store in database
     comp_records: List[SalesComp] = []

@@ -79,11 +79,13 @@ def _geo_score(subject: dict, comp: SalesComp) -> float:
     """
     s_sub = (subject.get("submarket") or "").strip().lower()
     s_county = (subject.get("county") or "").strip().lower()
+    s_metro = (subject.get("metro") or "").strip().lower()
 
     # Comp may store its location in market, submarket, or both
     c_market = (comp.market or "").strip().lower()
     c_sub = (comp.submarket or "").strip().lower()
     c_county = (comp.county or "").strip().lower()
+    c_metro = (comp.metro or "").strip().lower()
 
     # Exact submarket match: subject submarket == comp market or comp submarket
     if s_sub and (
@@ -91,9 +93,25 @@ def _geo_score(subject: dict, comp: SalesComp) -> float:
         or (c_sub and s_sub == c_sub)
     ):
         return 1.0
+
+    # Partial submarket match: one contains the other
+    # e.g. subject="South Atlanta" and comp market="Atlanta" or vice-versa
+    if s_sub and c_market and (s_sub in c_market or c_market in s_sub):
+        return 0.90
+    if s_sub and c_sub and (s_sub in c_sub or c_sub in s_sub):
+        return 0.90
+
     # County match
     if s_county and c_county and s_county == c_county:
         return 0.85
+
+    # Metro match (explicit metro fields)
+    if s_metro and (
+        (c_metro and s_metro == c_metro)
+        or (c_market and s_metro in c_market)
+    ):
+        return 0.70
+
     # Same user's comps with no better match — assume same metro area
     return 0.50
 
@@ -185,26 +203,29 @@ def select_comps(
     """
     Select and rank comps by relevance.
     Returns list of dicts with comp data + relevance score.
+
+    Uses progressive threshold relaxation to ensure we return at least
+    ``min_comps`` results when enough comps exist in the data bank.
     """
     scored = []
     for comp in all_comps:
         rel = calculate_relevance(subject, comp)
         scored.append({"comp": comp, "relevance": rel})
 
-    # Filter by threshold
-    threshold = 0.25
-    filtered = [s for s in scored if s["relevance"] > threshold]
+    # Sort by relevance descending (always — used for all threshold tiers)
+    scored.sort(key=lambda x: x["relevance"], reverse=True)
 
-    # Progressive relaxation if too few
-    if len(filtered) < min_comps:
-        threshold = 0.10
+    # Progressive threshold relaxation
+    for threshold in (0.25, 0.10, 0.03):
         filtered = [s for s in scored if s["relevance"] > threshold]
+        if len(filtered) >= min_comps:
+            return filtered[:max_comps]
 
-    # Sort by relevance descending
-    filtered.sort(key=lambda x: x["relevance"], reverse=True)
+    # Last resort: take top min_comps regardless of threshold
+    if len(scored) >= min_comps:
+        return scored[:max_comps]
 
-    # Cap at max_comps
-    return filtered[:max_comps]
+    return scored
 
 
 def score_cap_rate_vs_comps(subject_cap: float, comps: List[dict]) -> dict:
@@ -438,9 +459,10 @@ def calculate_layer3_score(subject: dict, user_id: str, db: Session) -> dict:
         comps_used.append({
             "id": comp.id,
             "property_name": comp.property_name,
-            "submarket": comp.submarket,
+            "submarket": comp.submarket or comp.market,
             "cap_rate": comp.cap_rate,
             "price_per_unit": comp.price_per_unit,
+            "sale_price": comp.sale_price,
             "year_built": comp.year_built,
             "units": comp.units,
             "relevance": round(c["relevance"], 3),
