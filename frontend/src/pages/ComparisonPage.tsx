@@ -1060,7 +1060,9 @@ export const ComparisonPage = () => {
       setError(null);
 
       try {
-        // Fetch individual property data for each ID
+        // Fetch individual properties instead of using POST /api/v1/properties/compare
+        // because frontend needs full property data including BOV tiers and calculated
+        // metrics for transformation (economic occupancy, cap rates, return metrics, etc.)
         const propertyPromises = propertyIds.map(id => propertyService.getProperty(id));
         const properties = await Promise.all(propertyPromises);
 

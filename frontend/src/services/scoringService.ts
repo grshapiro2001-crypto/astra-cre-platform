@@ -106,12 +106,4 @@ export const scoringService = {
     );
     return response.data.scores;
   },
-
-  /** Refresh market intelligence for a property (Phase 4) */
-  async refreshMarketIntel(propertyId: number): Promise<DealScoreResult> {
-    const response = await api.post<DealScoreResult>(
-      `/scoring/refresh-market/${propertyId}`,
-    );
-    return response.data;
-  },
 };
