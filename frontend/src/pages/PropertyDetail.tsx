@@ -22,6 +22,10 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { propertyService } from '@/services/propertyService';
+import { scoringService } from '@/services/scoringService';
+import type { DealScoreResult } from '@/services/scoringService';
+import { DealScoreBadge } from '@/components/scoring/DealScoreBadge';
+import { DealScoreModal } from '@/components/scoring/DealScoreModal';
 import type {
   PropertyDetail as PropertyDetailType,
   FinancialPeriod,
@@ -246,6 +250,10 @@ export const PropertyDetail = () => {
   const [newNote, setNewNote] = useState('');
   const [showMoreMenu, setShowMoreMenu] = useState(false);
 
+  // --- Scoring state ---
+  const [dealScore, setDealScore] = useState<DealScoreResult | null>(null);
+  const [showScoreModal, setShowScoreModal] = useState(false);
+
   // --- Dialog state ---
   const [showReanalyzeDialog, setShowReanalyzeDialog] = useState(false);
   const [isReanalyzing, setIsReanalyzing] = useState(false);
@@ -281,6 +289,18 @@ export const PropertyDetail = () => {
       }
     };
     fetchProperty();
+
+    // Fetch deal score (non-blocking — score load doesn't block page)
+    const fetchScore = async () => {
+      if (!id) return;
+      try {
+        const score = await scoringService.getScore(parseInt(id));
+        setDealScore(score);
+      } catch {
+        // Score fetch failure is non-critical — badge will show "—"
+      }
+    };
+    fetchScore();
   }, [id]);
 
   // -----------------------------------------------------------------------
@@ -478,6 +498,12 @@ export const PropertyDetail = () => {
               >
                 <ArrowLeft className="w-5 h-5 text-muted-foreground" />
               </button>
+
+              <DealScoreBadge
+                score={dealScore?.total_score ?? null}
+                size="md"
+                onClick={() => dealScore && setShowScoreModal(true)}
+              />
 
               <div>
                 <div className="flex items-center gap-3 flex-wrap">
@@ -1854,6 +1880,14 @@ export const PropertyDetail = () => {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+
+      {/* Deal Score Modal */}
+      <DealScoreModal
+        open={showScoreModal}
+        onClose={() => setShowScoreModal(false)}
+        scoreData={dealScore}
+        propertyName={property?.deal_name}
+      />
         </motion.div>
       )}
     </AnimatePresence>

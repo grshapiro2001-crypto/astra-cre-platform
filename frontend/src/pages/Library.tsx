@@ -24,6 +24,10 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { propertyService } from '@/services/propertyService';
 import { dealFolderService, type DealFolder } from '@/services/dealFolderService';
+import { scoringService } from '@/services/scoringService';
+import type { DealScoreResult } from '@/services/scoringService';
+import { DealScoreBadge } from '@/components/scoring/DealScoreBadge';
+import { DealScoreModal } from '@/components/scoring/DealScoreModal';
 import type { PropertyListItem } from '@/types/property';
 import { CreateFolderModal } from '@/components/library/CreateFolderModal';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -144,6 +148,10 @@ export const Library = () => {
   const [showSortMenu, setShowSortMenu] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
+  // ---- Scoring state ----
+  const [scores, setScores] = useState<Record<number, DealScoreResult>>({});
+  const [scoreModalPropertyId, setScoreModalPropertyId] = useState<number | null>(null);
+
   // ---- Data fetching ----
   const fetchData = useCallback(async () => {
     setIsLoading(true);
@@ -171,6 +179,13 @@ export const Library = () => {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // ---- Batch score fetch ----
+  useEffect(() => {
+    if (!properties.length) return;
+    const ids = properties.map((p) => p.id);
+    scoringService.getScores(ids).then(setScores).catch(() => {});
+  }, [properties]);
 
   // ---- Folder status map ----
   const folderStatusMap = useMemo(() => {
@@ -612,13 +627,17 @@ export const Library = () => {
                         </span>
                       </div>
 
-                      {/* Document type indicator */}
-                      <div className="absolute bottom-3 right-3">
-                        <div className="px-2.5 py-1 rounded-lg bg-background/80 dark:bg-background/50 backdrop-blur-sm border border-border/50">
-                          <span className="font-mono text-[11px] font-semibold text-foreground">
-                            {property.document_type || '\u2014'}
-                          </span>
-                        </div>
+                      {/* Deal Score Badge */}
+                      <div className="absolute bottom-2 right-3 z-10">
+                        <DealScoreBadge
+                          score={scores[property.id]?.total_score ?? null}
+                          size="sm"
+                          onClick={() => {
+                            if (scores[property.id]) {
+                              setScoreModalPropertyId(property.id);
+                            }
+                          }}
+                        />
                       </div>
                     </div>
 
@@ -951,6 +970,18 @@ export const Library = () => {
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
         onSuccess={handleFolderCreated}
+      />
+
+      {/* Deal Score Modal */}
+      <DealScoreModal
+        open={scoreModalPropertyId !== null}
+        onClose={() => setScoreModalPropertyId(null)}
+        scoreData={scoreModalPropertyId ? scores[scoreModalPropertyId] ?? null : null}
+        propertyName={
+          scoreModalPropertyId
+            ? properties.find((p) => p.id === scoreModalPropertyId)?.deal_name
+            : undefined
+        }
       />
     </div>
   );

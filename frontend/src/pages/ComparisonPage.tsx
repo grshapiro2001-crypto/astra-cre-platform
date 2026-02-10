@@ -36,6 +36,10 @@ import {
   type PropertyComparisonItem,
   type BestValues,
 } from '@/services/comparisonService';
+import { scoringService } from '@/services/scoringService';
+import type { DealScoreResult } from '@/services/scoringService';
+import { DealScoreBadge } from '@/components/scoring/DealScoreBadge';
+import { DealScoreModal } from '@/components/scoring/DealScoreModal';
 import { exportComparisonToCSV } from '@/utils/csvExport';
 import { InvestmentCriteriaPanel } from '@/components/comparison/InvestmentCriteriaPanel';
 import {
@@ -702,6 +706,10 @@ export const ComparisonPage = () => {
   const [selectedPreset, setSelectedPreset] = useState<string>('value-add');
   const [sensitivityCapRate, setSensitivityCapRate] = useState(5.15);
   const [showSaveModal, setShowSaveModal] = useState(false);
+
+  // Real API scores
+  const [apiScores, setApiScores] = useState<Record<number, DealScoreResult>>({});
+  const [scoreModalPropertyId, setScoreModalPropertyId] = useState<number | null>(null);
   const [animated, setAnimated] = useState(false);
 
   // Investment Criteria State (for deep view table highlighting)
@@ -763,6 +771,13 @@ export const ComparisonPage = () => {
 
     fetchComparison();
   }, [searchParams]);
+
+  // Fetch real API scores when comparison data loads
+  useEffect(() => {
+    if (!data?.properties?.length) return;
+    const ids = data.properties.map((p) => p.id);
+    scoringService.getScores(ids).then(setApiScores).catch(() => {});
+  }, [data]);
 
   // Re-rank when criteria or data changes (for deep view table)
   useEffect(() => {
@@ -1122,8 +1137,21 @@ export const ComparisonPage = () => {
                             </p>
                           </div>
 
-                          {/* Score Circle */}
-                          <div className="relative shrink-0">
+                          {/* Score Circle — uses real API score if available */}
+                          <DealScoreBadge
+                            score={
+                              apiScores[property.id]?.total_score ?? (scoreTotal > 0 ? scoreTotal : null)
+                            }
+                            size="lg"
+                            animated={animated}
+                            onClick={() => {
+                              if (apiScores[property.id]) {
+                                setScoreModalPropertyId(property.id);
+                              }
+                            }}
+                          />
+                          {/* Legacy Score Circle (hidden — replaced by DealScoreBadge) */}
+                          <div className="hidden relative shrink-0">
                             <svg
                               width="56"
                               height="56"
@@ -1892,6 +1920,17 @@ export const ComparisonPage = () => {
           </div>
         </div>
       )}
+      {/* Deal Score Modal */}
+      <DealScoreModal
+        open={scoreModalPropertyId !== null}
+        onClose={() => setScoreModalPropertyId(null)}
+        scoreData={scoreModalPropertyId ? apiScores[scoreModalPropertyId] ?? null : null}
+        propertyName={
+          scoreModalPropertyId
+            ? data?.properties.find((p) => p.id === scoreModalPropertyId)?.property_name
+            : undefined
+        }
+      />
     </div>
         </motion.div>
       )}
