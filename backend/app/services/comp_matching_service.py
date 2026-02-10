@@ -69,22 +69,33 @@ def _get_vintage_bracket(year: Optional[int]) -> Optional[int]:
 
 
 def _geo_score(subject: dict, comp: SalesComp) -> float:
-    """Geographic proximity score."""
+    """Geographic proximity score.
+
+    Comp location lives in comp.market (and sometimes comp.submarket).
+    Subject location comes from Property.submarket.
+    Since metro is often null on comps, we compare subject submarket against
+    comp.market and comp.submarket, then fall back to county and metro.
+    All comps from the same user are assumed same metro → baseline 0.50.
+    """
     s_sub = (subject.get("submarket") or "").strip().lower()
     s_county = (subject.get("county") or "").strip().lower()
-    s_metro = (subject.get("metro") or "").strip().lower()
 
+    # Comp may store its location in market, submarket, or both
+    c_market = (comp.market or "").strip().lower()
     c_sub = (comp.submarket or "").strip().lower()
     c_county = (comp.county or "").strip().lower()
-    c_metro = (comp.metro or "").strip().lower()
 
-    if s_sub and c_sub and s_sub == c_sub:
+    # Exact submarket match: subject submarket == comp market or comp submarket
+    if s_sub and (
+        (c_market and s_sub == c_market)
+        or (c_sub and s_sub == c_sub)
+    ):
         return 1.0
+    # County match
     if s_county and c_county and s_county == c_county:
         return 0.85
-    if s_metro and c_metro and s_metro == c_metro:
-        return 0.50
-    return 0.25  # Regional / catch-all
+    # Same user's comps with no better match — assume same metro area
+    return 0.50
 
 
 def _type_score(subject: dict, comp: SalesComp) -> float:
@@ -337,13 +348,10 @@ def calculate_layer3_score(subject: dict, user_id: str, db: Session) -> dict:
 
     Sub-metric weights: cap_rate=35%, price_per_unit=40%, vintage=25%
     """
-    metro = subject.get("metro") or subject.get("submarket", "")
-
-    # Query user's sales comps, filter by metro if available
-    query = db.query(SalesComp).filter(SalesComp.user_id == user_id)
-    if metro:
-        query = query.filter(SalesComp.metro == metro)
-    all_comps = query.all()
+    # Query ALL of the user's sales comps — let relevance scoring handle filtering.
+    # We cannot pre-filter by metro because comp records often have metro=None;
+    # the actual location is in the "market" column instead.
+    all_comps = db.query(SalesComp).filter(SalesComp.user_id == user_id).all()
 
     if not all_comps:
         return {

@@ -133,7 +133,7 @@ def score_property(
     weights = scoring_service.get_user_weights(str(current_user.id), db)
 
     # Extract property data
-    property_data = scoring_service._extract_property_data(prop)
+    property_data = scoring_service._extract_property_data(prop, db)
 
     # Calculate score
     result = scoring_service.calculate_deal_score(property_data, weights, str(current_user.id), db)
@@ -166,7 +166,7 @@ def batch_score_properties(
             }
             continue
 
-        property_data = scoring_service._extract_property_data(prop)
+        property_data = scoring_service._extract_property_data(prop, db)
         result = scoring_service.calculate_deal_score(property_data, weights, user_id, db)
         results[pid] = result
 

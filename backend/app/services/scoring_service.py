@@ -132,10 +132,16 @@ def calculate_supply_pipeline_score(
     Calculate supply pipeline pressure for a submarket.
     Queries PipelineProject records, weights by status, divides by inventory.
     """
-    # Query pipeline projects for this submarket
+    # Query pipeline projects matching this submarket.
+    # Pipeline projects may store location in submarket or metro field,
+    # so check both against the property's submarket value.
+    from sqlalchemy import or_
     query = db.query(PipelineProject).filter(
         PipelineProject.user_id == user_id,
-        PipelineProject.submarket == submarket,
+        or_(
+            PipelineProject.submarket == submarket,
+            PipelineProject.metro == submarket,
+        ),
     )
     projects = query.all()
 
@@ -329,7 +335,6 @@ def calculate_deal_score(
     # ===== LAYER 3: Deal Comp Analysis =====
     subject_for_comps = {
         "submarket": submarket,
-        "metro": metro,
         "county": property_data.get("county", ""),
         "property_type": property_data.get("property_type", ""),
         "year_built": property_data.get("year_built"),
@@ -483,12 +488,13 @@ def apply_preset(user_id: str, preset_name: str, db: Session) -> UserScoringWeig
     return weights
 
 
-def _extract_property_data(prop: Property) -> dict:
+def _extract_property_data(prop: Property, db: Optional[Session] = None) -> dict:
     """Extract scoring-relevant data from a Property model instance."""
+    from app.models.deal_folder import BOVPricingTier, BOVCapRate
+
     data = {
         "property_type": prop.property_type,
         "submarket": prop.submarket,
-        "metro": "",  # Not stored on property yet
         "county": "",
         "year_built": prop.year_built,
         "total_units": prop.total_units,
@@ -516,6 +522,27 @@ def _extract_property_data(prop: Property) -> dict:
             elif gsr and gsr > 0 and t12.get("total_opex"):
                 data["opex_ratio"] = (t12["total_opex"] / gsr) * 100
         except (json.JSONDecodeError, TypeError):
+            pass
+
+    # Extract cap_rate and price_per_unit from BOV pricing tiers if available
+    if db is not None:
+        try:
+            tier = db.query(BOVPricingTier).filter(
+                BOVPricingTier.property_id == prop.id,
+            ).first()
+
+            if tier:
+                if tier.price_per_unit:
+                    data["price_per_unit"] = float(tier.price_per_unit)
+
+                # Get first available cap rate for this tier
+                cap = db.query(BOVCapRate).filter(
+                    BOVCapRate.pricing_tier_id == tier.id,
+                ).first()
+                if cap and cap.cap_rate_value:
+                    # BOV cap rates stored as percentage (4.75) → convert to decimal (0.0475)
+                    data["cap_rate"] = float(cap.cap_rate_value) / 100.0
+        except Exception:
             pass
 
     return data
