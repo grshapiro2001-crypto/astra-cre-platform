@@ -1,5 +1,7 @@
 # QA Audit — Placeholder & No-Op Handlers
 
+> **Note:** This audit is archived as of February 10, 2026. Many issues listed here may have been resolved. Run a new audit if needed.
+
 **Generated:** February 8, 2026
 **Scope:** `frontend/src/` — all `.tsx` and `.ts` files
 **Methodology:** Full scan for empty onClick handlers, console.log-only stubs, missing handlers, disabled buttons without implementation, TODO/placeholder comments, and hardcoded mock data on interactive elements.

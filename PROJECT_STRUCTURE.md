@@ -1,5 +1,7 @@
 # CRE Platform - Current Project Structure
 
+> **Note:** This file is archived as of February 10, 2026. See [.ai/03-CODEBASE.md](.ai/03-CODEBASE.md) for current codebase inventory.
+
 ## 📁 Complete File Tree
 
 ```

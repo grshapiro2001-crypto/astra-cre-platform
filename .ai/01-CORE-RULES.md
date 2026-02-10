@@ -373,6 +373,28 @@ raise HTTPException(status_code=404, detail="Property not found")
 
 ---
 
-**Last Updated:** January 21, 2026  
-**Token Count:** ~2,000 (optimized for Claude Code context)
+## New Patterns (Feb 2026)
+
+### Progressive Empty States
+When displaying extracted data, show what's available vs missing:
+- **Unit Mix**: If no unit_mix data, show "No unit mix data extracted from this document"
+- **Rent Comps**: If no rent_comps data, show "No rent comps extracted from this document"
+- **Renovation**: If no renovation data, show empty card state
+- **Null Values**: Use "—" (em dash) for null/undefined numeric values, not "$0" or "N/A"
+
+### New Database Tables (Use These!)
+- `property_unit_mix` - Unit mix rows extracted from OM (floorplan, bedrooms, rents)
+- `property_rent_comps` - Rent comps extracted from OM (distinct from Data Bank sales comps)
+- Use relationships: `property.unit_mix` and `property.rent_comps`
+
+### Deal Scoring Patterns
+- **Layer 1**: Property fundamentals (economic occupancy, opex ratio, supply pipeline)
+- **Layer 2**: Market intelligence (AI sentiment, cached on property)
+- **Layer 3**: Comp analysis (relevance-weighted matching)
+- Color coding: Green (70-100), Yellow (40-69), Red (0-39)
+
+---
+
+**Last Updated:** February 10, 2026
+**Token Count:** ~2,200 (optimized for Claude Code context)
 

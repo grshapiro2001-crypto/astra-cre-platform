@@ -1,5 +1,7 @@
 # CRE Platform - UI Preview
 
+> **Note:** This file is archived as of February 10, 2026. UI has evolved significantly with new purple theme, progressive empty states, and new features.
+
 ## 🎨 Visual Representation of Current UI
 
 ### 1. Login Page (`/login`)
