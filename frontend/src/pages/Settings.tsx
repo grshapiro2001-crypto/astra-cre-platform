@@ -18,6 +18,7 @@ import {
   Moon,
   Copy,
   RefreshCw,
+  Target,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/authSlice';
@@ -25,6 +26,7 @@ import { useUIStore } from '@/store/uiStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { DealScoreSettings } from '@/components/scoring/DealScoreSettings';
 
 // ============================================================
 // Toggle Switch (simple inline component)
@@ -58,7 +60,7 @@ const Toggle = ({
 // ============================================================
 // Section definitions
 // ============================================================
-type SectionId = 'profile' | 'appearance' | 'notifications' | 'api';
+type SectionId = 'scoring' | 'profile' | 'appearance' | 'notifications' | 'api';
 
 interface SectionMeta {
   id: SectionId;
@@ -68,6 +70,12 @@ interface SectionMeta {
 }
 
 const SECTIONS: SectionMeta[] = [
+  {
+    id: 'scoring',
+    icon: Target,
+    title: 'Deal Scoring',
+    description: 'Configure scoring weights and strategy presets',
+  },
   {
     id: 'profile',
     icon: User,
@@ -261,7 +269,10 @@ const ApiSection = () => {
   );
 };
 
+const ScoringSection = () => <DealScoreSettings />;
+
 const SECTION_CONTENT: Record<SectionId, () => JSX.Element> = {
+  scoring: ScoringSection,
   profile: ProfileSection,
   appearance: AppearanceSection,
   notifications: NotificationsSection,
