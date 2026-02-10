@@ -19,6 +19,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import {
   ArrowLeft,
   ArrowRight,
+  ArrowUpDown,
   Zap,
   Layers,
   Bookmark,
@@ -716,6 +717,9 @@ export const ComparisonPage = () => {
   const [criteria, setCriteria] = useState<Criterion[]>([]);
   const [rankings, setRankings] = useState<Map<number, PropertyRanking>>(new Map());
 
+  // Deep table sort by deal score
+  const [tableSortByScore, setTableSortByScore] = useState<'asc' | 'desc' | null>(null);
+
   // Trigger animation after mount
   useEffect(() => {
     const timer = setTimeout(() => setAnimated(true), 150);
@@ -933,6 +937,16 @@ export const ComparisonPage = () => {
   // These are only used in the content branch (guarded by `!data ? null :`)
   const properties = data?.properties ?? [];
   const bestValues = data?.best_values as NonNullable<ComparisonResponse['best_values']>;
+
+  // Deep table: sorted properties by deal score when sort is active
+  const tableSortedScoredProperties = useMemo(() => {
+    if (!tableSortByScore) return scoredProperties;
+    return [...scoredProperties].sort((a, b) => {
+      const scoreA = apiScores[a.property.id]?.total_score ?? -1;
+      const scoreB = apiScores[b.property.id]?.total_score ?? -1;
+      return tableSortByScore === 'desc' ? scoreB - scoreA : scoreA - scoreB;
+    });
+  }, [scoredProperties, apiScores, tableSortByScore]);
 
   // ============================================================
   // Render
@@ -1735,7 +1749,7 @@ export const ComparisonPage = () => {
                 <div className="font-display font-bold text-foreground">
                   Metric
                 </div>
-                {scoredProperties.map((sp) => (
+                {tableSortedScoredProperties.map((sp) => (
                   <div
                     key={sp.property.id}
                     className="text-center"
@@ -1768,6 +1782,64 @@ export const ComparisonPage = () => {
                 ))}
               </div>
 
+              {/* Deal Score Row (sortable) */}
+              <div className="px-4 py-2 bg-primary/5 dark:bg-primary/10">
+                <span className="text-xs font-bold uppercase tracking-wider text-primary">
+                  DEAL SCORE
+                </span>
+              </div>
+              <div
+                className="grid items-center p-4 border-b border-border bg-primary/[0.02]"
+                style={{
+                  gridTemplateColumns: `200px repeat(${properties.length}, 1fr)`,
+                }}
+              >
+                <button
+                  onClick={() =>
+                    setTableSortByScore((prev) =>
+                      prev === 'desc' ? 'asc' : prev === 'asc' ? null : 'desc'
+                    )
+                  }
+                  className="flex items-center gap-1.5 text-sm font-medium text-foreground hover:text-primary transition-colors"
+                >
+                  Deal Score
+                  <ArrowUpDown className={cn(
+                    'w-3.5 h-3.5',
+                    tableSortByScore ? 'text-primary' : 'text-muted-foreground'
+                  )} />
+                  {tableSortByScore && (
+                    <span className="text-[10px] text-primary font-mono">
+                      {tableSortByScore === 'desc' ? 'Hi\u2013Lo' : 'Lo\u2013Hi'}
+                    </span>
+                  )}
+                </button>
+                {tableSortedScoredProperties.map((sp) => {
+                  const apiScore = apiScores[sp.property.id]?.total_score;
+                  const isHovered = hoveredPropertyId === sp.property.id;
+
+                  return (
+                    <div
+                      key={sp.property.id}
+                      className="flex justify-center"
+                      onMouseEnter={() => setHoveredPropertyId(sp.property.id)}
+                      onMouseLeave={() => setHoveredPropertyId(null)}
+                    >
+                      <DealScoreBadge
+                        score={apiScore ?? null}
+                        size="sm"
+                        animated={animated}
+                        onClick={
+                          apiScores[sp.property.id]
+                            ? () => setScoreModalPropertyId(sp.property.id)
+                            : undefined
+                        }
+                        className={cn(isHovered && 'scale-110 transition-transform')}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+
               {/* Table Sections */}
               {TABLE_SECTIONS.map((section) => (
                 <div key={section.title}>
@@ -1794,7 +1866,7 @@ export const ComparisonPage = () => {
                         {row.label}
                       </div>
 
-                      {scoredProperties.map((sp) => {
+                      {tableSortedScoredProperties.map((sp) => {
                         const value = row.getValue(sp.property);
                         const isBest =
                           row.metricKey != null &&

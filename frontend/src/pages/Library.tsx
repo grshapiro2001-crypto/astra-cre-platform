@@ -48,7 +48,7 @@ interface PropertyWithFinancials extends PropertyListItem {
 
 type DealStatus = 'all' | 'active' | 'new' | 'review' | 'passed' | 'closed';
 type ViewMode = 'grid' | 'list';
-type SortOption = 'dateAdded' | 'name' | 'noi' | 'capRate';
+type SortOption = 'dateAdded' | 'name' | 'noi' | 'capRate' | 'dealScore';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -95,6 +95,7 @@ const SORT_OPTIONS: { id: SortOption; label: string }[] = [
   { id: 'name', label: 'Name (A-Z)' },
   { id: 'noi', label: 'Highest NOI' },
   { id: 'capRate', label: 'Cap Rate' },
+  { id: 'dealScore', label: 'Deal Score' },
 ];
 
 const FILTER_TABS: { id: DealStatus; label: string }[] = [
@@ -236,6 +237,11 @@ export const Library = () => {
             );
           case 'name':
             return (a.deal_name || '').localeCompare(b.deal_name || '');
+          case 'dealScore':
+            return (
+              (scores[b.id]?.total_score ?? -1) -
+              (scores[a.id]?.total_score ?? -1)
+            );
           case 'capRate':
           case 'dateAdded':
           default:
@@ -245,7 +251,7 @@ export const Library = () => {
             );
         }
       });
-  }, [properties, selectedFilter, searchQuery, sortBy, getPropertyStatus]);
+  }, [properties, selectedFilter, searchQuery, sortBy, getPropertyStatus, scores]);
 
   // ---- Pipeline stats ----
   const pipelineStats = useMemo(
@@ -787,7 +793,7 @@ export const Library = () => {
               className="grid items-center px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground bg-muted/50 border-b border-border"
               style={{
                 gridTemplateColumns:
-                  '40px 2fr 1.2fr 90px 100px 100px 90px 110px',
+                  '40px 2fr 1.2fr 90px 100px 100px 70px 90px 110px',
               }}
             >
               <div />
@@ -796,6 +802,7 @@ export const Library = () => {
               <div className="text-right">Units</div>
               <div className="text-right">T12 NOI</div>
               <div className="text-right">Y1 NOI</div>
+              <div className="text-center">Score</div>
               <div className="text-center">Type</div>
               <div className="text-center">Status</div>
             </div>
@@ -822,7 +829,7 @@ export const Library = () => {
                   )}
                   style={{
                     gridTemplateColumns:
-                      '40px 2fr 1.2fr 90px 100px 100px 90px 110px',
+                      '40px 2fr 1.2fr 90px 100px 100px 70px 90px 110px',
                   }}
                   onMouseEnter={() => setHoveredDealId(property.id)}
                   onMouseLeave={() => setHoveredDealId(null)}
@@ -895,6 +902,23 @@ export const Library = () => {
                   {/* Y1 NOI */}
                   <div className="text-right font-mono text-sm text-foreground">
                     {formatPrice(property.y1_noi)}
+                  </div>
+
+                  {/* Deal Score */}
+                  <div
+                    className="flex justify-center"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (scores[property.id]) {
+                        setScoreModalPropertyId(property.id);
+                      }
+                    }}
+                  >
+                    <DealScoreBadge
+                      score={scores[property.id]?.total_score ?? null}
+                      size="sm"
+                      onClick={scores[property.id] ? () => setScoreModalPropertyId(property.id) : undefined}
+                    />
                   </div>
 
                   {/* Type */}

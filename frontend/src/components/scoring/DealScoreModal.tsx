@@ -23,15 +23,13 @@ import { DealScoreBadge } from './DealScoreBadge';
 // ---------------------------------------------------------------------------
 
 function getScoreColor(score: number): string {
-  if (score >= 80) return 'text-green-400';
-  if (score >= 60) return 'text-primary';
+  if (score >= 70) return 'text-green-400';
   if (score >= 40) return 'text-yellow-400';
   return 'text-red-400';
 }
 
 function getBarColor(score: number): string {
-  if (score >= 80) return 'bg-green-400';
-  if (score >= 60) return 'bg-primary';
+  if (score >= 70) return 'bg-green-400';
   if (score >= 40) return 'bg-yellow-400';
   return 'bg-red-400';
 }

@@ -321,8 +321,7 @@ function LivePreview({
   const dashOffset = circumference - (circumference * score) / 100;
 
   function getColor(s: number) {
-    if (s >= 80) return { text: 'text-green-400', stroke: '#4ade80' };
-    if (s >= 60) return { text: 'text-primary', stroke: 'hsl(263, 70%, 58%)' };
+    if (s >= 70) return { text: 'text-green-400', stroke: '#4ade80' };
     if (s >= 40) return { text: 'text-yellow-400', stroke: '#facc15' };
     return { text: 'text-red-400', stroke: '#f87171' };
   }
