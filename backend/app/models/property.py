@@ -50,6 +50,11 @@ class Property(Base):
     analysis_status = Column(String(50))  # success, failed, needs_review
     search_text = Column(Text)  # Lowercase concatenation for search
 
+    # Deal Score v2 — Market Intelligence (Layer 2)
+    market_sentiment_score = Column(Integer, nullable=True)  # -10 to +10
+    market_sentiment_rationale = Column(Text, nullable=True)
+    market_sentiment_updated_at = Column(DateTime(timezone=True), nullable=True)
+
 
 class AnalysisLog(Base):
     """Log of all analysis operations for auditing and debugging"""

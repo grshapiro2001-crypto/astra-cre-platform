@@ -7,7 +7,12 @@ from alembic import context
 
 # Import Base and models
 from app.database import Base
-from app.models.user import User  # Import all models here
+from app.models import (  # noqa: F401 — Import all models so Alembic can see them
+    User, Property, AnalysisLog,
+    DealFolder, BOVPricingTier, BOVCapRate,
+    UserScoringWeights,
+    DataBankDocument, SalesComp, PipelineProject, SubmarketInventory,
+)
 from app.config import settings
 
 # this is the Alembic Config object, which provides
