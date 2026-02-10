@@ -56,7 +56,7 @@ def save_property(
     ]
     search_text = " ".join(search_parts).lower()
 
-    # Convert financial periods to JSON
+    # Convert financial periods to JSON and extract granular fields
     t12_json = None
     t3_json = None
     y1_json = None
@@ -64,17 +64,71 @@ def save_property(
     t3_noi = None
     y1_noi = None
 
+    # Extract granular T12 fields
+    t12_granular = {}
     if property_data.t12_financials:
         t12_json = json.dumps(property_data.t12_financials.model_dump())
         t12_noi = property_data.t12_financials.noi
+        t12_granular = {
+            "t12_loss_to_lease": property_data.t12_financials.loss_to_lease,
+            "t12_vacancy_rate_pct": property_data.t12_financials.vacancy_rate_pct,
+            "t12_concessions": property_data.t12_financials.concessions,
+            "t12_credit_loss": property_data.t12_financials.credit_loss,
+            "t12_net_rental_income": property_data.t12_financials.net_rental_income,
+            "t12_utility_reimbursements": property_data.t12_financials.utility_reimbursements,
+            "t12_parking_storage_income": property_data.t12_financials.parking_storage_income,
+            "t12_other_income": property_data.t12_financials.other_income,
+            "t12_management_fee_pct": property_data.t12_financials.management_fee_pct,
+            "t12_real_estate_taxes": property_data.t12_financials.real_estate_taxes,
+            "t12_insurance": property_data.t12_financials.insurance_amount,
+            "t12_replacement_reserves": property_data.t12_financials.replacement_reserves,
+            "t12_net_cash_flow": property_data.t12_financials.net_cash_flow,
+            "t12_expense_ratio_pct": property_data.t12_financials.expense_ratio_pct,
+        }
 
+    # Extract granular T3 fields
+    t3_granular = {}
     if property_data.t3_financials:
         t3_json = json.dumps(property_data.t3_financials.model_dump())
         t3_noi = property_data.t3_financials.noi
+        t3_granular = {
+            "t3_loss_to_lease": property_data.t3_financials.loss_to_lease,
+            "t3_vacancy_rate_pct": property_data.t3_financials.vacancy_rate_pct,
+            "t3_concessions": property_data.t3_financials.concessions,
+            "t3_credit_loss": property_data.t3_financials.credit_loss,
+            "t3_net_rental_income": property_data.t3_financials.net_rental_income,
+            "t3_utility_reimbursements": property_data.t3_financials.utility_reimbursements,
+            "t3_parking_storage_income": property_data.t3_financials.parking_storage_income,
+            "t3_other_income": property_data.t3_financials.other_income,
+            "t3_management_fee_pct": property_data.t3_financials.management_fee_pct,
+            "t3_real_estate_taxes": property_data.t3_financials.real_estate_taxes,
+            "t3_insurance": property_data.t3_financials.insurance_amount,
+            "t3_replacement_reserves": property_data.t3_financials.replacement_reserves,
+            "t3_net_cash_flow": property_data.t3_financials.net_cash_flow,
+            "t3_expense_ratio_pct": property_data.t3_financials.expense_ratio_pct,
+        }
 
+    # Extract granular Y1 fields
+    y1_granular = {}
     if property_data.y1_financials:
         y1_json = json.dumps(property_data.y1_financials.model_dump())
         y1_noi = property_data.y1_financials.noi
+        y1_granular = {
+            "y1_loss_to_lease": property_data.y1_financials.loss_to_lease,
+            "y1_vacancy_rate_pct": property_data.y1_financials.vacancy_rate_pct,
+            "y1_concessions": property_data.y1_financials.concessions,
+            "y1_credit_loss": property_data.y1_financials.credit_loss,
+            "y1_net_rental_income": property_data.y1_financials.net_rental_income,
+            "y1_utility_reimbursements": property_data.y1_financials.utility_reimbursements,
+            "y1_parking_storage_income": property_data.y1_financials.parking_storage_income,
+            "y1_other_income": property_data.y1_financials.other_income,
+            "y1_management_fee_pct": property_data.y1_financials.management_fee_pct,
+            "y1_real_estate_taxes": property_data.y1_financials.real_estate_taxes,
+            "y1_insurance": property_data.y1_financials.insurance_amount,
+            "y1_replacement_reserves": property_data.y1_financials.replacement_reserves,
+            "y1_net_cash_flow": property_data.y1_financials.net_cash_flow,
+            "y1_expense_ratio_pct": property_data.y1_financials.expense_ratio_pct,
+        }
 
     # Create property
     property_obj = Property(
@@ -87,17 +141,31 @@ def save_property(
         property_address=property_data.property_address,
         property_type=property_data.property_type,
         submarket=property_data.submarket,
+        metro=property_data.metro,
         year_built=property_data.year_built,
         total_units=property_data.total_units,
         total_residential_sf=property_data.total_residential_sf,
         average_market_rent=property_data.average_market_rent,
         average_inplace_rent=property_data.average_inplace_rent,
+        # Renovation assumptions
+        renovation_cost_per_unit=property_data.renovation_cost_per_unit,
+        renovation_total_cost=property_data.renovation_total_cost,
+        renovation_rent_premium=property_data.renovation_rent_premium,
+        renovation_roi_pct=property_data.renovation_roi_pct,
+        renovation_duration_years=property_data.renovation_duration_years,
+        renovation_stabilized_revenue=property_data.renovation_stabilized_revenue,
+        # Financials
         t12_financials_json=t12_json,
         t3_financials_json=t3_json,
         y1_financials_json=y1_json,
         t12_noi=t12_noi,
         t3_noi=t3_noi,
         y1_noi=y1_noi,
+        # Granular financial fields
+        **t12_granular,
+        **t3_granular,
+        **y1_granular,
+        # Metadata
         raw_pdf_path=property_data.raw_pdf_path,
         analysis_date=datetime.now(),
         last_analyzed_at=datetime.now(),
@@ -118,6 +186,42 @@ def save_property(
         # Convert Pydantic models to dictionaries for service layer
         tiers_data = [tier.model_dump() for tier in property_data.bov_pricing_tiers]
         bov_service.save_bov_pricing_tiers(db, property_obj.id, tiers_data)
+
+    # Save unit mix if provided
+    if property_data.unit_mix:
+        from app.models.property import PropertyUnitMix
+        for unit in property_data.unit_mix:
+            unit_obj = PropertyUnitMix(
+                property_id=property_obj.id,
+                floorplan_name=unit.floorplan_name,
+                unit_type=unit.unit_type,
+                bedroom_count=unit.bedroom_count,
+                bathroom_count=unit.bathroom_count,
+                num_units=unit.num_units,
+                unit_sf=unit.unit_sf,
+                in_place_rent=unit.in_place_rent,
+                proforma_rent=unit.proforma_rent,
+                proforma_rent_psf=unit.proforma_rent_psf,
+                renovation_premium=unit.renovation_premium
+            )
+            db.add(unit_obj)
+
+    # Save rent comps if provided
+    if property_data.rent_comps:
+        from app.models.property import PropertyRentComp
+        for comp in property_data.rent_comps:
+            comp_obj = PropertyRentComp(
+                property_id=property_obj.id,
+                comp_name=comp.comp_name,
+                location=comp.location,
+                num_units=comp.num_units,
+                avg_unit_sf=comp.avg_unit_sf,
+                in_place_rent=comp.in_place_rent,
+                in_place_rent_psf=comp.in_place_rent_psf,
+                bedroom_type=comp.bedroom_type,
+                is_new_construction=comp.is_new_construction
+            )
+            db.add(comp_obj)
 
     # Log the analysis
     log = AnalysisLog(

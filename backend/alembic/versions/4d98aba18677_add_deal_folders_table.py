@@ -23,7 +23,7 @@ def upgrade() -> None:
     op.create_table(
         'deal_folders',
         sa.Column('id', sa.Integer(), nullable=False),
-        sa.Column('user_id', sa.Integer(), nullable=False),
+        sa.Column('user_id', sa.String(36), nullable=False),
         sa.Column('folder_name', sa.String(), nullable=False),
 
         # Property summary fields (for display optimization)
