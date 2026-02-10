@@ -19,6 +19,20 @@ class FinancialPeriodData(BaseModel):
     total_opex: Optional[float] = None
     noi: Optional[float] = None
     opex_ratio: Optional[float] = None
+    # Granular financial line items
+    loss_to_lease: Optional[float] = None
+    vacancy_rate_pct: Optional[float] = None
+    credit_loss: Optional[float] = None
+    net_rental_income: Optional[float] = None
+    utility_reimbursements: Optional[float] = None
+    parking_storage_income: Optional[float] = None
+    other_income: Optional[float] = None
+    management_fee_pct: Optional[float] = None
+    real_estate_taxes: Optional[float] = None
+    insurance_amount: Optional[float] = None
+    replacement_reserves: Optional[float] = None
+    net_cash_flow: Optional[float] = None
+    expense_ratio_pct: Optional[float] = None
 
 
 # ==================== BOV SCHEMAS ====================
@@ -119,11 +133,20 @@ class PropertyCreate(BaseModel):
     property_address: Optional[str] = None
     property_type: Optional[str] = None
     submarket: Optional[str] = None
+    metro: Optional[str] = None
     year_built: Optional[int] = None
     total_units: Optional[int] = None
     total_residential_sf: Optional[int] = None
     average_market_rent: Optional[float] = None
     average_inplace_rent: Optional[float] = None
+
+    # Renovation assumptions
+    renovation_cost_per_unit: Optional[float] = None
+    renovation_total_cost: Optional[float] = None
+    renovation_rent_premium: Optional[float] = None
+    renovation_roi_pct: Optional[float] = None
+    renovation_duration_years: Optional[int] = None
+    renovation_stabilized_revenue: Optional[float] = None
 
     # Financial periods (as structured data)
     t12_financials: Optional[FinancialPeriodData] = None
@@ -132,6 +155,10 @@ class PropertyCreate(BaseModel):
 
     # BOV pricing tiers (Phase 3A - only for BOV documents)
     bov_pricing_tiers: Optional[List[BOVPricingTierData]] = None
+
+    # Unit mix and rent comps
+    unit_mix: Optional[List[UnitMixItem]] = None
+    rent_comps: Optional[List[RentCompItem]] = None
 
     # Metadata
     raw_pdf_path: str
