@@ -14,6 +14,7 @@
  */
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import {
   Sparkles,
   Plus,
@@ -496,8 +497,10 @@ export const Dashboard = () => {
     setShowStageEditor(false);
   };
 
-  const moveDeal = (dealId: number, newStage: string) => {
-    console.log(`Moving deal ${dealId} to ${newStage}`);
+  const moveDeal = (_dealId: number, _newStage: string) => {
+    toast.info('Coming soon', {
+      description: 'Deal stage updates will be persisted in a future update.'
+    });
     setDraggedDeal(null);
   };
 

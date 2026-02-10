@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import {
   ArrowLeft,
   ArrowRight,
@@ -1492,7 +1493,9 @@ export const PropertyDetail = () => {
                 <button
                   onClick={() => {
                     if (newNote.trim()) {
-                      console.log('Adding note:', newNote);
+                      toast.info('Coming soon', {
+                        description: 'Note persistence will be available in a future update.'
+                      });
                       setNewNote('');
                     }
                   }}
@@ -1806,7 +1809,14 @@ export const PropertyDetail = () => {
                     placeholder="E.g., What's the rent growth assumption in the Y1 proforma?"
                     className="w-full px-4 py-3 pr-12 rounded-xl text-sm bg-muted border border-border text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-ring"
                   />
-                  <button className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors">
+                  <button
+                    onClick={() => {
+                      toast.info('Coming soon', {
+                        description: 'AI follow-up questions will be available in a future update.'
+                      });
+                    }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                  >
                     <ArrowRight className="w-4 h-4" />
                   </button>
                 </div>
