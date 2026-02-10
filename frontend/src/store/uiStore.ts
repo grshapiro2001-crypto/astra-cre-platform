@@ -13,6 +13,13 @@ interface UIState {
   mobileSidebarOpen: boolean;
   setMobileSidebarOpen: (open: boolean) => void;
   toggleMobileSidebar: () => void;
+
+  comparisonPropertyIds: number[];
+  setComparisonPropertyIds: (ids: number[]) => void;
+  addToComparison: (id: number) => void;
+  removeFromComparison: (id: number) => void;
+  togglePropertyComparison: (id: number) => void;
+  clearComparison: () => void;
 }
 
 function applyTheme(theme: 'light' | 'dark') {
@@ -45,12 +52,35 @@ export const useUIStore = create<UIState>()(
       mobileSidebarOpen: false,
       setMobileSidebarOpen: (open) => set({ mobileSidebarOpen: open }),
       toggleMobileSidebar: () => set((state) => ({ mobileSidebarOpen: !state.mobileSidebarOpen })),
+
+      comparisonPropertyIds: [],
+      setComparisonPropertyIds: (ids) => set({ comparisonPropertyIds: ids }),
+      addToComparison: (id) =>
+        set((state) => {
+          if (state.comparisonPropertyIds.includes(id)) return state;
+          if (state.comparisonPropertyIds.length >= 5) return state;
+          return { comparisonPropertyIds: [...state.comparisonPropertyIds, id] };
+        }),
+      removeFromComparison: (id) =>
+        set((state) => ({
+          comparisonPropertyIds: state.comparisonPropertyIds.filter((pid) => pid !== id),
+        })),
+      togglePropertyComparison: (id) =>
+        set((state) => {
+          if (state.comparisonPropertyIds.includes(id)) {
+            return { comparisonPropertyIds: state.comparisonPropertyIds.filter((pid) => pid !== id) };
+          }
+          if (state.comparisonPropertyIds.length >= 5) return state;
+          return { comparisonPropertyIds: [...state.comparisonPropertyIds, id] };
+        }),
+      clearComparison: () => set({ comparisonPropertyIds: [] }),
     }),
     {
       name: 'astra-ui-storage',
       partialize: (state) => ({
         theme: state.theme,
         sidebarCollapsed: state.sidebarCollapsed,
+        comparisonPropertyIds: state.comparisonPropertyIds,
       }),
       onRehydrateStorage: () => {
         return (state) => {

@@ -20,6 +20,7 @@ import {
   Trash2,
   FileText,
   Receipt,
+  BarChart3,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { propertyService } from '@/services/propertyService';
@@ -27,6 +28,7 @@ import { scoringService } from '@/services/scoringService';
 import type { DealScoreResult } from '@/services/scoringService';
 import { DealScoreBadge } from '@/components/scoring/DealScoreBadge';
 import { DealScoreModal } from '@/components/scoring/DealScoreModal';
+import { useUIStore } from '@/store/uiStore';
 import type {
   PropertyDetail as PropertyDetailType,
   FinancialPeriod,
@@ -260,6 +262,10 @@ export const PropertyDetail = () => {
   const [isReanalyzing, setIsReanalyzing] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // --- Comparison state from uiStore ---
+  const comparisonPropertyIds = useUIStore((state) => state.comparisonPropertyIds);
+  const togglePropertyComparison = useUIStore((state) => state.togglePropertyComparison);
 
   // -----------------------------------------------------------------------
   // Data fetching
@@ -542,6 +548,36 @@ export const PropertyDetail = () => {
               >
                 <Sparkles className="w-4 h-4" />
                 AI Analysis
+              </button>
+
+              <button
+                onClick={() => {
+                  if (!property) return;
+                  togglePropertyComparison(property.id);
+                  const isCurrentlySelected = comparisonPropertyIds.includes(property.id);
+                  const newIds = isCurrentlySelected
+                    ? comparisonPropertyIds.filter(pid => pid !== property.id)
+                    : [...comparisonPropertyIds, property.id];
+                  if (newIds.length >= 2) {
+                    navigate(`/compare?ids=${newIds.join(',')}`);
+                  } else {
+                    toast.success(
+                      isCurrentlySelected
+                        ? 'Removed from comparison'
+                        : 'Added to comparison. Select 1+ more properties to compare.',
+                      { duration: 2000 }
+                    );
+                  }
+                }}
+                className={cn(
+                  "flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium border transition-colors",
+                  property && comparisonPropertyIds.includes(property.id)
+                    ? "bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/20 hover:bg-violet-500/20"
+                    : "bg-card text-muted-foreground border-border hover:bg-accent"
+                )}
+              >
+                <BarChart3 className="w-4 h-4" />
+                {property && comparisonPropertyIds.includes(property.id) ? 'In Comparison' : 'Add to Comparison'}
               </button>
 
               <button

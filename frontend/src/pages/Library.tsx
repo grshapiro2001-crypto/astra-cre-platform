@@ -32,6 +32,7 @@ import type { PropertyListItem } from '@/types/property';
 import { CreateFolderModal } from '@/components/library/CreateFolderModal';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { LibrarySkeleton } from '@/components/ui/PageSkeleton';
+import { useUIStore } from '@/store/uiStore';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -143,11 +144,15 @@ export const Library = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState<DealStatus>('all');
-  const [selectedPropertyIds, setSelectedPropertyIds] = useState<number[]>([]);
   const [hoveredDealId, setHoveredDealId] = useState<number | null>(null);
   const [sortBy, setSortBy] = useState<SortOption>('dateAdded');
   const [showSortMenu, setShowSortMenu] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+
+  // ---- Comparison state from uiStore ----
+  const comparisonPropertyIds = useUIStore((state) => state.comparisonPropertyIds);
+  const togglePropertyComparison = useUIStore((state) => state.togglePropertyComparison);
+  const clearComparison = useUIStore((state) => state.clearComparison);
 
   // ---- Scoring state ----
   const [scores, setScores] = useState<Record<number, DealScoreResult>>({});
@@ -279,19 +284,9 @@ export const Library = () => {
   }, [properties, getPropertyStatus]);
 
   // ---- Selection helpers ----
-  const togglePropertySelection = (propertyId: number) => {
-    setSelectedPropertyIds((prev) =>
-      prev.includes(propertyId)
-        ? prev.filter((id) => id !== propertyId)
-        : prev.length < 5
-          ? [...prev, propertyId]
-          : prev,
-    );
-  };
-
   const handleCompare = () => {
-    if (selectedPropertyIds.length >= 2) {
-      navigate(`/compare?ids=${selectedPropertyIds.join(',')}`);
+    if (comparisonPropertyIds.length >= 2) {
+      navigate(`/compare?ids=${comparisonPropertyIds.join(',')}`);
     }
   };
 
@@ -373,7 +368,7 @@ export const Library = () => {
               <div
                 className={cn(
                   'transition-all duration-300 overflow-hidden',
-                  selectedPropertyIds.length >= 2
+                  comparisonPropertyIds.length >= 2
                     ? 'max-w-[200px] opacity-100'
                     : 'max-w-0 opacity-0',
                 )}
@@ -383,7 +378,7 @@ export const Library = () => {
                   className="px-5 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2 whitespace-nowrap text-white bg-gradient-to-r from-emerald-500 to-emerald-600 shadow-lg shadow-emerald-500/20 transition-all duration-300 hover:shadow-emerald-500/30"
                 >
                   <BarChart3 className="w-4 h-4" />
-                  Compare ({selectedPropertyIds.length})
+                  Compare ({comparisonPropertyIds.length})
                 </button>
               </div>
 
@@ -503,14 +498,14 @@ export const Library = () => {
             </div>
 
             {/* Selection info */}
-            {selectedPropertyIds.length > 0 && (
+            {comparisonPropertyIds.length > 0 && (
               <div className="flex items-center gap-2">
                 <span className="text-sm text-muted-foreground">
-                  {selectedPropertyIds.length} selected
+                  {comparisonPropertyIds.length} selected
                   <span className="text-xs ml-1">(max 5)</span>
                 </span>
                 <button
-                  onClick={() => setSelectedPropertyIds([])}
+                  onClick={clearComparison}
                   className="text-sm font-medium text-primary hover:text-primary/80 transition-colors"
                 >
                   Clear
@@ -545,7 +540,7 @@ export const Library = () => {
         {viewMode === 'grid' && (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-5">
             {filteredProperties.map((property) => {
-              const isSelected = selectedPropertyIds.includes(property.id);
+              const isSelected = comparisonPropertyIds.includes(property.id);
               const isHovered = hoveredDealId === property.id;
               const status = getPropertyStatus(property);
               const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.active;
@@ -588,7 +583,7 @@ export const Library = () => {
                         className="absolute top-3 left-3 z-10"
                         onClick={(e) => {
                           e.stopPropagation();
-                          togglePropertySelection(property.id);
+                          togglePropertyComparison(property.id);
                         }}
                         aria-label={
                           isSelected
@@ -809,7 +804,7 @@ export const Library = () => {
 
             {/* Table rows */}
             {filteredProperties.map((property, index) => {
-              const isSelected = selectedPropertyIds.includes(property.id);
+              const isSelected = comparisonPropertyIds.includes(property.id);
               const isHovered = hoveredDealId === property.id;
               const status = getPropertyStatus(property);
               const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.active;
@@ -839,7 +834,7 @@ export const Library = () => {
                   <div
                     onClick={(e) => {
                       e.stopPropagation();
-                      togglePropertySelection(property.id);
+                      togglePropertyComparison(property.id);
                     }}
                   >
                     <div
