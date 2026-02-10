@@ -30,6 +30,7 @@ export interface CompUsed {
   submarket: string | null;
   cap_rate: number | null;
   price_per_unit: number | null;
+  sale_price: number | null;
   year_built: number | null;
   units: number | null;
   relevance: number;
