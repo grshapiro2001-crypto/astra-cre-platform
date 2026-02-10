@@ -1,19 +1,36 @@
 """
-Data Bank routes — inventory, comps, and pipeline queries
+Data Bank routes — inventory, comps, pipeline queries, and Excel uploads
 
-Endpoints for managing submarket inventory, querying sales comps, and pipeline projects.
+Endpoints for managing submarket inventory, querying sales comps, pipeline projects,
+and uploading/extracting data from Excel spreadsheets.
 """
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+import uuid
+import logging
+from pathlib import Path
+
+from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File
 from sqlalchemy.orm import Session
 from typing import List, Optional
 
 from app.database import get_db
 from app.models.user import User
-from app.models.data_bank import SubmarketInventory, SalesComp, PipelineProject
+from app.models.data_bank import DataBankDocument, SubmarketInventory, SalesComp, PipelineProject
 from app.api.deps import get_current_user
 from app.schemas.scoring import SubmarketInventoryCreate, SubmarketInventoryResponse
+from app.schemas.data_bank import (
+    DataBankUploadResponse,
+    DataBankDocumentResponse,
+    DataBankDocumentListResponse,
+)
+from app.services.data_bank_extraction_service import process_data_bank_upload
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/data-bank", tags=["Data Bank"])
+
+# Allowed file extensions
+ALLOWED_EXTENSIONS = {".xlsx", ".xlsm", ".csv"}
+MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 MB
 
 
 # ==================== INVENTORY ====================
@@ -169,3 +186,169 @@ def query_pipeline(
         }
         for p in projects
     ]
+
+
+# ==================== DOCUMENT UPLOAD ====================
+
+@router.post("/upload", response_model=DataBankUploadResponse, status_code=status.HTTP_201_CREATED)
+def upload_data_bank_file(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Upload an Excel file (.xlsx, .xlsm, .csv) to the Data Bank.
+
+    The file is saved to disk, then processed through the extraction pipeline:
+    1. Document type detection (sales_comps, pipeline_tracker, underwriting_model)
+    2. Structural parse (openpyxl)
+    3. Claude API column classification + value normalization
+    4. Records stored in DB (SalesComp or PipelineProject rows)
+    """
+    user_id = str(current_user.id)
+
+    # Validate filename and extension
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No filename provided")
+
+    ext = Path(file.filename).suffix.lower()
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file type '{ext}'. Allowed: {', '.join(ALLOWED_EXTENSIONS)}",
+        )
+
+    # Read file contents
+    contents = file.file.read()
+    if len(contents) > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File too large. Maximum size is {MAX_FILE_SIZE // (1024 * 1024)}MB.",
+        )
+
+    if len(contents) == 0:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty")
+
+    # Save file to disk
+    upload_dir = Path("backend/uploads/data_bank")
+    upload_dir.mkdir(parents=True, exist_ok=True)
+
+    unique_filename = f"{uuid.uuid4()}_{Path(file.filename).name}"
+    file_path = upload_dir / unique_filename
+    file_path.write_bytes(contents)
+
+    # Create document record
+    document = DataBankDocument(
+        user_id=user_id,
+        filename=file.filename,
+        file_path=str(file_path),
+        document_type="unknown",
+        extraction_status="processing",
+    )
+    db.add(document)
+    db.flush()  # Get the document ID
+
+    # Run extraction
+    try:
+        doc_type, record_count, warnings = process_data_bank_upload(
+            filepath=str(file_path),
+            user_id=user_id,
+            db=db,
+            document=document,
+        )
+    except Exception as e:
+        logger.exception(f"Upload processing failed for {file.filename}")
+        document.extraction_status = "failed"
+        db.commit()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Extraction failed: {str(e)}",
+        )
+
+    return DataBankUploadResponse(
+        document_id=document.id,
+        document_type=doc_type,
+        extraction_status=document.extraction_status,
+        record_count=record_count,
+        warnings=warnings,
+        filename=file.filename,
+    )
+
+
+# ==================== DOCUMENT LIST / DETAIL / DELETE ====================
+
+@router.get("/documents", response_model=DataBankDocumentListResponse)
+def list_documents(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """List all Data Bank documents for the current user."""
+    documents = (
+        db.query(DataBankDocument)
+        .filter(DataBankDocument.user_id == str(current_user.id))
+        .order_by(DataBankDocument.created_at.desc())
+        .all()
+    )
+    return DataBankDocumentListResponse(
+        documents=documents,
+        total=len(documents),
+    )
+
+
+@router.get("/document/{document_id}", response_model=DataBankDocumentResponse)
+def get_document(
+    document_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Get a single Data Bank document with full extraction data."""
+    document = (
+        db.query(DataBankDocument)
+        .filter(
+            DataBankDocument.id == document_id,
+            DataBankDocument.user_id == str(current_user.id),
+        )
+        .first()
+    )
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return document
+
+
+@router.delete("/document/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_document(
+    document_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Delete a Data Bank document and all associated extracted records
+    (SalesComp and PipelineProject rows linked to this document).
+    """
+    user_id = str(current_user.id)
+
+    document = (
+        db.query(DataBankDocument)
+        .filter(
+            DataBankDocument.id == document_id,
+            DataBankDocument.user_id == user_id,
+        )
+        .first()
+    )
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    # Delete associated records
+    db.query(SalesComp).filter(SalesComp.document_id == document_id).delete()
+    db.query(PipelineProject).filter(PipelineProject.document_id == document_id).delete()
+
+    # Delete the file from disk
+    file_path = Path(document.file_path)
+    if file_path.exists():
+        file_path.unlink()
+
+    # Delete document record
+    db.delete(document)
+    db.commit()
+
+    return None
