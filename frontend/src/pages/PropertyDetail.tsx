@@ -448,6 +448,10 @@ export const PropertyDetail = () => {
 
   const hasFinancials = availablePeriods.length > 0;
 
+  const hasRenoPremium = useMemo(() => {
+    return unitMix.some(u => u.renovation_premium != null);
+  }, [unitMix]);
+
   const unitMixSummary = useMemo(() => {
     if (!unitMix.length) return null;
     let totalUnitsSum = 0;
@@ -1525,7 +1529,10 @@ export const PropertyDetail = () => {
                       <th className="px-4 py-3 text-right font-semibold text-muted-foreground">SF</th>
                       <th className="px-4 py-3 text-right font-semibold text-muted-foreground">In-Place Rent</th>
                       <th className="px-4 py-3 text-right font-semibold text-muted-foreground">Proforma Rent</th>
-                      <th className="px-4 py-3 text-right font-semibold text-muted-foreground">Rent PSF</th>
+                      <th className="px-4 py-3 text-right font-semibold text-muted-foreground">Rent/SF</th>
+                      {hasRenoPremium && (
+                        <th className="px-4 py-3 text-right font-semibold text-muted-foreground">Reno Premium</th>
+                      )}
                     </tr>
                   </thead>
                   <tbody>
@@ -1538,6 +1545,9 @@ export const PropertyDetail = () => {
                         <td className="px-4 py-3 text-right font-mono text-foreground">{u.in_place_rent != null ? fmtCurrency(u.in_place_rent) : '\u2014'}</td>
                         <td className="px-4 py-3 text-right font-mono text-foreground">{u.proforma_rent != null ? fmtCurrency(u.proforma_rent) : '\u2014'}</td>
                         <td className="px-4 py-3 text-right font-mono text-foreground">{u.proforma_rent_psf != null ? `$${u.proforma_rent_psf.toFixed(2)}` : '\u2014'}</td>
+                        {hasRenoPremium && (
+                          <td className="px-4 py-3 text-right font-mono text-foreground">{u.renovation_premium != null ? fmtCurrency(u.renovation_premium) : '\u2014'}</td>
+                        )}
                       </tr>
                     ))}
                   </tbody>
@@ -1548,7 +1558,7 @@ export const PropertyDetail = () => {
                         <td className="px-4 py-3 text-right font-mono font-semibold text-foreground">{unitMixSummary.totalUnits}</td>
                         <td className="px-4 py-3 text-right font-mono font-semibold text-foreground">{unitMixSummary.avgSF.toLocaleString()}</td>
                         <td className="px-4 py-3 text-right font-mono font-semibold text-foreground">{fmtCurrency(unitMixSummary.avgRent)}</td>
-                        <td className="px-4 py-3" colSpan={2}></td>
+                        <td className="px-4 py-3" colSpan={hasRenoPremium ? 3 : 2}></td>
                       </tr>
                     </tfoot>
                   )}
@@ -1573,11 +1583,11 @@ export const PropertyDetail = () => {
             <h2 className="font-display text-lg font-bold mb-4 text-foreground">
               Renovation Assumptions
             </h2>
-            <div className="border border-border rounded-2xl bg-card p-6">
+            <div className="border border-border/60 rounded-2xl bg-card/50 p-6">
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 {property.renovation_cost_per_unit != null && (
                   <div className="p-3 rounded-xl bg-accent">
-                    <p className="text-xs text-muted-foreground">Cost per Unit</p>
+                    <p className="text-xs text-muted-foreground">Cost/Unit</p>
                     <p className="font-mono text-lg font-semibold text-foreground">{fmtCurrency(property.renovation_cost_per_unit)}</p>
                   </div>
                 )}
@@ -1607,7 +1617,7 @@ export const PropertyDetail = () => {
                 )}
                 {property.renovation_stabilized_revenue != null && (
                   <div className="p-3 rounded-xl bg-muted">
-                    <p className="text-xs text-muted-foreground">Stabilized Revenue Increase</p>
+                    <p className="text-xs text-muted-foreground">Stabilized Revenue</p>
                     <p className="font-mono text-lg font-semibold text-foreground">{fmtCurrency(property.renovation_stabilized_revenue, true)}</p>
                   </div>
                 )}
@@ -1681,7 +1691,7 @@ export const PropertyDetail = () => {
             </div>
           ) : (
             <div className="bg-card/30 border-border/40 border-dashed rounded-2xl p-8 text-center border">
-              <Building2 className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
+              <TrendingUp className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
               <p className="text-muted-foreground text-sm">
                 Rent comparables will appear after document analysis
               </p>
