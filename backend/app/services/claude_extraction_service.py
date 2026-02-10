@@ -161,6 +161,54 @@ IMPORTANT:
 - Cap rates are nested within each tier
 - If a field is not provided for a specific tier, use null
 
+METRO EXTRACTION:
+- This is the MSA/metro area, NOT the submarket
+- For Atlanta properties, metro = "Atlanta"
+- For Dallas properties, metro = "Dallas-Fort Worth"
+- If not explicitly stated, infer from city/state in the address
+- This MUST always be populated if address or submarket is known
+
+RENOVATION ASSUMPTIONS EXTRACTION:
+- Look for sections titled "Renovation Assumptions", "Value-Add", "Renovation Summary", "Capital Improvements"
+- These may not exist in every OM — return null for all if not found
+- Cost per unit is often prominently displayed
+- ROI / Return on Cost is usually calculated as (stabilized revenue increase / total cost)
+- renovation_rent_premium = weighted average rent premium per renovated unit
+
+GRANULAR FINANCIAL LINE ITEMS (per period — Y1, T12, T3):
+For whichever period(s) exist, also extract these additional line items:
+- loss_to_lease: Loss to Lease amount (negative number or null)
+- vacancy_rate_pct: Vacancy as a percentage (e.g. 5.0)
+- credit_loss: Credit loss / bad debt amount
+- net_rental_income: NRI = GSR + Renovation Premium + Loss to Lease - Vacancy - Concessions - Credit Loss
+- utility_reimbursements: Utility reimbursement income
+- parking_storage_income: Parking, storage, garage income
+- other_income: Other miscellaneous income items
+- management_fee_pct: Management fee as % of EGI (e.g. 2.5)
+- real_estate_taxes: Real estate / property tax amount
+- insurance_amount: Insurance expense amount
+- replacement_reserves: Capital replacement reserves
+- net_cash_flow: NOI minus replacement reserves
+- expense_ratio_pct: Total OpEx / EGI (or GSR) as stated in document
+Not all OMs include every line item — return null for missing items, never fabricate.
+
+UNIT MIX EXTRACTION:
+- Usually in Financial Analysis section or a "Unit Mix" table
+- Each row = one floorplan
+- bedroom_count: 0 for Studio, 1 for 1BD, 2 for 2BD, 3 for 3BD
+- proforma_rent_psf = proforma_rent / unit_sf
+- renovation_premium: only present in value-add OMs, null otherwise
+- Sort by bedroom_count ascending, then by num_units descending
+- Return empty array if no unit mix found
+
+RENT COMP EXTRACTION:
+- Usually in "Rental Market" or "Rent Comparable Analysis" section
+- Extract "All Unit" summary as bedroom_type = "All"
+- If per-bedroom tables exist, extract those too with bedroom_type = "Studio", "1BR", "2BR", "3BR"
+- is_new_construction = true if comp is labeled as "New Construction"
+- Do NOT include the subject property itself as a comp
+- Return empty array if no rent comps found
+
 VERIFICATION - CRITICAL STEP:
 - Verify: GSR - Vacancy - Concessions - Bad Debt - Non-Revenue Units ≈ EGI
 - If numbers don't match, double-check which row you're reading from
@@ -187,6 +235,7 @@ Return JSON format:
     "property_address": "string or null",
     "property_type": "string or null",
     "submarket": "string or null",
+    "metro": "string or null — MSA-level metro area (e.g. 'Atlanta', 'Dallas-Fort Worth'). Infer from city/state if not explicit.",
     "year_built": number or null,
     "total_units": number or null,
     "total_sf": number or null
@@ -194,6 +243,14 @@ Return JSON format:
   "average_rents": {{
     "market_rent": number or null,
     "in_place_rent": number or null
+  }},
+  "renovation": {{
+    "renovation_cost_per_unit": number or null,
+    "renovation_total_cost": number or null,
+    "renovation_rent_premium": number or null,
+    "renovation_roi_pct": number or null,
+    "renovation_duration_years": number or null,
+    "renovation_stabilized_revenue": number or null
   }},
   "financials_by_period": {{
     "t12": {{
@@ -210,11 +267,50 @@ Return JSON format:
         "insurance": number or null,
         "property_taxes": number or null
       }},
-      "noi": number or null
+      "noi": number or null,
+      "loss_to_lease": number or null,
+      "vacancy_rate_pct": number or null,
+      "credit_loss": number or null,
+      "net_rental_income": number or null,
+      "utility_reimbursements": number or null,
+      "parking_storage_income": number or null,
+      "other_income": number or null,
+      "management_fee_pct": number or null,
+      "real_estate_taxes": number or null,
+      "insurance_amount": number or null,
+      "replacement_reserves": number or null,
+      "net_cash_flow": number or null,
+      "expense_ratio_pct": number or null
     }},
-    "t3": {{...}},
-    "y1": {{...}}
+    "t3": {{...same structure as t12...}},
+    "y1": {{...same structure as t12...}}
   }},
+  "unit_mix": [
+    {{
+      "floorplan_name": "string or null",
+      "unit_type": "string (e.g. '1 BD/1 BA')",
+      "bedroom_count": number (0=Studio, 1, 2, 3),
+      "bathroom_count": number or null,
+      "num_units": number,
+      "unit_sf": number or null,
+      "in_place_rent": number or null,
+      "proforma_rent": number or null,
+      "proforma_rent_psf": number or null,
+      "renovation_premium": number or null
+    }}
+  ],
+  "rent_comps": [
+    {{
+      "comp_name": "string",
+      "location": "string or null",
+      "num_units": number or null,
+      "avg_unit_sf": number or null,
+      "in_place_rent": number or null,
+      "in_place_rent_psf": number or null,
+      "bedroom_type": "All" | "Studio" | "1BR" | "2BR" | "3BR",
+      "is_new_construction": boolean
+    }}
+  ],
   "bov_pricing_tiers": [
     {{
       "pricing_tier_id": "tier_1",

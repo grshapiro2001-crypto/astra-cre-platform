@@ -8,7 +8,7 @@ from alembic import context
 # Import Base and models
 from app.database import Base
 from app.models import (  # noqa: F401 — Import all models so Alembic can see them
-    User, Property, AnalysisLog,
+    User, Property, AnalysisLog, PropertyUnitMix, PropertyRentComp,
     DealFolder, BOVPricingTier, BOVCapRate,
     UserScoringWeights,
     DataBankDocument, SalesComp, PipelineProject, SubmarketInventory,

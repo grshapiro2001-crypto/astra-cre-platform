@@ -369,10 +369,38 @@ def calculate_layer3_score(subject: dict, user_id: str, db: Session) -> dict:
 
     Sub-metric weights: cap_rate=35%, price_per_unit=40%, vintage=25%
     """
-    # Query ALL of the user's sales comps — let relevance scoring handle filtering.
-    # We cannot pre-filter by metro because comp records often have metro=None;
-    # the actual location is in the "market" column instead.
-    all_comps = db.query(SalesComp).filter(SalesComp.user_id == user_id).all()
+    # Pre-filter by metro when available for better relevance, but include
+    # comps without metro too since many have metro=None.
+    subject_metro = (subject.get("metro") or "").strip().lower()
+    subject_submarket = (subject.get("submarket") or "").strip().lower()
+
+    if subject_metro:
+        # Prefer comps in the same metro, but also include comps where metro
+        # or market column contains the metro name, plus comps with no metro.
+        from sqlalchemy import or_, func as sa_func
+        all_comps = db.query(SalesComp).filter(
+            SalesComp.user_id == user_id,
+            or_(
+                sa_func.lower(SalesComp.metro) == subject_metro,
+                sa_func.lower(SalesComp.market).contains(subject_metro),
+                SalesComp.metro.is_(None),
+            )
+        ).all()
+    elif subject_submarket:
+        # Fallback: match on submarket → market column
+        from sqlalchemy import or_, func as sa_func
+        all_comps = db.query(SalesComp).filter(
+            SalesComp.user_id == user_id,
+            or_(
+                sa_func.lower(SalesComp.market) == subject_submarket,
+                sa_func.lower(SalesComp.market).contains(subject_submarket),
+                sa_func.lower(SalesComp.submarket) == subject_submarket,
+                SalesComp.market.is_(None),
+            )
+        ).all()
+    else:
+        # No geographic info — query all comps and let scoring handle it
+        all_comps = db.query(SalesComp).filter(SalesComp.user_id == user_id).all()
 
     if not all_comps:
         return {

@@ -9,7 +9,7 @@ import json
 import os
 from datetime import datetime
 from typing import List, Optional
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_, and_
 
 from app.models.property import Property, AnalysisLog
@@ -218,7 +218,10 @@ def get_property(
     Optionally updates last_viewed_date.
     Returns None if not found or wrong user.
     """
-    property_obj = db.query(Property).filter(
+    property_obj = db.query(Property).options(
+        joinedload(Property.unit_mix),
+        joinedload(Property.rent_comps),
+    ).filter(
         Property.id == property_id,
         Property.user_id == user_id
     ).first()

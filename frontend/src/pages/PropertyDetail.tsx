@@ -21,6 +21,8 @@ import {
   FileText,
   Receipt,
   BarChart3,
+  MapPin,
+  Upload,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { propertyService } from '@/services/propertyService';
@@ -33,6 +35,8 @@ import type {
   PropertyDetail as PropertyDetailType,
   FinancialPeriod,
   BOVPricingTier,
+  UnitMixItem,
+  RentCompItem,
 } from '@/types/property';
 import { AnimatePresence, motion } from 'framer-motion';
 import { PropertyDetailSkeleton } from '@/components/ui/PageSkeleton';
@@ -430,6 +434,54 @@ export const PropertyDetail = () => {
     return Math.round(noi / (capRateSlider / 100));
   }, [currentFinancials, capRateSlider]);
 
+  const [rentCompTab, setRentCompTab] = useState<string>('All');
+
+  const unitMix: UnitMixItem[] = property?.unit_mix ?? [];
+  const rentComps: RentCompItem[] = property?.rent_comps ?? [];
+
+  const hasRenovation = property != null && (
+    property.renovation_cost_per_unit != null ||
+    property.renovation_total_cost != null ||
+    property.renovation_rent_premium != null ||
+    property.renovation_roi_pct != null
+  );
+
+  const hasFinancials = availablePeriods.length > 0;
+
+  const unitMixSummary = useMemo(() => {
+    if (!unitMix.length) return null;
+    let totalUnitsSum = 0;
+    let weightedSF = 0;
+    let weightedRent = 0;
+    for (const u of unitMix) {
+      const n = u.num_units ?? 0;
+      totalUnitsSum += n;
+      weightedSF += n * (u.unit_sf ?? 0);
+      weightedRent += n * (u.in_place_rent ?? 0);
+    }
+    return {
+      totalUnits: totalUnitsSum,
+      avgSF: totalUnitsSum > 0 ? Math.round(weightedSF / totalUnitsSum) : 0,
+      avgRent: totalUnitsSum > 0 ? Math.round(weightedRent / totalUnitsSum) : 0,
+    };
+  }, [unitMix]);
+
+  const rentCompTabs = useMemo(() => {
+    const types = new Set<string>();
+    for (const c of rentComps) {
+      if (c.bedroom_type) types.add(c.bedroom_type);
+    }
+    return Array.from(types).sort((a, b) => {
+      const order = ['All', 'Studio', '1BR', '2BR', '3BR'];
+      return order.indexOf(a) - order.indexOf(b);
+    });
+  }, [rentComps]);
+
+  const filteredRentComps = useMemo(() => {
+    if (rentCompTabs.length <= 1) return rentComps;
+    return rentComps.filter(c => c.bedroom_type === rentCompTab);
+  }, [rentComps, rentCompTab, rentCompTabs]);
+
   const bovTiers: BOVPricingTier[] = property?.bov_pricing_tiers ?? [];
   const hasBOV = bovTiers.length > 0;
   const selectedTier: BOVPricingTier | null = hasBOV
@@ -517,14 +569,20 @@ export const PropertyDetail = () => {
                   <h1 className="font-display text-xl font-bold text-foreground">
                     {property.deal_name}
                   </h1>
-                  <span
-                    className={cn(
-                      'px-2.5 py-1 rounded-lg text-2xs font-bold uppercase tracking-wider',
-                      docBadgeClass(property.document_type),
-                    )}
-                  >
-                    {property.document_type}
-                  </span>
+                  {property.document_type ? (
+                    <span
+                      className={cn(
+                        'px-2.5 py-1 rounded-lg text-2xs font-bold uppercase tracking-wider',
+                        docBadgeClass(property.document_type),
+                      )}
+                    >
+                      {property.document_type}
+                    </span>
+                  ) : (
+                    <span className="px-2.5 py-1 rounded-lg text-2xs font-bold uppercase tracking-wider bg-muted text-muted-foreground">
+                      No Document
+                    </span>
+                  )}
                   {property.document_subtype && (
                     <span className="px-2.5 py-1 rounded-lg text-2xs font-bold uppercase tracking-wider bg-muted text-muted-foreground">
                       {property.document_subtype}
@@ -645,6 +703,11 @@ export const PropertyDetail = () => {
                     {property.submarket && (
                       <span className="px-2 py-1 rounded-lg text-xs font-medium bg-accent text-primary">
                         {property.submarket}
+                      </span>
+                    )}
+                    {property.metro && (
+                      <span className="px-2 py-1 rounded-lg text-xs font-medium bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                        {property.metro}
                       </span>
                     )}
                     {property.property_type && (
@@ -1100,6 +1163,26 @@ export const PropertyDetail = () => {
         {/* --------------------------------------------------------------- */}
         {/* OPERATING FINANCIALS                                             */}
         {/* --------------------------------------------------------------- */}
+        {!hasFinancials && (
+          <section className="animate-fade-in" style={{ animationDelay: '200ms' }}>
+            <h2 className="font-display text-lg font-bold mb-4 text-foreground">
+              Operating Financials
+            </h2>
+            <div className="bg-card/30 border-border/40 border-dashed rounded-2xl p-8 text-center border">
+              <BarChart3 className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
+              <p className="text-muted-foreground text-sm">
+                Financial data will populate when you upload an OM or BOV
+              </p>
+              <button
+                onClick={() => navigate('/upload')}
+                className="mt-4 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium border border-primary text-primary hover:bg-primary/10 transition-colors"
+              >
+                <Upload className="w-4 h-4" />
+                Upload Document
+              </button>
+            </div>
+          </section>
+        )}
         {availablePeriods.length > 0 && currentFinancials && (
           <section
             className="animate-fade-in"
@@ -1419,6 +1502,214 @@ export const PropertyDetail = () => {
                   </div>
                 </div>
               )}
+            </div>
+          </section>
+        )}
+
+        {/* --------------------------------------------------------------- */}
+        {/* UNIT MIX                                                         */}
+        {/* --------------------------------------------------------------- */}
+        <section className="animate-fade-in" style={{ animationDelay: '270ms' }}>
+          <h2 className="font-display text-lg font-bold mb-4 text-foreground">
+            Unit Mix
+          </h2>
+          {unitMix.length > 0 ? (
+            <div className="border border-border rounded-2xl bg-card overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border bg-muted/50">
+                      <th className="px-4 py-3 text-left font-semibold text-muted-foreground">Floorplan</th>
+                      <th className="px-4 py-3 text-left font-semibold text-muted-foreground">Type</th>
+                      <th className="px-4 py-3 text-right font-semibold text-muted-foreground">Units</th>
+                      <th className="px-4 py-3 text-right font-semibold text-muted-foreground">SF</th>
+                      <th className="px-4 py-3 text-right font-semibold text-muted-foreground">In-Place Rent</th>
+                      <th className="px-4 py-3 text-right font-semibold text-muted-foreground">Proforma Rent</th>
+                      <th className="px-4 py-3 text-right font-semibold text-muted-foreground">Rent PSF</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {unitMix.map((u, idx) => (
+                      <tr key={u.id ?? idx} className="border-b border-border last:border-0 hover:bg-accent/50 transition-colors">
+                        <td className="px-4 py-3 font-medium text-foreground">{u.floorplan_name ?? '\u2014'}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{u.unit_type ?? '\u2014'}</td>
+                        <td className="px-4 py-3 text-right font-mono text-foreground">{u.num_units ?? '\u2014'}</td>
+                        <td className="px-4 py-3 text-right font-mono text-foreground">{u.unit_sf != null ? u.unit_sf.toLocaleString() : '\u2014'}</td>
+                        <td className="px-4 py-3 text-right font-mono text-foreground">{u.in_place_rent != null ? fmtCurrency(u.in_place_rent) : '\u2014'}</td>
+                        <td className="px-4 py-3 text-right font-mono text-foreground">{u.proforma_rent != null ? fmtCurrency(u.proforma_rent) : '\u2014'}</td>
+                        <td className="px-4 py-3 text-right font-mono text-foreground">{u.proforma_rent_psf != null ? `$${u.proforma_rent_psf.toFixed(2)}` : '\u2014'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  {unitMixSummary && (
+                    <tfoot>
+                      <tr className="border-t-2 border-primary bg-accent/30">
+                        <td className="px-4 py-3 font-semibold text-foreground" colSpan={2}>Total / Weighted Avg</td>
+                        <td className="px-4 py-3 text-right font-mono font-semibold text-foreground">{unitMixSummary.totalUnits}</td>
+                        <td className="px-4 py-3 text-right font-mono font-semibold text-foreground">{unitMixSummary.avgSF.toLocaleString()}</td>
+                        <td className="px-4 py-3 text-right font-mono font-semibold text-foreground">{fmtCurrency(unitMixSummary.avgRent)}</td>
+                        <td className="px-4 py-3" colSpan={2}></td>
+                      </tr>
+                    </tfoot>
+                  )}
+                </table>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-card/30 border-border/40 border-dashed rounded-2xl p-8 text-center border">
+              <Building2 className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
+              <p className="text-muted-foreground text-sm">
+                Unit mix details will appear after document analysis
+              </p>
+            </div>
+          )}
+        </section>
+
+        {/* --------------------------------------------------------------- */}
+        {/* RENOVATION ASSUMPTIONS (only show if data exists)                */}
+        {/* --------------------------------------------------------------- */}
+        {hasRenovation && (
+          <section className="animate-fade-in" style={{ animationDelay: '280ms' }}>
+            <h2 className="font-display text-lg font-bold mb-4 text-foreground">
+              Renovation Assumptions
+            </h2>
+            <div className="border border-border rounded-2xl bg-card p-6">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {property.renovation_cost_per_unit != null && (
+                  <div className="p-3 rounded-xl bg-accent">
+                    <p className="text-xs text-muted-foreground">Cost per Unit</p>
+                    <p className="font-mono text-lg font-semibold text-foreground">{fmtCurrency(property.renovation_cost_per_unit)}</p>
+                  </div>
+                )}
+                {property.renovation_total_cost != null && (
+                  <div className="p-3 rounded-xl bg-muted">
+                    <p className="text-xs text-muted-foreground">Total Cost</p>
+                    <p className="font-mono text-lg font-semibold text-foreground">{fmtCurrency(property.renovation_total_cost, true)}</p>
+                  </div>
+                )}
+                {property.renovation_rent_premium != null && (
+                  <div className="p-3 rounded-xl bg-muted">
+                    <p className="text-xs text-muted-foreground">Avg Rent Premium</p>
+                    <p className="font-mono text-lg font-semibold text-foreground">{fmtCurrency(property.renovation_rent_premium)}/unit</p>
+                  </div>
+                )}
+                {property.renovation_roi_pct != null && (
+                  <div className="p-3 rounded-xl bg-accent">
+                    <p className="text-xs text-muted-foreground">Return on Cost</p>
+                    <p className="font-mono text-lg font-semibold text-primary">{property.renovation_roi_pct.toFixed(1)}%</p>
+                  </div>
+                )}
+                {property.renovation_duration_years != null && (
+                  <div className="p-3 rounded-xl bg-muted">
+                    <p className="text-xs text-muted-foreground">Duration</p>
+                    <p className="font-mono text-lg font-semibold text-foreground">{property.renovation_duration_years} years</p>
+                  </div>
+                )}
+                {property.renovation_stabilized_revenue != null && (
+                  <div className="p-3 rounded-xl bg-muted">
+                    <p className="text-xs text-muted-foreground">Stabilized Revenue Increase</p>
+                    <p className="font-mono text-lg font-semibold text-foreground">{fmtCurrency(property.renovation_stabilized_revenue, true)}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* --------------------------------------------------------------- */}
+        {/* RENT COMPS                                                       */}
+        {/* --------------------------------------------------------------- */}
+        <section className="animate-fade-in" style={{ animationDelay: '290ms' }}>
+          <h2 className="font-display text-lg font-bold mb-4 text-foreground">
+            Rent Comparables
+          </h2>
+          {rentComps.length > 0 ? (
+            <div className="border border-border rounded-2xl bg-card overflow-hidden">
+              {rentCompTabs.length > 1 && (
+                <div className="px-4 pt-4">
+                  <div className="flex items-center rounded-xl p-1 bg-muted w-fit">
+                    {rentCompTabs.map((tab) => (
+                      <button
+                        key={tab}
+                        onClick={() => setRentCompTab(tab)}
+                        className={cn(
+                          'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
+                          rentCompTab === tab
+                            ? 'bg-accent text-primary'
+                            : 'text-muted-foreground hover:text-foreground',
+                        )}
+                      >
+                        {tab}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border bg-muted/50">
+                      <th className="px-4 py-3 text-left font-semibold text-muted-foreground">Property</th>
+                      <th className="px-4 py-3 text-left font-semibold text-muted-foreground">Location</th>
+                      <th className="px-4 py-3 text-right font-semibold text-muted-foreground">Units</th>
+                      <th className="px-4 py-3 text-right font-semibold text-muted-foreground">Avg SF</th>
+                      <th className="px-4 py-3 text-right font-semibold text-muted-foreground">Rent</th>
+                      <th className="px-4 py-3 text-right font-semibold text-muted-foreground">Rent/SF</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredRentComps.map((c, idx) => (
+                      <tr key={c.id ?? idx} className="border-b border-border last:border-0 hover:bg-accent/50 transition-colors">
+                        <td className="px-4 py-3 font-medium text-foreground">
+                          {c.comp_name}
+                          {c.is_new_construction && (
+                            <span className="ml-2 px-1.5 py-0.5 rounded text-2xs font-bold uppercase bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                              New
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground">{c.location ?? '\u2014'}</td>
+                        <td className="px-4 py-3 text-right font-mono text-foreground">{c.num_units ?? '\u2014'}</td>
+                        <td className="px-4 py-3 text-right font-mono text-foreground">{c.avg_unit_sf != null ? c.avg_unit_sf.toLocaleString() : '\u2014'}</td>
+                        <td className="px-4 py-3 text-right font-mono text-foreground">{c.in_place_rent != null ? fmtCurrency(c.in_place_rent) : '\u2014'}</td>
+                        <td className="px-4 py-3 text-right font-mono text-foreground">{c.in_place_rent_psf != null ? `$${c.in_place_rent_psf.toFixed(2)}` : '\u2014'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-card/30 border-border/40 border-dashed rounded-2xl p-8 text-center border">
+              <Building2 className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
+              <p className="text-muted-foreground text-sm">
+                Rent comparables will appear after document analysis
+              </p>
+            </div>
+          )}
+        </section>
+
+        {/* --------------------------------------------------------------- */}
+        {/* LOCATION / DEMOGRAPHICS (placeholder)                            */}
+        {/* --------------------------------------------------------------- */}
+        {property.property_address && (
+          <section className="animate-fade-in" style={{ animationDelay: '295ms' }}>
+            <h2 className="font-display text-lg font-bold mb-4 text-foreground">
+              Location
+            </h2>
+            <div className="bg-card/30 border-border/40 border-dashed rounded-2xl p-8 text-center border">
+              <MapPin className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
+              <p className="text-muted-foreground text-sm">
+                Location intelligence coming soon
+              </p>
+              <div className="mt-3 flex items-center justify-center gap-4 text-sm">
+                {property.submarket && (
+                  <span className="text-muted-foreground">Submarket: <span className="font-semibold text-foreground">{property.submarket}</span></span>
+                )}
+                {property.metro && (
+                  <span className="text-muted-foreground">Metro: <span className="font-semibold text-foreground">{property.metro}</span></span>
+                )}
+              </div>
             </div>
           </section>
         )}
