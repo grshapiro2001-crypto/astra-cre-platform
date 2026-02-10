@@ -89,6 +89,32 @@ export interface BOVPricingTier {
   terminal_assumptions?: BOVTerminalAssumptions | null;
 }
 
+export interface UnitMixItem {
+  id: number;
+  floorplan_name: string | null;
+  unit_type: string | null;
+  bedroom_count: number | null;
+  bathroom_count: number | null;
+  num_units: number | null;
+  unit_sf: number | null;
+  in_place_rent: number | null;
+  proforma_rent: number | null;
+  proforma_rent_psf: number | null;
+  renovation_premium: number | null;
+}
+
+export interface RentCompItem {
+  id: number;
+  comp_name: string;
+  location: string | null;
+  num_units: number | null;
+  avg_unit_sf: number | null;
+  in_place_rent: number | null;
+  in_place_rent_psf: number | null;
+  bedroom_type: string | null;
+  is_new_construction: boolean;
+}
+
 export interface ExtractionResult {
   document_type: 'OM' | 'BOV' | 'Unknown';
   confidence: 'high' | 'medium' | 'low';
@@ -130,11 +156,20 @@ export interface PropertyDetail {
   property_address?: string | null;
   property_type?: string | null;
   submarket?: string | null;
+  metro?: string | null;
   year_built?: number | null;
   total_units?: number | null;
   total_residential_sf?: number | null;
   average_market_rent?: number | null;
   average_inplace_rent?: number | null;
+  // Renovation assumptions
+  renovation_cost_per_unit?: number | null;
+  renovation_total_cost?: number | null;
+  renovation_rent_premium?: number | null;
+  renovation_roi_pct?: number | null;
+  renovation_duration_years?: number | null;
+  renovation_stabilized_revenue?: number | null;
+  // Financials
   t12_financials?: FinancialPeriod | null;
   t3_financials?: FinancialPeriod | null;
   y1_financials?: FinancialPeriod | null;
@@ -144,6 +179,9 @@ export interface PropertyDetail {
     y1?: CalculatedMetrics;
   };
   bov_pricing_tiers?: BOVPricingTier[];
+  // Unit mix and rent comps
+  unit_mix?: UnitMixItem[];
+  rent_comps?: RentCompItem[];
   source_notes?: SourceNotes;
   missing_fields?: string[];
   upload_date?: string;

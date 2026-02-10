@@ -350,7 +350,7 @@ async def reanalyze_property(
         )
 
         # Update property with new data
-        update_property_from_extraction(property_obj, extraction_result)
+        update_property_from_extraction(property_obj, extraction_result, db=db)
         property_obj.analysis_count += 1
         property_obj.last_analyzed_at = datetime.now()
         property_obj.analysis_status = "success"
@@ -397,6 +397,7 @@ def build_property_detail_response(property_obj: Property) -> PropertyDetail:
     # Import bov_service here to avoid circular imports
     from app.services import bov_service
     from app.database import get_db
+    from app.schemas.property import UnitMixItem, RentCompItem
 
     # Get BOV pricing tiers if this is a BOV document
     bov_tiers = None
@@ -407,6 +408,15 @@ def build_property_detail_response(property_obj: Property) -> PropertyDetail:
             # Convert to Pydantic models
             from app.schemas.property import BOVPricingTierData
             bov_tiers = [BOVPricingTierData(**tier) for tier in bov_tiers_data]
+
+    # Build unit_mix and rent_comps from relationships
+    unit_mix_items = []
+    if hasattr(property_obj, 'unit_mix') and property_obj.unit_mix:
+        unit_mix_items = [UnitMixItem.model_validate(u) for u in property_obj.unit_mix]
+
+    rent_comp_items = []
+    if hasattr(property_obj, 'rent_comps') and property_obj.rent_comps:
+        rent_comp_items = [RentCompItem.model_validate(c) for c in property_obj.rent_comps]
 
     return PropertyDetail(
         id=property_obj.id,
@@ -419,15 +429,24 @@ def build_property_detail_response(property_obj: Property) -> PropertyDetail:
         property_address=property_obj.property_address,
         property_type=property_obj.property_type,
         submarket=property_obj.submarket,
+        metro=property_obj.metro,
         year_built=property_obj.year_built,
         total_units=property_obj.total_units,
         total_residential_sf=property_obj.total_residential_sf,
         average_market_rent=property_obj.average_market_rent,
         average_inplace_rent=property_obj.average_inplace_rent,
+        renovation_cost_per_unit=float(property_obj.renovation_cost_per_unit) if property_obj.renovation_cost_per_unit else None,
+        renovation_total_cost=float(property_obj.renovation_total_cost) if property_obj.renovation_total_cost else None,
+        renovation_rent_premium=float(property_obj.renovation_rent_premium) if property_obj.renovation_rent_premium else None,
+        renovation_roi_pct=property_obj.renovation_roi_pct,
+        renovation_duration_years=property_obj.renovation_duration_years,
+        renovation_stabilized_revenue=float(property_obj.renovation_stabilized_revenue) if property_obj.renovation_stabilized_revenue else None,
         t12_financials=property_service.parse_financial_period(property_obj.t12_financials_json),
         t3_financials=property_service.parse_financial_period(property_obj.t3_financials_json),
         y1_financials=property_service.parse_financial_period(property_obj.y1_financials_json),
         bov_pricing_tiers=bov_tiers,  # Phase 3A
+        unit_mix=unit_mix_items,
+        rent_comps=rent_comp_items,
         analysis_date=property_obj.analysis_date,
         last_viewed_date=property_obj.last_viewed_date,
         analysis_count=property_obj.analysis_count,
@@ -437,9 +456,10 @@ def build_property_detail_response(property_obj: Property) -> PropertyDetail:
     )
 
 
-def update_property_from_extraction(property_obj: Property, extraction_result: dict):
+def update_property_from_extraction(property_obj: Property, extraction_result: dict, db: Session = None):
     """Update property with new extraction data"""
     import json
+    from app.models.property import PropertyUnitMix, PropertyRentComp
 
     # Update property info
     if "property_info" in extraction_result:
@@ -447,6 +467,7 @@ def update_property_from_extraction(property_obj: Property, extraction_result: d
         property_obj.property_address = info.get("property_address")
         property_obj.property_type = info.get("property_type")
         property_obj.submarket = info.get("submarket")
+        property_obj.metro = info.get("metro")
         property_obj.year_built = info.get("year_built")
         property_obj.total_units = info.get("total_units")
         property_obj.total_residential_sf = info.get("total_sf")
@@ -457,6 +478,16 @@ def update_property_from_extraction(property_obj: Property, extraction_result: d
         property_obj.average_market_rent = rents.get("market_rent")
         property_obj.average_inplace_rent = rents.get("in_place_rent")
 
+    # Update renovation assumptions
+    if "renovation" in extraction_result:
+        reno = extraction_result["renovation"]
+        property_obj.renovation_cost_per_unit = reno.get("renovation_cost_per_unit")
+        property_obj.renovation_total_cost = reno.get("renovation_total_cost")
+        property_obj.renovation_rent_premium = reno.get("renovation_rent_premium")
+        property_obj.renovation_roi_pct = reno.get("renovation_roi_pct")
+        property_obj.renovation_duration_years = reno.get("renovation_duration_years")
+        property_obj.renovation_stabilized_revenue = reno.get("renovation_stabilized_revenue")
+
     # Update financials
     if "financials_by_period" in extraction_result:
         periods = extraction_result["financials_by_period"]
@@ -464,14 +495,59 @@ def update_property_from_extraction(property_obj: Property, extraction_result: d
         if periods.get("t12"):
             property_obj.t12_financials_json = json.dumps(periods["t12"])
             property_obj.t12_noi = periods["t12"].get("noi")
+            # Granular T12 fields
+            property_obj.t12_loss_to_lease = periods["t12"].get("loss_to_lease")
+            property_obj.t12_vacancy_rate_pct = periods["t12"].get("vacancy_rate_pct")
+            property_obj.t12_concessions = periods["t12"].get("concessions")
+            property_obj.t12_credit_loss = periods["t12"].get("credit_loss")
+            property_obj.t12_net_rental_income = periods["t12"].get("net_rental_income")
+            property_obj.t12_utility_reimbursements = periods["t12"].get("utility_reimbursements")
+            property_obj.t12_parking_storage_income = periods["t12"].get("parking_storage_income")
+            property_obj.t12_other_income = periods["t12"].get("other_income")
+            property_obj.t12_management_fee_pct = periods["t12"].get("management_fee_pct")
+            property_obj.t12_real_estate_taxes = periods["t12"].get("real_estate_taxes")
+            property_obj.t12_insurance = periods["t12"].get("insurance_amount")
+            property_obj.t12_replacement_reserves = periods["t12"].get("replacement_reserves")
+            property_obj.t12_net_cash_flow = periods["t12"].get("net_cash_flow")
+            property_obj.t12_expense_ratio_pct = periods["t12"].get("expense_ratio_pct")
 
         if periods.get("t3"):
             property_obj.t3_financials_json = json.dumps(periods["t3"])
             property_obj.t3_noi = periods["t3"].get("noi")
+            # Granular T3 fields
+            property_obj.t3_loss_to_lease = periods["t3"].get("loss_to_lease")
+            property_obj.t3_vacancy_rate_pct = periods["t3"].get("vacancy_rate_pct")
+            property_obj.t3_concessions = periods["t3"].get("concessions")
+            property_obj.t3_credit_loss = periods["t3"].get("credit_loss")
+            property_obj.t3_net_rental_income = periods["t3"].get("net_rental_income")
+            property_obj.t3_utility_reimbursements = periods["t3"].get("utility_reimbursements")
+            property_obj.t3_parking_storage_income = periods["t3"].get("parking_storage_income")
+            property_obj.t3_other_income = periods["t3"].get("other_income")
+            property_obj.t3_management_fee_pct = periods["t3"].get("management_fee_pct")
+            property_obj.t3_real_estate_taxes = periods["t3"].get("real_estate_taxes")
+            property_obj.t3_insurance = periods["t3"].get("insurance_amount")
+            property_obj.t3_replacement_reserves = periods["t3"].get("replacement_reserves")
+            property_obj.t3_net_cash_flow = periods["t3"].get("net_cash_flow")
+            property_obj.t3_expense_ratio_pct = periods["t3"].get("expense_ratio_pct")
 
         if periods.get("y1"):
             property_obj.y1_financials_json = json.dumps(periods["y1"])
             property_obj.y1_noi = periods["y1"].get("noi")
+            # Granular Y1 fields
+            property_obj.y1_loss_to_lease = periods["y1"].get("loss_to_lease")
+            property_obj.y1_vacancy_rate_pct = periods["y1"].get("vacancy_rate_pct")
+            property_obj.y1_concessions = periods["y1"].get("concessions")
+            property_obj.y1_credit_loss = periods["y1"].get("credit_loss")
+            property_obj.y1_net_rental_income = periods["y1"].get("net_rental_income")
+            property_obj.y1_utility_reimbursements = periods["y1"].get("utility_reimbursements")
+            property_obj.y1_parking_storage_income = periods["y1"].get("parking_storage_income")
+            property_obj.y1_other_income = periods["y1"].get("other_income")
+            property_obj.y1_management_fee_pct = periods["y1"].get("management_fee_pct")
+            property_obj.y1_real_estate_taxes = periods["y1"].get("real_estate_taxes")
+            property_obj.y1_insurance = periods["y1"].get("insurance_amount")
+            property_obj.y1_replacement_reserves = periods["y1"].get("replacement_reserves")
+            property_obj.y1_net_cash_flow = periods["y1"].get("net_cash_flow")
+            property_obj.y1_expense_ratio_pct = periods["y1"].get("expense_ratio_pct")
 
     # Update search text
     search_parts = [
@@ -481,6 +557,40 @@ def update_property_from_extraction(property_obj: Property, extraction_result: d
         property_obj.submarket or ""
     ]
     property_obj.search_text = " ".join(search_parts).lower()
+
+    # Update unit mix and rent comps (requires db session)
+    if db is not None:
+        if extraction_result.get("unit_mix"):
+            db.query(PropertyUnitMix).filter(PropertyUnitMix.property_id == property_obj.id).delete()
+            for unit in extraction_result["unit_mix"]:
+                db.add(PropertyUnitMix(
+                    property_id=property_obj.id,
+                    floorplan_name=unit.get("floorplan_name"),
+                    unit_type=unit.get("unit_type"),
+                    bedroom_count=unit.get("bedroom_count"),
+                    bathroom_count=unit.get("bathroom_count"),
+                    num_units=unit.get("num_units"),
+                    unit_sf=unit.get("unit_sf"),
+                    in_place_rent=unit.get("in_place_rent"),
+                    proforma_rent=unit.get("proforma_rent"),
+                    proforma_rent_psf=unit.get("proforma_rent_psf"),
+                    renovation_premium=unit.get("renovation_premium"),
+                ))
+
+        if extraction_result.get("rent_comps"):
+            db.query(PropertyRentComp).filter(PropertyRentComp.property_id == property_obj.id).delete()
+            for comp in extraction_result["rent_comps"]:
+                db.add(PropertyRentComp(
+                    property_id=property_obj.id,
+                    comp_name=comp.get("comp_name"),
+                    location=comp.get("location"),
+                    num_units=comp.get("num_units"),
+                    avg_unit_sf=comp.get("avg_unit_sf"),
+                    in_place_rent=comp.get("in_place_rent"),
+                    in_place_rent_psf=comp.get("in_place_rent_psf"),
+                    bedroom_type=comp.get("bedroom_type"),
+                    is_new_construction=comp.get("is_new_construction", False),
+                ))
 
 
 # ==================== COMPARISON ENDPOINT (Phase 3B) ====================

@@ -68,6 +68,42 @@ class BOVPricingTierData(BaseModel):
     terminal_assumptions: Optional[BOVTerminalAssumptions] = None
 
 
+# ==================== UNIT MIX & RENT COMP SCHEMAS ====================
+
+class UnitMixItem(BaseModel):
+    """Unit mix row from extracted OM data"""
+    id: Optional[int] = None
+    floorplan_name: Optional[str] = None
+    unit_type: Optional[str] = None
+    bedroom_count: Optional[int] = None
+    bathroom_count: Optional[int] = None
+    num_units: Optional[int] = None
+    unit_sf: Optional[int] = None
+    in_place_rent: Optional[float] = None
+    proforma_rent: Optional[float] = None
+    proforma_rent_psf: Optional[float] = None
+    renovation_premium: Optional[float] = None
+
+    class Config:
+        from_attributes = True
+
+
+class RentCompItem(BaseModel):
+    """Rent comp extracted from OM"""
+    id: Optional[int] = None
+    comp_name: str
+    location: Optional[str] = None
+    num_units: Optional[int] = None
+    avg_unit_sf: Optional[int] = None
+    in_place_rent: Optional[float] = None
+    in_place_rent_psf: Optional[float] = None
+    bedroom_type: Optional[str] = None
+    is_new_construction: bool = False
+
+    class Config:
+        from_attributes = True
+
+
 # ==================== SAVE PROPERTY REQUEST ====================
 
 class PropertyCreate(BaseModel):
@@ -138,11 +174,20 @@ class PropertyDetail(BaseModel):
     property_address: Optional[str]
     property_type: Optional[str]
     submarket: Optional[str]
+    metro: Optional[str] = None
     year_built: Optional[int]
     total_units: Optional[int]
     total_residential_sf: Optional[int]
     average_market_rent: Optional[float]
     average_inplace_rent: Optional[float]
+
+    # Renovation assumptions
+    renovation_cost_per_unit: Optional[float] = None
+    renovation_total_cost: Optional[float] = None
+    renovation_rent_premium: Optional[float] = None
+    renovation_roi_pct: Optional[float] = None
+    renovation_duration_years: Optional[int] = None
+    renovation_stabilized_revenue: Optional[float] = None
 
     # Financials (parsed from JSON)
     t12_financials: Optional[FinancialPeriodData] = None
@@ -151,6 +196,10 @@ class PropertyDetail(BaseModel):
 
     # BOV pricing tiers (Phase 3A - only for BOV documents)
     bov_pricing_tiers: Optional[List[BOVPricingTierData]] = None
+
+    # Unit mix and rent comps
+    unit_mix: List[UnitMixItem] = []
+    rent_comps: List[RentCompItem] = []
 
     # Metadata
     analysis_date: Optional[datetime]
