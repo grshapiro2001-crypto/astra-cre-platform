@@ -19,6 +19,20 @@ export interface FinancialPeriod {
   total_opex?: number | null;
   opex_components?: OpExComponents;
   noi?: number | null;
+  // Granular financial line items
+  loss_to_lease?: number | null;
+  vacancy_rate_pct?: number | null;
+  credit_loss?: number | null;
+  net_rental_income?: number | null;
+  utility_reimbursements?: number | null;
+  parking_storage_income?: number | null;
+  other_income?: number | null;
+  management_fee_pct?: number | null;
+  real_estate_taxes?: number | null;
+  insurance_amount?: number | null;
+  replacement_reserves?: number | null;
+  net_cash_flow?: number | null;
+  expense_ratio_pct?: number | null;
 }
 
 export interface CalculatedMetrics {
