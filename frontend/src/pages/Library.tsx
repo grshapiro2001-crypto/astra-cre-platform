@@ -4,7 +4,7 @@
  * Integrates with real API via propertyService and dealFolderService.
  */
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import {
   Search,
   Plus,
@@ -28,6 +28,7 @@ import { scoringService } from '@/services/scoringService';
 import type { DealScoreResult } from '@/services/scoringService';
 import { DealScoreBadge } from '@/components/scoring/DealScoreBadge';
 import { DealScoreModal } from '@/components/scoring/DealScoreModal';
+import { ScreeningBadge } from '@/components/screening/ScreeningBadge';
 import type { PropertyListItem } from '@/types/property';
 import { CreateFolderModal } from '@/components/library/CreateFolderModal';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -132,6 +133,7 @@ function formatDate(dateString?: string): string {
 
 export const Library = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   // ---- Data state ----
   const [properties, setProperties] = useState<PropertyWithFinancials[]>([]);
@@ -153,6 +155,10 @@ export const Library = () => {
   const comparisonPropertyIds = useUIStore((state) => state.comparisonPropertyIds);
   const togglePropertyComparison = useUIStore((state) => state.togglePropertyComparison);
   const clearComparison = useUIStore((state) => state.clearComparison);
+
+  // ---- Screening filter state ----
+  const initialScreening = searchParams.get('screening') ?? 'all';
+  const [screeningFilter, setScreeningFilter] = useState<string>(initialScreening);
 
   // ---- Scoring state ----
   const [scores, setScores] = useState<Record<number, DealScoreResult>>({});
@@ -221,6 +227,10 @@ export const Library = () => {
           const status = getPropertyStatus(p);
           if (status !== selectedFilter) return false;
         }
+        // Screening filter
+        if (screeningFilter !== 'all') {
+          if (!p.screening_verdict || p.screening_verdict !== screeningFilter) return false;
+        }
         // Search filter
         if (searchQuery) {
           const q = searchQuery.toLowerCase();
@@ -256,7 +266,7 @@ export const Library = () => {
             );
         }
       });
-  }, [properties, selectedFilter, searchQuery, sortBy, getPropertyStatus, scores]);
+  }, [properties, selectedFilter, screeningFilter, searchQuery, sortBy, getPropertyStatus, scores]);
 
   // ---- Pipeline stats ----
   const pipelineStats = useMemo(
@@ -495,6 +505,23 @@ export const Library = () => {
                   </div>
                 )}
               </div>
+              {/* Screening filter */}
+              <div className="flex items-center gap-0.5 rounded-lg bg-muted/50 p-1">
+                {(['all', 'PASS', 'REVIEW', 'FAIL'] as const).map((v) => (
+                  <button
+                    key={v}
+                    onClick={() => setScreeningFilter(v)}
+                    className={cn(
+                      'px-2.5 py-1.5 rounded-md text-xs font-medium transition-all duration-200 whitespace-nowrap',
+                      screeningFilter === v
+                        ? 'bg-background text-foreground shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground',
+                    )}
+                  >
+                    {v === 'all' ? 'All' : v}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* Selection info */}
@@ -675,7 +702,10 @@ export const Library = () => {
                       )}
 
                       {/* Tags */}
-                      <div className="flex gap-1.5 mt-3 flex-wrap">
+                      <div className="flex gap-1.5 mt-3 flex-wrap items-center">
+                        {property.screening_verdict && (
+                          <ScreeningBadge verdict={property.screening_verdict} size="sm" />
+                        )}
                         {property.document_subtype && (
                           <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
                             {property.document_subtype}
@@ -788,7 +818,7 @@ export const Library = () => {
               className="grid items-center px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground bg-muted/50 border-b border-border"
               style={{
                 gridTemplateColumns:
-                  '40px 2fr 1.2fr 90px 100px 100px 70px 90px 120px',
+                  '40px 2fr 1.2fr 90px 100px 100px 70px 80px 90px 120px',
               }}
             >
               <div />
@@ -798,6 +828,7 @@ export const Library = () => {
               <div className="text-right">T12 NOI</div>
               <div className="text-right">Y1 NOI</div>
               <div className="text-center">Score</div>
+              <div className="text-center">Screen</div>
               <div className="text-center">Type</div>
               <div className="text-center">Status</div>
             </div>
@@ -824,7 +855,7 @@ export const Library = () => {
                   )}
                   style={{
                     gridTemplateColumns:
-                      '40px 2fr 1.2fr 90px 100px 100px 70px 90px 120px',
+                      '40px 2fr 1.2fr 90px 100px 100px 70px 80px 90px 120px',
                   }}
                   onMouseEnter={() => setHoveredDealId(property.id)}
                   onMouseLeave={() => setHoveredDealId(null)}
@@ -917,6 +948,15 @@ export const Library = () => {
                       size="sm"
                       onClick={scores[property.id] ? () => setScoreModalPropertyId(property.id) : undefined}
                     />
+                  </div>
+
+                  {/* Screening */}
+                  <div className="flex justify-center">
+                    {property.screening_verdict ? (
+                      <ScreeningBadge verdict={property.screening_verdict} size="sm" />
+                    ) : (
+                      <span className="text-[10px] text-muted-foreground">{'\u2014'}</span>
+                    )}
                   </div>
 
                   {/* Type */}

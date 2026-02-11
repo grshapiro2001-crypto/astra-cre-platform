@@ -203,6 +203,9 @@ export interface PropertyDetail {
   analysis_count?: number;
   raw_pdf_path?: string;
   user_id?: string;
+  screening_verdict?: string | null;
+  screening_score?: number | null;
+  screening_details_json?: string | null;
 }
 
 /** Property list item for library views */
@@ -218,4 +221,53 @@ export interface PropertyListItem {
   submarket?: string | null;
   total_units?: number | null;
   upload_date?: string;
+  screening_verdict?: string | null;
+  screening_score?: number | null;
+}
+
+/** Investment criteria for deal screening */
+export interface InvestmentCriteria {
+  id: number;
+  user_id: string;
+  criteria_name: string;
+  min_units?: number | null;
+  max_units?: number | null;
+  property_types?: string | null;
+  target_markets?: string | null;
+  min_year_built?: number | null;
+  min_cap_rate?: number | null;
+  max_cap_rate?: number | null;
+  min_economic_occupancy?: number | null;
+  max_opex_ratio?: number | null;
+  min_noi?: number | null;
+  max_price_per_unit?: number | null;
+  min_deal_score?: number | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+/** Screening check result */
+export interface ScreeningCheck {
+  criterion: string;
+  value: number | null;
+  result: 'PASS' | 'FAIL' | 'SKIP';
+}
+
+/** Full screening result for a property */
+export interface ScreeningResult {
+  property_id: number;
+  property_name: string;
+  verdict: 'PASS' | 'FAIL' | 'REVIEW';
+  score: number;
+  checks: ScreeningCheck[];
+  summary: string;
+}
+
+/** Screening summary item */
+export interface ScreeningSummaryItem {
+  property_id: number;
+  property_name: string;
+  verdict: 'PASS' | 'FAIL' | 'REVIEW';
+  score: number;
+  summary: string;
 }

@@ -12,6 +12,7 @@ from app.models import (  # noqa: F401 — Import all models so Alembic can see 
     DealFolder, BOVPricingTier, BOVCapRate,
     UserScoringWeights,
     DataBankDocument, SalesComp, PipelineProject, SubmarketInventory,
+    UserInvestmentCriteria,
 )
 from app.config import settings
 

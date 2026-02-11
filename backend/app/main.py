@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
-from app.api.routes import auth, upload, properties, deal_folders, scoring, data_bank
+from app.api.routes import auth, upload, properties, deal_folders, scoring, data_bank, criteria
 
 # Create FastAPI app
 app = FastAPI(
@@ -26,6 +26,7 @@ app.include_router(properties.router, prefix="/api/v1")
 app.include_router(deal_folders.router, prefix="/api/v1")
 app.include_router(scoring.router, prefix="/api/v1")
 app.include_router(data_bank.router, prefix="/api/v1")
+app.include_router(criteria.router, prefix="/api/v1")
 
 
 @app.get("/")

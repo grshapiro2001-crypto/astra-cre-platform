@@ -145,6 +145,8 @@ def list_properties(
             total_units=p.total_units,
             deal_folder_id=p.deal_folder_id,
             document_subtype=p.document_subtype,
+            screening_verdict=p.screening_verdict,
+            screening_score=p.screening_score,
         )
         for p in properties
     ]
@@ -508,7 +510,10 @@ def build_property_detail_response(property_obj: Property) -> PropertyDetail:
         analysis_count=property_obj.analysis_count,
         last_analyzed_at=property_obj.last_analyzed_at,
         analysis_model=property_obj.analysis_model,
-        analysis_status=property_obj.analysis_status
+        analysis_status=property_obj.analysis_status,
+        screening_verdict=property_obj.screening_verdict,
+        screening_score=property_obj.screening_score,
+        screening_details_json=property_obj.screening_details_json,
     )
 
 
