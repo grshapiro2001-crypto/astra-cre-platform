@@ -866,36 +866,43 @@ def parse_json_response(response_text: str) -> Dict[str, Any]:
     Raises:
         json.JSONDecodeError: If no valid JSON found
     """
-    # First, try to parse as-is
+    # Strip markdown code fences if present
+    # Handle format: ```json\n{...}\n```
+    cleaned_text = response_text.strip()
+
+    # Remove opening fence (```json or ```)
+    if cleaned_text.startswith('```json'):
+        cleaned_text = cleaned_text[7:]  # Remove '```json'
+    elif cleaned_text.startswith('```'):
+        cleaned_text = cleaned_text[3:]  # Remove '```'
+
+    # Remove closing fence (```)
+    if cleaned_text.endswith('```'):
+        cleaned_text = cleaned_text[:-3]  # Remove '```'
+
+    # Strip any remaining whitespace
+    cleaned_text = cleaned_text.strip()
+
+    # First, try to parse the cleaned text
     try:
-        return json.loads(response_text)
+        return json.loads(cleaned_text)
     except json.JSONDecodeError:
         pass
 
-    # Try to extract JSON from markdown code blocks
-    # Look for ```json ... ``` or ``` ... ```
-    code_block_pattern = r'```(?:json)?\s*(\{.*?\})\s*```'
-    match = re.search(code_block_pattern, response_text, re.DOTALL)
-    if match:
-        try:
-            return json.loads(match.group(1))
-        except json.JSONDecodeError:
-            pass
-
     # Try to find JSON object by looking for balanced braces
     # Start from first { and try to find matching }
-    start_idx = response_text.find('{')
+    start_idx = cleaned_text.find('{')
     if start_idx != -1:
         brace_count = 0
-        for i in range(start_idx, len(response_text)):
-            if response_text[i] == '{':
+        for i in range(start_idx, len(cleaned_text)):
+            if cleaned_text[i] == '{':
                 brace_count += 1
-            elif response_text[i] == '}':
+            elif cleaned_text[i] == '}':
                 brace_count -= 1
                 if brace_count == 0:
                     # Found matching closing brace
                     try:
-                        return json.loads(response_text[start_idx:i+1])
+                        return json.loads(cleaned_text[start_idx:i+1])
                     except json.JSONDecodeError:
                         break
 
