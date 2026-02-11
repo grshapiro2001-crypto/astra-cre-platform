@@ -115,4 +115,30 @@ export const propertyService = {
     const response = await api.post(`/properties/${id}/reanalyze`);
     return response.data;
   },
+
+  /**
+   * Download a professional PDF summary for a property (NO LLM - server-side PDF generation)
+   */
+  async downloadSummaryPdf(propertyId: number): Promise<void> {
+    const response = await api.get(`/properties/${propertyId}/summary-pdf`, {
+      responseType: 'blob',
+    });
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    // Extract filename from Content-Disposition header if available
+    const disposition = response.headers['content-disposition'];
+    let filename = `Property_Summary_${propertyId}.pdf`;
+    if (disposition) {
+      const match = disposition.match(/filename="?([^"]+)"?/);
+      if (match?.[1]) {
+        filename = match[1];
+      }
+    }
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  },
 };

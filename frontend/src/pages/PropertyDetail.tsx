@@ -23,6 +23,7 @@ import {
   BarChart3,
   MapPin,
   Upload,
+  FileDown,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { propertyService } from '@/services/propertyService';
@@ -267,6 +268,7 @@ export const PropertyDetail = () => {
   const [isReanalyzing, setIsReanalyzing] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   // --- Comparison state from uiStore ---
   const comparisonPropertyIds = useUIStore((state) => state.comparisonPropertyIds);
@@ -666,6 +668,26 @@ export const PropertyDetail = () => {
               >
                 <BarChart3 className="w-4 h-4" />
                 {property && comparisonPropertyIds.includes(property.id) ? 'In Comparison' : 'Add to Comparison'}
+              </button>
+
+              <button
+                onClick={async () => {
+                  if (!property || isExporting) return;
+                  setIsExporting(true);
+                  try {
+                    await propertyService.downloadSummaryPdf(property.id);
+                    toast.success('PDF summary downloaded', { duration: 2000 });
+                  } catch {
+                    toast.error('Failed to generate PDF summary');
+                  } finally {
+                    setIsExporting(false);
+                  }
+                }}
+                disabled={isExporting}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-card text-muted-foreground border border-border hover:bg-accent transition-colors disabled:opacity-50"
+              >
+                {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
+                Export Summary
               </button>
 
               <button
