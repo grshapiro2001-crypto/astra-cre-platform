@@ -1,6 +1,6 @@
-# Deal Score System — Implementation Spec
+# ARCHIVED — See .ai/ folder for current documentation
 
-> **Note:** This spec is archived as of February 10, 2026. The Deal Score system has been implemented with a **three-layer architecture** (not the two-layer model described here). See `.ai/03-CODEBASE.md` and `backend/app/services/scoring_service.py` for current implementation.
+> **Note:** This spec is archived as of February 11, 2026. The Deal Score system has been implemented with a **three-layer architecture** (not the two-layer model described here). See [.ai/03-CODEBASE.md](.ai/03-CODEBASE.md) and `backend/app/services/scoring_service.py` for current implementation.
 
 ## Overview
 Build a 0-100 Deal Score system for the Astra CRE Platform. Every property gets a score based on weighted quantitative metrics + an AI market intelligence adjustment. Users can customize metric weights in Settings. Scores appear in three places: Library cards, Property Detail, and Comparison view.

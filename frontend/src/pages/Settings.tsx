@@ -199,6 +199,28 @@ const AppearanceSection = () => {
         </div>
         <span className="text-xs text-muted-foreground italic">Coming soon</span>
       </div>
+
+      <div className="pt-4 border-t border-border">
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <p className="text-sm font-medium text-foreground">Onboarding Tour</p>
+            <p className="text-xs text-muted-foreground">
+              Restart the first-run onboarding wizard
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              localStorage.removeItem('astra_onboarding_complete');
+              window.location.reload();
+            }}
+          >
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Restart
+          </Button>
+        </div>
+      </div>
     </div>
   );
 };

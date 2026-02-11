@@ -1,6 +1,6 @@
-# CRE Platform - UI Preview
+# ARCHIVED — See .ai/ folder for current documentation
 
-> **Note:** This file is archived as of February 10, 2026. UI has evolved significantly with new purple theme, progressive empty states, and new features.
+> **Note:** This file is archived as of February 11, 2026. UI has evolved significantly with new purple theme, progressive empty states, and new features. See [README.md](README.md) for current feature list.
 
 ## 🎨 Visual Representation of Current UI
 

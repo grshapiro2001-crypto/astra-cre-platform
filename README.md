@@ -1,104 +1,183 @@
-# Astra CRE Platform
+# Astra CRE — AI-Powered Commercial Real Estate Investment Platform
 
-AI-powered commercial real estate deal analysis platform. Upload OMs and BOVs, extract financial metrics with Claude AI, score deals against benchmarks, organize into deal folders, and compare properties side-by-side.
+AI-powered commercial real estate deal analysis platform. Upload offering memorandums (OMs) and broker opinion of values (BOVs), extract financial metrics with Claude AI, score deals against benchmarks, screen against custom investment criteria, and manage your deal pipeline with an interactive Kanban board. Built for real estate investors, analysts, and firms who need fast, intelligent underwriting and portfolio management.
+
+<!-- TODO: Add screenshot -->
+
+---
 
 ## Features
 
-All features listed below are **fully implemented and working** in the codebase:
+All features below are **fully implemented and working** in the codebase:
 
-### AI Document Extraction
-- **OM Support** - Extract property details, unit mix, rent comps, financials (T12, T3, Y1), renovation assumptions
-- **BOV Support** - Extract multi-tier pricing scenarios with cap rates, returns, loan assumptions
-- **Intelligent Parsing** - Claude Sonnet 4.5 extracts structured data from unstructured PDFs
-- **Granular Financials** - 40+ financial line items per period including loss-to-lease, concessions, expense breakdown
+### 🤖 AI-Powered Document Extraction
+- **OM Support** — Extract property details, unit mix, rent comps, financials (T12, T3, Y1), renovation assumptions
+- **BOV Support** — Extract multi-tier pricing scenarios with cap rates, returns, loan assumptions
+- **Intelligent Parsing** — Claude Sonnet 4.5 extracts structured data from unstructured PDFs
+- **Granular Financials** — 40+ financial line items per period including loss-to-lease, concessions, expense breakdown
 
-### Deal Folders
-- **Hierarchical Organization** - Organize properties by deal/property into folders
-- **Flexible Management** - Create folders before or after upload, move properties between folders
-- **Orphaned Properties** - Properties can exist without folders for flexible workflow
+### 📊 Automated Deal Scoring
+- **Three-Layer Scoring System**:
+  - **Layer 1: Property Fundamentals (30%)** — Economic occupancy, opex ratio, supply pipeline pressure
+  - **Layer 2: Market Intelligence (20%)** — AI-generated market sentiment score (cached)
+  - **Layer 3: Comp Analysis (50%)** — Relevance-weighted comp matching (cap rate, price/unit, vintage)
+- **Configurable Weights** — Adjust metric and layer weights via Settings
+- **Presets** — Value-add, Cash Flow, Core, Opportunistic scoring profiles
+- **Color-Coded Badges** — Visual deal score indicators (green = strong, yellow = moderate, red = weak)
 
-### Property Detail
-- **Financial Breakdown** - View T12, T3, and Y1 financials with per-unit toggle
-- **Unit Mix Table** - Bedroom/bathroom breakdown, square footage, in-place vs proforma rent
-- **Rent Comps** - Comps extracted from the OM document (distinct from Data Bank sales comps)
-- **Renovation Card** - Cost per unit, total cost, rent premium, ROI, duration
-- **BOV Pricing Tiers** - Multiple pricing scenarios with returns and cap rates
-- **Progressive Empty States** - Show what's available vs what's missing
-- **Navigation** - Previous/next property navigation within folder context
+### ✅ Deal Screening Against Investment Criteria
+- **Custom Investment Criteria** — Define thresholds for IRR, cap rate, opex ratio, NOI growth, unit count, etc.
+- **Automated Screening** — Properties automatically evaluated against criteria on upload
+- **Pass/Fail/Review Verdicts** — Visual screening badges on property cards
+- **Screening Modal** — Detailed breakdown of which criteria passed or failed
 
-### Side-by-Side Comparison
-- **2-5 Properties** - Compare multiple properties in table format
-- **Real API Data** - Wired to `/api/v1/properties/compare` endpoint
-- **Gradient Highlighting** - Best values highlighted green, worst red, middle yellow
-- **Investment Criteria Filtering** - Filter by IRR, cap rate, opex ratio, NOI growth
-- **Sortable Columns** - Click to sort by any metric
-- **CSV Export** - Export comparison table to CSV
-- **Metric Categories** - Pricing, Cap Rates, BOV Returns, Financials, Operations
+### 🔬 Interactive Sensitivity Analysis & Quick Underwriting
+- **Cap Rate What-If Analysis** — Adjust cap rates and see immediate impact on pricing
+- **Per-Unit Toggle** — View all financials per unit for easy scaling comparisons
+- **BOV Multi-Tier Pricing** — Compare multiple pricing scenarios with different leverage and return assumptions
+- **Financial Period Toggle** — Switch between T12, T3, and Y1 views
 
-### Deal Scoring
-- **Three-Layer System**:
-  - **Layer 1: Property Fundamentals** - Economic occupancy, opex ratio, supply pipeline pressure
-  - **Layer 2: Market Intelligence** - AI-generated market sentiment score (cached)
-  - **Layer 3: Comp Analysis** - Relevance-weighted comp matching (cap rate, price/unit, vintage)
-- **Configurable Weights** - Adjust metric and layer weights via Settings
-- **Presets** - Value-add, Cash Flow, Core, Opportunistic scoring profiles
-- **Color-Coded Badges** - Visual deal score indicators (green = strong, yellow = moderate, red = weak)
+### 📄 Executive Deal Summary PDF Export
+- **PDF Report Generation** — Export property summaries with key metrics, financials, and analysis
+- **Professional Formatting** — Presentation-ready reports for investor memos
 
-### Data Bank
-- **Sales Comps** - Upload Excel files with sales comp data
-- **Pipeline Projects** - Track under-construction and planned developments
-- **Submarket Inventory** - Set inventory denominators for supply pressure calculations
-- **AI Extraction** - Claude classifies columns and normalizes values from user Excel files
-- **Comp Matching** - Automated relevance scoring based on geography, type, vintage, size
+### 🎯 Drag-and-Drop Pipeline Kanban Board
+- **Customizable Stages** — New, Active, Review, Passed, Closed
+- **Deal Cards** — Visual cards with deal scores, property details, and key metrics
+- **Real-Time Updates** — Drag properties between stages to update pipeline status
+- **Pipeline Analytics** — Dashboard metrics showing total NOI, average cap rate, property count, folder count
 
-### Dashboard
-- **Real API Data** - Fetches from `/api/v1/properties` and `/api/v1/deal-folders`
-- **Pipeline Board** - Kanban view with customizable stages (New, Active, Review, Passed, Closed)
-- **Metrics Cards** - Total NOI, average cap rate, property count, folder count
-- **Geography Distribution** - Bar chart by submarket
-- **Tag Filtering** - Filter entire dashboard by tags (not fully implemented)
-- **Time-of-Day Greeting** - Personalized welcome message
+### 💬 AI Pipeline Analyst Chat (Claude-Powered)
+- **Natural Language Queries** — Ask questions about your portfolio and deals
+- **Context-Aware Responses** — Claude provides insights based on your data
+- **Follow-Up Questions** — Continue conversations about specific properties
 
-### Design System
-- **Purple Theme** - Violet-to-purple gradient primary color scheme
-- **Dark Mode** - Full dark/light mode support with toggle
-- **Responsive Layout** - Collapsible sidebar, mobile-friendly navigation
-- **Skeleton Loading** - Progressive loading states for all pages
-- **Page Transitions** - Smooth transitions between routes
-- **Typography** - Syne (display), Instrument Sans (body), JetBrains Mono (numbers)
+### 🗺️ Interactive Comp Map (Google Maps)
+- **Geographic Visualization** — View properties and comps on an interactive map
+- **Comp Proximity** — See which sales comps are geographically close to your subject property
+- **Rent Comps** — Display rent comps extracted from OM documents
+
+### 📈 Rent Comps and Unit Mix Tables
+- **Unit Mix Breakdown** — Bedroom/bathroom breakdown, square footage, in-place vs proforma rent
+- **Rent Comps** — Comps extracted from OM documents (distinct from Data Bank sales comps)
+- **Renovation Analysis** — Cost per unit, total cost, rent premium, ROI, duration
+
+### 💼 Deal Folders & Organization
+- **Hierarchical Organization** — Organize properties by deal/property into folders
+- **Flexible Management** — Create folders before or after upload, move properties between folders
+- **Orphaned Properties** — Properties can exist without folders for flexible workflow
+
+### 📊 Side-by-Side Comparison
+- **2-5 Properties** — Compare multiple properties in table format
+- **Gradient Highlighting** — Best values highlighted green, worst red, middle yellow
+- **Investment Criteria Filtering** — Filter by IRR, cap rate, opex ratio, NOI growth
+- **Sortable Columns** — Click to sort by any metric
+- **CSV Export** — Export comparison table to CSV
+- **Metric Categories** — Pricing, Cap Rates, BOV Returns, Financials, Operations
+
+### 📊 Data Bank with Sales Comps & Pipeline Projects
+- **Sales Comps** — Upload Excel files with sales comp data
+- **Pipeline Projects** — Track under-construction and planned developments
+- **Submarket Inventory** — Set inventory denominators for supply pressure calculations
+- **AI Extraction** — Claude classifies columns and normalizes values from user Excel files
+- **Comp Matching** — Automated relevance scoring based on geography, type, vintage, size
+
+### 🌙 Dark Mode UI
+- **Full Dark/Light Mode Support** — Toggle between themes with persistent preferences
+- **Purple Theme** — Violet-to-purple gradient primary color scheme
+- **Responsive Layout** — Collapsible sidebar, mobile-friendly navigation
+- **Skeleton Loading** — Progressive loading states for all pages
+- **Page Transitions** — Smooth transitions between routes
+- **Typography** — Syne (display), Instrument Sans (body), JetBrains Mono (numbers)
+
+---
 
 ## Tech Stack
 
-- **Frontend:** React 18 + Vite + TypeScript + Tailwind CSS + shadcn/ui + Zustand + Framer Motion
-- **Backend:** Python FastAPI + SQLAlchemy + SQLite + Alembic
-- **AI:** Anthropic Claude Sonnet 4.5
-- **Design:** Purple theme with dark mode support
-
-## Quick Start
+### Frontend
+- **React 18** — UI framework
+- **TypeScript 5.3** — Type safety
+- **Vite 5** — Build tool
+- **Tailwind CSS 3.4** — Styling
+- **shadcn/ui** — Component primitives
+- **Zustand 4.4** — State management
+- **Framer Motion** — Animations
+- **React Router 6** — Routing
+- **Axios** — HTTP client
+- **React Dropzone** — File uploads
+- **TanStack Table** — Data tables
+- **React Google Maps** — Map integration
 
 ### Backend
+- **FastAPI** — Python web framework
+- **SQLAlchemy 2.0** — ORM
+- **SQLite** — Database (default, PostgreSQL supported)
+- **Alembic** — Database migrations
+- **Anthropic Claude SDK** — AI extraction
+- **PDFPlumber** — PDF parsing
+- **ReportLab** — PDF generation
+- **python-jose** — JWT authentication
+- **bcrypt** — Password hashing
+
+### APIs
+- **Anthropic Claude API** — Document extraction and chat
+- **Google Maps API** — Geographic visualization
+
+---
+
+## Getting Started
+
+### Prerequisites
+- **Python 3.9+**
+- **Node.js 18+**
+- **Anthropic API Key** — Sign up at [console.anthropic.com](https://console.anthropic.com/)
+
+### 1. Clone Repository
 ```bash
-cd backend
-python3 -m venv venv
-source venv/bin/activate  # Mac/Linux
-# OR: venv\Scripts\activate  # Windows
-pip install -r requirements.txt
-
-# Create .env file with:
-# ANTHROPIC_API_KEY=your_key_here
-# SECRET_KEY=your_secret_key
-
-uvicorn app.main:app --reload
-# Runs at http://localhost:8000
+git clone https://github.com/yourusername/astra-cre-platform.git
+cd astra-cre-platform
 ```
 
-### Frontend
+### 2. Backend Setup
+```bash
+cd backend
+python -m venv venv
+source venv/bin/activate  # Mac/Linux
+# OR: venv\Scripts\activate  # Windows
+
+pip install -r requirements.txt
+
+# Create .env file from example
+cp .env.example .env
+
+# Edit .env and add your ANTHROPIC_API_KEY:
+# ANTHROPIC_API_KEY=your_key_here
+# SECRET_KEY=your_secret_key_change_in_production
+
+# Run database migrations
+alembic upgrade head
+
+# Start backend server
+uvicorn app.main:app --reload --port 8000
+# Backend runs at http://localhost:8000
+```
+
+### 3. Frontend Setup
 ```bash
 cd frontend
 npm install
+
+# (Optional) Create .env file for custom API URL
+# VITE_API_URL=http://localhost:8000/api/v1
+
 npm run dev
-# Opens at http://localhost:5173
+# Frontend runs at http://localhost:5173
 ```
+
+### 4. Open Browser
+Navigate to `http://localhost:5173` and create an account to get started.
+
+---
 
 ## Project Structure
 
@@ -106,92 +185,177 @@ npm run dev
 astra-cre-platform/
 ├── backend/
 │   ├── app/
-│   │   ├── api/routes/     # API endpoints (auth, properties, deal_folders, scoring, data_bank, upload)
-│   │   ├── models/         # SQLAlchemy models (property, deal_folder, data_bank, scoring, user)
-│   │   ├── schemas/        # Pydantic schemas for request/response validation
-│   │   ├── services/       # Business logic (claude_extraction, scoring, comparison, comp_matching)
-│   │   ├── utils/          # File handling, helpers
-│   │   ├── main.py         # FastAPI app initialization
-│   │   ├── config.py       # Configuration and environment variables
-│   │   └── database.py     # Database connection and session management
-│   ├── requirements.txt
-│   └── astra.db           # SQLite database file
+│   │   ├── api/routes/          # API endpoints
+│   │   │   ├── auth.py          # User registration, login, logout
+│   │   │   ├── upload.py        # PDF upload and extraction
+│   │   │   ├── properties.py    # Property CRUD, reanalysis, comparison
+│   │   │   ├── deal_folders.py  # Folder CRUD, folder properties
+│   │   │   ├── scoring.py       # Scoring weights, presets, scoring
+│   │   │   ├── criteria.py      # Investment criteria endpoints
+│   │   │   ├── data_bank.py     # Data bank CRUD and extraction
+│   │   │   └── chat.py          # AI chat endpoints
+│   │   ├── models/              # SQLAlchemy models
+│   │   │   ├── property.py      # Property, PropertyUnitMix, PropertyRentComp, AnalysisLog
+│   │   │   ├── deal_folder.py   # DealFolder
+│   │   │   ├── bov.py           # BOVPricingTier, BOVCapRate
+│   │   │   ├── data_bank.py     # SalesComp, PipelineProject, SubmarketInventory, DataBankDocument
+│   │   │   ├── scoring.py       # UserScoringWeights
+│   │   │   ├── criteria.py      # UserInvestmentCriteria
+│   │   │   └── user.py          # User
+│   │   ├── schemas/             # Pydantic schemas for request/response validation
+│   │   ├── services/            # Business logic
+│   │   │   ├── claude_extraction_service.py  # Main extraction logic (600+ lines)
+│   │   │   ├── scoring_service.py            # Three-layer scoring system (400+ lines)
+│   │   │   ├── comp_matching_service.py      # Comp relevance scoring (506 lines)
+│   │   │   ├── comparison_service.py         # Comparison data preparation (300+ lines)
+│   │   │   ├── screening_service.py          # Investment criteria evaluation
+│   │   │   ├── pdf_report_service.py         # PDF report generation
+│   │   │   ├── bov_service.py                # BOV extraction
+│   │   │   ├── data_bank_extraction_service.py  # Excel parsing and extraction
+│   │   │   ├── property_service.py           # Property CRUD operations
+│   │   │   └── auth_service.py               # Authentication logic
+│   │   ├── utils/               # File handling, helpers
+│   │   ├── main.py              # FastAPI app initialization
+│   │   ├── config.py            # Configuration and environment variables
+│   │   └── database.py          # Database connection and session management
+│   ├── alembic/                 # Database migration files
+│   ├── requirements.txt         # Python dependencies
+│   ├── .env.example             # Example environment variables
+│   └── astra.db                 # SQLite database file
 ├── frontend/
 │   ├── src/
-│   │   ├── components/    # React components (layout, library, comparison, property, scoring, ui)
-│   │   ├── pages/         # Page components (Dashboard, Library, PropertyDetail, ComparisonPage, etc.)
-│   │   ├── services/      # API service functions (propertyService, dealFolderService, scoringService)
-│   │   ├── store/         # Zustand stores (authSlice, uiStore)
-│   │   ├── types/         # TypeScript interfaces
-│   │   ├── utils/         # Utility functions (csvExport, criteriaEvaluation)
-│   │   ├── App.tsx        # Main app component with routing
-│   │   └── main.tsx       # React entry point
+│   │   ├── components/          # React components
+│   │   │   ├── layout/          # MainLayout, Sidebar, Header, PageTransition
+│   │   │   ├── library/         # CreateFolderModal, DeleteFolderModal, SaveToFolderModal
+│   │   │   ├── comparison/      # ComparisonTable, InvestmentCriteriaPanel
+│   │   │   ├── property/        # BOVPricingTiers, PricingAnalysis, SensitivityAnalysis, CompMap
+│   │   │   ├── scoring/         # DealScoreBadge, DealScoreModal, DealScoreSettings
+│   │   │   ├── screening/       # ScreeningBadge, ScreeningModal, InvestmentCriteriaForm
+│   │   │   ├── upload/          # PDFUploader, ExtractionPreview
+│   │   │   ├── auth/            # LoginForm, RegisterForm, ProtectedRoute
+│   │   │   └── ui/              # shadcn/ui primitives (button, card, dialog, input, etc.)
+│   │   ├── pages/               # Page components
+│   │   │   ├── Dashboard.tsx    # Dashboard with Kanban board and metrics
+│   │   │   ├── Library.tsx      # Property library with grid/list view
+│   │   │   ├── PropertyDetail.tsx  # Property detail view
+│   │   │   ├── ComparisonPage.tsx  # Side-by-side comparison
+│   │   │   ├── DataBankPage.tsx    # Data bank management
+│   │   │   ├── Settings.tsx        # User settings
+│   │   │   └── Upload.tsx          # PDF upload page
+│   │   ├── services/            # API service functions
+│   │   │   ├── api.ts           # Axios base configuration
+│   │   │   ├── authService.ts   # Auth API calls
+│   │   │   ├── propertyService.ts     # Property API calls
+│   │   │   ├── dealFolderService.ts   # Folder API calls
+│   │   │   ├── comparisonService.ts   # Comparison API calls
+│   │   │   ├── scoringService.ts      # Scoring API calls
+│   │   │   ├── criteriaService.ts     # Criteria API calls
+│   │   │   └── dataBankService.ts     # Data bank API calls
+│   │   ├── store/               # Zustand stores
+│   │   │   ├── authSlice.ts     # Authentication state
+│   │   │   └── uiStore.ts       # UI preferences (theme, sidebar)
+│   │   ├── types/               # TypeScript interfaces
+│   │   ├── utils/               # Utility functions
+│   │   │   ├── csvExport.ts     # CSV export logic
+│   │   │   └── criteriaEvaluation.ts  # Gradient color calculation
+│   │   ├── App.tsx              # Main app component with routing
+│   │   └── main.tsx             # React entry point
 │   ├── package.json
-│   └── vite.config.ts
-└── .ai/                   # Documentation for developers and AI assistants
-    ├── 01-CORE-RULES.md
-    ├── 02-ARCHITECTURE.md
-    ├── 03-CODEBASE.md
-    └── 04-CURRENT-WORK.md
+│   ├── vite.config.ts
+│   └── .env.example             # Example environment variables
+└── .ai/                         # Documentation for developers and AI assistants
+    ├── 01-CORE-RULES.md         # Coding standards, patterns, constraints
+    ├── 02-ARCHITECTURE.md       # Technical decisions and rationale
+    ├── 03-CODEBASE.md           # Complete inventory of what exists
+    └── 04-CURRENT-WORK.md       # Active tasks and priorities
 ```
 
-## API Endpoints
+---
+
+## Environment Variables
+
+### Backend (.env)
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `DATABASE_URL` | Database connection string (default: SQLite) | No |
+| `SECRET_KEY` | JWT secret key for token signing | Yes |
+| `ANTHROPIC_API_KEY` | Anthropic API key for Claude | Yes |
+| `ALGORITHM` | JWT algorithm (default: HS256) | No |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | Token expiration time (default: 60) | No |
+| `UPLOAD_DIR` | Directory for uploaded files (default: ./uploads) | No |
+| `CORS_ORIGINS` | Comma-separated allowed origins | No |
+
+### Frontend (.env)
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `VITE_API_URL` | Backend API URL (default: http://localhost:8000/api/v1) | No |
+| `VITE_GOOGLE_MAPS_API_KEY` | Google Maps API key for comp map | No |
+
+---
+
+## API Overview
 
 All endpoints are prefixed with `/api/v1`:
 
-- **`/auth`** - User authentication (register, login, logout, me)
-- **`/upload`** - PDF upload and extraction
-- **`/properties`** - Property CRUD, reanalysis, comparison, folder assignment
-- **`/deal-folders`** - Folder CRUD, get folder properties
-- **`/scoring`** - Scoring weights, presets, score property, batch scoring
-- **`/data-bank`** - Inventory, sales comps, pipeline projects, Excel upload
+### Authentication (`/auth`)
+- `POST /auth/register` — User registration
+- `POST /auth/login` — Login with JWT token generation
+- `GET /auth/me` — Get current user info
+- `POST /auth/logout` — Logout and clear session
 
-## Database Schema
+### Upload (`/upload`)
+- `POST /upload` — Upload PDF and extract with Claude
+- `GET /upload/health` — Health check
 
-**Core Tables:**
-- `users` - User accounts (email, hashed_password, full_name)
-- `properties` - Property data with 40+ financial fields
-- `property_unit_mix` - Unit mix rows (floorplan, bedrooms, bathrooms, rents)
-- `property_rent_comps` - Rent comps extracted from OM documents
-- `deal_folders` - Deal folder organization
-- `bov_pricing_tiers` - BOV multi-tier pricing scenarios
-- `bov_cap_rates` - Cap rates linked to pricing tiers
-- `analysis_logs` - Audit log of all LLM extraction operations
+### Properties (`/properties`)
+- `POST /properties` — Save property to library
+- `GET /properties` — List properties with filters, search, sorting
+- `GET /properties/{id}` — Get property detail
+- `PATCH /properties/{id}/folder` — Move property to folder
+- `DELETE /properties/{id}` — Delete property
+- `POST /properties/{id}/reanalyze` — Re-analyze with Claude
+- `POST /properties/compare` — Compare 2-5 properties
 
-**Data Bank Tables:**
-- `sales_comps` - User-uploaded sales comp records
-- `pipeline_projects` - User-uploaded pipeline/development projects
-- `submarket_inventory` - User-input inventory denominators
-- `data_bank_documents` - Uploaded Excel file tracking
+### Deal Folders (`/deal-folders`)
+- `POST /deal-folders` — Create folder
+- `GET /deal-folders` — List folders with status filter
+- `GET /deal-folders/{id}` — Get folder detail
+- `PATCH /deal-folders/{id}` — Update folder
+- `DELETE /deal-folders/{id}` — Delete folder (cascade or orphan)
+- `GET /deal-folders/{id}/properties` — Get properties in folder
 
-**Scoring Tables:**
-- `user_scoring_weights` - User-configurable scoring weights and presets
+### Scoring (`/scoring`)
+- `GET /scoring/weights` — Get user scoring weights
+- `PUT /scoring/weights` — Update scoring weights
+- `GET /scoring/presets` — List scoring presets
+- `PUT /scoring/weights/preset` — Apply preset
+- `GET /scoring/score/{property_id}` — Score single property
+- `POST /scoring/scores` — Batch score multiple properties
 
-## Documentation
+### Investment Criteria (`/criteria`)
+- `GET /criteria` — Get user investment criteria
+- `PUT /criteria` — Update investment criteria
+- `POST /criteria/screen/{property_id}` — Screen property against criteria
 
-For developers and AI assistants, see `.ai/` directory:
+### Data Bank (`/data-bank`)
+- `POST /data-bank/inventory` — Set submarket inventory
+- `GET /data-bank/inventory` — List inventory by user
+- `GET /data-bank/comps` — Query sales comps with filters
+- `GET /data-bank/pipeline` — Query pipeline projects
+- `POST /data-bank/upload` — Upload Excel file
+- `GET /data-bank/documents` — List uploaded documents
+- `GET /data-bank/document/{id}` — Get document detail
+- `DELETE /data-bank/document/{id}` — Delete document
 
-- **[01-CORE-RULES.md](.ai/01-CORE-RULES.md)** - Coding standards, patterns, constraints
-- **[02-ARCHITECTURE.md](.ai/02-ARCHITECTURE.md)** - Technical decisions and rationale
-- **[03-CODEBASE.md](.ai/03-CODEBASE.md)** - Complete inventory of what exists
-- **[04-CURRENT-WORK.md](.ai/04-CURRENT-WORK.md)** - Active tasks and priorities
+### Chat (`/chat`)
+- `POST /chat` — Send chat message to AI Pipeline Analyst
+- `GET /chat/history` — Get chat history
 
-## Current Status
+---
 
-**Phase:** Active Development - Deal Scoring + Data Bank Integration
-**Last Updated:** February 10, 2026
+## License
 
-**Recently Completed:**
-- Schema expansion for unit mix, rent comps, metro, renovation fields
-- Progressive empty states on PropertyDetail
-- Extraction pipeline wired for new fields
-- Comp matching uses metro field
-- Deal Score UI with color coding and sortable comparison
-- Comparison page wired to real API
-- Data Bank page with Excel upload and Claude-powered extraction
-
-**Known Issues:**
-- _cffi_backend env dependency warning on backend startup (pre-existing, non-blocking)
+MIT
 
 ---
 
