@@ -6,10 +6,12 @@ CRITICAL ARCHITECTURE:
 - Reanalyze endpoint: ONLY endpoint that calls LLM after initial upload
 """
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 from datetime import datetime
 from typing import List
 import os
+import re
 
 from app.database import get_db
 from app.models.user import User
@@ -391,6 +393,57 @@ async def reanalyze_property(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Re-analysis failed: {str(e)}"
         )
+
+
+# ==================== EXPORT SUMMARY PDF (NO LLM) ====================
+
+@router.get("/{property_id}/summary-pdf")
+def export_summary_pdf(
+    property_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Generate and download a professional PDF summary for a property (NO LLM CALLS)
+
+    Returns a 2-page PDF brief with property overview and market context.
+    """
+    from app.services.pdf_report_service import generate_deal_summary
+
+    # Verify property exists and belongs to user
+    property_obj = property_service.get_property(
+        db,
+        property_id,
+        str(current_user.id),
+        update_view_date=False
+    )
+
+    if not property_obj:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Property not found"
+        )
+
+    try:
+        pdf_bytes = generate_deal_summary(property_id, db)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"PDF generation failed: {str(e)}"
+        )
+
+    # Sanitize filename
+    safe_name = re.sub(r'[^\w\s\-]', '', property_obj.deal_name or "Property")
+    safe_name = safe_name.strip().replace(" ", "_") or "Property"
+    filename = f"{safe_name}_Summary.pdf"
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"'
+        }
+    )
 
 
 # ==================== HELPER FUNCTIONS ====================
