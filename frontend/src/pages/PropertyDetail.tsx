@@ -41,6 +41,7 @@ import type {
 } from '@/types/property';
 import { AnimatePresence, motion } from 'framer-motion';
 import { PropertyDetailSkeleton } from '@/components/ui/PageSkeleton';
+import { SensitivityAnalysis } from '@/components/property/SensitivityAnalysis';
 import {
   Dialog,
   DialogContent,
@@ -1558,6 +1559,11 @@ export const PropertyDetail = () => {
             </div>
           </section>
         )}
+
+        {/* --------------------------------------------------------------- */}
+        {/* QUICK UNDERWRITING                                               */}
+        {/* --------------------------------------------------------------- */}
+        {property && <SensitivityAnalysis property={property} />}
 
         {/* --------------------------------------------------------------- */}
         {/* UNIT MIX                                                         */}
