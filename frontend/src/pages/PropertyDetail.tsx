@@ -42,6 +42,7 @@ import type {
 import { AnimatePresence, motion } from 'framer-motion';
 import { PropertyDetailSkeleton } from '@/components/ui/PageSkeleton';
 import { SensitivityAnalysis } from '@/components/property/SensitivityAnalysis';
+import { CompMap } from '@/components/property/CompMap';
 import {
   Dialog,
   DialogContent,
@@ -1757,27 +1758,37 @@ export const PropertyDetail = () => {
         </section>
 
         {/* --------------------------------------------------------------- */}
-        {/* LOCATION / DEMOGRAPHICS (placeholder)                            */}
+        {/* LOCATION / DEMOGRAPHICS                                          */}
         {/* --------------------------------------------------------------- */}
         {property.property_address && (
           <section className="animate-fade-in" style={{ animationDelay: '295ms' }}>
             <h2 className="font-display text-lg font-bold mb-4 text-foreground">
               Location
             </h2>
-            <div className="bg-card/30 border-border/40 border-dashed rounded-2xl p-8 text-center border">
-              <MapPin className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
-              <p className="text-muted-foreground text-sm">
-                Location intelligence coming soon
-              </p>
-              <div className="mt-3 flex items-center justify-center gap-4 text-sm">
+
+            {/* Submarket and Metro info */}
+            {(property.submarket || property.metro) && (
+              <div className="mb-4 flex items-center gap-4 text-sm">
                 {property.submarket && (
-                  <span className="text-muted-foreground">Submarket: <span className="font-semibold text-foreground">{property.submarket}</span></span>
+                  <span className="text-muted-foreground">
+                    Submarket: <span className="font-semibold text-foreground">{property.submarket}</span>
+                  </span>
                 )}
                 {property.metro && (
-                  <span className="text-muted-foreground">Metro: <span className="font-semibold text-foreground">{property.metro}</span></span>
+                  <span className="text-muted-foreground">
+                    Metro: <span className="font-semibold text-foreground">{property.metro}</span>
+                  </span>
                 )}
               </div>
-            </div>
+            )}
+
+            {/* Interactive map with property and comps */}
+            <CompMap
+              address={property.property_address}
+              propertyName={property.deal_name}
+              rentComps={rentComps}
+              salesComps={property.bov_pricing_tiers}
+            />
           </section>
         )}
 
