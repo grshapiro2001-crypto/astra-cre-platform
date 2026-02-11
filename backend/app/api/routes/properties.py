@@ -139,7 +139,10 @@ def list_properties(
             t3_noi=p.t3_noi,
             y1_noi=p.y1_noi,
             t12_noi=p.t12_noi,
-            document_type=p.document_type
+            document_type=p.document_type,
+            total_units=p.total_units,
+            deal_folder_id=p.deal_folder_id,
+            document_subtype=p.document_subtype,
         )
         for p in properties
     ]

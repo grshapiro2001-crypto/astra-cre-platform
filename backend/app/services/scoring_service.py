@@ -502,27 +502,43 @@ def _extract_property_data(prop: Property, db: Optional[Session] = None) -> dict
         "market_sentiment_rationale": prop.market_sentiment_rationale,
     }
 
-    # Parse T12 financials for economic occupancy and opex ratio
-    if prop.t12_financials_json:
-        try:
-            t12 = json.loads(prop.t12_financials_json) if isinstance(prop.t12_financials_json, str) else prop.t12_financials_json
-            # Economic occupancy = (GSR - vacancy - concessions - bad_debt) / GSR * 100
-            gsr = t12.get("gsr")
-            if gsr and gsr > 0:
-                vacancy = t12.get("vacancy") or 0
-                concessions = t12.get("concessions") or 0
-                bad_debt = t12.get("bad_debt") or 0
-                egi = gsr - vacancy - concessions - bad_debt
-                data["economic_occupancy"] = (egi / gsr) * 100
+    # Parse financials for economic occupancy and opex ratio
+    # Try T12 first, then Y1, then direct property columns
+    for financials_json in [prop.t12_financials_json, prop.y1_financials_json]:
+        if financials_json and "economic_occupancy" not in data:
+            try:
+                fin = json.loads(financials_json) if isinstance(financials_json, str) else financials_json
+                gsr = fin.get("gsr")
+                if gsr and gsr > 0:
+                    vacancy = fin.get("vacancy") or 0
+                    concessions = fin.get("concessions") or 0
+                    bad_debt = fin.get("bad_debt") or 0
+                    egi = gsr - vacancy - concessions - bad_debt
+                    data["economic_occupancy"] = (egi / gsr) * 100
+            except (json.JSONDecodeError, TypeError):
+                pass
 
-            # OpEx ratio
-            opex_ratio = t12.get("opex_ratio")
-            if opex_ratio is not None:
-                data["opex_ratio"] = opex_ratio
-            elif gsr and gsr > 0 and t12.get("total_opex"):
-                data["opex_ratio"] = (t12["total_opex"] / gsr) * 100
-        except (json.JSONDecodeError, TypeError):
-            pass
+    for financials_json in [prop.t12_financials_json, prop.y1_financials_json]:
+        if financials_json and "opex_ratio" not in data:
+            try:
+                fin = json.loads(financials_json) if isinstance(financials_json, str) else financials_json
+                opex_ratio = fin.get("opex_ratio")
+                if opex_ratio is not None:
+                    data["opex_ratio"] = opex_ratio
+                else:
+                    gsr = fin.get("gsr")
+                    if gsr and gsr > 0 and fin.get("total_opex"):
+                        data["opex_ratio"] = (fin["total_opex"] / gsr) * 100
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+    # Fallback to direct property columns for expense ratio
+    if "opex_ratio" not in data:
+        for attr in ["t12_expense_ratio_pct", "y1_expense_ratio_pct"]:
+            val = getattr(prop, attr, None)
+            if val is not None:
+                data["opex_ratio"] = float(val)
+                break
 
     # Extract cap_rate and price_per_unit from BOV pricing tiers if available
     if db is not None:

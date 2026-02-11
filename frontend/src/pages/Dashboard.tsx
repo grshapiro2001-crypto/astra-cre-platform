@@ -824,8 +824,11 @@ export const Dashboard = () => {
                             <span className="text-muted-foreground">
                               {deal.units > 0 ? `${deal.units} units` : '\u2014'}
                             </span>
-                            <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400">
-                              {formatPrice(deal.noiT12)}
+                            <span className={cn(
+                              "font-mono font-semibold",
+                              (deal.noiT12 || deal.noiY1) ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"
+                            )}>
+                              {deal.noiT12 ? formatPrice(deal.noiT12) : deal.noiY1 ? formatPrice(deal.noiY1) : 'No Pricing'}
                             </span>
                           </div>
                         </div>
@@ -953,20 +956,20 @@ export const Dashboard = () => {
                             {geo.count} {geo.count === 1 ? 'deal' : 'deals'}
                           </span>
                         </div>
-                        <div className="h-6 rounded-lg overflow-hidden bg-muted">
+                        <div className="h-6 rounded-lg overflow-hidden bg-muted relative">
                           <div
-                            className="h-full rounded-lg flex items-center justify-end px-2 bg-primary transition-all duration-700 ease-out"
+                            className="h-full rounded-lg bg-primary transition-all duration-700 ease-out"
                             style={{
                               width: mounted ? `${barWidth}%` : '0%',
                               transitionDelay: `${500 + index * 100}ms`,
                             }}
-                          >
-                            {barWidth > 20 && (
-                              <span className="text-xs font-mono text-primary-foreground font-semibold">
-                                {formatPrice(geo.value)}
-                              </span>
-                            )}
-                          </div>
+                          />
+                          <span className={cn(
+                            "absolute top-0 h-full flex items-center text-xs font-mono font-semibold px-2",
+                            barWidth > 25 ? "right-0 text-primary-foreground" : "text-muted-foreground"
+                          )} style={barWidth <= 25 ? { left: `${barWidth}%` } : undefined}>
+                            {formatPrice(geo.value)}
+                          </span>
                         </div>
                       </div>
                     );

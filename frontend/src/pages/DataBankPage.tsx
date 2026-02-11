@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   Database,
   Upload as UploadIcon,
@@ -392,9 +392,8 @@ const DocumentsTab = () => {
             </TableHeader>
             <TableBody>
               {documents.map((doc) => (
-                <>
+                <React.Fragment key={doc.id}>
                   <TableRow
-                    key={doc.id}
                     className="cursor-pointer"
                     onClick={() => setExpandedId(expandedId === doc.id ? null : doc.id)}
                   >
@@ -481,7 +480,7 @@ const DocumentsTab = () => {
                       </TableCell>
                     </TableRow>
                   )}
-                </>
+                </React.Fragment>
               ))}
             </TableBody>
           </Table>

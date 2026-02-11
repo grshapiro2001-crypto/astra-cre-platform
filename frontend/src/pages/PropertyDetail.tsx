@@ -218,7 +218,8 @@ const FinancialRow = ({
           className={cn(
             'font-mono',
             (isTotal || isHighlight) && 'font-bold text-lg',
-            isDeduction && !isTotal && 'text-destructive',
+            isDeduction && !isTotal && value !== 0 && 'text-destructive',
+            isDeduction && !isTotal && value === 0 && 'text-muted-foreground',
             !isDeduction && !isHighlight && !isTotal && 'text-foreground',
             isHighlight && 'text-foreground',
           )}
@@ -457,16 +458,30 @@ export const PropertyDetail = () => {
     let totalUnitsSum = 0;
     let weightedSF = 0;
     let weightedRent = 0;
+    let weightedProformaRent = 0;
+    let proformaRentUnits = 0;
+    let weightedProformaPSF = 0;
+    let proformaPSFUnits = 0;
     for (const u of unitMix) {
       const n = u.num_units ?? 0;
       totalUnitsSum += n;
       weightedSF += n * (u.unit_sf ?? 0);
       weightedRent += n * (u.in_place_rent ?? 0);
+      if (u.proforma_rent != null) {
+        weightedProformaRent += n * u.proforma_rent;
+        proformaRentUnits += n;
+      }
+      if (u.proforma_rent_psf != null) {
+        weightedProformaPSF += n * u.proforma_rent_psf;
+        proformaPSFUnits += n;
+      }
     }
     return {
       totalUnits: totalUnitsSum,
       avgSF: totalUnitsSum > 0 ? Math.round(weightedSF / totalUnitsSum) : 0,
       avgRent: totalUnitsSum > 0 ? Math.round(weightedRent / totalUnitsSum) : 0,
+      avgProformaRent: proformaRentUnits > 0 ? Math.round(weightedProformaRent / proformaRentUnits) : null,
+      avgProformaPSF: proformaPSFUnits > 0 ? +(weightedProformaPSF / proformaPSFUnits).toFixed(2) : null,
     };
   }, [unitMix]);
 
@@ -483,7 +498,18 @@ export const PropertyDetail = () => {
 
   const filteredRentComps = useMemo(() => {
     if (rentCompTabs.length <= 1) return rentComps;
-    return rentComps.filter(c => c.bedroom_type === rentCompTab);
+    const filtered = rentComps.filter(c => c.bedroom_type === rentCompTab);
+    // Build location lookup from "All" entries so filtered views don't lose location
+    const locationMap = new Map<string, string>();
+    for (const c of rentComps) {
+      if (c.location && c.bedroom_type === 'All') {
+        locationMap.set(c.comp_name, c.location);
+      }
+    }
+    return filtered.map(c => ({
+      ...c,
+      location: c.location ?? locationMap.get(c.comp_name) ?? null,
+    }));
   }, [rentComps, rentCompTab, rentCompTabs]);
 
   const bovTiers: BOVPricingTier[] = property?.bov_pricing_tiers ?? [];
@@ -587,7 +613,7 @@ export const PropertyDetail = () => {
                       No Document
                     </span>
                   )}
-                  {property.document_subtype && (
+                  {property.document_subtype && property.document_subtype.toUpperCase() !== property.document_type?.toUpperCase() && (
                     <span className="px-2.5 py-1 rounded-lg text-2xs font-bold uppercase tracking-wider bg-muted text-muted-foreground">
                       {property.document_subtype}
                     </span>
@@ -1045,13 +1071,14 @@ export const PropertyDetail = () => {
                       </span>
                       <input
                         type="text"
-                        value={pricingGuidance.toLocaleString()}
+                        value={pricingGuidance > 0 ? pricingGuidance.toLocaleString() : ''}
+                        placeholder="Enter asking price..."
                         onChange={(e) =>
                           setPricingGuidance(
                             parseInt(e.target.value.replace(/,/g, '')) || 0,
                           )
                         }
-                        className="w-full pl-8 pr-4 py-4 rounded-xl text-2xl font-mono font-bold bg-muted border border-border text-foreground outline-none focus:ring-2 focus:ring-ring"
+                        className="w-full pl-8 pr-4 py-4 rounded-xl text-2xl font-mono font-bold bg-muted border border-border text-foreground placeholder:text-muted-foreground/50 placeholder:font-normal placeholder:text-lg outline-none focus:ring-2 focus:ring-ring"
                       />
                     </div>
 
@@ -1558,7 +1585,9 @@ export const PropertyDetail = () => {
                         <td className="px-4 py-3 text-right font-mono font-semibold text-foreground">{unitMixSummary.totalUnits}</td>
                         <td className="px-4 py-3 text-right font-mono font-semibold text-foreground">{unitMixSummary.avgSF.toLocaleString()}</td>
                         <td className="px-4 py-3 text-right font-mono font-semibold text-foreground">{fmtCurrency(unitMixSummary.avgRent)}</td>
-                        <td className="px-4 py-3" colSpan={hasRenoPremium ? 3 : 2}></td>
+                        <td className="px-4 py-3 text-right font-mono font-semibold text-foreground">{unitMixSummary.avgProformaRent != null ? fmtCurrency(unitMixSummary.avgProformaRent) : '\u2014'}</td>
+                        <td className="px-4 py-3 text-right font-mono font-semibold text-foreground">{unitMixSummary.avgProformaPSF != null ? `$${unitMixSummary.avgProformaPSF.toFixed(2)}` : '\u2014'}</td>
+                        {hasRenoPremium && <td className="px-4 py-3"></td>}
                       </tr>
                     </tfoot>
                   )}
@@ -2040,7 +2069,8 @@ export const PropertyDetail = () => {
                       at {selectedTier.tier_label || 'listed'} pricing
                     </>
                   )}
-                  . Economic occupancy at{' '}
+                  {(property.t12_financials?.noi != null || (hasBOV && selectedTier?.pricing != null)) && '.'}
+                  {' '}Economic occupancy at{' '}
                   <strong>{economicOccupancy.percent.toFixed(1)}%</strong>{' '}
                   indicates
                   {economicOccupancy.percent >= 90

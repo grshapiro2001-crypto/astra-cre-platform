@@ -1270,18 +1270,36 @@ export const ComparisonPage = () => {
       ) : error ? (
         <motion.div key="error" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}>
           <div className="max-w-4xl mx-auto">
-            <div className="border border-rose-200 dark:border-rose-800 rounded-2xl bg-rose-50 dark:bg-rose-950/30 p-6">
-              <h2 className="text-lg font-display font-semibold text-rose-900 dark:text-rose-200 mb-2">
-                Error
-              </h2>
-              <p className="text-sm text-rose-800 dark:text-rose-300">{error}</p>
-              <button
-                onClick={() => navigate('/library')}
-                className="mt-4 px-4 py-2.5 rounded-xl bg-primary text-white text-sm font-medium hover:bg-primary/90 transition-colors"
-              >
-                Back to Library
-              </button>
-            </div>
+            {error === 'No properties selected' || error === 'Please select at least 2 properties' ? (
+              <div className="border border-border rounded-2xl bg-card p-12 text-center">
+                <Layers className="w-12 h-12 text-muted-foreground/40 mx-auto mb-4" />
+                <h2 className="text-lg font-display font-semibold text-foreground mb-2">
+                  Compare Properties
+                </h2>
+                <p className="text-sm text-muted-foreground mb-6">
+                  Select properties from your library to compare them side-by-side.
+                </p>
+                <button
+                  onClick={() => navigate('/library')}
+                  className="px-5 py-2.5 rounded-xl bg-primary text-white text-sm font-medium hover:bg-primary/90 transition-colors"
+                >
+                  Go to Library
+                </button>
+              </div>
+            ) : (
+              <div className="border border-rose-200 dark:border-rose-800 rounded-2xl bg-rose-50 dark:bg-rose-950/30 p-6">
+                <h2 className="text-lg font-display font-semibold text-rose-900 dark:text-rose-200 mb-2">
+                  Error
+                </h2>
+                <p className="text-sm text-rose-800 dark:text-rose-300">{error}</p>
+                <button
+                  onClick={() => navigate('/library')}
+                  className="mt-4 px-4 py-2.5 rounded-xl bg-primary text-white text-sm font-medium hover:bg-primary/90 transition-colors"
+                >
+                  Back to Library
+                </button>
+              </div>
+            )}
           </div>
         </motion.div>
       ) : !data ? null : (

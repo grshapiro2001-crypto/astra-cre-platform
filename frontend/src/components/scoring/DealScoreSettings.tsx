@@ -177,8 +177,8 @@ function computeSampleScore(
   layerWeights: { layer1: number; layer2: number; layer3: number },
   metricWeights: { economic_occupancy: number; opex_ratio: number; supply_pipeline: number },
 ): number {
-  // Sample raw scores for a hypothetical property
-  const sampleLayerScores = { layer1: 72, layer2: 65, layer3: 81 };
+  // Sample raw scores for a hypothetical property (realistic CRE deal)
+  const sampleLayerScores = { layer1: 68, layer2: 55, layer3: 74 };
 
   // Weighted total using layer weights
   const total =
@@ -432,12 +432,12 @@ export function DealScoreSettings() {
 
       for (const [name, values] of Object.entries(presetData)) {
         if (
-          values.layer1_weight === layers.layer1 / 100 &&
-          values.layer2_weight === layers.layer2 / 100 &&
-          values.layer3_weight === layers.layer3 / 100 &&
-          values.economic_occupancy_weight === metrics.economic_occupancy / 100 &&
-          values.opex_ratio_weight === metrics.opex_ratio / 100 &&
-          values.supply_pipeline_weight === metrics.supply_pipeline / 100
+          values.layer1_weight === layers.layer1 &&
+          values.layer2_weight === layers.layer2 &&
+          values.layer3_weight === layers.layer3 &&
+          values.economic_occupancy_weight === metrics.economic_occupancy &&
+          values.opex_ratio_weight === metrics.opex_ratio &&
+          values.supply_pipeline_weight === metrics.supply_pipeline
         ) {
           return name;
         }
@@ -453,12 +453,12 @@ export function DealScoreSettings() {
       const saved = savedWeightsRef.current;
       if (!saved) return false;
       return (
-        Math.round(saved.layer1_weight * 100) !== layers.layer1 ||
-        Math.round(saved.layer2_weight * 100) !== layers.layer2 ||
-        Math.round(saved.layer3_weight * 100) !== layers.layer3 ||
-        Math.round(saved.economic_occupancy_weight * 100) !== metrics.economic_occupancy ||
-        Math.round(saved.opex_ratio_weight * 100) !== metrics.opex_ratio ||
-        Math.round(saved.supply_pipeline_weight * 100) !== metrics.supply_pipeline
+        saved.layer1_weight !== layers.layer1 ||
+        saved.layer2_weight !== layers.layer2 ||
+        saved.layer3_weight !== layers.layer3 ||
+        saved.economic_occupancy_weight !== metrics.economic_occupancy ||
+        saved.opex_ratio_weight !== metrics.opex_ratio ||
+        saved.supply_pipeline_weight !== metrics.supply_pipeline
       );
     },
     [],
@@ -481,14 +481,14 @@ export function DealScoreSettings() {
         setPresets(presetsData);
 
         const layers = {
-          layer1: Math.round(weights.layer1_weight * 100),
-          layer2: Math.round(weights.layer2_weight * 100),
-          layer3: Math.round(weights.layer3_weight * 100),
+          layer1: weights.layer1_weight,
+          layer2: weights.layer2_weight,
+          layer3: weights.layer3_weight,
         };
         const metrics = {
-          economic_occupancy: Math.round(weights.economic_occupancy_weight * 100),
-          opex_ratio: Math.round(weights.opex_ratio_weight * 100),
-          supply_pipeline: Math.round(weights.supply_pipeline_weight * 100),
+          economic_occupancy: weights.economic_occupancy_weight,
+          opex_ratio: weights.opex_ratio_weight,
+          supply_pipeline: weights.supply_pipeline_weight,
         };
 
         setLayerWeights(layers);
@@ -556,14 +556,14 @@ export function DealScoreSettings() {
       savedWeightsRef.current = weights;
 
       const layers = {
-        layer1: Math.round(weights.layer1_weight * 100),
-        layer2: Math.round(weights.layer2_weight * 100),
-        layer3: Math.round(weights.layer3_weight * 100),
+        layer1: weights.layer1_weight,
+        layer2: weights.layer2_weight,
+        layer3: weights.layer3_weight,
       };
       const metrics = {
-        economic_occupancy: Math.round(weights.economic_occupancy_weight * 100),
-        opex_ratio: Math.round(weights.opex_ratio_weight * 100),
-        supply_pipeline: Math.round(weights.supply_pipeline_weight * 100),
+        economic_occupancy: weights.economic_occupancy_weight,
+        opex_ratio: weights.opex_ratio_weight,
+        supply_pipeline: weights.supply_pipeline_weight,
       };
 
       setLayerWeights(layers);
@@ -586,12 +586,12 @@ export function DealScoreSettings() {
     setSaving(true);
     try {
       const payload: Partial<ScoringWeights> = {
-        layer1_weight: layerWeights.layer1 / 100,
-        layer2_weight: layerWeights.layer2 / 100,
-        layer3_weight: layerWeights.layer3 / 100,
-        economic_occupancy_weight: metricWeights.economic_occupancy / 100,
-        opex_ratio_weight: metricWeights.opex_ratio / 100,
-        supply_pipeline_weight: metricWeights.supply_pipeline / 100,
+        layer1_weight: layerWeights.layer1,
+        layer2_weight: layerWeights.layer2,
+        layer3_weight: layerWeights.layer3,
+        economic_occupancy_weight: metricWeights.economic_occupancy,
+        opex_ratio_weight: metricWeights.opex_ratio,
+        supply_pipeline_weight: metricWeights.supply_pipeline,
       };
 
       const updated = await scoringService.updateWeights(payload);
