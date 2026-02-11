@@ -182,6 +182,8 @@ class PropertyListItem(BaseModel):
     total_units: Optional[int] = None
     deal_folder_id: Optional[int] = None  # Phase 3A
     document_subtype: Optional[str] = None  # Phase 3A
+    screening_verdict: Optional[str] = None
+    screening_score: Optional[int] = None
 
     class Config:
         from_attributes = True
@@ -236,6 +238,11 @@ class PropertyDetail(BaseModel):
     last_analyzed_at: Optional[datetime]
     analysis_model: Optional[str]
     analysis_status: Optional[str]
+
+    # Screening
+    screening_verdict: Optional[str] = None
+    screening_score: Optional[int] = None
+    screening_details_json: Optional[str] = None
 
     class Config:
         from_attributes = True

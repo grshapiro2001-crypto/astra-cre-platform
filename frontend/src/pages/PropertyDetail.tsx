@@ -21,7 +21,6 @@ import {
   FileText,
   Receipt,
   BarChart3,
-  MapPin,
   Upload,
   FileDown,
 } from 'lucide-react';
@@ -31,6 +30,8 @@ import { scoringService } from '@/services/scoringService';
 import type { DealScoreResult } from '@/services/scoringService';
 import { DealScoreBadge } from '@/components/scoring/DealScoreBadge';
 import { DealScoreModal } from '@/components/scoring/DealScoreModal';
+import { ScreeningBadge } from '@/components/screening/ScreeningBadge';
+import { ScreeningModal } from '@/components/screening/ScreeningModal';
 import { useUIStore } from '@/store/uiStore';
 import type {
   PropertyDetail as PropertyDetailType,
@@ -264,6 +265,9 @@ export const PropertyDetail = () => {
   // --- Scoring state ---
   const [dealScore, setDealScore] = useState<DealScoreResult | null>(null);
   const [showScoreModal, setShowScoreModal] = useState(false);
+
+  // --- Screening state ---
+  const [showScreeningModal, setShowScreeningModal] = useState(false);
 
   // --- Dialog state ---
   const [showReanalyzeDialog, setShowReanalyzeDialog] = useState(false);
@@ -597,6 +601,18 @@ export const PropertyDetail = () => {
                 size="md"
                 onClick={() => dealScore && setShowScoreModal(true)}
               />
+
+              {property.screening_verdict ? (
+                <ScreeningBadge
+                  verdict={property.screening_verdict}
+                  size="md"
+                  onClick={() => setShowScreeningModal(true)}
+                />
+              ) : (
+                <span className="text-xs text-muted-foreground italic">
+                  No screening criteria
+                </span>
+              )}
 
               <div>
                 <div className="flex items-center gap-3 flex-wrap">
@@ -2303,6 +2319,31 @@ export const PropertyDetail = () => {
         onClose={() => setShowScoreModal(false)}
         scoreData={dealScore}
         propertyName={property?.deal_name}
+      />
+
+      {/* Screening Modal */}
+      <ScreeningModal
+        open={showScreeningModal}
+        onClose={() => setShowScreeningModal(false)}
+        propertyId={property?.id ?? null}
+        propertyName={property?.deal_name}
+        existingData={
+          property?.screening_details_json
+            ? (() => {
+                try {
+                  const checks = JSON.parse(property.screening_details_json);
+                  return {
+                    verdict: property.screening_verdict ?? '',
+                    score: property.screening_score ?? 0,
+                    checks,
+                    summary: '',
+                  };
+                } catch {
+                  return null;
+                }
+              })()
+            : null
+        }
       />
         </motion.div>
       )}

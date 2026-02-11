@@ -86,8 +86,9 @@ export const CompMap: React.FC<CompMapProps> = ({
   address,
   propertyName,
   rentComps = [],
-  salesComps = [],
+  salesComps: _salesComps = [],
 }) => {
+  void _salesComps;
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
   const { isLoaded, loadError } = useLoadScript({
@@ -211,7 +212,7 @@ export const CompMap: React.FC<CompMapProps> = ({
     setMap(null);
   }, []);
 
-  const getMarkerIcon = (type: 'subject' | 'rent' | 'sales'): google.maps.Icon => {
+  const getMarkerIcon = (type: 'subject' | 'rent' | 'sales'): google.maps.Symbol => {
     const colors = {
       subject: '#a855f7', // Purple
       rent: '#3b82f6',    // Blue

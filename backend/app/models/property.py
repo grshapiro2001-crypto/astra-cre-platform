@@ -115,6 +115,11 @@ class Property(Base):
     market_sentiment_rationale = Column(Text, nullable=True)
     market_sentiment_updated_at = Column(DateTime(timezone=True), nullable=True)
 
+    # Screening results (auto-populated on save)
+    screening_verdict = Column(String, nullable=True)  # PASS/FAIL/REVIEW
+    screening_score = Column(Integer, nullable=True)
+    screening_details_json = Column(Text, nullable=True)  # JSON of checks array
+
     # Relationships
     unit_mix = relationship("PropertyUnitMix", backref="property", cascade="all, delete-orphan")
     rent_comps = relationship("PropertyRentComp", backref="property", cascade="all, delete-orphan")

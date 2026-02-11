@@ -38,7 +38,9 @@ import { Button } from '@/components/ui/button';
 import { DashboardSkeleton } from '@/components/ui/PageSkeleton';
 import { propertyService } from '@/services/propertyService';
 import { dealFolderService, type DealFolder } from '@/services/dealFolderService';
-import type { PropertyListItem } from '@/types/property';
+import { criteriaService } from '@/services/criteriaService';
+import type { PropertyListItem, ScreeningSummaryItem } from '@/types/property';
+import { Shield, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
 
 // ============================================================
 // TYPES
@@ -267,6 +269,7 @@ export const Dashboard = () => {
   const [folders, setFolders] = useState<DealFolder[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [screeningSummary, setScreeningSummary] = useState<ScreeningSummaryItem[]>([]);
 
   // --- UI State ---
   const [mounted, setMounted] = useState(false);
@@ -315,6 +318,9 @@ export const Dashboard = () => {
         propertiesResult.properties as PropertyWithFinancials[],
       );
       setFolders(foldersResult);
+
+      // Non-blocking fetch of screening summary
+      criteriaService.getScreeningSummary().then(setScreeningSummary).catch(() => {});
     } catch (err: unknown) {
       const message =
         err instanceof Error
@@ -712,6 +718,62 @@ export const Dashboard = () => {
                   </div>
                 );
               })}
+            </div>
+          </section>
+        )}
+
+        {/* ============== SCREENING RESULTS ============== */}
+        {screeningSummary.length > 0 && (
+          <section
+            className={cn(
+              'transition-all duration-500 delay-250',
+              mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5',
+            )}
+          >
+            <div className="border border-border rounded-2xl bg-card p-5">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-primary/10">
+                  <Shield className="w-4.5 h-4.5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-display font-semibold text-foreground text-sm">
+                    Screening Results
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    {screeningSummary.filter((s) => s.verdict === 'PASS').length} of{' '}
+                    {screeningSummary.length} properties pass your criteria
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-4 mb-3">
+                <div className="flex items-center gap-1.5 text-xs">
+                  <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
+                  <span className="font-mono font-semibold text-foreground">
+                    {screeningSummary.filter((s) => s.verdict === 'PASS').length}
+                  </span>
+                  <span className="text-muted-foreground">Pass</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-xs">
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+                  <span className="font-mono font-semibold text-foreground">
+                    {screeningSummary.filter((s) => s.verdict === 'REVIEW').length}
+                  </span>
+                  <span className="text-muted-foreground">Review</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-xs">
+                  <XCircle className="w-3.5 h-3.5 text-rose-500" />
+                  <span className="font-mono font-semibold text-foreground">
+                    {screeningSummary.filter((s) => s.verdict === 'FAIL').length}
+                  </span>
+                  <span className="text-muted-foreground">Fail</span>
+                </div>
+              </div>
+              <button
+                onClick={() => navigate('/library?screening=PASS')}
+                className="text-xs font-medium text-primary hover:text-primary/80 transition-colors"
+              >
+                View passing properties &rarr;
+              </button>
             </div>
           </section>
         )}

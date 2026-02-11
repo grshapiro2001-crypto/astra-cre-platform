@@ -20,6 +20,7 @@ import {
   Copy,
   RefreshCw,
   Target,
+  Shield,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/authSlice';
@@ -28,6 +29,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { DealScoreSettings } from '@/components/scoring/DealScoreSettings';
+import { InvestmentCriteriaForm } from '@/components/screening/InvestmentCriteriaForm';
 
 // ============================================================
 // Toggle Switch (simple inline component)
@@ -61,7 +63,7 @@ const Toggle = ({
 // ============================================================
 // Section definitions
 // ============================================================
-type SectionId = 'scoring' | 'profile' | 'appearance' | 'notifications' | 'api';
+type SectionId = 'screening' | 'scoring' | 'profile' | 'appearance' | 'notifications' | 'api';
 
 interface SectionMeta {
   id: SectionId;
@@ -71,6 +73,12 @@ interface SectionMeta {
 }
 
 const SECTIONS: SectionMeta[] = [
+  {
+    id: 'screening',
+    icon: Shield,
+    title: 'Investment Criteria',
+    description: 'Set screening thresholds for automatic pass/fail on uploads',
+  },
   {
     id: 'scoring',
     icon: Target,
@@ -281,9 +289,11 @@ const ApiSection = () => {
   );
 };
 
+const ScreeningSection = () => <InvestmentCriteriaForm />;
 const ScoringSection = () => <DealScoreSettings />;
 
 const SECTION_CONTENT: Record<SectionId, () => JSX.Element> = {
+  screening: ScreeningSection,
   scoring: ScoringSection,
   profile: ProfileSection,
   appearance: AppearanceSection,

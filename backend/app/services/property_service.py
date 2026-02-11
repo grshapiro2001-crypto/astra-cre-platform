@@ -232,6 +232,11 @@ def save_property(
         status="success"
     )
     db.add(log)
+
+    # Auto-screen against user criteria
+    from app.services.screening_service import screen_and_store
+    screen_and_store(db, property_obj, user_id)
+
     db.commit()
     db.refresh(property_obj)
 
