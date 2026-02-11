@@ -147,6 +147,8 @@ def list_properties(
             document_subtype=p.document_subtype,
             screening_verdict=p.screening_verdict,
             screening_score=p.screening_score,
+            pipeline_stage=p.pipeline_stage,
+            pipeline_notes=p.pipeline_notes,
         )
         for p in properties
     ]
@@ -256,6 +258,99 @@ def update_property_folder(
 
     # Update property
     property_obj.deal_folder_id = folder_id
+
+    db.commit()
+    db.refresh(property_obj)
+
+    return build_property_detail_response(property_obj)
+
+
+# ==================== UPDATE PROPERTY PIPELINE STAGE (NO LLM) ====================
+
+@router.patch("/{property_id}/stage", response_model=PropertyDetail)
+def update_property_stage(
+    property_id: int,
+    stage: str,  # Query parameter: ?stage=under_review
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Update property's pipeline stage for Kanban board (NO LLM CALLS)
+
+    This endpoint:
+    - Updates pipeline_stage column
+    - Updates pipeline_updated_at timestamp
+    - Validates stage is one of the valid values
+    - Does NOT call LLM
+
+    Valid stages: screening, under_review, loi, under_contract, closed, passed
+    """
+    # Validate stage
+    valid_stages = ["screening", "under_review", "loi", "under_contract", "closed", "passed"]
+    if stage not in valid_stages:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid stage. Must be one of: {', '.join(valid_stages)}"
+        )
+
+    # Get property
+    property_obj = property_service.get_property(
+        db,
+        property_id,
+        str(current_user.id),
+        update_view_date=False
+    )
+
+    if not property_obj:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Property not found"
+        )
+
+    # Update stage
+    property_obj.pipeline_stage = stage
+    property_obj.pipeline_updated_at = datetime.now()
+
+    db.commit()
+    db.refresh(property_obj)
+
+    return build_property_detail_response(property_obj)
+
+
+# ==================== UPDATE PROPERTY PIPELINE NOTES (NO LLM) ====================
+
+@router.patch("/{property_id}/notes", response_model=PropertyDetail)
+def update_property_notes(
+    property_id: int,
+    notes: str,  # Query parameter: ?notes=Spoke%20with%20broker
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Update property's pipeline notes (NO LLM CALLS)
+
+    This endpoint:
+    - Updates pipeline_notes column
+    - Updates pipeline_updated_at timestamp
+    - Does NOT call LLM
+    """
+    # Get property
+    property_obj = property_service.get_property(
+        db,
+        property_id,
+        str(current_user.id),
+        update_view_date=False
+    )
+
+    if not property_obj:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Property not found"
+        )
+
+    # Update notes
+    property_obj.pipeline_notes = notes
+    property_obj.pipeline_updated_at = datetime.now()
 
     db.commit()
     db.refresh(property_obj)
@@ -514,6 +609,9 @@ def build_property_detail_response(property_obj: Property) -> PropertyDetail:
         screening_verdict=property_obj.screening_verdict,
         screening_score=property_obj.screening_score,
         screening_details_json=property_obj.screening_details_json,
+        pipeline_stage=property_obj.pipeline_stage,
+        pipeline_notes=property_obj.pipeline_notes,
+        pipeline_updated_at=property_obj.pipeline_updated_at,
     )
 
 

@@ -184,6 +184,8 @@ class PropertyListItem(BaseModel):
     document_subtype: Optional[str] = None  # Phase 3A
     screening_verdict: Optional[str] = None
     screening_score: Optional[int] = None
+    pipeline_stage: str = "screening"  # Pipeline Kanban board
+    pipeline_notes: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -243,6 +245,11 @@ class PropertyDetail(BaseModel):
     screening_verdict: Optional[str] = None
     screening_score: Optional[int] = None
     screening_details_json: Optional[str] = None
+
+    # Pipeline management
+    pipeline_stage: str = "screening"
+    pipeline_notes: Optional[str] = None
+    pipeline_updated_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True

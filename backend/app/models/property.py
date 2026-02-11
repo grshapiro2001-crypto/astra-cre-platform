@@ -120,6 +120,11 @@ class Property(Base):
     screening_score = Column(Integer, nullable=True)
     screening_details_json = Column(Text, nullable=True)  # JSON of checks array
 
+    # Pipeline management (Kanban board)
+    pipeline_stage = Column(String, nullable=False, server_default='screening')  # screening, under_review, loi, under_contract, closed, passed
+    pipeline_notes = Column(Text, nullable=True)
+    pipeline_updated_at = Column(DateTime(timezone=True), nullable=True)
+
     # Relationships
     unit_mix = relationship("PropertyUnitMix", backref="property", cascade="all, delete-orphan")
     rent_comps = relationship("PropertyRentComp", backref="property", cascade="all, delete-orphan")
