@@ -1,6 +1,6 @@
-# QA Audit — Placeholder & No-Op Handlers
+# ARCHIVED — See .ai/ folder for current documentation
 
-> **Note:** This audit is archived as of February 10, 2026. Many issues listed here may have been resolved. Run a new audit if needed.
+> **Note:** This audit is archived as of February 11, 2026. Many issues listed here may have been resolved. See [.ai/03-CODEBASE.md](.ai/03-CODEBASE.md) for known issues and current status.
 
 **Generated:** February 8, 2026
 **Scope:** `frontend/src/` — all `.tsx` and `.ts` files

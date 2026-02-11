@@ -1,6 +1,6 @@
-# PROJECT_STATUS.md — Astra CRE Platform
+# ARCHIVED — See .ai/ folder for current documentation
 
-> **Note:** This file is archived as of February 10, 2026. See [.ai/04-CURRENT-WORK.md](.ai/04-CURRENT-WORK.md) and [README.md](README.md) for current documentation.
+> **Note:** This file is archived as of February 11, 2026. See [.ai/04-CURRENT-WORK.md](.ai/04-CURRENT-WORK.md) and [README.md](README.md) for current documentation.
 
 > Context file for AI assistants. Not user documentation. Last updated: Feb 8, 2026.
 
