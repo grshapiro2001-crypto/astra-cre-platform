@@ -38,6 +38,7 @@ import { DashboardSkeleton } from '@/components/ui/PageSkeleton';
 import { propertyService } from '@/services/propertyService';
 import { dealFolderService, type DealFolder } from '@/services/dealFolderService';
 import { criteriaService } from '@/services/criteriaService';
+import { api } from '@/services/api';
 import type { PropertyListItem, ScreeningSummaryItem } from '@/types/property';
 import { Shield, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
 import { KanbanBoard } from '@/components/dashboard/KanbanBoard';
@@ -120,11 +121,10 @@ interface GeoChartDatum {
   value: number;
 }
 
-interface AIResponse {
-  summary: string;
-  insights: string[];
-  topDeal: DashboardDeal | null;
-  recommendation: string;
+interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: Date;
 }
 
 // ============================================================
@@ -166,10 +166,10 @@ const STAGE_TEMPLATES: Record<string, StageTemplate> = {
 };
 
 const AI_QUICK_PROMPTS = [
-  'Summarize my pipeline',
-  'Top NOI performers',
-  'Deals in review',
-  'Pipeline breakdown by submarket',
+  'Which deals pass my screening criteria?',
+  'Compare my top 3 deals by NOI',
+  'What are the risks in my pipeline?',
+  'Summarize my portfolio',
 ];
 
 // ============================================================
@@ -276,8 +276,8 @@ export const Dashboard = () => {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [showAIPanel, setShowAIPanel] = useState(false);
   const [aiQuery, setAiQuery] = useState('');
-  const [aiResponse, setAiResponse] = useState<AIResponse | null>(null);
-  const [aiLoading, setAiLoading] = useState(false);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [isTyping, setIsTyping] = useState(false);
   const [showMetricsEditor, setShowMetricsEditor] = useState(false);
   const [showStageEditor, setShowStageEditor] = useState(false);
 
@@ -559,52 +559,47 @@ export const Dashboard = () => {
     }
   };
 
-  const generateAISummary = useCallback(
-    async (query: string) => {
-      setAiLoading(true);
+  // Chat function using Claude API
+  const sendChatMessage = useCallback(async (message: string) => {
+    if (!message.trim()) return;
 
-      // Simulate AI processing delay
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+    // Add user message to chat
+    const userMessage: ChatMessage = {
+      role: 'user',
+      content: message.trim(),
+      timestamp: new Date(),
+    };
+    setChatMessages(prev => [...prev, userMessage].slice(-10));
 
-      const tagContext =
-        selectedTags.length > 0
-          ? `for ${selectedTags.join(' + ')} deals`
-          : 'across your entire pipeline';
+    // Clear input and show typing indicator
+    setAiQuery('');
+    setIsTyping(true);
 
-      const noiDeals = filteredDeals.filter(
-        (d) => d.noiT12 !== null && d.noiT12 > 0,
-      );
+    try {
+      // Call backend API
+      const response = await api.post('/chat', { message: message.trim() });
 
-      const response: AIResponse = {
-        summary: `Your pipeline ${tagContext} contains ${filteredDeals.length} deals totaling ${formatPrice(metrics.totalNOI)} in T12 NOI across ${metrics.totalUnits.toLocaleString()} units.`,
-        insights: [
-          metrics.avgNOI > 0
-            ? `Average T12 NOI is ${formatPrice(metrics.avgNOI)} across ${noiDeals.length} deals with financial data.`
-            : 'Financial data is still being populated for your pipeline deals.',
-          `${filteredDeals.filter((d) => d.stage === 'review').length} deal(s) are currently in review.`,
-          `Your pipeline includes ${metrics.totalUnits.toLocaleString()} total units across ${filteredDeals.length} properties.`,
-        ],
-        topDeal:
-          noiDeals.length > 0
-            ? noiDeals.reduce((best, deal) =>
-                (deal.noiT12 || 0) > (best.noiT12 || 0) ? deal : best,
-              )
-            : null,
-        recommendation:
-          filteredDeals.length > 0
-            ? query.toLowerCase().includes('noi')
-              ? `Your top NOI performer is ${noiDeals.length > 0 ? noiDeals.reduce((best, d) => ((d.noiT12 || 0) > (best.noiT12 || 0) ? d : best)).name : 'N/A'} with ${formatPrice(metrics.highestNOI)} T12 NOI.`
-              : query.toLowerCase().includes('review')
-                ? `You have ${filteredDeals.filter((d) => d.stage === 'review').length} deal(s) in review. Advancing these will strengthen your pipeline velocity.`
-                : `Focus on the ${filteredDeals.filter((d) => d.stage === 'active' || d.stage === 'review').length} deals in active/review stages to advance your pipeline.`
-            : 'Upload new deal documents to get started with your pipeline analysis.',
+      // Add assistant response to chat
+      const assistantMessage: ChatMessage = {
+        role: 'assistant',
+        content: response.data.response,
+        timestamp: new Date(),
       };
+      setChatMessages(prev => [...prev, assistantMessage].slice(-10));
+    } catch (error: any) {
+      console.error('Chat API error:', error);
 
-      setAiResponse(response);
-      setAiLoading(false);
-    },
-    [filteredDeals, metrics, selectedTags],
-  );
+      // Add error message to chat
+      const errorMessage: ChatMessage = {
+        role: 'assistant',
+        content: error.response?.data?.detail || 'Sorry, I encountered an error. Please make sure the ANTHROPIC_API_KEY is configured in your backend .env file.',
+        timestamp: new Date(),
+      };
+      setChatMessages(prev => [...prev, errorMessage].slice(-10));
+    } finally {
+      setIsTyping(false);
+    }
+  }, []);
 
   // --- Render Helpers ---
   const isWidgetVisible = (widgetId: string): boolean =>
@@ -1135,124 +1130,90 @@ export const Dashboard = () => {
           {/* Content */}
           <div className="p-6">
             {/* Quick Prompts */}
-            <div className="mb-6">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
-                Quick Prompts
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {AI_QUICK_PROMPTS.map((prompt) => (
-                  <button
-                    key={prompt}
-                    onClick={() => {
-                      setAiQuery(prompt);
-                      generateAISummary(prompt);
-                    }}
-                    className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all bg-muted text-muted-foreground border border-border hover:border-primary hover:text-primary"
-                  >
-                    {prompt}
-                  </button>
-                ))}
+            {chatMessages.length === 0 && (
+              <div className="mb-6">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+                  Quick Prompts
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {AI_QUICK_PROMPTS.map((prompt) => (
+                    <button
+                      key={prompt}
+                      onClick={() => sendChatMessage(prompt)}
+                      disabled={isTyping}
+                      className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all bg-muted text-muted-foreground border border-border hover:border-primary hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {prompt}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* Chat Messages */}
+            {chatMessages.length > 0 && (
+              <div className="mb-6 space-y-4 max-h-[400px] overflow-y-auto">
+                {chatMessages.map((msg, idx) => (
+                  <div
+                    key={idx}
+                    className={cn(
+                      'flex',
+                      msg.role === 'user' ? 'justify-end' : 'justify-start'
+                    )}
+                  >
+                    <div
+                      className={cn(
+                        'max-w-[85%] px-4 py-3 rounded-2xl',
+                        msg.role === 'user'
+                          ? 'bg-primary text-primary-foreground rounded-br-sm'
+                          : 'bg-card border border-border rounded-bl-sm'
+                      )}
+                    >
+                      <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                        {msg.content}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Typing Indicator */}
+                {isTyping && (
+                  <div className="flex justify-start">
+                    <div className="bg-card border border-border px-4 py-3 rounded-2xl rounded-bl-sm">
+                      <div className="flex gap-1.5">
+                        <div className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                        <div className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                        <div className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Input */}
             <div className="mb-6">
               <div className="relative">
                 <input
                   type="text"
-                  placeholder="Ask about your pipeline..."
+                  placeholder="Ask about your portfolio..."
                   value={aiQuery}
                   onChange={(e) => setAiQuery(e.target.value)}
                   onKeyDown={(e) =>
-                    e.key === 'Enter' && aiQuery && generateAISummary(aiQuery)
+                    e.key === 'Enter' && aiQuery && !isTyping && sendChatMessage(aiQuery)
                   }
-                  className="w-full px-4 py-3 pr-12 rounded-xl text-sm outline-none bg-muted border border-border text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+                  disabled={isTyping}
+                  className="w-full px-4 py-3 pr-12 rounded-xl text-sm outline-none bg-muted border border-border text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary transition-all disabled:opacity-50"
                 />
                 <button
-                  onClick={() => aiQuery && generateAISummary(aiQuery)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg bg-primary text-primary-foreground hover:brightness-110 transition-all"
+                  onClick={() => aiQuery && sendChatMessage(aiQuery)}
+                  disabled={isTyping || !aiQuery}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg bg-primary text-primary-foreground hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
             </div>
-
-            {/* Loading */}
-            {aiLoading && (
-              <div className="flex items-center justify-center py-12">
-                <div className="w-8 h-8 border-2 rounded-full border-border border-t-primary animate-spin" />
-              </div>
-            )}
-
-            {/* Response */}
-            {aiResponse && !aiLoading && (
-              <div className="space-y-4 animate-fade-in">
-                {/* Summary */}
-                <div className="p-4 rounded-xl bg-primary/10 border border-primary/20">
-                  <p className="text-sm leading-relaxed text-foreground">
-                    {aiResponse.summary}
-                  </p>
-                </div>
-
-                {/* Insights */}
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-                    Key Insights
-                  </p>
-                  <div className="space-y-2">
-                    {aiResponse.insights.map((insight, i) => (
-                      <div
-                        key={i}
-                        className="flex gap-2 text-sm text-muted-foreground"
-                      >
-                        <span className="text-primary shrink-0">
-                          &#8226;
-                        </span>
-                        <span>{insight}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Top Deal */}
-                {aiResponse.topDeal && (
-                  <div className="p-4 rounded-xl bg-muted">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-                      Top NOI Performer
-                    </p>
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center shrink-0">
-                        <Building2 className="w-5 h-5 text-primary" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="font-semibold text-foreground truncate">
-                          {aiResponse.topDeal.name}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {aiResponse.topDeal.submarket || aiResponse.topDeal.address || '\u2014'}
-                        </p>
-                      </div>
-                      <div className="ml-auto text-right shrink-0">
-                        <p className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                          {formatPrice(aiResponse.topDeal.noiT12)}
-                        </p>
-                        <p className="text-xs text-muted-foreground">T12 NOI</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Recommendation */}
-                <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-2">
-                    Recommendation
-                  </p>
-                  <p className="text-sm text-foreground">
-                    {aiResponse.recommendation}
-                  </p>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </div>
