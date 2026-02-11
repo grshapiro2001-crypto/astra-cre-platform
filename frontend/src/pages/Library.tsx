@@ -571,11 +571,9 @@ export const Library = () => {
                   >
                     {/* Top gradient area */}
                     <div className="relative h-32 bg-gradient-to-br from-primary/20 via-primary/10 to-accent/20 dark:from-primary/10 dark:via-primary/5 dark:to-accent/10 overflow-hidden">
-                      {/* Decorative pattern */}
-                      <div className="absolute inset-0 opacity-[0.04] dark:opacity-[0.06]">
-                        <div className="absolute top-4 right-4 w-24 h-24 border border-current rounded-full" />
-                        <div className="absolute top-8 right-8 w-16 h-16 border border-current rounded-full" />
-                        <div className="absolute -bottom-4 -left-4 w-20 h-20 border border-current rounded-full" />
+                      {/* Property type icon */}
+                      <div className="absolute inset-0 flex items-center justify-center opacity-[0.08] dark:opacity-[0.12]">
+                        <Building2 className="w-20 h-20 text-primary" />
                       </div>
 
                       {/* Checkbox */}
@@ -651,6 +649,7 @@ export const Library = () => {
                     >
                       {/* Title */}
                       <h3
+                        title={displayName}
                         className={cn(
                           'font-display text-lg font-bold tracking-tight transition-colors duration-200 line-clamp-1',
                           isHovered
@@ -669,6 +668,7 @@ export const Library = () => {
                           <span className="truncate">
                             {[property.submarket, property.property_address]
                               .filter(Boolean)
+                              .filter((v, i, arr) => arr.indexOf(v) === i)
                               .join(' \u00b7 ')}
                           </span>
                         </p>
@@ -788,7 +788,7 @@ export const Library = () => {
               className="grid items-center px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground bg-muted/50 border-b border-border"
               style={{
                 gridTemplateColumns:
-                  '40px 2fr 1.2fr 90px 100px 100px 70px 90px 110px',
+                  '40px 2fr 1.2fr 90px 100px 100px 70px 90px 120px',
               }}
             >
               <div />
@@ -824,7 +824,7 @@ export const Library = () => {
                   )}
                   style={{
                     gridTemplateColumns:
-                      '40px 2fr 1.2fr 90px 100px 100px 70px 90px 110px',
+                      '40px 2fr 1.2fr 90px 100px 100px 70px 90px 120px',
                   }}
                   onMouseEnter={() => setHoveredDealId(property.id)}
                   onMouseLeave={() => setHoveredDealId(null)}
@@ -858,6 +858,7 @@ export const Library = () => {
                     </div>
                     <div className="min-w-0">
                       <p
+                        title={displayName}
                         className={cn(
                           'font-semibold text-sm truncate transition-colors duration-200',
                           isHovered
@@ -879,9 +880,11 @@ export const Library = () => {
                     <p className="text-sm text-foreground truncate">
                       {property.property_address || '\u2014'}
                     </p>
-                    <p className="text-[11px] text-muted-foreground truncate">
-                      {property.submarket || ''}
-                    </p>
+                    {property.submarket && property.submarket !== property.property_address && (
+                      <p className="text-[11px] text-muted-foreground truncate">
+                        {property.submarket}
+                      </p>
+                    )}
                   </div>
 
                   {/* Units */}

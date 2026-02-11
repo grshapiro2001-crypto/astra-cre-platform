@@ -179,6 +179,7 @@ class PropertyListItem(BaseModel):
     y1_noi: Optional[float]
     t12_noi: Optional[float]
     document_type: Optional[str]
+    total_units: Optional[int] = None
     deal_folder_id: Optional[int] = None  # Phase 3A
     document_subtype: Optional[str] = None  # Phase 3A
 

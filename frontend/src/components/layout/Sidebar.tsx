@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -16,6 +17,7 @@ import { useUIStore } from '@/store/uiStore';
 import { useAuthStore } from '@/store/authSlice';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { propertyService } from '@/services/propertyService';
 
 const navItems = [
   { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
@@ -29,6 +31,13 @@ const navItems = [
 export const Sidebar = () => {
   const { theme, toggleTheme, sidebarCollapsed, toggleSidebar } = useUIStore();
   const user = useAuthStore((s) => s.user);
+  const [dealCount, setDealCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    propertyService.listProperties({}).then((res) => {
+      setDealCount(res.total);
+    }).catch(() => {});
+  }, []);
 
   const initials = user?.full_name
     ? user.full_name
@@ -111,19 +120,15 @@ export const Sidebar = () => {
         })}
       </nav>
 
-      {/* Pipeline Stats (mock) */}
+      {/* Pipeline Stats */}
       {!sidebarCollapsed && (
         <div className="px-4 py-3 mx-3 mb-3 rounded-xl bg-white/5 border border-white/5">
           <div className="text-[10px] font-medium uppercase tracking-widest text-purple-300/50 mb-2">
             Pipeline
           </div>
           <div className="flex justify-between items-baseline">
-            <div>
-              <span className="text-white text-lg font-bold font-mono">$24.5M</span>
-              <p className="text-purple-300/50 text-[10px] mt-0.5">Total Value</p>
-            </div>
             <div className="text-right">
-              <span className="text-white text-lg font-bold font-mono">12</span>
+              <span className="text-white text-lg font-bold font-mono">{dealCount ?? '\u2014'}</span>
               <p className="text-purple-300/50 text-[10px] mt-0.5">Active Deals</p>
             </div>
           </div>

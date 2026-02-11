@@ -117,9 +117,9 @@ function MetricRow({
     <div className="py-2.5">
       <div className="flex items-center justify-between mb-1.5">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="text-sm text-foreground font-medium truncate">{label}</span>
+          <span className="text-sm text-foreground font-medium">{label}</span>
           {metric.context && (
-            <span className="hidden sm:inline text-[10px] text-muted-foreground truncate max-w-[200px]">
+            <span className="hidden sm:inline text-[10px] text-muted-foreground break-words">
               {metric.context}
             </span>
           )}
@@ -367,7 +367,7 @@ export function DealScoreModal({
                             {Math.round(layerData.score)}
                           </span>
                         ) : (
-                          <span className="font-mono text-lg text-muted-foreground">&mdash;</span>
+                          <span className="font-mono text-sm text-muted-foreground">N/A</span>
                         )}
                       </div>
                     </div>
@@ -388,7 +388,7 @@ export function DealScoreModal({
                       <div className="py-3 text-sm text-muted-foreground flex items-center gap-2">
                         <Info className="w-4 h-4" />
                         {layer.key === 'market_intelligence'
-                          ? 'Market intelligence not yet analyzed (Phase 4)'
+                          ? 'Market intelligence not yet configured'
                           : 'No data available for this layer'}
                       </div>
                     )}
