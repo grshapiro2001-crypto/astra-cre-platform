@@ -63,6 +63,7 @@ export const propertyService = {
       property_address: extractionResult.extraction_result.property_info.property_address,
       property_type: extractionResult.extraction_result.property_info.property_type,
       submarket: extractionResult.extraction_result.property_info.submarket,
+      metro: extractionResult.extraction_result.property_info.metro,
       year_built: extractionResult.extraction_result.property_info.year_built,
       total_units: extractionResult.extraction_result.property_info.total_units,
       total_residential_sf: extractionResult.extraction_result.property_info.total_sf,
@@ -71,7 +72,16 @@ export const propertyService = {
       t12_financials: extractionResult.extraction_result.financials_by_period.t12,
       t3_financials: extractionResult.extraction_result.financials_by_period.t3,
       y1_financials: extractionResult.extraction_result.financials_by_period.y1,
+      // Renovation assumptions
+      renovation_cost_per_unit: extractionResult.extraction_result.renovation?.renovation_cost_per_unit,
+      renovation_total_cost: extractionResult.extraction_result.renovation?.renovation_total_cost,
+      renovation_rent_premium: extractionResult.extraction_result.renovation?.renovation_rent_premium,
+      renovation_roi_pct: extractionResult.extraction_result.renovation?.renovation_roi_pct,
+      renovation_duration_years: extractionResult.extraction_result.renovation?.renovation_duration_years,
+      renovation_stabilized_revenue: extractionResult.extraction_result.renovation?.renovation_stabilized_revenue,
       bov_pricing_tiers: extractionResult.extraction_result.bov_pricing_tiers,  // Phase 3A - BOV pricing tiers
+      unit_mix: extractionResult.extraction_result.unit_mix,
+      rent_comps: extractionResult.extraction_result.rent_comps,
       raw_pdf_path: pdfPath,
       analysis_model: 'claude-sonnet-4-5-20250929',
     });

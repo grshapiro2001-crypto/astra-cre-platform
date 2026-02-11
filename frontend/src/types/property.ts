@@ -47,6 +47,7 @@ export interface PropertyInfo {
   property_address?: string | null;
   property_type?: string | null;
   submarket?: string | null;
+  metro?: string | null;
   year_built?: number | null;
   total_units?: number | null;
   total_sf?: number | null;
@@ -145,6 +146,16 @@ export interface ExtractionResult {
     y1?: CalculatedMetrics;
   };
   bov_pricing_tiers?: BOVPricingTier[];  // Phase 3A: BOV pricing tiers
+  unit_mix?: Array<Omit<UnitMixItem, 'id'>>;
+  rent_comps?: Array<Omit<RentCompItem, 'id'>>;
+  renovation?: {
+    renovation_cost_per_unit?: number | null;
+    renovation_total_cost?: number | null;
+    renovation_rent_premium?: number | null;
+    renovation_roi_pct?: number | null;
+    renovation_duration_years?: number | null;
+    renovation_stabilized_revenue?: number | null;
+  };
   source_notes?: SourceNotes;
   missing_fields: string[];
 }

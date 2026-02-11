@@ -246,7 +246,7 @@ export const PropertyDetail = () => {
 
   // --- UI state ---
   const [financialPeriod, setFinancialPeriod] =
-    useState<FinancialPeriodKey>('t12');
+    useState<FinancialPeriodKey>('y1');
   const [financialView, setFinancialView] =
     useState<FinancialViewMode>('total');
   const [selectedTierIdx, setSelectedTierIdx] = useState(0);
@@ -370,9 +370,10 @@ export const PropertyDetail = () => {
   const availablePeriods = useMemo((): FinancialPeriodKey[] => {
     if (!property) return [];
     const out: FinancialPeriodKey[] = [];
-    if (property.t3_financials) out.push('t3');
-    if (property.t12_financials) out.push('t12');
+    // Order: Y1 Pro Forma first (default), then T12, then T3
     if (property.y1_financials) out.push('y1');
+    if (property.t12_financials) out.push('t12');
+    if (property.t3_financials) out.push('t3');
     return out;
   }, [property]);
 
@@ -809,7 +810,7 @@ export const PropertyDetail = () => {
                 >
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">
-                      Economic Occupancy ({financialPeriod.toUpperCase()})
+                      Economic Occupancy ({periodLabel(financialPeriod)})
                     </p>
                     <p className="text-xs mt-0.5 text-muted-foreground">
                       GSR minus Vacancy, Concessions, Bad Debt, Non-Revenue
@@ -1206,7 +1207,7 @@ export const PropertyDetail = () => {
                       className={cn(
                         'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
                         financialPeriod === p
-                          ? 'bg-accent text-primary'
+                          ? 'bg-violet-600 text-white shadow-sm'
                           : 'text-muted-foreground hover:text-foreground',
                       )}
                     >
