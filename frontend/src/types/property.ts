@@ -223,6 +223,11 @@ export interface PropertyListItem {
   upload_date?: string;
   screening_verdict?: string | null;
   screening_score?: number | null;
+  pipeline_stage?: string;
+  pipeline_notes?: string | null;
+  t12_noi?: number | null;
+  y1_noi?: number | null;
+  t3_noi?: number | null;
 }
 
 /** Investment criteria for deal screening */

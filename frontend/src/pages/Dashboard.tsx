@@ -14,7 +14,6 @@
  */
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { toast } from 'sonner';
 import {
   Sparkles,
   Plus,
@@ -41,6 +40,7 @@ import { dealFolderService, type DealFolder } from '@/services/dealFolderService
 import { criteriaService } from '@/services/criteriaService';
 import type { PropertyListItem, ScreeningSummaryItem } from '@/types/property';
 import { Shield, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
+import { KanbanBoard } from '@/components/dashboard/KanbanBoard';
 
 // ============================================================
 // TYPES
@@ -280,7 +280,6 @@ export const Dashboard = () => {
   const [aiLoading, setAiLoading] = useState(false);
   const [showMetricsEditor, setShowMetricsEditor] = useState(false);
   const [showStageEditor, setShowStageEditor] = useState(false);
-  const [draggedDeal, setDraggedDeal] = useState<number | null>(null);
 
   // Widget visibility
   const [widgets] = useState<Widget[]>([
@@ -503,11 +502,61 @@ export const Dashboard = () => {
     setShowStageEditor(false);
   };
 
-  const moveDeal = (_dealId: number, _newStage: string) => {
-    toast.info('Coming soon', {
-      description: 'Deal stage updates will be persisted in a future update.'
-    });
-    setDraggedDeal(null);
+  const handleStageChange = async (propertyId: number, newStage: string) => {
+    try {
+      // Optimistically update the UI
+      setProperties((prev) =>
+        prev.map((p) =>
+          p.id === propertyId ? { ...p, pipeline_stage: newStage } : p
+        )
+      );
+
+      // Call the API
+      const response = await fetch(`/api/v1/properties/${propertyId}/stage?stage=${newStage}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update stage');
+      }
+
+      // Refresh data to ensure consistency
+      await fetchData();
+    } catch (error) {
+      // Revert on error
+      await fetchData();
+      throw error;
+    }
+  };
+
+  const handleNotesUpdate = async (propertyId: number, notes: string) => {
+    try {
+      // Optimistically update the UI
+      setProperties((prev) =>
+        prev.map((p) =>
+          p.id === propertyId ? { ...p, pipeline_notes: notes } : p
+        )
+      );
+
+      // Call the API
+      const response = await fetch(`/api/v1/properties/${propertyId}/notes?notes=${encodeURIComponent(notes)}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update notes');
+      }
+    } catch (error) {
+      // Revert on error
+      await fetchData();
+      throw error;
+    }
   };
 
   const generateAISummary = useCallback(
@@ -792,122 +841,14 @@ export const Dashboard = () => {
               <h2 className="font-display text-lg font-bold text-foreground">
                 Pipeline Board
               </h2>
-              <button
-                onClick={() => setShowStageEditor(true)}
-                className="text-xs font-medium flex items-center gap-1 text-primary hover:text-primary/80 transition-colors"
-              >
-                <Pencil className="w-3.5 h-3.5" />
-                Edit Stages
-              </button>
             </div>
 
-            <div
-              className="flex gap-4 overflow-x-auto pb-4"
-              style={{ minHeight: 400 }}
-            >
-              {stages.map((stage, stageIndex) => {
-                const stageDeals = filteredDeals.filter(
-                  (d) => d.stage === stage.id,
-                );
-                const stageNOI = stageDeals.reduce(
-                  (sum, d) => sum + (d.noiT12 || 0),
-                  0,
-                );
-
-                return (
-                  <div
-                    key={stage.id}
-                    className={cn(
-                      'flex-shrink-0 w-72 border border-border rounded-2xl bg-card overflow-hidden transition-all duration-500',
-                      mounted
-                        ? 'opacity-100 translate-x-0'
-                        : 'opacity-0 translate-x-5',
-                    )}
-                    style={{
-                      transitionDelay: `${300 + stageIndex * 100}ms`,
-                    }}
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={() =>
-                      draggedDeal !== null && moveDeal(draggedDeal, stage.id)
-                    }
-                  >
-                    {/* Stage Header */}
-                    <div
-                      className="px-4 py-3 flex items-center justify-between"
-                      style={{ borderBottom: `2px solid ${stage.color}` }}
-                    >
-                      <div className="flex items-center gap-2">
-                        <div
-                          className="w-3 h-3 rounded-full"
-                          style={{ backgroundColor: stage.color }}
-                        />
-                        <span className="font-semibold text-sm text-foreground">
-                          {stage.label}
-                        </span>
-                        <span className="text-xs px-1.5 py-0.5 rounded-full font-mono bg-muted text-muted-foreground">
-                          {stageDeals.length}
-                        </span>
-                      </div>
-                      <span className="text-xs font-mono text-muted-foreground">
-                        {formatPrice(stageNOI)}
-                      </span>
-                    </div>
-
-                    {/* Stage Cards */}
-                    <div className="p-3 space-y-3 min-h-[300px]">
-                      {stageDeals.map((deal) => (
-                        <div
-                          key={deal.id}
-                          draggable
-                          onDragStart={() => setDraggedDeal(deal.id)}
-                          onDragEnd={() => setDraggedDeal(null)}
-                          onClick={() => navigate(`/library/${deal.id}`)}
-                          className={cn(
-                            'rounded-xl p-3 cursor-grab active:cursor-grabbing transition-all duration-200 hover:scale-[1.02] hover:shadow-md border border-border bg-muted',
-                            draggedDeal === deal.id && 'opacity-50',
-                          )}
-                        >
-                          <div className="flex items-start justify-between mb-2">
-                            <div className="min-w-0">
-                              <p className="font-semibold text-sm text-foreground truncate">
-                                {deal.name}
-                              </p>
-                              <p className="text-xs text-muted-foreground truncate">
-                                {deal.submarket || deal.address || '\u2014'}
-                              </p>
-                            </div>
-                            {deal.documentType && (
-                              <span className="text-[10px] font-mono font-bold px-2 py-1 rounded-lg bg-primary/10 text-primary shrink-0 ml-2">
-                                {deal.documentType}
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="text-muted-foreground">
-                              {deal.units > 0 ? `${deal.units} units` : '\u2014'}
-                            </span>
-                            <span className={cn(
-                              "font-mono font-semibold",
-                              (deal.noiT12 || deal.noiY1) ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"
-                            )}>
-                              {deal.noiT12 ? formatPrice(deal.noiT12) : deal.noiY1 ? formatPrice(deal.noiY1) : 'No Pricing'}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-
-                      {stageDeals.length === 0 && (
-                        <div className="h-32 rounded-xl border-2 border-dashed border-border flex items-center justify-center">
-                          <span className="text-xs text-muted-foreground">
-                            Drop deals here
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            <KanbanBoard
+              properties={properties as PropertyListItem[]}
+              onStageChange={handleStageChange}
+              onNotesUpdate={handleNotesUpdate}
+              mounted={mounted}
+            />
           </section>
         )}
 
