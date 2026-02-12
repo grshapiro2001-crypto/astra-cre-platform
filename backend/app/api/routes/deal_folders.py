@@ -20,6 +20,7 @@ from app.api.deps import get_current_user
 router = APIRouter(prefix="/deal-folders", tags=["Deal Folders"])
 
 
+@router.post("", response_model=DealFolderResponse, status_code=status.HTTP_201_CREATED)
 @router.post("/", response_model=DealFolderResponse, status_code=status.HTTP_201_CREATED)
 def create_deal_folder(
     folder_data: DealFolderCreate,
@@ -31,6 +32,7 @@ def create_deal_folder(
     NO LLM - Pure database insert
 
     If folder with same name exists, automatically appends (2), (3), etc.
+    Handles both /deal-folders and /deal-folders/ to prevent trailing slash issues
     """
     # Check if folder with same name already exists for this user
     base_name = folder_data.folder_name
@@ -78,6 +80,7 @@ def create_deal_folder(
     return new_folder
 
 
+@router.get("", response_model=List[DealFolderResponse])
 @router.get("/", response_model=List[DealFolderResponse])
 def list_deal_folders(
     status_filter: str = None,  # 'active', 'archived'
@@ -87,6 +90,8 @@ def list_deal_folders(
     """
     List all deal folders for current user
     NO LLM - Pure database query
+
+    Handles both /deal-folders and /deal-folders/ to prevent trailing slash issues
     """
     query = db.query(DealFolder).filter(DealFolder.user_id == current_user.id)
 
