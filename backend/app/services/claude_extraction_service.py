@@ -853,65 +853,21 @@ PDF TEXT:
 {pdf_text}
 """
 
-def parse_json_response(response_text: str) -> Dict[str, Any]:
-    """
-    Parse JSON from Claude's response, handling markdown code blocks and extra text.
+def parse_json_response(response_text: str) -> dict:
+    """Parse JSON from Claude API response, handling markdown fences."""
+    text = response_text.strip()
 
-    Args:
-        response_text: Raw text response from Claude API
+    # Strip markdown fences if present
+    if text.startswith("```"):
+        # Remove opening fence (```json or ```)
+        first_newline = text.index("\n")
+        text = text[first_newline + 1:]
+        # Remove closing fence
+        if text.rstrip().endswith("```"):
+            text = text.rstrip()
+            text = text[:-3].rstrip()
 
-    Returns:
-        Parsed JSON as dictionary
-
-    Raises:
-        json.JSONDecodeError: If no valid JSON found
-    """
-    # Strip markdown code fences if present
-    # Handle format: ```json\n{...}\n```
-    cleaned_text = response_text.strip()
-
-    # Remove opening fence (```json or ```)
-    if cleaned_text.startswith('```json'):
-        cleaned_text = cleaned_text[7:]  # Remove '```json'
-    elif cleaned_text.startswith('```'):
-        cleaned_text = cleaned_text[3:]  # Remove '```'
-
-    # Remove closing fence (```)
-    if cleaned_text.endswith('```'):
-        cleaned_text = cleaned_text[:-3]  # Remove '```'
-
-    # Strip any remaining whitespace
-    cleaned_text = cleaned_text.strip()
-
-    # First, try to parse the cleaned text
-    try:
-        return json.loads(cleaned_text)
-    except json.JSONDecodeError:
-        pass
-
-    # Try to find JSON object by looking for balanced braces
-    # Start from first { and try to find matching }
-    start_idx = cleaned_text.find('{')
-    if start_idx != -1:
-        brace_count = 0
-        for i in range(start_idx, len(cleaned_text)):
-            if cleaned_text[i] == '{':
-                brace_count += 1
-            elif cleaned_text[i] == '}':
-                brace_count -= 1
-                if brace_count == 0:
-                    # Found matching closing brace
-                    try:
-                        return json.loads(cleaned_text[start_idx:i+1])
-                    except json.JSONDecodeError:
-                        break
-
-    # If all else fails, raise error with the response for debugging
-    raise json.JSONDecodeError(
-        f"Could not find valid JSON in response. Response text: {response_text[:500]}...",
-        response_text,
-        0
-    )
+    return json.loads(text)
 
 async def extract_with_claude(
     pdf_text: str,
@@ -972,7 +928,7 @@ async def extract_with_claude(
         # Call Claude API with specialized prompt
         message = client.messages.create(
             model="claude-sonnet-4-5-20250929",
-            max_tokens=4096,
+            max_tokens=16384,
             messages=[{
                 "role": "user",
                 "content": extraction_prompt
