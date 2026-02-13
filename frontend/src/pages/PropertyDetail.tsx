@@ -27,6 +27,7 @@ import {
 import { cn } from '@/lib/utils';
 import { propertyService } from '@/services/propertyService';
 import { scoringService } from '@/services/scoringService';
+import { fmtPercent, fmtCapRate, normalizePercent } from '@/utils/formatUtils';
 import type { DealScoreResult } from '@/services/scoringService';
 import { DealScoreBadge } from '@/components/scoring/DealScoreBadge';
 import { DealScoreModal } from '@/components/scoring/DealScoreModal';
@@ -297,7 +298,7 @@ export const PropertyDetail = () => {
         if (data.bov_pricing_tiers?.length) {
           const firstCap =
             data.bov_pricing_tiers[0].cap_rates?.[0]?.cap_rate_value;
-          if (firstCap) setCapRateSlider(firstCap);
+          if (firstCap) setCapRateSlider(normalizePercent(firstCap));
         }
       } catch (err: unknown) {
         const e = err as { response?: { data?: { detail?: string } } };
@@ -955,12 +956,10 @@ export const PropertyDetail = () => {
                       {selectedTier.cap_rates.map((cr, idx) => (
                         <div key={idx} className="p-3 rounded-xl bg-accent">
                           <p className="text-xs text-muted-foreground">
-                            {cr.cap_rate_type}
+                            {cr.cap_rate_type === 'Unknown' ? 'Cap Rate' : cr.cap_rate_type}
                           </p>
                           <p className="font-mono text-lg font-semibold text-primary">
-                            {cr.cap_rate_value != null
-                              ? `${cr.cap_rate_value}%`
-                              : '---'}
+                            {fmtCapRate(cr.cap_rate_value)}
                           </p>
                         </div>
                       ))}
@@ -994,7 +993,7 @@ export const PropertyDetail = () => {
                             Cash-on-Cash
                           </p>
                           <p className="font-mono text-lg font-semibold text-foreground">
-                            {selectedTier.return_metrics.avg_cash_on_cash}%
+                            {fmtPercent(selectedTier.return_metrics.avg_cash_on_cash)}
                           </p>
                         </div>
                       )}
@@ -1005,7 +1004,7 @@ export const PropertyDetail = () => {
                             Levered IRR
                           </p>
                           <p className="font-mono text-lg font-semibold text-primary">
-                            {selectedTier.return_metrics.levered_irr}%
+                            {fmtPercent(selectedTier.return_metrics.levered_irr)}
                           </p>
                         </div>
                       )}
@@ -1016,7 +1015,7 @@ export const PropertyDetail = () => {
                             Unlevered IRR
                           </p>
                           <p className="font-mono text-lg font-semibold text-foreground">
-                            {selectedTier.return_metrics.unlevered_irr}%
+                            {fmtPercent(selectedTier.return_metrics.unlevered_irr)}
                           </p>
                         </div>
                       )}
@@ -1070,29 +1069,38 @@ export const PropertyDetail = () => {
                       <p className="text-xs mb-1 text-muted-foreground">
                         Implied Price at {capRateSlider.toFixed(2)}% Cap
                       </p>
-                      <p className="font-mono text-2xl font-bold text-foreground">
-                        {fmtCurrency(derivedPrice, true)}
-                      </p>
-                      {selectedTier.pricing != null && derivedPrice > 0 && (
-                        <p className="text-sm mt-2">
-                          {derivedPrice > selectedTier.pricing ? (
-                            <span className="text-emerald-600 dark:text-emerald-400">
-                              +
-                              {fmtCurrency(
-                                derivedPrice - selectedTier.pricing,
-                                true,
-                              )}{' '}
-                              above {selectedTier.tier_label || 'asking'}
-                            </span>
-                          ) : (
-                            <span className="text-rose-600 dark:text-rose-400">
-                              {fmtCurrency(
-                                derivedPrice - selectedTier.pricing,
-                                true,
-                              )}{' '}
-                              below {selectedTier.tier_label || 'asking'}
-                            </span>
+                      {derivedPrice > 0 ? (
+                        <>
+                          <p className="font-mono text-2xl font-bold text-foreground">
+                            {fmtCurrency(derivedPrice, true)}
+                          </p>
+                          {selectedTier.pricing != null && (
+                            <p className="text-sm mt-2">
+                              {derivedPrice > selectedTier.pricing ? (
+                                <span className="text-emerald-600 dark:text-emerald-400">
+                                  +
+                                  {fmtCurrency(
+                                    derivedPrice - selectedTier.pricing,
+                                    true,
+                                  )}{' '}
+                                  above {selectedTier.tier_label || 'asking'}
+                                </span>
+                              ) : (
+                                <span className="text-rose-600 dark:text-rose-400">
+                                  {fmtCurrency(
+                                    derivedPrice - selectedTier.pricing,
+                                    true,
+                                  )}{' '}
+                                  below {selectedTier.tier_label || 'asking'}
+                                </span>
+                              )}
+                            </p>
                           )}
+                        </>
+                      ) : (
+                        <p className="text-sm text-muted-foreground mt-1">
+                          N/A — NOI is negative for this period.
+                          Try switching to Y1 Pro Forma.
                         </p>
                       )}
                     </div>
@@ -1486,7 +1494,7 @@ export const PropertyDetail = () => {
                           <p>
                             LTV:{' '}
                             <span className="font-mono font-semibold text-foreground">
-                              {selectedTier.loan_assumptions.leverage}%
+                              {fmtPercent(selectedTier.loan_assumptions.leverage)}
                             </span>
                           </p>
                         )}
@@ -1507,7 +1515,7 @@ export const PropertyDetail = () => {
                           <p>
                             Rate:{' '}
                             <span className="font-mono font-semibold text-foreground">
-                              {selectedTier.loan_assumptions.interest_rate}%
+                              {fmtPercent(selectedTier.loan_assumptions.interest_rate)}
                             </span>
                           </p>
                         )}
@@ -1553,8 +1561,7 @@ export const PropertyDetail = () => {
                           <p>
                             Terminal Cap:{' '}
                             <span className="font-mono font-semibold text-foreground">
-                              {selectedTier.terminal_assumptions.terminal_cap_rate}
-                              %
+                              {fmtCapRate(selectedTier.terminal_assumptions.terminal_cap_rate)}
                             </span>
                           </p>
                         )}
@@ -1680,7 +1687,7 @@ export const PropertyDetail = () => {
                 {property.renovation_roi_pct != null && (
                   <div className="p-3 rounded-xl bg-accent">
                     <p className="text-xs text-muted-foreground">Return on Cost</p>
-                    <p className="font-mono text-lg font-semibold text-primary">{property.renovation_roi_pct.toFixed(1)}%</p>
+                    <p className="font-mono text-lg font-semibold text-primary">{fmtPercent(property.renovation_roi_pct, 1)}</p>
                   </div>
                 )}
                 {property.renovation_duration_years != null && (

@@ -375,7 +375,7 @@
 <!-- ═══════════════════════════════════════ HEADER ═══════ -->
 <div class="page-header">
   <h1>Astra CRE Platform — Ecosystem Map</h1>
-  <div class="sub">Full architecture, component inventory, and roadmap &nbsp;·&nbsp; Generated Feb 8 2026</div>
+  <div class="sub">Full architecture, component inventory, and roadmap &nbsp;·&nbsp; Updated Feb 12 2026</div>
 </div>
 
 <div class="legend">
@@ -386,12 +386,12 @@
 
 <!-- ═══════════════════════════════════════ STATS BAR ════ -->
 <div class="stats-bar">
-  <div class="stat"><div class="stat-val">9</div><div class="stat-label">Pages</div></div>
-  <div class="stat"><div class="stat-val">18</div><div class="stat-label">API Routes</div></div>
-  <div class="stat"><div class="stat-val">6</div><div class="stat-label">DB Models</div></div>
-  <div class="stat"><div class="stat-val">5</div><div class="stat-label">Services</div></div>
-  <div class="stat"><div class="stat-val">13</div><div class="stat-label">Commits (2 days)</div></div>
-  <div class="stat"><div class="stat-val">2</div><div class="stat-label">Uncommitted Files</div></div>
+  <div class="stat"><div class="stat-val">10</div><div class="stat-label">Pages</div></div>
+  <div class="stat"><div class="stat-val">21</div><div class="stat-label">API Routes</div></div>
+  <div class="stat"><div class="stat-val">9</div><div class="stat-label">DB Models</div></div>
+  <div class="stat"><div class="stat-val">8</div><div class="stat-label">Services</div></div>
+  <div class="stat"><div class="stat-val">21+</div><div class="stat-label">Merged PRs</div></div>
+  <div class="stat"><div class="stat-val">39</div><div class="stat-label">Uncommitted Files</div></div>
 </div>
 
 <div class="canvas">
@@ -443,7 +443,7 @@
 
     <div class="card hero infra">
       <div class="card-title"><span class="status live"></span> AI / External</div>
-      <div class="card-desc">Anthropic Claude API for PDF extraction. pdfplumber for text parsing. Bcrypt + JWT for auth tokens</div>
+      <div class="card-desc">Anthropic Claude API for PDF extraction (120s timeout). pdfplumber for text parsing. Bcrypt + JWT for auth tokens</div>
       <div class="tech">
         <span class="tag">Claude Sonnet 4.5</span>
         <span class="tag">pdfplumber</span>
@@ -482,8 +482,8 @@
 
       <div class="card">
         <div class="card-title"><span class="status live"></span> Property Detail</div>
-        <div class="card-desc">Full property analysis — T12/T3/Y1 financials, BOV pricing tiers, cap rate sensitivity, AI re-analysis.</div>
-        <div class="chip-list"><span class="chip">PropertyDetail.tsx</span><span class="chip green">Multi-period</span><span class="chip pink">BOV Tiers</span></div>
+        <div class="card-desc">Full property analysis — T12/T3/Y1 financials, BOV pricing tiers, cap rate sensitivity slider, quick underwriting model (IRR, CoC, equity multiple, year-by-year projections), AI re-analysis. Smart decimal/percent normalization via formatUtils.</div>
+        <div class="chip-list"><span class="chip">PropertyDetail.tsx</span><span class="chip green">Multi-period</span><span class="chip pink">BOV Tiers</span><span class="chip cyan">Underwriting</span></div>
       </div>
 
       <div class="card">
@@ -494,14 +494,20 @@
 
       <div class="card">
         <div class="card-title"><span class="status live"></span> Upload</div>
-        <div class="card-desc">Premium drag-and-drop PDF upload → Claude extraction → auto-save → navigate to property detail. No preview step.</div>
-        <div class="chip-list"><span class="chip">Upload.tsx</span><span class="chip">PDFUploader.tsx</span><span class="chip orange">LLM Call</span></div>
+        <div class="card-desc">Premium drag-and-drop PDF upload → Claude extraction → auto-save → navigate to property detail. Hardened error handling with Pydantic validation coercion, ErrorBoundary, global crash recovery.</div>
+        <div class="chip-list"><span class="chip">Upload.tsx</span><span class="chip">PDFUploader.tsx</span><span class="chip orange">LLM Call</span><span class="chip green">Crash-proof</span></div>
       </div>
 
       <div class="card">
         <div class="card-title"><span class="status live"></span> Folder Detail</div>
         <div class="card-desc">Properties within a specific deal folder, with folder metadata and navigation.</div>
         <div class="chip-list"><span class="chip">FolderDetail.tsx</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><span class="status live"></span> Data Bank</div>
+        <div class="card-desc">Centralized data library — sales comps, pipeline projects, submarket inventory. Tabular views with search, sort, and smart cap rate formatting.</div>
+        <div class="chip-list"><span class="chip">DataBankPage.tsx</span><span class="chip green">Data Hub</span><span class="chip blue">3 Tabs</span></div>
       </div>
 
       <div class="row" style="gap:8px;margin-top:8px;margin-bottom:0">
@@ -541,8 +547,11 @@
           <tr><td class="method">GET</td><td class="path">/</td><td class="purpose">List + filter + search</td></tr>
           <tr><td class="method">GET</td><td class="path">/{id}</td><td class="purpose">Full detail</td></tr>
           <tr><td class="method patch">PATCH</td><td class="path">/{id}/folder</td><td class="purpose">Move to folder</td></tr>
+          <tr><td class="method patch">PATCH</td><td class="path">/{id}/stage</td><td class="purpose">Kanban stage update</td></tr>
+          <tr><td class="method patch">PATCH</td><td class="path">/{id}/notes</td><td class="purpose">Pipeline notes</td></tr>
           <tr><td class="method delete">DEL</td><td class="path">/{id}</td><td class="purpose">Delete property</td></tr>
           <tr><td class="method post">POST</td><td class="path">/{id}/reanalyze</td><td class="purpose">Re-run Claude ⚡</td></tr>
+          <tr><td class="method">GET</td><td class="path">/{id}/summary-pdf</td><td class="purpose">PDF export</td></tr>
           <tr><td class="method post">POST</td><td class="path">/compare</td><td class="purpose">Compare 2-5 props</td></tr>
         </table>
       </div>
@@ -566,6 +575,29 @@
           <tr><td class="method">GET</td><td class="path">/health</td><td class="purpose">Service health</td></tr>
         </table>
       </div>
+
+      <div class="card">
+        <div class="card-title"><span class="status live"></span> Screening — /api/v1/screening</div>
+        <table class="endpoint-table">
+          <tr><td class="method post">POST</td><td class="path">/evaluate</td><td class="purpose">Auto-screen property</td></tr>
+          <tr><td class="method post">POST</td><td class="path">/criteria</td><td class="purpose">Save investment criteria</td></tr>
+        </table>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><span class="status live"></span> Scoring — /api/v1/scoring</div>
+        <table class="endpoint-table">
+          <tr><td class="method post">POST</td><td class="path">/calculate</td><td class="purpose">Compute deal score</td></tr>
+          <tr><td class="method post">POST</td><td class="path">/templates</td><td class="purpose">Manage scoring rules</td></tr>
+        </table>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><span class="status live"></span> Chat — /api/v1/chat</div>
+        <table class="endpoint-table">
+          <tr><td class="method post">POST</td><td class="path">/</td><td class="purpose">AI Pipeline Analyst ⚡</td></tr>
+        </table>
+      </div>
     </div>
 
   </div>
@@ -584,7 +616,7 @@
 
       <div class="card">
         <div class="card-title"><span class="status live"></span> Claude Extraction Service</div>
-        <div class="card-desc">Core LLM integration — sends PDF text to Claude Sonnet 4.5, extracts doc type (OM/BOV), property info, multi-period financials, BOV pricing tiers, cap rates. Handles truncation at 100k chars.</div>
+        <div class="card-desc">Core LLM integration — sends PDF text to Claude Sonnet 4.5 (120s timeout), extracts doc type (OM/BOV), property info, multi-period financials, BOV pricing tiers, cap rates. Handles truncation at 100k chars.</div>
         <div class="chip-list"><span class="chip orange">LLM ⚡</span><span class="chip">claude_extraction_service.py</span></div>
       </div>
 
@@ -614,6 +646,30 @@
           <div class="card-desc">Aggregate 2-5 properties, identify best values.</div>
         </div>
       </div>
+
+      <div class="card">
+        <div class="card-title"><span class="status live"></span> Screening Service</div>
+        <div class="card-desc">Auto-screens properties against user investment criteria (location, price, cap rate, NOI). Real-time evaluation.</div>
+        <div class="chip-list"><span class="chip green">Auto-qualify</span><span class="chip">screening_service.py</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><span class="status live"></span> Scoring Service</div>
+        <div class="card-desc">Weighted deal scoring — multiple scoring templates, customizable criteria, comparison rankings.</div>
+        <div class="chip-list"><span class="chip blue">Ranking</span><span class="chip">scoring_service.py / scoringService.ts</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><span class="status live"></span> PDF Report Service</div>
+        <div class="card-desc">Generates polished deal summary PDFs with financials, BOV tiers, scoring, comps.</div>
+        <div class="chip-list"><span class="chip orange">PDF Gen</span><span class="chip">pdf_report_service.py</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><span class="status live"></span> Chat / AI Pipeline Analyst</div>
+        <div class="card-desc">Conversational AI interface to deal pipeline — ask questions, get insights, explore scenarios with Claude.</div>
+        <div class="chip-list"><span class="chip orange">LLM ⚡</span><span class="chip">chat.py</span></div>
+      </div>
     </div>
 
     <!-- FRONTEND STORES + SERVICES -->
@@ -634,19 +690,21 @@
 
       <div class="card">
         <div class="card-title"><span class="status live"></span> API Services</div>
-        <div class="card-desc">4 service modules — Axios with JWT interceptor, auto-redirect on 401</div>
+        <div class="card-desc">6 service modules — Axios with JWT interceptor, CustomEvent-based 401 handling (no redirect loops)</div>
         <div class="chip-list">
           <span class="chip">authService.ts</span>
           <span class="chip">propertyService.ts</span>
           <span class="chip">dealFolderService.ts</span>
           <span class="chip">comparisonService.ts</span>
+          <span class="chip">scoringService.ts</span>
+          <span class="chip">dataBankService.ts</span>
         </div>
       </div>
 
       <div class="card">
         <div class="card-title"><span class="status live"></span> Utilities</div>
-        <div class="card-desc">criteriaEvaluation.ts (rank + gradient colors) · csvExport.ts (comparison → CSV)</div>
-        <div class="chip-list"><span class="chip cyan">Scoring</span><span class="chip cyan">Export</span></div>
+        <div class="card-desc">formatUtils.ts (centralised % normalization — decimal vs percentage detection) · criteriaEvaluation.ts (rank + gradient colors) · csvExport.ts (comparison → CSV)</div>
+        <div class="chip-list"><span class="chip cyan">Formatting</span><span class="chip cyan">Scoring</span><span class="chip cyan">Export</span></div>
       </div>
     </div>
 
@@ -680,12 +738,27 @@
 
         <div class="card" style="flex:0.8;min-width:150px">
           <div class="card-title"><span class="status live"></span> BOVCapRate</div>
-          <div class="field-list">pricing_tier_id → Tier<br/>cap_rate_type · value<br/>noi_basis · qualifier</div>
+          <div class="field-list">pricing_tier_id → Tier (default tier_0)<br/>cap_rate_type (default Unknown) · value<br/>noi_basis · qualifier</div>
         </div>
 
         <div class="card" style="flex:0.8;min-width:150px">
           <div class="card-title"><span class="status live"></span> AnalysisLog</div>
           <div class="field-list">property_id · user_id<br/>action · model<br/>status · error_message</div>
+        </div>
+
+        <div class="card" style="flex:1.2;min-width:200px">
+          <div class="card-title"><span class="status live"></span> PropertyUnitMix</div>
+          <div class="field-list">property_id → Property<br/>floorplan_name · unit_type<br/>bedroom_count · bathroom_count<br/>num_units · unit_sf<br/>in_place_rent · proforma_rent<br/>proforma_rent_psf · renovation_premium</div>
+        </div>
+
+        <div class="card" style="flex:1.2;min-width:200px">
+          <div class="card-title"><span class="status live"></span> PropertyRentComp</div>
+          <div class="field-list">property_id → Property<br/>comp_name · location<br/>num_units · avg_unit_sf<br/>in_place_rent · in_place_rent_psf<br/>bedroom_type · is_new_construction</div>
+        </div>
+
+        <div class="card" style="flex:1;min-width:180px">
+          <div class="card-title"><span class="status live"></span> UserInvestmentCriteria</div>
+          <div class="field-list">user_id → User<br/>min_price · max_price<br/>min_units · max_units<br/>min_cap_rate · noi_threshold<br/>location_preferences</div>
         </div>
 
       </div>
@@ -708,9 +781,10 @@
         <span class="chip pink">Header</span>
         <span class="chip pink">PageTransition</span>
         <span class="chip pink">ProtectedRoute</span>
+        <span class="chip pink">ErrorBoundary</span>
         <span class="chip pink">PageSkeleton</span>
       </div>
-      <div class="card-desc" style="margin-top:8px">App shell with collapsible sidebar, breadcrumb header, ambient background orbs, Framer Motion page transitions, skeleton loading states for every page</div>
+      <div class="card-desc" style="margin-top:8px">App shell with collapsible sidebar, breadcrumb header, ambient background orbs, Framer Motion page transitions, skeleton loading states for every page, ErrorBoundary with recovery UI + global crash handlers in main.tsx</div>
     </div>
 
     <div class="section-group">
@@ -727,6 +801,15 @@
         <span class="chip pink">CreateFolderModal</span>
         <span class="chip pink">DeleteFolderModal</span>
         <span class="chip pink">SaveToFolderModal</span>
+        <span class="chip pink">DealScoreBadge</span>
+        <span class="chip pink">DealScoreModal</span>
+        <span class="chip pink">ScreeningBadge</span>
+        <span class="chip pink">ScreeningModal</span>
+        <span class="chip pink">SensitivityAnalysis</span>
+        <span class="chip pink">CompMap</span>
+        <span class="chip pink">DealScoreSettings</span>
+        <span class="chip pink">KanbanBoard</span>
+        <span class="chip pink">OnboardingWizard</span>
       </div>
     </div>
 
@@ -748,8 +831,9 @@
         <span class="chip dim">RadioGroup</span>
         <span class="chip dim">Separator</span>
         <span class="chip dim">Skeleton</span>
+        <span class="chip dim">Sonner Toast</span>
       </div>
-      <div class="card-desc" style="margin-top:8px">Purple design system — Syne headings, Instrument Sans body, custom animations (fade-in, scale-in, shimmer, float), dark mode via CSS variables</div>
+      <div class="card-desc" style="margin-top:8px">Purple design system — Syne headings, Instrument Sans body, custom animations (fade-in, scale-in, shimmer, float), dark mode via CSS variables, Sonner for toast notifications</div>
     </div>
 
   </div>
@@ -767,11 +851,13 @@
       <div class="card-desc" style="line-height:1.7">
         <strong style="color:var(--text)">1.</strong> User drops PDF on Upload page<br/>
         <strong style="color:var(--text)">2.</strong> Frontend → <span style="color:var(--blue)">POST /upload</span> (multipart)<br/>
-        <strong style="color:var(--text)">3.</strong> Backend: pdfplumber extracts text<br/>
+        <strong style="color:var(--text)">3.</strong> Backend: pdfplumber extracts text (120s timeout)<br/>
         <strong style="color:var(--text)">4.</strong> Backend: Claude Sonnet 4.5 analyzes text <span style="color:var(--orange)">⚡ LLM</span><br/>
-        <strong style="color:var(--text)">5.</strong> Returns ExtractionResult → auto-save<br/>
-        <strong style="color:var(--text)">6.</strong> Frontend → <span style="color:var(--blue)">POST /properties</span> (with folder)<br/>
-        <strong style="color:var(--text)">7.</strong> Navigate to PropertyDetail page
+        <strong style="color:var(--text)">5.</strong> Returns ExtractionResult → null guards → auto-save<br/>
+        <strong style="color:var(--text)">6.</strong> Frontend: injects period_label, defaults for Pydantic<br/>
+        <strong style="color:var(--text)">7.</strong> Frontend → <span style="color:var(--blue)">POST /properties</span> (with folder)<br/>
+        <strong style="color:var(--text)">8.</strong> Error coercion (Pydantic objects → strings)<br/>
+        <strong style="color:var(--text)">9.</strong> Auto-screening → Navigate to PropertyDetail
       </div>
     </div>
 
@@ -800,6 +886,30 @@
       </div>
     </div>
 
+    <div class="card" style="flex:1;border-left:3px solid var(--cyan)">
+      <div class="card-title">Deal Scoring &amp; Screening</div>
+      <div class="card-desc" style="line-height:1.7">
+        <strong style="color:var(--text)">1.</strong> Property created / updated<br/>
+        <strong style="color:var(--text)">2.</strong> <span style="color:var(--blue)">POST /screening/evaluate</span> → auto-pass/fail<br/>
+        <strong style="color:var(--text)">3.</strong> Filter & badge invalid deals<br/>
+        <strong style="color:var(--text)">4.</strong> <span style="color:var(--blue)">POST /scoring/calculate</span> → weighted score<br/>
+        <strong style="color:var(--text)">5.</strong> Compare rankings across library<br/>
+        <strong style="color:var(--text)">6.</strong> Library displays score badges per property
+      </div>
+    </div>
+
+    <div class="card" style="flex:1;border-left:3px solid var(--pink)">
+      <div class="card-title">AI Pipeline Analyst Chat</div>
+      <div class="card-desc" style="line-height:1.7">
+        <strong style="color:var(--text)">1.</strong> User opens chat panel on Dashboard<br/>
+        <strong style="color:var(--text)">2.</strong> Contextualizes current deal pipeline<br/>
+        <strong style="color:var(--text)">3.</strong> <span style="color:var(--blue)">POST /api/v1/chat</span> with query <span style="color:var(--orange)">⚡ LLM</span><br/>
+        <strong style="color:var(--text)">4.</strong> Claude analyzes financials, trends, risks<br/>
+        <strong style="color:var(--text)">5.</strong> Streams insights & recommendations<br/>
+        <strong style="color:var(--text)">6.</strong> User asks follow-ups, explores scenarios
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -811,40 +921,47 @@
   <div class="row">
 
     <div class="section-group" style="flex:1">
-      <div class="section-group-title" style="color:var(--yellow)">Uncommitted Work</div>
+      <div class="section-group-title" style="color:var(--yellow)">Uncommitted Work (39 files)</div>
       <div class="card">
-        <div class="card-title"><span class="status wip"></span> Modified Files</div>
+        <div class="card-title"><span class="status wip"></span> Backend Changes (4 files)</div>
         <div class="card-desc">
-          <code style="font-size:10px;color:var(--accent2)">claude_extraction_service.py</code> — added explicit base_url to Anthropic client<br/>
-          <code style="font-size:10px;color:var(--accent2)">package-lock.json</code> — dependency lockfile change
+          <code style="font-size:10px;color:var(--accent2)">properties.py</code> (db session fix) · <code style="font-size:10px;color:var(--accent2)">config.py</code> (.env priority) · <code style="font-size:10px;color:var(--accent2)">property.py schema</code> (Pydantic defaults) · <code style="font-size:10px;color:var(--accent2)">claude_extraction_service.py</code> (120s timeout)
         </div>
       </div>
       <div class="card">
-        <div class="card-title"><span class="status wip"></span> Untracked Files</div>
+        <div class="card-title"><span class="status wip"></span> Frontend Fixes (17 files)</div>
         <div class="card-desc">
-          <code style="font-size:10px;color:var(--accent2)">.ai/10-SCORING-IMPLEMENTATION-PLAN.md</code> — scoring system spec<br/>
-          <code style="font-size:10px;color:var(--accent2)">backend/test_claude_api.py</code> — API test script
+          <code style="font-size:10px;color:var(--accent2)">App.tsx</code> · <code style="font-size:10px;color:var(--accent2)">main.tsx</code> · <code style="font-size:10px;color:var(--accent2)">Upload.tsx</code> · <code style="font-size:10px;color:var(--accent2)">PropertyDetail.tsx</code> · <code style="font-size:10px;color:var(--accent2)">BOVPricingTiers.tsx</code> · <code style="font-size:10px;color:var(--accent2)">SensitivityAnalysis.tsx</code> · <code style="font-size:10px;color:var(--accent2)">DealScoreModal.tsx</code> · <code style="font-size:10px;color:var(--accent2)">ComparisonPage.tsx</code> · <code style="font-size:10px;color:var(--accent2)">DataBankPage.tsx</code> · +8 more — blank page fix, % formatting overhaul, error handling
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title"><span class="status wip"></span> New Files (2 files)</div>
+        <div class="card-desc">
+          <code style="font-size:10px;color:var(--accent2)">ErrorBoundary.tsx</code> (React error boundary with recovery UI) · <code style="font-size:10px;color:var(--accent2)">formatUtils.ts</code> (centralised % normalization utility)
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title"><span class="status wip"></span> Docs &amp; Scripts (16 files)</div>
+        <div class="card-desc">
+          <code style="font-size:10px;color:var(--accent2)">astra-api-research.md</code> · <code style="font-size:10px;color:var(--accent2)">calibration-test-plan.md</code> · <code style="font-size:10px;color:var(--accent2)">deal-score-spec-v2.md</code> · <code style="font-size:10px;color:var(--accent2)">extraction-prompt-templates.md</code> · <code style="font-size:10px;color:var(--accent2)">backfill_comps.py</code> · +11 more
         </div>
       </div>
     </div>
 
     <div class="section-group" style="flex:1">
-      <div class="section-group-title" style="color:var(--blue)">Branches</div>
+      <div class="section-group-title" style="color:var(--blue)">Branches (27 remote)</div>
       <div class="card">
         <div class="card-title"><span class="status live"></span> main <span class="tag" style="background:rgba(52,211,153,.15);color:var(--green)">active</span></div>
-        <div class="card-desc">Primary branch — all 13 recent commits landed here.</div>
+        <div class="card-desc">Primary branch — 21+ merged PRs. All latest features live.</div>
       </div>
       <div class="card">
-        <div class="card-title"><span class="status live"></span> claude/astra-cre-ui-integration</div>
-        <div class="card-desc">Local + remote. Fully merged. Safe to delete.</div>
-      </div>
-      <div class="card">
-        <div class="card-title"><span class="status live"></span> claude/emerald-forest-design-system</div>
-        <div class="card-desc">Local + remote. Fully merged. Safe to delete.</div>
-      </div>
-      <div class="card">
-        <div class="card-title"><span class="status live"></span> claude/dashboard-api-integration</div>
-        <div class="card-desc">Remote only. Fully merged. Safe to delete.</div>
+        <div class="card-title"><span class="status live"></span> Feature Branches</div>
+        <div class="card-desc">
+          <code style="font-size:10px;color:var(--accent2)">claude/astra-cre-ui-integration</code> ·
+          <code style="font-size:10px;color:var(--accent2)">claude/emerald-forest-design-system</code> ·
+          <code style="font-size:10px;color:var(--accent2)">claude/dashboard-api-integration</code> ·
+          +24 more remote branches. All merged, safe to clean up.
+        </div>
       </div>
     </div>
 
@@ -860,13 +977,16 @@
 
     <div class="roadmap-card opt-a">
       <div class="card-title">Option A: Polish &amp; Enhance</div>
-      <div class="timeframe">1–3 days</div>
+      <div class="timeframe">Mostly complete</div>
       <ul>
-        <li>Functional Settings page (profile, appearance)</li>
-        <li>Property selection checkboxes</li>
-        <li>Bulk operations (multi-delete)</li>
-        <li>Advanced search filters</li>
-        <li>Notification system</li>
+        <li>Deal Scoring system (weighted criteria) — DONE ✓</li>
+        <li>Auto-screening against investment criteria — DONE ✓</li>
+        <li>Kanban board for pipeline stages — DONE ✓</li>
+        <li>Onboarding wizard — DONE ✓</li>
+        <li>Bug fix: Blank page after upload — FIXED ✓</li>
+        <li>Percentage/number formatting overhaul — FIXED ✓</li>
+        <li>Quick Underwriting model (IRR, CoC, projections) — LIVE ✓</li>
+        <li>ErrorBoundary + global crash recovery — LIVE ✓</li>
       </ul>
     </div>
 
@@ -898,11 +1018,12 @@
       <div class="card-title">Option D: AI Enhancements</div>
       <div class="timeframe">From spec docs</div>
       <ul>
-        <li>Property scoring system (weighted criteria)</li>
-        <li>AI chatbot assistant (per-property)</li>
-        <li>Automated deal memo generation</li>
-        <li>Market comp integration</li>
-        <li>Rent roll extraction</li>
+        <li>Property scoring system (weighted criteria) — LIVE ✓</li>
+        <li>AI Pipeline Analyst chat — LIVE ✓</li>
+        <li>Automated deal summary PDF generation — LIVE ✓</li>
+        <li>Market comp integration — LIVE ✓</li>
+        <li>Rent roll extraction (PropertyUnitMix) — LIVE ✓</li>
+        <li>Smart decimal/percent normalization — LIVE ✓</li>
       </ul>
     </div>
 
@@ -911,7 +1032,7 @@
 
 <!-- ═══════════════ FOOTER ══════════════════════════════ -->
 <div style="text-align:center;padding:32px 0 48px;color:var(--text-dim);font-size:11px">
-  Astra CRE Platform · Ecosystem Map · 9 pages · 18 API routes · 6 models · 5 services · Feb 8, 2026
+  Astra CRE Platform · Ecosystem Map · 10 pages · 21 API routes · 9 models · 8 services · Feb 12, 2026
 </div>
 
 </div><!-- /canvas -->

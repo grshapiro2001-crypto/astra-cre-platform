@@ -6,6 +6,7 @@ import { Link } from 'react-router-dom';
 import type { ComparisonResponse } from '../../services/comparisonService';
 import type { Criterion, PropertyRanking, MetricKey } from '../../utils/criteriaEvaluation';
 import { getGradientColor } from '../../utils/criteriaEvaluation';
+import { fmtPercent } from '../../utils/formatUtils';
 
 interface ComparisonTableProps {
   data: ComparisonResponse;
@@ -51,7 +52,7 @@ export const ComparisonTable = ({ data, criteria, rankings }: ComparisonTablePro
 
   const fmt = {
     currency: (val?: number) => val ? `$${val.toLocaleString()}` : 'N/A',
-    percent: (val?: number) => val ? `${val}%` : 'N/A',
+    percent: (val?: number) => val != null ? fmtPercent(val) : 'N/A',
     number: (val?: number) => val ? val.toLocaleString() : 'N/A',
     decimal: (val?: number) => val ? val.toFixed(2) : 'N/A',
   };

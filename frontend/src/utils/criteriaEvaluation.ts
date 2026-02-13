@@ -7,6 +7,7 @@
  */
 
 import { PropertyComparisonItem } from '../services/comparisonService';
+import { fmtPercent } from './formatUtils';
 
 /**
  * Supported metric keys matching ComparisonResponse data structure
@@ -61,25 +62,25 @@ export const METRIC_CONFIGS: Record<MetricKey, MetricConfig> = {
   going_in_cap: {
     label: 'Going-In Cap Rate',
     path: ['cap_rates', 'going_in'],
-    formatter: (val) => `${val.toFixed(2)}%`,
+    formatter: (val) => fmtPercent(val),
     defaultDirection: 'highest', // Higher is better
   },
   stabilized_cap: {
     label: 'Stabilized Cap Rate',
     path: ['cap_rates', 'stabilized'],
-    formatter: (val) => `${val.toFixed(2)}%`,
+    formatter: (val) => fmtPercent(val),
     defaultDirection: 'highest',
   },
   levered_irr: {
     label: 'Levered IRR',
     path: ['bov_returns', 'levered_irr'],
-    formatter: (val) => `${val.toFixed(2)}%`,
+    formatter: (val) => fmtPercent(val),
     defaultDirection: 'highest',
   },
   unlevered_irr: {
     label: 'Unlevered IRR',
     path: ['bov_returns', 'unlevered_irr'],
-    formatter: (val) => `${val.toFixed(2)}%`,
+    formatter: (val) => fmtPercent(val),
     defaultDirection: 'highest',
   },
   price_per_unit: {
@@ -97,7 +98,7 @@ export const METRIC_CONFIGS: Record<MetricKey, MetricConfig> = {
   noi_growth: {
     label: 'NOI Growth',
     path: ['financials', 'noi_growth_pct'],
-    formatter: (val) => `${val.toFixed(2)}%`,
+    formatter: (val) => fmtPercent(val),
     defaultDirection: 'highest',
   },
 };

@@ -16,6 +16,7 @@ import {
 import { cn } from '@/lib/utils';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { DealScoreResult, MetricBreakdown, CompUsed } from '@/services/scoringService';
+import { fmtPercent, fmtCapRate } from '@/utils/formatUtils';
 import { DealScoreBadge } from './DealScoreBadge';
 
 // ---------------------------------------------------------------------------
@@ -47,8 +48,8 @@ function getConfidenceBadge(confidence: string): { label: string; className: str
 
 function fmtMetricValue(name: string, value: number | null): string {
   if (value == null) return '\u2014';
-  if (name === 'economic_occupancy' || name === 'opex_ratio') return `${value.toFixed(1)}%`;
-  if (name === 'supply_pipeline') return `${value.toFixed(1)}%`;
+  if (name === 'economic_occupancy' || name === 'opex_ratio') return fmtPercent(value, 1);
+  if (name === 'supply_pipeline') return fmtPercent(value, 1);
   if (name === 'market_sentiment') return value > 0 ? `+${value}` : `${value}`;
   return value.toFixed(1);
 }
@@ -203,7 +204,7 @@ function CompTable({ comps }: { comps: CompUsed[] }) {
             {comp.submarket || '\u2014'}
           </div>
           <div className="text-right font-mono text-foreground">
-            {comp.cap_rate != null ? `${(comp.cap_rate * 100).toFixed(1)}%` : '\u2014'}
+            {comp.cap_rate != null ? fmtCapRate(comp.cap_rate, 1) : '\u2014'}
           </div>
           <div className="text-right font-mono text-foreground">
             {comp.sale_price != null
@@ -216,7 +217,7 @@ function CompTable({ comps }: { comps: CompUsed[] }) {
               : '\u2014'}
           </div>
           <div className="text-right font-mono text-primary font-semibold">
-            {(comp.relevance * 100).toFixed(0)}%
+            {fmtPercent(comp.relevance, 0)}
           </div>
         </div>
       ))}

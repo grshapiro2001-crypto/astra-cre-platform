@@ -93,7 +93,7 @@ def save_property_to_library(
     )
 
     # Convert to response format
-    return build_property_detail_response(property_obj)
+    return build_property_detail_response(property_obj, db)
 
 
 # ==================== LIST PROPERTIES (NO LLM) ====================
@@ -190,7 +190,7 @@ def get_property_detail(
             detail="Property not found"
         )
 
-    return build_property_detail_response(property_obj)
+    return build_property_detail_response(property_obj, db)
 
 
 # ==================== UPDATE PROPERTY FOLDER (NO LLM) ====================
@@ -262,7 +262,7 @@ def update_property_folder(
     db.commit()
     db.refresh(property_obj)
 
-    return build_property_detail_response(property_obj)
+    return build_property_detail_response(property_obj, db)
 
 
 # ==================== UPDATE PROPERTY PIPELINE STAGE (NO LLM) ====================
@@ -314,7 +314,7 @@ def update_property_stage(
     db.commit()
     db.refresh(property_obj)
 
-    return build_property_detail_response(property_obj)
+    return build_property_detail_response(property_obj, db)
 
 
 # ==================== UPDATE PROPERTY PIPELINE NOTES (NO LLM) ====================
@@ -355,7 +355,7 @@ def update_property_notes(
     db.commit()
     db.refresh(property_obj)
 
-    return build_property_detail_response(property_obj)
+    return build_property_detail_response(property_obj, db)
 
 
 # ==================== DELETE PROPERTY (NO LLM) ====================
@@ -470,7 +470,7 @@ async def reanalyze_property(
         db.commit()
         db.refresh(property_obj)
 
-        return build_property_detail_response(property_obj)
+        return build_property_detail_response(property_obj, db)
 
     except Exception as e:
         # Log failure
@@ -545,17 +545,20 @@ def export_summary_pdf(
 
 # ==================== HELPER FUNCTIONS ====================
 
-def build_property_detail_response(property_obj: Property) -> PropertyDetail:
-    """Convert Property model to PropertyDetail response"""
+def build_property_detail_response(property_obj: Property, db: Session) -> PropertyDetail:
+    """Convert Property model to PropertyDetail response.
+
+    Args:
+        property_obj: The Property ORM model
+        db: The existing database session (avoids creating orphaned sessions)
+    """
     # Import bov_service here to avoid circular imports
     from app.services import bov_service
-    from app.database import get_db
     from app.schemas.property import UnitMixItem, RentCompItem
 
     # Get BOV pricing tiers if this is a BOV document
     bov_tiers = None
     if property_obj.document_type == "BOV" or property_obj.document_subtype == "BOV":
-        db = next(get_db())
         bov_tiers_data = bov_service.get_bov_pricing_tiers(db, property_obj.id)
         if bov_tiers_data:
             # Convert to Pydantic models

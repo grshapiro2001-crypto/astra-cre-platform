@@ -3,6 +3,7 @@
  * Phase 3B
  */
 import type { ComparisonResponse } from '../services/comparisonService';
+import { fmtPercent, fmtCapRate } from './formatUtils';
 
 export function exportComparisonToCSV(data: ComparisonResponse): void {
   // Build CSV rows
@@ -37,10 +38,10 @@ export function exportComparisonToCSV(data: ComparisonResponse): void {
   rows.push(['']);
   rows.push(['CAP RATES', ...data.properties.map(() => '')]);
   rows.push(['Going-In Cap', ...data.properties.map(p =>
-    p.cap_rates.going_in ? `${p.cap_rates.going_in}%` : 'N/A'
+    p.cap_rates.going_in != null ? fmtCapRate(p.cap_rates.going_in) : 'N/A'
   )]);
   rows.push(['Stabilized Cap', ...data.properties.map(p =>
-    p.cap_rates.stabilized ? `${p.cap_rates.stabilized}%` : 'N/A'
+    p.cap_rates.stabilized != null ? fmtCapRate(p.cap_rates.stabilized) : 'N/A'
   )]);
 
   // BOV Returns (if any BOVs)
@@ -49,10 +50,10 @@ export function exportComparisonToCSV(data: ComparisonResponse): void {
     rows.push(['BOV RETURNS', ...data.properties.map(() => '')]);
     rows.push(['BOV Tier', ...data.properties.map(p => p.bov_returns?.tier_name || 'N/A')]);
     rows.push(['Levered IRR', ...data.properties.map(p =>
-      p.bov_returns?.levered_irr ? `${p.bov_returns.levered_irr}%` : 'N/A'
+      p.bov_returns?.levered_irr != null ? fmtPercent(p.bov_returns.levered_irr) : 'N/A'
     )]);
     rows.push(['Unlevered IRR', ...data.properties.map(p =>
-      p.bov_returns?.unlevered_irr ? `${p.bov_returns.unlevered_irr}%` : 'N/A'
+      p.bov_returns?.unlevered_irr != null ? fmtPercent(p.bov_returns.unlevered_irr) : 'N/A'
     )]);
     rows.push(['Equity Multiple', ...data.properties.map(p =>
       p.bov_returns?.equity_multiple ? `${p.bov_returns.equity_multiple}x` : 'N/A'
@@ -69,14 +70,14 @@ export function exportComparisonToCSV(data: ComparisonResponse): void {
     p.financials.y1_noi ? `$${p.financials.y1_noi.toLocaleString()}` : 'N/A'
   )]);
   rows.push(['NOI Growth', ...data.properties.map(p =>
-    p.financials.noi_growth_pct ? `${p.financials.noi_growth_pct}%` : 'N/A'
+    p.financials.noi_growth_pct != null ? fmtPercent(p.financials.noi_growth_pct) : 'N/A'
   )]);
 
   // Operations Section
   rows.push(['']);
   rows.push(['OPERATIONS', ...data.properties.map(() => '')]);
   rows.push(['OpEx Ratio', ...data.properties.map(p =>
-    p.operations.opex_ratio ? `${p.operations.opex_ratio}%` : 'N/A'
+    p.operations.opex_ratio != null ? fmtPercent(p.operations.opex_ratio) : 'N/A'
   )]);
   rows.push(['OpEx/Unit', ...data.properties.map(p =>
     p.operations.opex_per_unit ? `$${p.operations.opex_per_unit.toLocaleString()}` : 'N/A'

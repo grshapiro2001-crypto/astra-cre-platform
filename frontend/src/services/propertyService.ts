@@ -45,8 +45,13 @@ export const propertyService = {
     documentSubtype?: string,
     force?: boolean
   ): Promise<PropertyDetail> {
+    // Defensive: guard against malformed extraction responses
+    const ext = extractionResult?.extraction_result;
+    const pInfo = ext?.property_info;
+    const financials = ext?.financials_by_period;
+
     console.log('💾 Saving property to library...', {
-      deal_name: extractionResult.extraction_result.property_info.deal_name || filename.replace('.pdf', ''),
+      deal_name: pInfo?.deal_name || filename.replace('.pdf', ''),
       pdfPath,
       dealFolderId,
       documentSubtype,
@@ -55,24 +60,27 @@ export const propertyService = {
     const url = force ? '/properties?force=true' : '/properties';
 
     const response = await api.post(url, {
-      deal_name: extractionResult.extraction_result.property_info.deal_name || filename.replace('.pdf', ''),
+      deal_name: pInfo?.deal_name || filename.replace('.pdf', ''),
       uploaded_filename: filename,
-      document_type: extractionResult.extraction_result.document_type,
+      document_type: ext?.document_type || 'Unknown',  // Required by backend — fallback to avoid Pydantic error
       deal_folder_id: dealFolderId,  // Phase 3A - REQUIRED
       document_subtype: documentSubtype,  // Phase 3A - "OM", "BOV", "Rent Roll", etc.
-      property_address: extractionResult.extraction_result.property_info.property_address,
-      property_type: extractionResult.extraction_result.property_info.property_type,
-      submarket: extractionResult.extraction_result.property_info.submarket,
-      year_built: extractionResult.extraction_result.property_info.year_built,
-      total_units: extractionResult.extraction_result.property_info.total_units,
-      total_residential_sf: extractionResult.extraction_result.property_info.total_sf,
-      average_market_rent: extractionResult.extraction_result.average_rents?.market_rent,
-      average_inplace_rent: extractionResult.extraction_result.average_rents?.in_place_rent,
-      t12_financials: extractionResult.extraction_result.financials_by_period.t12,
-      t3_financials: extractionResult.extraction_result.financials_by_period.t3,
-      y1_financials: extractionResult.extraction_result.financials_by_period.y1,
-      bov_pricing_tiers: extractionResult.extraction_result.bov_pricing_tiers,  // Phase 3A - BOV pricing tiers
-      raw_pdf_path: pdfPath,
+      property_address: pInfo?.property_address,
+      property_type: pInfo?.property_type,
+      submarket: pInfo?.submarket,
+      year_built: pInfo?.year_built,
+      total_units: pInfo?.total_units,
+      total_residential_sf: pInfo?.total_sf,
+      average_market_rent: ext?.average_rents?.market_rent,
+      average_inplace_rent: ext?.average_rents?.in_place_rent,
+      // Financial periods require `period_label` (Pydantic required field).
+      // The Claude extraction doesn't include it, so inject it here.
+      // Only send the period if data exists; undefined values are dropped by Axios.
+      t12_financials: financials?.t12 ? { ...financials.t12, period_label: 'T12' } : undefined,
+      t3_financials: financials?.t3 ? { ...financials.t3, period_label: 'T3' } : undefined,
+      y1_financials: financials?.y1 ? { ...financials.y1, period_label: 'Y1' } : undefined,
+      bov_pricing_tiers: ext?.bov_pricing_tiers,  // Phase 3A - BOV pricing tiers
+      raw_pdf_path: pdfPath || '',  // Required by backend — fallback to empty string
       analysis_model: 'claude-sonnet-4-5-20250929',
     });
 

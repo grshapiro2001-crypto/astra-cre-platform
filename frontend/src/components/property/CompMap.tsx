@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { GoogleMap, Marker, InfoWindow, useLoadScript } from '@react-google-maps/api';
 import { MapPin } from 'lucide-react';
 import type { RentCompItem, BOVPricingTier } from '../../types/property';
+import { fmtCapRate } from '../../utils/formatUtils';
 
 interface CompMapProps {
   address: string;
@@ -341,7 +342,7 @@ export const CompMap: React.FC<CompMapProps> = ({
                             <div>Price/Unit: {formatCurrency(pin.details.pricePerUnit)}</div>
                           )}
                           {pin.details.capRate != null && (
-                            <div>Cap Rate: {(pin.details.capRate * 100).toFixed(2)}%</div>
+                            <div>Cap Rate: {fmtCapRate(pin.details.capRate)}</div>
                           )}
                         </>
                       )}

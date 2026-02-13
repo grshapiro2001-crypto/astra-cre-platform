@@ -29,10 +29,15 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Clear token and redirect to login
+      // Clear stored credentials
       localStorage.removeItem('access_token');
       localStorage.removeItem('user');
-      window.location.href = '/login';
+
+      // Dispatch a custom event so the React app can handle the redirect
+      // via React Router (soft SPA navigation). DO NOT use window.location.href
+      // here — that causes a hard page reload which destroys the React tree
+      // and results in a blank page if an API call fails mid-operation.
+      window.dispatchEvent(new CustomEvent('auth:session-expired'));
     }
     return Promise.reject(error);
   }

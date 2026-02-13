@@ -1,5 +1,5 @@
 from pydantic_settings import BaseSettings
-from typing import List
+from typing import List, Tuple, Type
 
 
 class Settings(BaseSettings):
@@ -29,6 +29,30 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = True
+        env_file_encoding = "utf-8"
+        extra = "ignore"
+
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: Type[BaseSettings],
+        init_settings,
+        env_settings,
+        dotenv_settings,
+        file_secret_settings,
+    ):
+        """
+        Override source priority so .env file wins over shell environment variables.
+        Default order: init > env > dotenv > file_secret
+        New order:     init > dotenv > env > file_secret
+        This prevents stale exported shell vars from overriding .env values.
+        """
+        return (
+            init_settings,
+            dotenv_settings,      # .env file — highest priority after init
+            env_settings,         # shell environment — fallback
+            file_secret_settings,
+        )
 
 
 settings = Settings()

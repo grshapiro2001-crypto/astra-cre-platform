@@ -122,9 +122,24 @@ export const PDFUploader = ({ onUploadComplete }: PDFUploaderProps) => {
       const result = await propertyService.uploadPDF(selectedFile);
       // Pass result, filename, and PDF path (which backend returns) to parent
       const pdfPath = result.file_path || '';
-      onUploadComplete(result, selectedFile.name, pdfPath);
+
+      // Wrap callback in its own try-catch so parent errors don't crash this component
+      try {
+        onUploadComplete(result, selectedFile.name, pdfPath);
+      } catch (callbackErr) {
+        console.error('Upload callback error:', callbackErr);
+        setError('Processing completed but save failed. Please try again.');
+      }
     } catch (err: any) {
-      const errorMessage = err.response?.data?.detail || 'Upload failed. Please try again.';
+      console.error('Upload API error:', err);
+      // FastAPI Pydantic errors return `detail` as an array of objects — always coerce to string
+      const rawDetail = err.response?.data?.detail;
+      const errorMessage: string =
+        typeof rawDetail === 'string'
+          ? rawDetail
+          : Array.isArray(rawDetail)
+            ? rawDetail.map((d: any) => d.msg || JSON.stringify(d)).join('; ')
+            : 'Upload failed. Please try again.';
       setError(errorMessage);
     } finally {
       setIsUploading(false);

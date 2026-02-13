@@ -10,7 +10,7 @@ from datetime import datetime
 
 class FinancialPeriodData(BaseModel):
     """Financial data for a single period (T12, T3, Y1, etc.)"""
-    period_label: str
+    period_label: str = "Unknown"  # Default to avoid validation errors if frontend omits it
     gsr: Optional[float] = None
     vacancy: Optional[float] = None
     concessions: Optional[float] = None
@@ -39,7 +39,7 @@ class FinancialPeriodData(BaseModel):
 
 class BOVCapRateData(BaseModel):
     """Cap rate data for a BOV pricing tier"""
-    cap_rate_type: str
+    cap_rate_type: str = "Unknown"  # Default to avoid validation errors from extraction data
     cap_rate_value: Optional[float] = None
     noi_basis: Optional[int] = None
     qualifier: Optional[str] = None
@@ -70,7 +70,7 @@ class BOVTerminalAssumptions(BaseModel):
 
 class BOVPricingTierData(BaseModel):
     """Complete BOV pricing tier data"""
-    pricing_tier_id: str
+    pricing_tier_id: str = "tier_0"  # Default to avoid validation errors from extraction data
     tier_label: Optional[str] = None
     tier_type: Optional[str] = None
     pricing: Optional[int] = None

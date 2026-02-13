@@ -38,6 +38,7 @@ import type { DealScoreResult } from '@/services/scoringService';
 import { DealScoreBadge } from '@/components/scoring/DealScoreBadge';
 import { DealScoreModal } from '@/components/scoring/DealScoreModal';
 import { exportComparisonToCSV } from '@/utils/csvExport';
+import { fmtPercent, fmtCapRate } from '@/utils/formatUtils';
 import { InvestmentCriteriaPanel } from '@/components/comparison/InvestmentCriteriaPanel';
 import {
   type Criterion,
@@ -371,12 +372,12 @@ const PROPERTY_COLORS = ['#8b5cf6', '#10b981', '#f59e0b', '#f43f5e', '#0ea5e9'];
 const METRIC_DEFS: Record<CompMetricKey, MetricDef> = {
   going_in_cap: {
     label: 'Going-In Cap',
-    format: (v) => (v != null ? `${v.toFixed(2)}%` : EM_DASH),
+    format: (v) => (v != null ? fmtCapRate(v) : EM_DASH),
     category: 'returns',
   },
   stabilized_cap: {
     label: 'Stabilized Cap',
-    format: (v) => (v != null ? `${v.toFixed(2)}%` : EM_DASH),
+    format: (v) => (v != null ? fmtCapRate(v) : EM_DASH),
     category: 'returns',
   },
   price_per_unit: {
@@ -396,12 +397,12 @@ const METRIC_DEFS: Record<CompMetricKey, MetricDef> = {
   },
   levered_irr: {
     label: 'Levered IRR',
-    format: (v) => (v != null ? `${v.toFixed(2)}%` : EM_DASH),
+    format: (v) => (v != null ? fmtPercent(v) : EM_DASH),
     category: 'returns',
   },
   unlevered_irr: {
     label: 'Unlevered IRR',
-    format: (v) => (v != null ? `${v.toFixed(2)}%` : EM_DASH),
+    format: (v) => (v != null ? fmtPercent(v) : EM_DASH),
     category: 'returns',
   },
   equity_multiple: {
@@ -411,7 +412,7 @@ const METRIC_DEFS: Record<CompMetricKey, MetricDef> = {
   },
   noi_growth: {
     label: 'NOI Growth',
-    format: (v) => (v != null ? `${v.toFixed(2)}%` : EM_DASH),
+    format: (v) => (v != null ? fmtPercent(v) : EM_DASH),
     category: 'financials',
   },
   t12_noi: {
@@ -441,7 +442,7 @@ const METRIC_DEFS: Record<CompMetricKey, MetricDef> = {
   },
   opex_ratio: {
     label: 'OpEx Ratio',
-    format: (v) => (v != null ? `${v.toFixed(1)}%` : EM_DASH),
+    format: (v) => (v != null ? fmtPercent(v, 1) : EM_DASH),
     category: 'operations',
   },
   opex_per_unit: {
@@ -616,7 +617,7 @@ const TABLE_SECTIONS: TableSectionDef[] = [
     rows: [
       {
         label: 'Economic Occupancy',
-        getValue: (p) => p.operations.economic_occupancy != null ? `${p.operations.economic_occupancy.toFixed(1)}%` : 'N/A',
+        getValue: (p) => p.operations.economic_occupancy != null ? fmtPercent(p.operations.economic_occupancy, 1, 'N/A') : 'N/A',
         metricKey: undefined,
       },
       {
@@ -1997,9 +1998,7 @@ export const ComparisonPage = () => {
                       .
                       {scoredProperties[0].property.cap_rates.going_in !=
                         null &&
-                        ` Strong yield at ${scoredProperties[0].property.cap_rates.going_in.toFixed(
-                          2
-                        )}% cap.`}
+                        ` Strong yield at ${fmtCapRate(scoredProperties[0].property.cap_rates.going_in)} cap.`}
                       {scoredProperties.length > 1 &&
                         ` Runner-up: ${scoredProperties[1].property.property_name} (${scoredProperties[1].score?.total ?? 0}).`}
                     </p>

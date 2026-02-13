@@ -1,11 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Upload as UploadIcon, Sparkles, CheckCircle2, FileText, ArrowRight, Loader2 } from 'lucide-react';
+import { Upload as UploadIcon, Sparkles, CheckCircle2, FileText, ArrowRight, Loader2, RotateCcw } from 'lucide-react';
+import { toast } from 'sonner';
 import { PDFUploader } from '../components/upload/PDFUploader';
 import { propertyService } from '../services/propertyService';
 import { dealFolderService } from '../services/dealFolderService';
 import { cn } from '@/lib/utils';
 import type { UploadResponse, PropertyListItem } from '../types/property';
+
+const SAVE_TIMEOUT_MS = 30_000; // 30 seconds
 
 // ============================================================
 // How-It-Works Steps
@@ -139,6 +142,21 @@ export const Upload = () => {
   const [recentLoading, setRecentLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [lastUploadData, setLastUploadData] = useState<{
+    result: UploadResponse;
+    filename: string;
+    pdfPath: string;
+  } | null>(null);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Cleanup timeout on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -166,11 +184,30 @@ export const Upload = () => {
       return;
     }
 
+    // Store upload data for potential retry
+    setLastUploadData({ result, filename, pdfPath });
+
     // Auto-save: create a folder and save the property, then navigate to detail
     setIsSaving(true);
     setSaveError(null);
 
+    // Safety timeout — if save hangs for 30s, recover instead of showing blank page forever
+    const timeoutId = setTimeout(() => {
+      setIsSaving(false);
+      const msg = 'Save timed out. The server may be slow or unavailable.';
+      setSaveError(msg);
+      toast.error('Save timed out', {
+        description: 'The server may be slow or unavailable. You can retry below.',
+      });
+    }, SAVE_TIMEOUT_MS);
+    saveTimeoutRef.current = timeoutId;
+
     try {
+      // Defensive: guard against malformed extraction responses
+      if (!result.extraction_result || !result.extraction_result.property_info) {
+        throw new Error('Extraction returned an incomplete response. Please re-upload.');
+      }
+
       const pInfo = result.extraction_result.property_info;
       const dealName = pInfo.deal_name || filename.replace('.pdf', '');
       const docType = result.extraction_result.document_type;
@@ -196,16 +233,57 @@ export const Upload = () => {
         true // force=true to skip duplicate check on auto-save
       );
 
+      // Clear timeout on success
+      clearTimeout(timeoutId);
+      saveTimeoutRef.current = null;
+
+      // Reset saving state BEFORE navigating to prevent stale state during route transition
+      setIsSaving(false);
+
       // Navigate to the property detail page
       navigate(`/library/${savedProperty.id}`);
     } catch (err: any) {
+      // Clear timeout on failure
+      clearTimeout(timeoutId);
+      saveTimeoutRef.current = null;
+
       console.error('Auto-save failed:', err);
-      setSaveError(err.response?.data?.detail || 'Failed to save property. Please try again.');
+      // CRITICAL: FastAPI Pydantic errors return `detail` as an array of objects
+      // e.g. [{type, loc, msg, input, url}]. Rendering an object as a React child
+      // crashes the entire tree. Always coerce to a plain string.
+      const rawDetail = err.response?.data?.detail;
+      const errorMsg: string =
+        typeof rawDetail === 'string'
+          ? rawDetail
+          : Array.isArray(rawDetail)
+            ? rawDetail.map((d: any) => {
+              const field = Array.isArray(d.loc) ? d.loc.join('.') : '';
+              return field ? `${field}: ${d.msg}` : (d.msg || JSON.stringify(d));
+            }).join('; ')
+            : 'Failed to save property. Please try again.';
+      setSaveError(errorMsg);
+      toast.error('Save failed', { description: errorMsg });
       setIsSaving(false);
     }
   };
 
-  // Saving transition state
+  const handleRetry = () => {
+    if (lastUploadData) {
+      handleUploadComplete(lastUploadData.result, lastUploadData.filename, lastUploadData.pdfPath);
+    }
+  };
+
+  const handleCancelSave = () => {
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = null;
+    }
+    setIsSaving(false);
+    setSaveError('Save was cancelled. Your extraction data is preserved — you can retry.');
+    toast.info('Save cancelled');
+  };
+
+  // Saving transition state — includes cancel button so user is never stuck
   if (isSaving) {
     return (
       <div className="max-w-2xl mx-auto flex flex-col items-center justify-center py-32 gap-4">
@@ -216,6 +294,12 @@ export const Upload = () => {
           <p className="text-lg font-medium text-foreground">Extraction complete!</p>
           <p className="text-sm text-muted-foreground">Saving to your library and loading property details...</p>
         </div>
+        <button
+          onClick={handleCancelSave}
+          className="text-xs text-muted-foreground hover:text-foreground transition-colors underline mt-2"
+        >
+          Cancel
+        </button>
       </div>
     );
   }
@@ -232,10 +316,19 @@ export const Upload = () => {
         </p>
       </div>
 
-      {/* Save Error */}
+      {/* Save Error with Retry */}
       {saveError && (
-        <div className="max-w-2xl mx-auto bg-destructive/10 border border-destructive/20 p-4 rounded-xl">
+        <div className="max-w-2xl mx-auto bg-destructive/10 border border-destructive/20 p-4 rounded-xl flex items-center justify-between gap-4">
           <p className="text-sm text-destructive">{saveError}</p>
+          {lastUploadData && (
+            <button
+              onClick={handleRetry}
+              className="flex items-center gap-1.5 text-sm font-medium text-primary hover:text-primary/80 transition-colors shrink-0"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              Retry
+            </button>
+          )}
         </div>
       )}
 

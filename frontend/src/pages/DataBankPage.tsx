@@ -47,6 +47,7 @@ import {
   type PipelineProject,
   type SubmarketInventory,
 } from '@/services/dataBankService';
+import { fmtCapRate as fmtCapRateShared } from '@/utils/formatUtils';
 
 // ============================================================
 // Formatting Helpers
@@ -68,10 +69,7 @@ const fmtPerUnit = (value: number | null | undefined): string => {
 };
 
 const fmtCapRate = (value: number | null | undefined): string => {
-  if (value == null) return '—';
-  // API returns decimal (e.g. 0.055 for 5.5%), convert to percentage
-  const pct = value > 1 ? value : value * 100;
-  return `${pct.toFixed(2)}%`;
+  return fmtCapRateShared(value);
 };
 
 const fmtNumber = (value: number | null | undefined): string => {

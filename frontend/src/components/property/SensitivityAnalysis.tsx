@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import type { PropertyDetail } from '../../types/property';
 import { BarChart3 } from 'lucide-react';
+import { normalizePercent } from '../../utils/formatUtils';
 
 interface SensitivityAnalysisProps {
   property: PropertyDetail;
@@ -77,12 +78,12 @@ export const SensitivityAnalysis = ({ property }: SensitivityAnalysisProps) => {
     return 30_000_000; // Ultimate fallback
   }, [property.bov_pricing_tiers, y1NOI]);
 
-  // Get default terminal cap rate
+  // Get default terminal cap rate (normalise: API may return 0.055 or 5.5)
   const defaultTerminalCap = useMemo(() => {
     if (property.bov_pricing_tiers && property.bov_pricing_tiers.length > 0) {
       const firstTier = property.bov_pricing_tiers[0];
       if (firstTier.terminal_assumptions?.terminal_cap_rate) {
-        return firstTier.terminal_assumptions.terminal_cap_rate;
+        return normalizePercent(firstTier.terminal_assumptions.terminal_cap_rate);
       }
     }
     return 5.5; // Default 5.5%

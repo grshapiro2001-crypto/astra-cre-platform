@@ -4,6 +4,7 @@ import { SaveToFolderModal } from '../library/SaveToFolderModal';
 import { PricingAnalysis } from '../property/PricingAnalysis';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { fmtPercent } from '../../utils/formatUtils';
 import type { UploadResponse, FinancialPeriod, CalculatedMetrics } from '../../types/property';
 
 interface ExtractionPreviewProps {
@@ -32,8 +33,7 @@ const formatYear = (value?: number | null): string => {
 };
 
 const formatPercentage = (value?: number | null): string => {
-  if (value == null) return 'N/A';
-  return `${value.toFixed(2)}%`;
+  return fmtPercent(value, 2, 'N/A');
 };
 
 // ==================== METRIC CARD COMPONENT ====================
