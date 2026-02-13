@@ -1,7 +1,12 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
+from app.database import engine, Base
+import app.models  # noqa: F401 — import all models so Base.metadata knows about them
 from app.api.routes import auth, upload, properties, deal_folders, scoring, data_bank, criteria, chat
+
+# Create all database tables on startup (ensures tables exist for fresh deployments)
+Base.metadata.create_all(bind=engine)
 
 # Create FastAPI app
 app = FastAPI(

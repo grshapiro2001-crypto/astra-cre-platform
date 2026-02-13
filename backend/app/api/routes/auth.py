@@ -5,6 +5,7 @@ from app.models.user import User
 from app.schemas.user import UserCreate, UserLogin, UserResponse, Token
 from app.services.auth_service import verify_password, get_password_hash, create_access_token
 from app.api.deps import get_current_user
+from app.config import settings
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -57,13 +58,14 @@ def login(response: Response, user_credentials: UserLogin, db: Session = Depends
     # Create access token
     access_token = create_access_token(data={"sub": user.email})
 
-    # Set httpOnly cookie
+    # Set httpOnly cookie — use secure settings in production for cross-origin
+    is_production = not settings.DEBUG
     response.set_cookie(
         key="access_token",
         value=access_token,
         httponly=True,
-        secure=False,  # Set to True in production with HTTPS
-        samesite="lax",
+        secure=is_production,
+        samesite="none" if is_production else "lax",
         max_age=3600  # 1 hour
     )
 
