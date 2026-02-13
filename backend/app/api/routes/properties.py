@@ -5,6 +5,7 @@ CRITICAL ARCHITECTURE:
 - Save, List, Detail, Delete endpoints: NO LLM CALLS (database only)
 - Reanalyze endpoint: ONLY endpoint that calls LLM after initial upload
 """
+import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
@@ -28,6 +29,8 @@ from app.schemas.property import (
     ComparisonResponse
 )
 from app.services import property_service
+
+logger = logging.getLogger(__name__)
 
 # LLM service is ONLY imported in reanalyze endpoint
 # This prevents accidental LLM calls in read-only operations
@@ -85,11 +88,30 @@ def save_property_to_library(
                 }
             )
 
+    logger.warning(
+        "SAVE_PROPERTY_ROUTE received: unit_mix=%d, rent_comps=%d, "
+        "renovation_cost_per_unit=%s",
+        len(property_data.unit_mix) if property_data.unit_mix else 0,
+        len(property_data.rent_comps) if property_data.rent_comps else 0,
+        property_data.renovation_cost_per_unit,
+    )
+
     # Save property
     property_obj = property_service.save_property(
         db,
         str(current_user.id),
         property_data
+    )
+
+    # Re-query with eager loading to ensure unit_mix/rent_comps relationships
+    # are included in the response.  save_property() adds child objects to the
+    # session individually (not via the relationship), so lazy-loading after
+    # refresh may return stale/empty results depending on session state.
+    property_obj = property_service.get_property(
+        db,
+        property_obj.id,
+        str(current_user.id),
+        update_view_date=False,
     )
 
     # Convert to response format
@@ -573,6 +595,13 @@ def build_property_detail_response(property_obj: Property, db: Session) -> Prope
     rent_comp_items = []
     if hasattr(property_obj, 'rent_comps') and property_obj.rent_comps:
         rent_comp_items = [RentCompItem.model_validate(c) for c in property_obj.rent_comps]
+
+    logger.warning(
+        "BUILD_RESPONSE id=%d: unit_mix=%d, rent_comps=%d, "
+        "renovation_cost_per_unit=%s",
+        property_obj.id, len(unit_mix_items), len(rent_comp_items),
+        property_obj.renovation_cost_per_unit,
+    )
 
     return PropertyDetail(
         id=property_obj.id,

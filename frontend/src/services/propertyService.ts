@@ -50,16 +50,19 @@ export const propertyService = {
     const pInfo = ext?.property_info;
     const financials = ext?.financials_by_period;
 
-    console.log('💾 Saving property to library...', {
-      deal_name: pInfo?.deal_name || filename.replace('.pdf', ''),
-      pdfPath,
-      dealFolderId,
-      documentSubtype,
-    });
+    // Debug: log what the extraction result contains before building POST body
+    console.log('[saveToLibrary] ext keys:', ext ? Object.keys(ext) : 'ext is nullish');
+    console.log('[saveToLibrary] unit_mix:', Array.isArray(ext?.unit_mix) ? `${ext.unit_mix.length} items` : String(ext?.unit_mix));
+    console.log('[saveToLibrary] rent_comps:', Array.isArray(ext?.rent_comps) ? `${ext.rent_comps.length} items` : String(ext?.rent_comps));
+    console.log('[saveToLibrary] renovation:', ext?.renovation ? JSON.stringify(ext.renovation) : 'undefined/null');
 
     const url = force ? '/properties?force=true' : '/properties';
 
-    const response = await api.post(url, {
+    // Build POST body — use explicit variables so we can log the exact payload
+    const unitMixPayload = ext?.unit_mix ?? [];
+    const rentCompsPayload = ext?.rent_comps ?? [];
+
+    const postBody = {
       deal_name: pInfo?.deal_name || filename.replace('.pdf', ''),
       uploaded_filename: filename,
       document_type: ext?.document_type || 'Unknown',  // Required by backend — fallback to avoid Pydantic error
@@ -68,6 +71,7 @@ export const propertyService = {
       property_address: pInfo?.property_address,
       property_type: pInfo?.property_type,
       submarket: pInfo?.submarket,
+      metro: ext?.property_info?.metro,  // Pass metro from extraction
       year_built: pInfo?.year_built,
       total_units: pInfo?.total_units,
       total_residential_sf: pInfo?.total_sf,
@@ -86,13 +90,17 @@ export const propertyService = {
       t3_financials: financials?.t3 ? { ...financials.t3, period_label: 'T3' } : undefined,
       y1_financials: financials?.y1 ? { ...financials.y1, period_label: 'Y1' } : undefined,
       bov_pricing_tiers: ext?.bov_pricing_tiers,  // Phase 3A - BOV pricing tiers
-      unit_mix: ext?.unit_mix,  // Unit mix floorplan data from extraction
-      rent_comps: ext?.rent_comps,  // Rent comparable properties from extraction
+      unit_mix: unitMixPayload,  // Always send array (never undefined)
+      rent_comps: rentCompsPayload,  // Always send array (never undefined)
       raw_pdf_path: pdfPath || '',  // Required by backend — fallback to empty string
       analysis_model: 'claude-sonnet-4-5-20250929',
-    });
+    };
 
-    console.log('✅ Property saved successfully!', response.data);
+    console.log('[saveToLibrary] POST body unit_mix:', unitMixPayload.length, 'items, rent_comps:', rentCompsPayload.length, 'items');
+
+    const response = await api.post(url, postBody);
+
+    console.log('[saveToLibrary] Response unit_mix:', response.data?.unit_mix?.length ?? 0, 'rent_comps:', response.data?.rent_comps?.length ?? 0);
     return response.data;
   },
 

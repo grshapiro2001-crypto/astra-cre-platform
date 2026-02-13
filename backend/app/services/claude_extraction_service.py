@@ -2,10 +2,13 @@
 Claude API-based intelligent extraction service for CRE documents
 """
 import json
+import logging
 import re
 from typing import Dict, Any, Optional, Tuple
 import anthropic
 from app.config import settings
+
+logger = logging.getLogger(__name__)
 
 def detect_document_type(pdf_text: str) -> Tuple[str, str]:
     """
@@ -950,6 +953,29 @@ async def extract_with_claude(
             extraction_data['document_type'] = doc_type
         if 'confidence' not in extraction_data:
             extraction_data['confidence'] = confidence
+
+        # Ensure unit_mix, rent_comps, and renovation keys always exist in the
+        # extraction result.  Claude may omit these keys or return null, which
+        # causes the frontend optional-chaining (ext?.unit_mix) to evaluate to
+        # undefined.  Axios strips undefined values from the POST body so the
+        # backend never receives the data.
+        if not isinstance(extraction_data.get('unit_mix'), list):
+            extraction_data['unit_mix'] = extraction_data.get('unit_mix') or []
+        if not isinstance(extraction_data.get('rent_comps'), list):
+            extraction_data['rent_comps'] = extraction_data.get('rent_comps') or []
+        if not isinstance(extraction_data.get('renovation'), dict):
+            extraction_data['renovation'] = extraction_data.get('renovation') or {}
+
+        logger.warning(
+            "EXTRACTION_RESULT file=%s doc_type=%s: "
+            "unit_mix=%d items, rent_comps=%d items, "
+            "renovation_keys=%s",
+            filename,
+            extraction_data.get('document_type'),
+            len(extraction_data.get('unit_mix', [])),
+            len(extraction_data.get('rent_comps', [])),
+            list(extraction_data.get('renovation', {}).keys()),
+        )
 
         # Calculate derived metrics
         extraction_data['calculated_metrics'] = calculate_metrics(

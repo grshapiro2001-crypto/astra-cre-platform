@@ -47,6 +47,7 @@ export interface PropertyInfo {
   property_address?: string | null;
   property_type?: string | null;
   submarket?: string | null;
+  metro?: string | null;
   year_built?: number | null;
   total_units?: number | null;
   total_sf?: number | null;
