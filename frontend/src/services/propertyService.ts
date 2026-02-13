@@ -73,6 +73,12 @@ export const propertyService = {
       total_residential_sf: pInfo?.total_sf,
       average_market_rent: ext?.average_rents?.market_rent,
       average_inplace_rent: ext?.average_rents?.in_place_rent,
+      renovation_cost_per_unit: ext?.renovation?.renovation_cost_per_unit,
+      renovation_total_cost: ext?.renovation?.renovation_total_cost,
+      renovation_rent_premium: ext?.renovation?.renovation_rent_premium,
+      renovation_roi_pct: ext?.renovation?.renovation_roi_pct,
+      renovation_duration_years: ext?.renovation?.renovation_duration_years,
+      renovation_stabilized_revenue: ext?.renovation?.renovation_stabilized_revenue,
       // Financial periods require `period_label` (Pydantic required field).
       // The Claude extraction doesn't include it, so inject it here.
       // Only send the period if data exists; undefined values are dropped by Axios.
@@ -80,6 +86,8 @@ export const propertyService = {
       t3_financials: financials?.t3 ? { ...financials.t3, period_label: 'T3' } : undefined,
       y1_financials: financials?.y1 ? { ...financials.y1, period_label: 'Y1' } : undefined,
       bov_pricing_tiers: ext?.bov_pricing_tiers,  // Phase 3A - BOV pricing tiers
+      unit_mix: ext?.unit_mix,  // Unit mix floorplan data from extraction
+      rent_comps: ext?.rent_comps,  // Rent comparable properties from extraction
       raw_pdf_path: pdfPath || '',  // Required by backend — fallback to empty string
       analysis_model: 'claude-sonnet-4-5-20250929',
     });
