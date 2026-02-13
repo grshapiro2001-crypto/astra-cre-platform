@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Astra CRE Platform — Ecosystem Map</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+  :root {
+    --bg: #0c0e14;
+    --surface: #151820;
+    --surface2: #1c2030;
+    --border: #2a2e3e;
+    --border-hi: #3d4260;
+    --text: #e2e4ed;
+    --text-dim: #8b8fa6;
+    --accent: #7c5cfc;
+    --accent2: #a78bfa;
+    --green: #34d399;
+    --yellow: #fbbf24;
+    --orange: #fb923c;
+    --red: #f87171;
+    --blue: #60a5fa;
+    --pink: #f472b6;
+    --cyan: #22d3ee;
+    --line: #2d3250;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: auto;
+  }
+
+  /* ── Header ───────────────────────────── */
+  .page-header {
+    text-align: center;
+    padding: 48px 24px 12px;
+  }
+  .page-header h1 {
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2), var(--pink));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .page-header .sub {
+    color: var(--text-dim);
+    font-size: 13px;
+    margin-top: 6px;
+  }
+
+  /* ── Legend ────────────────────────────── */
+  .legend {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    padding: 14px 24px 28px;
+    flex-wrap: wrap;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+  .legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+  }
+
+  /* ── Canvas ───────────────────────────── */
+  .canvas {
+    width: 1400px;
+    margin: 0 auto;
+    padding: 0 32px 64px;
+    position: relative;
+  }
+
+  /* ── Tier Label ───────────────────────── */
+  .tier {
+    margin-bottom: 16px;
+  }
+  .tier-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.8px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 12px;
+    padding-left: 4px;
+  }
+
+  /* ── Row / Grid ───────────────────────── */
+  .row {
+    display: flex;
+    gap: 14px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+  }
+  .row.center { justify-content: center; }
+
+  /* ── Cards ─────────────────────────────── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    position: relative;
+    transition: border-color .2s, box-shadow .2s;
+    cursor: default;
+  }
+  .card:hover {
+    border-color: var(--border-hi);
+    box-shadow: 0 0 20px rgba(124,92,252,.08);
+  }
+
+  .card-title {
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .card-desc {
+    font-size: 11px;
+    color: var(--text-dim);
+    line-height: 1.5;
+  }
+
+  /* Status dot in card title */
+  .status {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .status.live     { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .status.wip      { background: var(--yellow); box-shadow: 0 0 6px var(--yellow); }
+  .status.planned  { background: var(--text-dim); }
+
+  /* ── Big hero cards (top-level arch) ──── */
+  .hero {
+    flex: 1;
+    min-width: 280px;
+    border-top: 3px solid;
+    padding: 18px 20px;
+    background: var(--surface);
+  }
+  .hero.frontend  { border-color: var(--accent); }
+  .hero.backend   { border-color: var(--green); }
+  .hero.database  { border-color: var(--blue); }
+  .hero.infra     { border-color: var(--orange); }
+
+  .hero .card-title { font-size: 15px; }
+  .hero .tech {
+    margin-top: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+  .tag {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+  }
+
+  /* ── Section groups ───────────────────── */
+  .section-group {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    flex: 1;
+    min-width: 300px;
+  }
+  .section-group-title {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: var(--accent2);
+    margin-bottom: 10px;
+  }
+  .section-group .card {
+    margin-bottom: 8px;
+  }
+  .section-group .card:last-child { margin-bottom: 0; }
+
+  /* ── Connectors (pure CSS) ────────────── */
+  .connector-row {
+    display: flex;
+    justify-content: center;
+    padding: 4px 0 4px;
+  }
+  .v-line {
+    width: 2px;
+    height: 28px;
+    background: var(--line);
+    border-radius: 1px;
+  }
+  .h-connector {
+    display: flex;
+    align-items: center;
+    gap: 0;
+  }
+  .h-line {
+    height: 2px;
+    flex: 1;
+    background: var(--line);
+  }
+
+  /* ── Chip lists inside cards ──────────── */
+  .chip-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 6px;
+  }
+  .chip {
+    font-size: 10px;
+    font-weight: 500;
+    padding: 2px 7px;
+    border-radius: 4px;
+    background: rgba(124,92,252,.1);
+    border: 1px solid rgba(124,92,252,.2);
+    color: var(--accent2);
+  }
+  .chip.green  { background: rgba(52,211,153,.1); border-color: rgba(52,211,153,.2); color: var(--green); }
+  .chip.blue   { background: rgba(96,165,250,.1); border-color: rgba(96,165,250,.2); color: var(--blue); }
+  .chip.orange { background: rgba(251,146,60,.1); border-color: rgba(251,146,60,.2); color: var(--orange); }
+  .chip.pink   { background: rgba(244,114,182,.1); border-color: rgba(244,114,182,.2); color: var(--pink); }
+  .chip.cyan   { background: rgba(34,211,238,.1); border-color: rgba(34,211,238,.2); color: var(--cyan); }
+  .chip.dim    { background: rgba(139,143,166,.08); border-color: rgba(139,143,166,.15); color: var(--text-dim); }
+
+  /* ── Endpoint table ───────────────────── */
+  .endpoint-table {
+    width: 100%;
+    font-size: 11px;
+    margin-top: 8px;
+    border-collapse: collapse;
+  }
+  .endpoint-table td {
+    padding: 3px 0;
+    vertical-align: top;
+  }
+  .endpoint-table .method {
+    font-weight: 700;
+    width: 48px;
+    color: var(--green);
+  }
+  .endpoint-table .method.post { color: var(--blue); }
+  .endpoint-table .method.patch { color: var(--yellow); }
+  .endpoint-table .method.delete { color: var(--red); }
+  .endpoint-table .path {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text);
+  }
+  .endpoint-table .purpose {
+    color: var(--text-dim);
+    padding-left: 8px;
+  }
+
+  /* ── Roadmap cards ────────────────────── */
+  .roadmap-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    flex: 1;
+    min-width: 200px;
+    border-left: 3px solid;
+  }
+  .roadmap-card.opt-a { border-left-color: var(--green); }
+  .roadmap-card.opt-b { border-left-color: var(--accent); }
+  .roadmap-card.opt-c { border-left-color: var(--orange); }
+  .roadmap-card.opt-d { border-left-color: var(--cyan); }
+  .roadmap-card .card-title { font-size: 13px; }
+  .roadmap-card .timeframe {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-dim);
+    margin-top: 2px;
+    margin-bottom: 6px;
+  }
+  .roadmap-card ul {
+    list-style: none;
+    padding: 0;
+  }
+  .roadmap-card li {
+    font-size: 11px;
+    color: var(--text-dim);
+    padding: 2px 0;
+    padding-left: 14px;
+    position: relative;
+  }
+  .roadmap-card li::before {
+    content: '›';
+    position: absolute;
+    left: 2px;
+    color: var(--border-hi);
+    font-weight: 700;
+  }
+
+  /* ── Flow arrows (SVG overlay) ────────── */
+  .flow-arrows {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── Stats bar ────────────────────────── */
+  .stats-bar {
+    display: flex;
+    justify-content: center;
+    gap: 32px;
+    padding: 18px 24px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+  .stat {
+    text-align: center;
+  }
+  .stat-val {
+    font-size: 24px;
+    font-weight: 800;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .stat-label {
+    font-size: 10px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-top: 2px;
+  }
+
+  /* ── Two-col split ────────────────────── */
+  .split { display: flex; gap: 14px; }
+  .split > * { flex: 1; }
+
+  /* ── Model field list ─────────────────── */
+  .field-list {
+    font-size: 10px;
+    color: var(--text-dim);
+    line-height: 1.6;
+    margin-top: 6px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  @media (max-width: 1440px) {
+    .canvas { width: 100%; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════ HEADER ═══════ -->
+<div class="page-header">
+  <h1>Astra CRE Platform — Ecosystem Map</h1>
+  <div class="sub">Full architecture, component inventory, and roadmap &nbsp;·&nbsp; Generated Feb 8 2026</div>
+</div>
+
+<div class="legend">
+  <span class="legend-item"><span class="legend-dot" style="background:var(--green);box-shadow:0 0 6px var(--green)"></span> Live</span>
+  <span class="legend-item"><span class="legend-dot" style="background:var(--yellow);box-shadow:0 0 6px var(--yellow)"></span> WIP / Partial</span>
+  <span class="legend-item"><span class="legend-dot" style="background:var(--text-dim)"></span> Planned</span>
+</div>
+
+<!-- ═══════════════════════════════════════ STATS BAR ════ -->
+<div class="stats-bar">
+  <div class="stat"><div class="stat-val">9</div><div class="stat-label">Pages</div></div>
+  <div class="stat"><div class="stat-val">18</div><div class="stat-label">API Routes</div></div>
+  <div class="stat"><div class="stat-val">6</div><div class="stat-label">DB Models</div></div>
+  <div class="stat"><div class="stat-val">5</div><div class="stat-label">Services</div></div>
+  <div class="stat"><div class="stat-val">13</div><div class="stat-label">Commits (2 days)</div></div>
+  <div class="stat"><div class="stat-val">2</div><div class="stat-label">Uncommitted Files</div></div>
+</div>
+
+<div class="canvas">
+
+<!-- ═══════════════ TIER 1 · CORE ARCHITECTURE ══════════ -->
+<div class="tier">
+  <div class="tier-label">Tier 1 — Core Architecture</div>
+  <div class="row">
+
+    <div class="card hero frontend">
+      <div class="card-title"><span class="status live"></span> Frontend</div>
+      <div class="card-desc">React 18 SPA with TypeScript, Vite dev server, Tailwind CSS + shadcn/ui components, Zustand state, Framer Motion transitions</div>
+      <div class="tech">
+        <span class="tag">React 18</span>
+        <span class="tag">TypeScript</span>
+        <span class="tag">Vite</span>
+        <span class="tag">Tailwind 3.4</span>
+        <span class="tag">shadcn/ui</span>
+        <span class="tag">Zustand</span>
+        <span class="tag">Framer Motion</span>
+        <span class="tag">Axios</span>
+      </div>
+    </div>
+
+    <div class="card hero backend">
+      <div class="card-title"><span class="status live"></span> Backend</div>
+      <div class="card-desc">FastAPI (Python) with JWT auth, file upload handling, Claude AI extraction pipeline, SQLAlchemy ORM</div>
+      <div class="tech">
+        <span class="tag">FastAPI</span>
+        <span class="tag">Python 3.11</span>
+        <span class="tag">Uvicorn</span>
+        <span class="tag">SQLAlchemy 2.0</span>
+        <span class="tag">Pydantic</span>
+        <span class="tag">Alembic</span>
+        <span class="tag">python-jose</span>
+      </div>
+    </div>
+
+    <div class="card hero database">
+      <div class="card-title"><span class="status live"></span> Database</div>
+      <div class="card-desc">SQLite for dev, PostgreSQL 15 for production (Docker). 7 tables, Alembic migrations, JSON financial storage</div>
+      <div class="tech">
+        <span class="tag">SQLite (dev)</span>
+        <span class="tag">PostgreSQL 15</span>
+        <span class="tag">Docker Compose</span>
+        <span class="tag">Alembic</span>
+      </div>
+    </div>
+
+    <div class="card hero infra">
+      <div class="card-title"><span class="status live"></span> AI / External</div>
+      <div class="card-desc">Anthropic Claude API for PDF extraction. pdfplumber for text parsing. Bcrypt + JWT for auth tokens</div>
+      <div class="tech">
+        <span class="tag">Claude Sonnet 4.5</span>
+        <span class="tag">pdfplumber</span>
+        <span class="tag">PyPDF2</span>
+        <span class="tag">Bcrypt</span>
+        <span class="tag">JWT</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- connector -->
+<div class="connector-row"><div class="v-line"></div></div>
+
+<!-- ═══════════════ TIER 2 · PAGES & API ROUTES ═════════ -->
+<div class="tier">
+  <div class="tier-label">Tier 2 — Frontend Pages &amp; Backend API Routes</div>
+  <div class="row">
+
+    <!-- FRONTEND PAGES -->
+    <div class="section-group" style="flex:1.3">
+      <div class="section-group-title" style="color:var(--accent2)">Frontend Pages</div>
+
+      <div class="card">
+        <div class="card-title"><span class="status live"></span> Dashboard</div>
+        <div class="card-desc">Deal command center — pipeline kanban, metrics cards, area charts, AI summary. Real API integration (no mocks).</div>
+        <div class="chip-list"><span class="chip">Dashboard.tsx</span><span class="chip green">API-connected</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><span class="status live"></span> Library</div>
+        <div class="card-desc">Property deal pipeline with grid/list views, search, filters, batch comparison selection, folder organization.</div>
+        <div class="chip-list"><span class="chip">Library.tsx</span><span class="chip green">Full CRUD</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><span class="status live"></span> Property Detail</div>
+        <div class="card-desc">Full property analysis — T12/T3/Y1 financials, BOV pricing tiers, cap rate sensitivity, AI re-analysis.</div>
+        <div class="chip-list"><span class="chip">PropertyDetail.tsx</span><span class="chip green">Multi-period</span><span class="chip pink">BOV Tiers</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><span class="status live"></span> Comparison</div>
+        <div class="card-desc">Side-by-side analysis (2-5 properties) with scoring templates, radar chart, sensitivity slider, CSV export.</div>
+        <div class="chip-list"><span class="chip">ComparisonPage.tsx</span><span class="chip blue">Scoring</span><span class="chip cyan">CSV Export</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><span class="status live"></span> Upload</div>
+        <div class="card-desc">Premium drag-and-drop PDF upload → Claude extraction → auto-save → navigate to property detail. No preview step.</div>
+        <div class="chip-list"><span class="chip">Upload.tsx</span><span class="chip">PDFUploader.tsx</span><span class="chip orange">LLM Call</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><span class="status live"></span> Folder Detail</div>
+        <div class="card-desc">Properties within a specific deal folder, with folder metadata and navigation.</div>
+        <div class="chip-list"><span class="chip">FolderDetail.tsx</span></div>
+      </div>
+
+      <div class="row" style="gap:8px;margin-top:8px;margin-bottom:0">
+        <div class="card" style="flex:1">
+          <div class="card-title"><span class="status live"></span> Login</div>
+          <div class="card-desc">Purple-themed auth with email/password.</div>
+        </div>
+        <div class="card" style="flex:1">
+          <div class="card-title"><span class="status live"></span> Register</div>
+          <div class="card-desc">User registration with validation.</div>
+        </div>
+        <div class="card" style="flex:1">
+          <div class="card-title"><span class="status wip"></span> Settings</div>
+          <div class="card-desc">Placeholder — profile, appearance, notifs.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BACKEND API ROUTES -->
+    <div class="section-group" style="flex:1">
+      <div class="section-group-title" style="color:var(--green)">Backend API Routes</div>
+
+      <div class="card">
+        <div class="card-title"><span class="status live"></span> Auth — /api/v1/auth</div>
+        <table class="endpoint-table">
+          <tr><td class="method post">POST</td><td class="path">/register</td><td class="purpose">Create account</td></tr>
+          <tr><td class="method post">POST</td><td class="path">/login</td><td class="purpose">JWT + cookie</td></tr>
+          <tr><td class="method">GET</td><td class="path">/me</td><td class="purpose">Current user</td></tr>
+          <tr><td class="method post">POST</td><td class="path">/logout</td><td class="purpose">Clear cookie</td></tr>
+        </table>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><span class="status live"></span> Properties — /api/v1/properties</div>
+        <table class="endpoint-table">
+          <tr><td class="method post">POST</td><td class="path">/</td><td class="purpose">Save to library</td></tr>
+          <tr><td class="method">GET</td><td class="path">/</td><td class="purpose">List + filter + search</td></tr>
+          <tr><td class="method">GET</td><td class="path">/{id}</td><td class="purpose">Full detail</td></tr>
+          <tr><td class="method patch">PATCH</td><td class="path">/{id}/folder</td><td class="purpose">Move to folder</td></tr>
+          <tr><td class="method delete">DEL</td><td class="path">/{id}</td><td class="purpose">Delete property</td></tr>
+          <tr><td class="method post">POST</td><td class="path">/{id}/reanalyze</td><td class="purpose">Re-run Claude ⚡</td></tr>
+          <tr><td class="method post">POST</td><td class="path">/compare</td><td class="purpose">Compare 2-5 props</td></tr>
+        </table>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><span class="status live"></span> Folders — /api/v1/deal-folders</div>
+        <table class="endpoint-table">
+          <tr><td class="method post">POST</td><td class="path">/</td><td class="purpose">Create folder</td></tr>
+          <tr><td class="method">GET</td><td class="path">/</td><td class="purpose">List folders</td></tr>
+          <tr><td class="method">GET</td><td class="path">/{id}</td><td class="purpose">Folder detail</td></tr>
+          <tr><td class="method patch">PATCH</td><td class="path">/{id}</td><td class="purpose">Update metadata</td></tr>
+          <tr><td class="method delete">DEL</td><td class="path">/{id}</td><td class="purpose">Delete (cascade opts)</td></tr>
+          <tr><td class="method">GET</td><td class="path">/{id}/properties</td><td class="purpose">Folder contents</td></tr>
+        </table>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><span class="status live"></span> Upload — /api/v1/upload</div>
+        <table class="endpoint-table">
+          <tr><td class="method post">POST</td><td class="path">/</td><td class="purpose">PDF → Claude extract ⚡</td></tr>
+          <tr><td class="method">GET</td><td class="path">/health</td><td class="purpose">Service health</td></tr>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="connector-row"><div class="v-line"></div></div>
+
+<!-- ═══════════════ TIER 3 · SERVICES, STORES, MODELS ═══ -->
+<div class="tier">
+  <div class="tier-label">Tier 3 — Services, State Management &amp; Data Models</div>
+  <div class="row">
+
+    <!-- BACKEND SERVICES -->
+    <div class="section-group">
+      <div class="section-group-title" style="color:var(--green)">Backend Services</div>
+
+      <div class="card">
+        <div class="card-title"><span class="status live"></span> Claude Extraction Service</div>
+        <div class="card-desc">Core LLM integration — sends PDF text to Claude Sonnet 4.5, extracts doc type (OM/BOV), property info, multi-period financials, BOV pricing tiers, cap rates. Handles truncation at 100k chars.</div>
+        <div class="chip-list"><span class="chip orange">LLM ⚡</span><span class="chip">claude_extraction_service.py</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><span class="status live"></span> Property Service</div>
+        <div class="card-desc">CRUD operations, duplicate detection, search/filter/sort, financial JSON parsing. No LLM calls — database only.</div>
+        <div class="chip-list"><span class="chip green">DB only</span><span class="chip">property_service.py</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><span class="status live"></span> BOV Service</div>
+        <div class="card-desc">Parse and store multi-tier BOV pricing (pricing, loan assumptions, return metrics, terminal assumptions).</div>
+        <div class="chip-list"><span class="chip green">DB only</span><span class="chip">bov_service.py</span></div>
+      </div>
+
+      <div class="row" style="gap:8px;margin-bottom:0">
+        <div class="card" style="flex:1">
+          <div class="card-title"><span class="status live"></span> Auth Service</div>
+          <div class="card-desc">Bcrypt hashing, JWT create/verify, 60-min expiry.</div>
+        </div>
+        <div class="card" style="flex:1">
+          <div class="card-title"><span class="status live"></span> PDF Service</div>
+          <div class="card-desc">pdfplumber text extraction → feeds Claude service.</div>
+        </div>
+        <div class="card" style="flex:1">
+          <div class="card-title"><span class="status live"></span> Comparison Service</div>
+          <div class="card-desc">Aggregate 2-5 properties, identify best values.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FRONTEND STORES + SERVICES -->
+    <div class="section-group">
+      <div class="section-group-title" style="color:var(--accent2)">Frontend State &amp; Services</div>
+
+      <div class="card">
+        <div class="card-title"><span class="status live"></span> Auth Store <span class="tag">Zustand</span></div>
+        <div class="card-desc">user, isAuthenticated, isLoading, error — login(), register(), logout(), checkAuth()</div>
+        <div class="chip-list"><span class="chip">authSlice.ts</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><span class="status live"></span> UI Store <span class="tag">Zustand + persist</span></div>
+        <div class="card-desc">theme (light/dark), sidebarCollapsed, mobileSidebarOpen — persisted to localStorage</div>
+        <div class="chip-list"><span class="chip">uiStore.ts</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><span class="status live"></span> API Services</div>
+        <div class="card-desc">4 service modules — Axios with JWT interceptor, auto-redirect on 401</div>
+        <div class="chip-list">
+          <span class="chip">authService.ts</span>
+          <span class="chip">propertyService.ts</span>
+          <span class="chip">dealFolderService.ts</span>
+          <span class="chip">comparisonService.ts</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><span class="status live"></span> Utilities</div>
+        <div class="card-desc">criteriaEvaluation.ts (rank + gradient colors) · csvExport.ts (comparison → CSV)</div>
+        <div class="chip-list"><span class="chip cyan">Scoring</span><span class="chip cyan">Export</span></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- DATA MODELS -->
+  <div class="row" style="margin-top:14px">
+    <div class="section-group" style="flex:1">
+      <div class="section-group-title" style="color:var(--blue)">Database Models (SQLAlchemy)</div>
+      <div class="row" style="gap:8px;margin-bottom:0;flex-wrap:wrap">
+
+        <div class="card" style="flex:1;min-width:180px">
+          <div class="card-title"><span class="status live"></span> User</div>
+          <div class="field-list">id · email · hashed_password<br/>full_name · is_active<br/>created_at · updated_at</div>
+        </div>
+
+        <div class="card" style="flex:1.5;min-width:240px">
+          <div class="card-title"><span class="status live"></span> Property</div>
+          <div class="field-list">id · user_id → User · deal_folder_id → Folder<br/>deal_name · document_type · document_subtype<br/>address · type · submarket · units · sf<br/>t12/t3/y1_financials_json · denorm NOI<br/>raw_pdf_path · analysis_status · search_text</div>
+        </div>
+
+        <div class="card" style="flex:1;min-width:180px">
+          <div class="card-title"><span class="status live"></span> DealFolder</div>
+          <div class="field-list">id · user_id → User<br/>folder_name · property_type<br/>address · submarket<br/>units · sf · status · notes<br/>document_count</div>
+        </div>
+
+        <div class="card" style="flex:1;min-width:180px">
+          <div class="card-title"><span class="status live"></span> BOVPricingTier</div>
+          <div class="field-list">id · property_id → Property<br/>tier_label · tier_type<br/>pricing · price/unit · price/sf<br/>leverage · loan · rate<br/>IRR · equity_multiple · CoC</div>
+        </div>
+
+        <div class="card" style="flex:0.8;min-width:150px">
+          <div class="card-title"><span class="status live"></span> BOVCapRate</div>
+          <div class="field-list">pricing_tier_id → Tier<br/>cap_rate_type · value<br/>noi_basis · qualifier</div>
+        </div>
+
+        <div class="card" style="flex:0.8;min-width:150px">
+          <div class="card-title"><span class="status live"></span> AnalysisLog</div>
+          <div class="field-list">property_id · user_id<br/>action · model<br/>status · error_message</div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="connector-row"><div class="v-line"></div></div>
+
+<!-- ═══════════════ TIER 4 · UI COMPONENTS ══════════════ -->
+<div class="tier">
+  <div class="tier-label">Tier 4 — UI Component Library &amp; Design System</div>
+  <div class="row">
+
+    <div class="section-group">
+      <div class="section-group-title" style="color:var(--pink)">Layout &amp; Navigation</div>
+      <div class="chip-list">
+        <span class="chip pink">MainLayout</span>
+        <span class="chip pink">Sidebar</span>
+        <span class="chip pink">Header</span>
+        <span class="chip pink">PageTransition</span>
+        <span class="chip pink">ProtectedRoute</span>
+        <span class="chip pink">PageSkeleton</span>
+      </div>
+      <div class="card-desc" style="margin-top:8px">App shell with collapsible sidebar, breadcrumb header, ambient background orbs, Framer Motion page transitions, skeleton loading states for every page</div>
+    </div>
+
+    <div class="section-group">
+      <div class="section-group-title" style="color:var(--pink)">Feature Components</div>
+      <div class="chip-list">
+        <span class="chip pink">LoginForm</span>
+        <span class="chip pink">RegisterForm</span>
+        <span class="chip pink">PDFUploader</span>
+        <span class="chip pink">ExtractionPreview</span>
+        <span class="chip pink">ComparisonTable</span>
+        <span class="chip pink">InvestmentCriteriaPanel</span>
+        <span class="chip pink">BOVPricingTiers</span>
+        <span class="chip pink">PricingAnalysis</span>
+        <span class="chip pink">CreateFolderModal</span>
+        <span class="chip pink">DeleteFolderModal</span>
+        <span class="chip pink">SaveToFolderModal</span>
+      </div>
+    </div>
+
+    <div class="section-group">
+      <div class="section-group-title" style="color:var(--pink)">shadcn/ui Primitives (15+)</div>
+      <div class="chip-list">
+        <span class="chip dim">Button</span>
+        <span class="chip dim">Card</span>
+        <span class="chip dim">Dialog</span>
+        <span class="chip dim">Input</span>
+        <span class="chip dim">Label</span>
+        <span class="chip dim">Select</span>
+        <span class="chip dim">Table</span>
+        <span class="chip dim">Tabs</span>
+        <span class="chip dim">Badge</span>
+        <span class="chip dim">Checkbox</span>
+        <span class="chip dim">Alert</span>
+        <span class="chip dim">AlertDialog</span>
+        <span class="chip dim">RadioGroup</span>
+        <span class="chip dim">Separator</span>
+        <span class="chip dim">Skeleton</span>
+      </div>
+      <div class="card-desc" style="margin-top:8px">Purple design system — Syne headings, Instrument Sans body, custom animations (fade-in, scale-in, shimmer, float), dark mode via CSS variables</div>
+    </div>
+
+  </div>
+</div>
+
+<div class="connector-row"><div class="v-line"></div></div>
+
+<!-- ═══════════════ TIER 5 · DATA FLOW ══════════════════ -->
+<div class="tier">
+  <div class="tier-label">Tier 5 — Key Data Flows</div>
+  <div class="row">
+
+    <div class="card" style="flex:1;border-left:3px solid var(--orange)">
+      <div class="card-title">PDF Upload → Property Creation</div>
+      <div class="card-desc" style="line-height:1.7">
+        <strong style="color:var(--text)">1.</strong> User drops PDF on Upload page<br/>
+        <strong style="color:var(--text)">2.</strong> Frontend → <span style="color:var(--blue)">POST /upload</span> (multipart)<br/>
+        <strong style="color:var(--text)">3.</strong> Backend: pdfplumber extracts text<br/>
+        <strong style="color:var(--text)">4.</strong> Backend: Claude Sonnet 4.5 analyzes text <span style="color:var(--orange)">⚡ LLM</span><br/>
+        <strong style="color:var(--text)">5.</strong> Returns ExtractionResult → auto-save<br/>
+        <strong style="color:var(--text)">6.</strong> Frontend → <span style="color:var(--blue)">POST /properties</span> (with folder)<br/>
+        <strong style="color:var(--text)">7.</strong> Navigate to PropertyDetail page
+      </div>
+    </div>
+
+    <div class="card" style="flex:1;border-left:3px solid var(--accent)">
+      <div class="card-title">Comparison Flow</div>
+      <div class="card-desc" style="line-height:1.7">
+        <strong style="color:var(--text)">1.</strong> User selects 2-5 properties in Library<br/>
+        <strong style="color:var(--text)">2.</strong> Frontend → <span style="color:var(--blue)">POST /properties/compare</span><br/>
+        <strong style="color:var(--text)">3.</strong> Backend aggregates financials, BOV tiers<br/>
+        <strong style="color:var(--text)">4.</strong> Identifies best values per metric<br/>
+        <strong style="color:var(--text)">5.</strong> Frontend renders ComparisonTable<br/>
+        <strong style="color:var(--text)">6.</strong> User applies scoring criteria → radar chart<br/>
+        <strong style="color:var(--text)">7.</strong> Optional: export to CSV
+      </div>
+    </div>
+
+    <div class="card" style="flex:1;border-left:3px solid var(--green)">
+      <div class="card-title">Auth Flow</div>
+      <div class="card-desc" style="line-height:1.7">
+        <strong style="color:var(--text)">1.</strong> User submits credentials<br/>
+        <strong style="color:var(--text)">2.</strong> <span style="color:var(--blue)">POST /auth/login</span> → bcrypt verify<br/>
+        <strong style="color:var(--text)">3.</strong> Returns JWT (60-min) + httpOnly cookie<br/>
+        <strong style="color:var(--text)">4.</strong> Axios interceptor attaches Bearer token<br/>
+        <strong style="color:var(--text)">5.</strong> 401 response → auto-redirect to Login<br/>
+        <strong style="color:var(--text)">6.</strong> checkAuth() on app load validates token
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="connector-row"><div class="v-line"></div></div>
+
+<!-- ═══════════════ TIER 6 · UNCOMMITTED & BRANCHES ═════ -->
+<div class="tier">
+  <div class="tier-label">Tier 6 — Current Git Status &amp; Branches</div>
+  <div class="row">
+
+    <div class="section-group" style="flex:1">
+      <div class="section-group-title" style="color:var(--yellow)">Uncommitted Work</div>
+      <div class="card">
+        <div class="card-title"><span class="status wip"></span> Modified Files</div>
+        <div class="card-desc">
+          <code style="font-size:10px;color:var(--accent2)">claude_extraction_service.py</code> — added explicit base_url to Anthropic client<br/>
+          <code style="font-size:10px;color:var(--accent2)">package-lock.json</code> — dependency lockfile change
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title"><span class="status wip"></span> Untracked Files</div>
+        <div class="card-desc">
+          <code style="font-size:10px;color:var(--accent2)">.ai/10-SCORING-IMPLEMENTATION-PLAN.md</code> — scoring system spec<br/>
+          <code style="font-size:10px;color:var(--accent2)">backend/test_claude_api.py</code> — API test script
+        </div>
+      </div>
+    </div>
+
+    <div class="section-group" style="flex:1">
+      <div class="section-group-title" style="color:var(--blue)">Branches</div>
+      <div class="card">
+        <div class="card-title"><span class="status live"></span> main <span class="tag" style="background:rgba(52,211,153,.15);color:var(--green)">active</span></div>
+        <div class="card-desc">Primary branch — all 13 recent commits landed here.</div>
+      </div>
+      <div class="card">
+        <div class="card-title"><span class="status live"></span> claude/astra-cre-ui-integration</div>
+        <div class="card-desc">Local + remote. Fully merged. Safe to delete.</div>
+      </div>
+      <div class="card">
+        <div class="card-title"><span class="status live"></span> claude/emerald-forest-design-system</div>
+        <div class="card-desc">Local + remote. Fully merged. Safe to delete.</div>
+      </div>
+      <div class="card">
+        <div class="card-title"><span class="status live"></span> claude/dashboard-api-integration</div>
+        <div class="card-desc">Remote only. Fully merged. Safe to delete.</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="connector-row"><div class="v-line"></div></div>
+
+<!-- ═══════════════ TIER 7 · ROADMAP ════════════════════ -->
+<div class="tier">
+  <div class="tier-label">Tier 7 — Roadmap &amp; Next Steps</div>
+  <div class="row">
+
+    <div class="roadmap-card opt-a">
+      <div class="card-title">Option A: Polish &amp; Enhance</div>
+      <div class="timeframe">1–3 days</div>
+      <ul>
+        <li>Functional Settings page (profile, appearance)</li>
+        <li>Property selection checkboxes</li>
+        <li>Bulk operations (multi-delete)</li>
+        <li>Advanced search filters</li>
+        <li>Notification system</li>
+      </ul>
+    </div>
+
+    <div class="roadmap-card opt-b">
+      <div class="card-title">Option B: Portfolio Analysis</div>
+      <div class="timeframe">5–7 days</div>
+      <ul>
+        <li>Geographic map view (Mapbox/Leaflet)</li>
+        <li>Portfolio-level aggregate metrics</li>
+        <li>Smart portfolios (filter-based)</li>
+        <li>Portfolio comparison mode</li>
+        <li>Export portfolio reports</li>
+      </ul>
+    </div>
+
+    <div class="roadmap-card opt-c">
+      <div class="card-title">Option C: Deploy to Production</div>
+      <div class="timeframe">2–3 days</div>
+      <ul>
+        <li>Vercel for frontend hosting</li>
+        <li>Render for backend API</li>
+        <li>SQLite → PostgreSQL migration</li>
+        <li>CI/CD pipeline (GitHub Actions)</li>
+        <li>Environment variables &amp; secrets</li>
+      </ul>
+    </div>
+
+    <div class="roadmap-card opt-d">
+      <div class="card-title">Option D: AI Enhancements</div>
+      <div class="timeframe">From spec docs</div>
+      <ul>
+        <li>Property scoring system (weighted criteria)</li>
+        <li>AI chatbot assistant (per-property)</li>
+        <li>Automated deal memo generation</li>
+        <li>Market comp integration</li>
+        <li>Rent roll extraction</li>
+      </ul>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════ FOOTER ══════════════════════════════ -->
+<div style="text-align:center;padding:32px 0 48px;color:var(--text-dim);font-size:11px">
+  Astra CRE Platform · Ecosystem Map · 9 pages · 18 API routes · 6 models · 5 services · Feb 8, 2026
+</div>
+
+</div><!-- /canvas -->
+</body>
+</html>

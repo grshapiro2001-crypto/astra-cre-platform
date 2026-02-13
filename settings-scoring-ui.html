@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Astra CRE — Scoring Settings</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0F0B15;
+    --bg-card: #1E1828;
+    --bg-elevated: #2A2236;
+    --bg-input: #1A1424;
+    --purple-50: #F5F3FF;
+    --purple-100: #EDE9FE;
+    --purple-200: #DDD6FE;
+    --purple-300: #C4B5FD;
+    --purple-400: #A78BFA;
+    --purple-500: #8B5CF6;
+    --purple-600: #7C3AED;
+    --purple-700: #6D28D9;
+    --text: #F5F3FF;
+    --text-secondary: #A8A0B8;
+    --text-muted: #6B6880;
+    --border: rgba(167, 139, 250, 0.12);
+    --border-hover: rgba(167, 139, 250, 0.25);
+    --emerald: #10B981;
+    --emerald-dim: rgba(16, 185, 129, 0.12);
+    --amber: #F59E0B;
+    --amber-dim: rgba(245, 158, 11, 0.12);
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'DM Sans', -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 32px;
+  }
+  .container { max-width: 760px; margin: 0 auto; }
+
+  h1 {
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin-bottom: 4px;
+  }
+  .subtitle {
+    font-size: 14px;
+    color: var(--text-muted);
+    margin-bottom: 28px;
+  }
+
+  /* Preset Selector */
+  .preset-section {
+    margin-bottom: 28px;
+  }
+  .section-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 10px;
+  }
+  .preset-pills {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .preset-pill {
+    padding: 8px 18px;
+    border-radius: 100px;
+    font-size: 13px;
+    font-weight: 500;
+    border: 1px solid var(--border);
+    background: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: inherit;
+  }
+  .preset-pill:hover {
+    border-color: var(--border-hover);
+    background: var(--bg-elevated);
+    color: var(--text);
+  }
+  .preset-pill.active {
+    border-color: var(--purple-500);
+    background: rgba(139, 92, 246, 0.15);
+    color: var(--purple-300);
+    font-weight: 600;
+  }
+
+  /* Layer Weights Section */
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    margin-bottom: 16px;
+  }
+  .card-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .card-desc {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-bottom: 20px;
+  }
+
+  /* Slider Row */
+  .slider-group {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .slider-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .slider-label {
+    width: 180px;
+    flex-shrink: 0;
+  }
+  .slider-label .name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+  }
+  .slider-label .desc {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 1px;
+  }
+  .slider-track {
+    flex: 1;
+    height: 6px;
+    background: var(--bg-elevated);
+    border-radius: 3px;
+    position: relative;
+    cursor: pointer;
+  }
+  .slider-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--purple-600), var(--purple-400));
+    border-radius: 3px;
+    transition: width 0.15s;
+  }
+  .slider-thumb {
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 18px;
+    height: 18px;
+    background: var(--purple-400);
+    border: 2px solid var(--bg-card);
+    border-radius: 50%;
+    cursor: grab;
+    box-shadow: 0 2px 8px rgba(139, 92, 246, 0.3);
+    transition: left 0.15s;
+  }
+  .slider-value {
+    width: 52px;
+    text-align: right;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--purple-300);
+    flex-shrink: 0;
+  }
+
+  /* Weight Sum Indicator */
+  .weight-sum {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+    font-size: 12px;
+  }
+  .weight-sum .total {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .weight-sum .total.valid { color: var(--emerald); }
+  .weight-sum .total.invalid { color: #FB7185; }
+  .weight-sum .label { color: var(--text-muted); }
+
+  /* Preview Section */
+  .preview-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    margin-bottom: 16px;
+  }
+  .preview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+  .preview-title {
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .preview-score {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .preview-badge {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 18px;
+    font-weight: 700;
+    border: 2px solid var(--purple-400);
+    color: var(--purple-300);
+  }
+  .preview-breakdown {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .preview-layer {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .preview-layer .layer-name {
+    font-size: 12px;
+    color: var(--text-muted);
+    width: 160px;
+    flex-shrink: 0;
+  }
+  .preview-layer .layer-bar-bg {
+    flex: 1;
+    height: 8px;
+    background: var(--bg-elevated);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .preview-layer .layer-bar {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.3s;
+  }
+  .preview-layer .layer-bar.l1 { background: var(--purple-400); }
+  .preview-layer .layer-bar.l2 { background: var(--amber); }
+  .preview-layer .layer-bar.l3 { background: var(--emerald); }
+  .preview-layer .layer-score {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    width: 60px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  /* Info Box */
+  .info-box {
+    background: rgba(139, 92, 246, 0.06);
+    border: 1px solid rgba(139, 92, 246, 0.15);
+    border-radius: var(--radius-sm);
+    padding: 14px 18px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    margin-bottom: 20px;
+  }
+  .info-box strong { color: var(--purple-300); }
+
+  /* Bottom Actions */
+  .actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 24px;
+  }
+  .actions .reset-btn {
+    font-size: 13px;
+    color: var(--text-muted);
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    padding: 8px 12px;
+    border-radius: var(--radius-sm);
+    transition: all 0.15s;
+  }
+  .actions .reset-btn:hover {
+    color: var(--text-secondary);
+    background: var(--bg-elevated);
+  }
+  .actions .save-btn {
+    padding: 10px 28px;
+    background: var(--purple-600);
+    color: white;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.15s;
+  }
+  .actions .save-btn:hover {
+    background: var(--purple-700);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
+  }
+
+  /* Metric sub-weights (nested inside layer card) */
+  .sub-weights {
+    background: var(--bg-input);
+    border-radius: var(--radius-sm);
+    padding: 16px;
+    margin-top: 16px;
+  }
+  .sub-weights .section-label { margin-bottom: 12px; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h1>Scoring Weights</h1>
+  <div class="subtitle">Customize how the Deal Score is calculated for your investment strategy</div>
+
+  <!-- Preset Selector -->
+  <div class="preset-section">
+    <div class="section-label">Strategy Preset</div>
+    <div class="preset-pills">
+      <button class="preset-pill" onclick="applyPreset('core')">Core</button>
+      <button class="preset-pill active" onclick="applyPreset('value_add')">Value-Add</button>
+      <button class="preset-pill" onclick="applyPreset('cash_flow')">Cash Flow</button>
+      <button class="preset-pill" onclick="applyPreset('opportunistic')">Opportunistic</button>
+      <button class="preset-pill" onclick="applyPreset('custom')">Custom</button>
+    </div>
+  </div>
+
+  <!-- Info Box -->
+  <div class="info-box">
+    <strong>Value-Add</strong> strategy emphasizes supply risk and comp analysis. Properties with favorable basis vs comps and manageable supply pipelines score highest. Best for repositioning and lease-up deals.
+  </div>
+
+  <!-- Layer Weights -->
+  <div class="card">
+    <div class="card-title">Layer Weights</div>
+    <div class="card-desc">How much each scoring layer contributes to the total score. Must sum to 100%.</div>
+    <div class="slider-group">
+      <div class="slider-row">
+        <div class="slider-label">
+          <div class="name">Property Fundamentals</div>
+          <div class="desc">Occupancy, OpEx, Supply</div>
+        </div>
+        <div class="slider-track">
+          <div class="slider-fill" style="width: 25%"></div>
+          <div class="slider-thumb" style="left: 25%"></div>
+        </div>
+        <div class="slider-value">25%</div>
+      </div>
+      <div class="slider-row">
+        <div class="slider-label">
+          <div class="name">Market Intelligence</div>
+          <div class="desc">Employment, rent trends, AI</div>
+        </div>
+        <div class="slider-track">
+          <div class="slider-fill" style="width: 20%"></div>
+          <div class="slider-thumb" style="left: 20%"></div>
+        </div>
+        <div class="slider-value">20%</div>
+      </div>
+      <div class="slider-row">
+        <div class="slider-label">
+          <div class="name">Deal Comp Analysis</div>
+          <div class="desc">Cap rate, $/unit vs comps</div>
+        </div>
+        <div class="slider-track">
+          <div class="slider-fill" style="width: 55%"></div>
+          <div class="slider-thumb" style="left: 55%"></div>
+        </div>
+        <div class="slider-value">55%</div>
+      </div>
+    </div>
+    <div class="weight-sum">
+      <span class="label">Total:</span>
+      <span class="total valid">100%</span>
+    </div>
+  </div>
+
+  <!-- Property Fundamentals Sub-Weights -->
+  <div class="card">
+    <div class="card-title">Property Fundamentals — Metric Weights</div>
+    <div class="card-desc">How metrics within Layer 1 are weighted relative to each other.</div>
+    <div class="slider-group">
+      <div class="slider-row">
+        <div class="slider-label">
+          <div class="name">Economic Occupancy</div>
+          <div class="desc">Current demand health</div>
+        </div>
+        <div class="slider-track">
+          <div class="slider-fill" style="width: 25%"></div>
+          <div class="slider-thumb" style="left: 25%"></div>
+        </div>
+        <div class="slider-value">25%</div>
+      </div>
+      <div class="slider-row">
+        <div class="slider-label">
+          <div class="name">OpEx Ratio</div>
+          <div class="desc">Operational efficiency</div>
+        </div>
+        <div class="slider-track">
+          <div class="slider-fill" style="width: 35%"></div>
+          <div class="slider-thumb" style="left: 35%"></div>
+        </div>
+        <div class="slider-value">35%</div>
+      </div>
+      <div class="slider-row">
+        <div class="slider-label">
+          <div class="name">Supply Pipeline</div>
+          <div class="desc">Future competitive risk</div>
+        </div>
+        <div class="slider-track">
+          <div class="slider-fill" style="width: 40%"></div>
+          <div class="slider-thumb" style="left: 40%"></div>
+        </div>
+        <div class="slider-value">40%</div>
+      </div>
+    </div>
+    <div class="weight-sum">
+      <span class="label">Total:</span>
+      <span class="total valid">100%</span>
+    </div>
+  </div>
+
+  <!-- Live Preview -->
+  <div class="preview-card">
+    <div class="preview-header">
+      <div class="preview-title">Preview — Prose Gainesville</div>
+      <div class="preview-score">
+        <div class="preview-badge">52</div>
+        <div style="font-size:12px; color:var(--text-muted)">Current<br>Score</div>
+      </div>
+    </div>
+    <div class="preview-breakdown">
+      <div class="preview-layer">
+        <div class="layer-name">Property Fundamentals</div>
+        <div class="layer-bar-bg">
+          <div class="layer-bar l1" style="width: 62%"></div>
+        </div>
+        <div class="layer-score">62 × 25%</div>
+      </div>
+      <div class="preview-layer">
+        <div class="layer-name">Market Intelligence</div>
+        <div class="layer-bar-bg">
+          <div class="layer-bar l2" style="width: 54%"></div>
+        </div>
+        <div class="layer-score">54 × 20%</div>
+      </div>
+      <div class="preview-layer">
+        <div class="layer-name">Deal Comp Analysis</div>
+        <div class="layer-bar-bg">
+          <div class="layer-bar l3" style="width: 48%"></div>
+        </div>
+        <div class="layer-score">48 × 55%</div>
+      </div>
+    </div>
+    <div style="margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+      <div style="font-size: 12px; color: var(--text-muted);">
+        Calculation: (62 × 0.25) + (54 × 0.20) + (48 × 0.55) = <span style="font-family: 'JetBrains Mono'; color: var(--purple-300); font-weight: 600;">52.3</span>
+      </div>
+      <div style="font-size: 11px; color: var(--text-muted);">
+        Using latest data · Updated now
+      </div>
+    </div>
+  </div>
+
+  <!-- Actions -->
+  <div class="actions">
+    <button class="reset-btn">Reset to defaults</button>
+    <button class="save-btn">Save Changes</button>
+  </div>
+</div>
+
+<script>
+  const PRESETS = {
+    value_add: { l1: 25, l2: 20, l3: 55, occ: 25, opex: 35, supply: 40, desc: 'Value-Add strategy emphasizes supply risk and comp analysis. Properties with favorable basis vs comps and manageable supply pipelines score highest. Best for repositioning and lease-up deals.' },
+    cash_flow: { l1: 35, l2: 25, l3: 40, occ: 40, opex: 30, supply: 30, desc: 'Cash Flow strategy prioritizes current income stability. High occupancy and low operating expenses are rewarded. Best for stabilized assets with predictable returns.' },
+    core: { l1: 30, l2: 20, l3: 50, occ: 40, opex: 25, supply: 35, desc: 'Core strategy balances property quality with market pricing. Strong occupancy and fair comp-based valuations score highest. Best for institutional-quality long-hold investments.' },
+    opportunistic: { l1: 20, l2: 20, l3: 60, occ: 20, opex: 30, supply: 50, desc: 'Opportunistic strategy maximizes focus on relative value vs comps and supply risk. Best for finding mispriced deals in transitioning markets.' },
+    custom: { l1: 30, l2: 20, l3: 50, occ: 35, opex: 30, supply: 35, desc: 'Custom weights. Adjust sliders to match your specific investment criteria.' },
+  };
+
+  function applyPreset(name) {
+    document.querySelectorAll('.preset-pill').forEach(p => p.classList.remove('active'));
+    event.target.classList.add('active');
+    document.querySelector('.info-box').innerHTML = `<strong>${name.replace('_', '-').replace(/\b\w/g, l => l.toUpperCase())}</strong> ${PRESETS[name].desc.substring(PRESETS[name].desc.indexOf('strategy'))}`;
+  }
+</script>
+
+</body>
+</html>

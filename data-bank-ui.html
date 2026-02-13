@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Astra CRE — Data Bank</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0F0B15;
+    --bg-card: #1E1828;
+    --bg-elevated: #2A2236;
+    --bg-input: #1A1424;
+    --purple-50: #F5F3FF;
+    --purple-100: #EDE9FE;
+    --purple-200: #DDD6FE;
+    --purple-300: #C4B5FD;
+    --purple-400: #A78BFA;
+    --purple-500: #8B5CF6;
+    --purple-600: #7C3AED;
+    --purple-700: #6D28D9;
+    --text: #F5F3FF;
+    --text-secondary: #A8A0B8;
+    --text-muted: #6B6880;
+    --border: rgba(167, 139, 250, 0.12);
+    --border-hover: rgba(167, 139, 250, 0.25);
+    --emerald: #10B981;
+    --emerald-dim: rgba(16, 185, 129, 0.12);
+    --amber: #F59E0B;
+    --amber-dim: rgba(245, 158, 11, 0.12);
+    --rose: #FB7185;
+    --blue: #60A5FA;
+    --blue-dim: rgba(96, 165, 250, 0.12);
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'DM Sans', -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 32px;
+  }
+
+  /* Page Layout */
+  .page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 28px;
+  }
+  .page-header h1 {
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+  .page-header .subtitle {
+    font-size: 14px;
+    color: var(--text-muted);
+    margin-top: 4px;
+  }
+
+  /* Tab Navigation */
+  .tabs {
+    display: flex;
+    gap: 2px;
+    background: var(--bg-card);
+    padding: 4px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    margin-bottom: 24px;
+    width: fit-content;
+  }
+  .tab {
+    padding: 8px 20px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-muted);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.15s;
+    border: none;
+    background: none;
+  }
+  .tab:hover { color: var(--text-secondary); }
+  .tab.active {
+    background: var(--purple-600);
+    color: white;
+  }
+
+  /* Stats Row */
+  .stats-row {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .stat-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    flex: 1;
+  }
+  .stat-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+  }
+  .stat-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--purple-400);
+  }
+  .stat-sub {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+
+  /* Upload Button */
+  .upload-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--purple-600);
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: inherit;
+  }
+  .upload-btn:hover {
+    background: var(--purple-700);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
+  }
+
+  /* Upload Zone */
+  .upload-zone {
+    border: 2px dashed var(--border-hover);
+    border-radius: var(--radius);
+    padding: 48px;
+    text-align: center;
+    margin-bottom: 24px;
+    transition: all 0.2s;
+    cursor: pointer;
+    background: rgba(139, 92, 246, 0.02);
+  }
+  .upload-zone:hover {
+    border-color: var(--purple-500);
+    background: rgba(139, 92, 246, 0.05);
+  }
+  .upload-zone.dragging {
+    border-color: var(--purple-400);
+    background: rgba(139, 92, 246, 0.08);
+  }
+  .upload-icon {
+    width: 48px;
+    height: 48px;
+    background: rgba(139, 92, 246, 0.12);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 16px;
+    color: var(--purple-400);
+  }
+  .upload-zone h3 {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  .upload-zone p {
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+  .upload-zone .file-types {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 12px;
+  }
+  .file-type-badge {
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* Document Type Selector */
+  .type-selector {
+    display: none;
+    margin-bottom: 24px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+  }
+  .type-selector.visible { display: block; }
+  .type-selector h3 {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .type-selector .detected {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+  }
+  .type-options {
+    display: flex;
+    gap: 12px;
+  }
+  .type-option {
+    flex: 1;
+    padding: 16px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.15s;
+    background: none;
+    text-align: left;
+  }
+  .type-option:hover {
+    border-color: var(--border-hover);
+    background: var(--bg-elevated);
+  }
+  .type-option.selected {
+    border-color: var(--purple-500);
+    background: rgba(139, 92, 246, 0.08);
+  }
+  .type-option .type-icon {
+    font-size: 20px;
+    margin-bottom: 8px;
+  }
+  .type-option h4 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 2px;
+  }
+  .type-option p {
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  /* Extraction Preview */
+  .extraction-preview {
+    display: none;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 24px;
+    overflow: hidden;
+  }
+  .extraction-preview.visible { display: block; }
+  .extraction-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .extraction-header h3 { font-size: 15px; font-weight: 600; }
+  .extraction-stats {
+    display: flex;
+    gap: 16px;
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+  .extraction-stats span {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--purple-300);
+    font-weight: 600;
+  }
+
+  /* Inventory Prompt */
+  .inventory-prompt {
+    display: none;
+    background: var(--bg-card);
+    border: 1px solid rgba(245, 158, 11, 0.25);
+    border-radius: var(--radius);
+    padding: 20px 24px;
+    margin-bottom: 24px;
+  }
+  .inventory-prompt.visible { display: block; }
+  .inventory-prompt h3 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--amber);
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .inventory-prompt p {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 16px;
+  }
+  .inventory-inputs {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .inventory-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .inventory-row .submarket-name {
+    font-size: 13px;
+    font-weight: 500;
+    width: 180px;
+    flex-shrink: 0;
+  }
+  .inventory-input {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 8px 12px;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    width: 140px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .inventory-input::placeholder { color: var(--text-muted); }
+  .inventory-input:focus { border-color: var(--purple-500); }
+  .inventory-unit-label {
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  /* Comp Table */
+  .comp-table {
+    width: 100%;
+    font-size: 12.5px;
+    border-collapse: collapse;
+  }
+  .comp-table th {
+    text-align: left;
+    font-weight: 500;
+    color: var(--text-muted);
+    padding: 10px 14px;
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    background: var(--bg-card);
+    z-index: 1;
+  }
+  .comp-table td {
+    padding: 10px 14px;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+    color: var(--text-secondary);
+  }
+  .comp-table td.name {
+    color: var(--text);
+    font-weight: 500;
+  }
+  .comp-table td.mono {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+  }
+  .comp-table tr:hover td {
+    background: var(--bg-elevated);
+  }
+  .cap-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 500;
+  }
+  .cap-badge.has-data {
+    background: var(--emerald-dim);
+    color: var(--emerald);
+  }
+  .cap-badge.tbd {
+    background: var(--bg-elevated);
+    color: var(--text-muted);
+  }
+
+  .table-scroll {
+    max-height: 400px;
+    overflow-y: auto;
+  }
+  .table-scroll::-webkit-scrollbar { width: 6px; }
+  .table-scroll::-webkit-scrollbar-track { background: transparent; }
+  .table-scroll::-webkit-scrollbar-thumb { 
+    background: rgba(167, 139, 250, 0.2); 
+    border-radius: 3px; 
+  }
+
+  /* Documents List */
+  .doc-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .doc-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    transition: all 0.15s;
+    cursor: pointer;
+  }
+  .doc-item:hover {
+    border-color: var(--border-hover);
+    background: var(--bg-elevated);
+  }
+  .doc-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+  .doc-icon.comps { background: var(--emerald-dim); }
+  .doc-icon.pipeline { background: var(--amber-dim); }
+  .doc-icon.model { background: rgba(167, 139, 250, 0.12); }
+  .doc-info { flex: 1; }
+  .doc-info h4 { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
+  .doc-info p { font-size: 12px; color: var(--text-muted); }
+  .doc-meta {
+    text-align: right;
+    flex-shrink: 0;
+  }
+  .doc-meta .count {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--purple-300);
+  }
+  .doc-meta .date {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-weight: 500;
+  }
+  .status-badge.complete {
+    background: var(--emerald-dim);
+    color: var(--emerald);
+  }
+  .status-badge.processing {
+    background: var(--amber-dim);
+    color: var(--amber);
+  }
+
+  /* Bottom actions */
+  .actions-bar {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    padding: 16px 20px;
+    border-top: 1px solid var(--border);
+  }
+  .btn-secondary {
+    padding: 8px 16px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: none;
+    color: var(--text-secondary);
+    font-family: inherit;
+    transition: all 0.15s;
+  }
+  .btn-secondary:hover {
+    border-color: var(--border-hover);
+    color: var(--text);
+  }
+  .btn-primary {
+    padding: 8px 20px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    background: var(--purple-600);
+    color: white;
+    font-family: inherit;
+    transition: all 0.15s;
+  }
+  .btn-primary:hover {
+    background: var(--purple-700);
+  }
+
+  /* Sections */
+  .section { margin-bottom: 32px; }
+  .section-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  /* Demo container */
+  .demo-container {
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+</style>
+</head>
+<body>
+
+<div class="demo-container">
+
+  <!-- Page Header -->
+  <div class="page-header">
+    <div>
+      <h1>Data Bank</h1>
+      <div class="subtitle">Market comps, pipeline trackers, and underwriting models</div>
+    </div>
+    <button class="upload-btn" onclick="toggleUpload()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+      Upload Document
+    </button>
+  </div>
+
+  <!-- Stats Row -->
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-label">Total Comps</div>
+      <div class="stat-value">177</div>
+      <div class="stat-sub">Across 1 document</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Pipeline Projects</div>
+      <div class="stat-value">24</div>
+      <div class="stat-sub">3 submarkets tracked</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Markets Covered</div>
+      <div class="stat-value">84</div>
+      <div class="stat-sub">Metro Atlanta</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Scoring Impact</div>
+      <div class="stat-value" style="color: var(--emerald)">High</div>
+      <div class="stat-sub">Layer 3 fully active</div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab(this, 'documents')">Documents</button>
+    <button class="tab" onclick="switchTab(this, 'comps')">Comps Browser</button>
+    <button class="tab" onclick="switchTab(this, 'pipeline')">Pipeline</button>
+    <button class="tab" onclick="switchTab(this, 'inventory')">Inventory</button>
+  </div>
+
+  <!-- Upload Zone (hidden by default) -->
+  <div class="upload-zone" id="uploadZone" style="display:none;">
+    <div class="upload-icon">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+    </div>
+    <h3>Drop your file here</h3>
+    <p>Astra will auto-detect the document type and extract structured data</p>
+    <div class="file-types">
+      <span class="file-type-badge">.xlsx</span>
+      <span class="file-type-badge">.xlsm</span>
+      <span class="file-type-badge">.csv</span>
+      <span class="file-type-badge">.pdf</span>
+    </div>
+  </div>
+
+  <!-- Document Type Detection (shown after upload) -->
+  <div class="type-selector" id="typeSelector">
+    <h3>Document Detected</h3>
+    <div class="detected">Nuveen_-_Metro_Atlanta_Sales_Comps_2024-2025.xlsx · 1 sheet · 180 rows</div>
+    <div class="type-options">
+      <div class="type-option selected">
+        <div class="type-icon">📊</div>
+        <h4>Sales Comp Tracker</h4>
+        <p>Transaction data with cap rates, pricing, and buyer/seller info</p>
+      </div>
+      <div class="type-option">
+        <div class="type-icon">🏗️</div>
+        <h4>Pipeline Tracker</h4>
+        <p>Development pipeline with delivery dates and project status</p>
+      </div>
+      <div class="type-option">
+        <div class="type-icon">📋</div>
+        <h4>Underwriting Model</h4>
+        <p>Full proforma with financials, assumptions, and returns</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Extraction Preview -->
+  <div class="extraction-preview" id="extractionPreview">
+    <div class="extraction-header">
+      <h3>Extraction Preview — Sales Comps</h3>
+      <div class="extraction-stats">
+        <div><span>177</span> comps extracted</div>
+        <div><span>112</span> with cap rates</div>
+        <div><span>84</span> submarkets</div>
+      </div>
+    </div>
+    <div class="table-scroll">
+      <table class="comp-table">
+        <thead>
+          <tr>
+            <th>Property</th>
+            <th>Submarket</th>
+            <th>Type</th>
+            <th>Units</th>
+            <th>Year</th>
+            <th>Cap Rate</th>
+            <th>$/Unit</th>
+            <th>Sale Date</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="name">Cortland Windward</td>
+            <td>Alpharetta</td>
+            <td>Garden</td>
+            <td class="mono">294</td>
+            <td class="mono">1987</td>
+            <td><span class="cap-badge tbd">TBD</span></td>
+            <td class="mono">$256,000</td>
+            <td class="mono">12/18/25</td>
+          </tr>
+          <tr>
+            <td class="name">Novo Stockbridge</td>
+            <td>Stockbridge</td>
+            <td>Garden</td>
+            <td class="mono">294</td>
+            <td class="mono">2023</td>
+            <td><span class="cap-badge has-data">5.25%</span></td>
+            <td class="mono">$210,340</td>
+            <td class="mono">12/16/25</td>
+          </tr>
+          <tr>
+            <td class="name">Bell Kennesaw Mountain</td>
+            <td>Kennesaw</td>
+            <td>Garden</td>
+            <td class="mono">450</td>
+            <td class="mono">2001</td>
+            <td><span class="cap-badge has-data">5.00%</span></td>
+            <td class="mono">$178,000</td>
+            <td class="mono">12/15/25</td>
+          </tr>
+          <tr>
+            <td class="name">Story Mundy Mill</td>
+            <td>Oakwood</td>
+            <td>Garden</td>
+            <td class="mono">300</td>
+            <td class="mono">2022</td>
+            <td><span class="cap-badge has-data">5.60%</span></td>
+            <td class="mono">$228,000</td>
+            <td class="mono">9/24/25</td>
+          </tr>
+          <tr>
+            <td class="name">The Finch</td>
+            <td>Hoschton</td>
+            <td>Garden</td>
+            <td class="mono">275</td>
+            <td class="mono">2023</td>
+            <td><span class="cap-badge has-data">5.30%</span></td>
+            <td class="mono">$242,755</td>
+            <td class="mono">8/29/25</td>
+          </tr>
+          <tr>
+            <td class="name">Prose Fairview</td>
+            <td>Covington</td>
+            <td>Garden</td>
+            <td class="mono">318</td>
+            <td class="mono">2022</td>
+            <td><span class="cap-badge has-data">5.60%</span></td>
+            <td class="mono">$197,013</td>
+            <td class="mono">6/25/25</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="actions-bar">
+      <button class="btn-secondary">Cancel</button>
+      <button class="btn-primary" onclick="confirmExtraction()">Confirm & Save to Data Bank</button>
+    </div>
+  </div>
+
+  <!-- Inventory Prompt (shown for pipeline uploads) -->
+  <div class="inventory-prompt" id="inventoryPrompt">
+    <h3>⚡ Submarket Inventory Needed</h3>
+    <p>We found pipeline projects in these submarkets. Enter the estimated total existing inventory for accurate supply pressure scoring.</p>
+    <div class="inventory-inputs">
+      <div class="inventory-row">
+        <div class="submarket-name">Gainesville</div>
+        <input class="inventory-input" type="text" placeholder="e.g. 4,500" value="4,500">
+        <span class="inventory-unit-label">units</span>
+      </div>
+      <div class="inventory-row">
+        <div class="submarket-name">Oakwood</div>
+        <input class="inventory-input" type="text" placeholder="e.g. 2,200">
+        <span class="inventory-unit-label">units</span>
+      </div>
+      <div class="inventory-row">
+        <div class="submarket-name">Buford</div>
+        <input class="inventory-input" type="text" placeholder="e.g. 6,800">
+        <span class="inventory-unit-label">units</span>
+      </div>
+    </div>
+    <div style="margin-top: 16px; display: flex; gap: 12px; justify-content: flex-end;">
+      <button class="btn-secondary">Skip for now</button>
+      <button class="btn-primary">Save Inventory</button>
+    </div>
+  </div>
+
+  <!-- Documents Tab -->
+  <div class="section" id="documentsTab">
+    <div class="section-title">Uploaded Documents</div>
+    <div class="doc-list">
+      <div class="doc-item">
+        <div class="doc-icon comps">📊</div>
+        <div class="doc-info">
+          <h4>Nuveen - Metro Atlanta Sales Comps 2024-2025</h4>
+          <p>Sales comp tracker · Metro Atlanta · 84 submarkets</p>
+        </div>
+        <div class="doc-meta">
+          <div class="count">177 comps</div>
+          <div class="date">Uploaded today</div>
+          <span class="status-badge complete">✓ Extracted</span>
+        </div>
+      </div>
+      <div class="doc-item">
+        <div class="doc-icon pipeline">🏗️</div>
+        <div class="doc-info">
+          <h4>NE Atlanta Pipeline Tracker Q4 2025</h4>
+          <p>Development pipeline · Gainesville, Oakwood, Buford</p>
+        </div>
+        <div class="doc-meta">
+          <div class="count">24 projects</div>
+          <div class="date">Uploaded today</div>
+          <span class="status-badge complete">✓ Extracted</span>
+        </div>
+      </div>
+      <div class="doc-item">
+        <div class="doc-icon model">📋</div>
+        <div class="doc-info">
+          <h4>Prose Gainesville Proforma 1/30/26</h4>
+          <p>Underwriting model · Walker & Dunlop / Enodo · 52 sheets</p>
+        </div>
+        <div class="doc-meta">
+          <div class="count">2 scenarios</div>
+          <div class="date">Uploaded today</div>
+          <span class="status-badge processing">⏳ Processing</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  function toggleUpload() {
+    const zone = document.getElementById('uploadZone');
+    zone.style.display = zone.style.display === 'none' ? 'block' : 'none';
+  }
+  
+  function switchTab(el, tab) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+  }
+  
+  function confirmExtraction() {
+    const preview = document.getElementById('extractionPreview');
+    const typeSelector = document.getElementById('typeSelector');
+    preview.classList.remove('visible');
+    typeSelector.classList.remove('visible');
+    alert('Saved to Data Bank! 177 comps now available for scoring.');
+  }
+
+  // Show demo flow
+  setTimeout(() => {
+    document.getElementById('typeSelector').classList.add('visible');
+  }, 500);
+  setTimeout(() => {
+    document.getElementById('extractionPreview').classList.add('visible');
+  }, 1200);
+  setTimeout(() => {
+    document.getElementById('inventoryPrompt').classList.add('visible');
+  }, 2000);
+</script>
+
+</body>
+</html>
