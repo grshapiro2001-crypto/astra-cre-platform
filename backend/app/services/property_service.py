@@ -6,6 +6,7 @@ It does NOT call the LLM or re-analyze PDFs.
 LLM calls are ONLY in claude_extraction_service.py
 """
 import json
+import logging
 import os
 from datetime import datetime
 from typing import List, Optional
@@ -16,6 +17,8 @@ from app.models.property import Property, AnalysisLog
 from app.models.deal_folder import DealFolder
 from app.schemas.property import PropertyCreate, PropertyFilters, FinancialPeriodData
 from app.services import bov_service
+
+logger = logging.getLogger(__name__)
 
 
 # ==================== SAVE PROPERTY ====================
@@ -188,6 +191,15 @@ def save_property(
         bov_service.save_bov_pricing_tiers(db, property_obj.id, tiers_data)
 
     # Save unit mix if provided
+    unit_mix_count = len(property_data.unit_mix) if property_data.unit_mix else 0
+    rent_comps_count = len(property_data.rent_comps) if property_data.rent_comps else 0
+    logger.warning(
+        "SAVE_PROPERTY id=%d: unit_mix=%d items, rent_comps=%d items, "
+        "renovation_cost_per_unit=%s",
+        property_obj.id, unit_mix_count, rent_comps_count,
+        property_data.renovation_cost_per_unit,
+    )
+
     if property_data.unit_mix:
         from app.models.property import PropertyUnitMix
         for unit in property_data.unit_mix:
