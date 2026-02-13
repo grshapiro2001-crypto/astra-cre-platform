@@ -176,7 +176,7 @@ export const CompMap: React.FC<CompMapProps> = ({
         id: `rent-${idx}`,
         type: 'rent',
         position: coords,
-        name: comp.comp_name,
+        name: comp.comp_name || 'Unknown',
         details: {
           units: comp.num_units,
           avgRent: comp.in_place_rent,

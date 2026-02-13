@@ -120,7 +120,7 @@ export interface UnitMixItem {
 
 export interface RentCompItem {
   id: number;
-  comp_name: string;
+  comp_name: string | null;
   location: string | null;
   num_units: number | null;
   avg_unit_sf: number | null;

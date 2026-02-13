@@ -105,7 +105,7 @@ class UnitMixItem(BaseModel):
 class RentCompItem(BaseModel):
     """Rent comp extracted from OM"""
     id: Optional[int] = None
-    comp_name: str
+    comp_name: Optional[str] = "Unknown"  # Default to avoid Pydantic validation failures if extraction omits name
     location: Optional[str] = None
     num_units: Optional[int] = None
     avg_unit_sf: Optional[int] = None

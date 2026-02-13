@@ -511,13 +511,13 @@ export const PropertyDetail = () => {
     // Build location lookup from "All" entries so filtered views don't lose location
     const locationMap = new Map<string, string>();
     for (const c of rentComps) {
-      if (c.location && c.bedroom_type === 'All') {
+      if (c.location && c.bedroom_type === 'All' && c.comp_name) {
         locationMap.set(c.comp_name, c.location);
       }
     }
     return filtered.map(c => ({
       ...c,
-      location: c.location ?? locationMap.get(c.comp_name) ?? null,
+      location: c.location ?? (c.comp_name ? locationMap.get(c.comp_name) : null) ?? null,
     }));
   }, [rentComps, rentCompTab, rentCompTabs]);
 
@@ -1752,7 +1752,7 @@ export const PropertyDetail = () => {
                     {filteredRentComps.map((c, idx) => (
                       <tr key={c.id ?? idx} className="border-b border-border last:border-0 hover:bg-accent/50 transition-colors">
                         <td className="px-4 py-3 font-medium text-foreground">
-                          {c.comp_name}
+                          {c.comp_name || 'Unknown'}
                           {c.is_new_construction && (
                             <span className="ml-2 px-1.5 py-0.5 rounded text-2xs font-bold uppercase bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
                               New

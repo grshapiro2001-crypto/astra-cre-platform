@@ -588,18 +588,30 @@ def build_property_detail_response(property_obj: Property, db: Session) -> Prope
             bov_tiers = [BOVPricingTierData(**tier) for tier in bov_tiers_data]
 
     # Build unit_mix and rent_comps from relationships
+    # Use try/except per-item so one bad record doesn't kill the whole response
     unit_mix_items = []
     if hasattr(property_obj, 'unit_mix') and property_obj.unit_mix:
-        unit_mix_items = [UnitMixItem.model_validate(u) for u in property_obj.unit_mix]
+        for u in property_obj.unit_mix:
+            try:
+                unit_mix_items.append(UnitMixItem.model_validate(u))
+            except Exception as e:
+                logger.error("Failed to validate unit_mix item id=%s: %s", getattr(u, 'id', '?'), e)
 
     rent_comp_items = []
     if hasattr(property_obj, 'rent_comps') and property_obj.rent_comps:
-        rent_comp_items = [RentCompItem.model_validate(c) for c in property_obj.rent_comps]
+        for c in property_obj.rent_comps:
+            try:
+                rent_comp_items.append(RentCompItem.model_validate(c))
+            except Exception as e:
+                logger.error("Failed to validate rent_comp item id=%s: %s", getattr(c, 'id', '?'), e)
 
     logger.warning(
-        "BUILD_RESPONSE id=%d: unit_mix=%d, rent_comps=%d, "
+        "BUILD_RESPONSE id=%d: unit_mix=%d (raw=%d), rent_comps=%d (raw=%d), "
         "renovation_cost_per_unit=%s",
-        property_obj.id, len(unit_mix_items), len(rent_comp_items),
+        property_obj.id, len(unit_mix_items),
+        len(property_obj.unit_mix) if hasattr(property_obj, 'unit_mix') and property_obj.unit_mix else 0,
+        len(rent_comp_items),
+        len(property_obj.rent_comps) if hasattr(property_obj, 'rent_comps') and property_obj.rent_comps else 0,
         property_obj.renovation_cost_per_unit,
     )
 

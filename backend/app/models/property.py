@@ -172,7 +172,7 @@ class PropertyRentComp(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     property_id = Column(Integer, ForeignKey("properties.id", ondelete="CASCADE"), nullable=False)
 
-    comp_name = Column(String, nullable=False)            # "The Linc at Brookhaven"
+    comp_name = Column(String, nullable=True, default="Unknown")  # "The Linc at Brookhaven"
     location = Column(String, nullable=True)              # "Brookhaven"
     num_units = Column(Integer, nullable=True)            # 300
     avg_unit_sf = Column(Integer, nullable=True)          # 939

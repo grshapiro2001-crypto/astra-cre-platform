@@ -202,38 +202,44 @@ def save_property(
 
     if property_data.unit_mix:
         from app.models.property import PropertyUnitMix
-        for unit in property_data.unit_mix:
-            unit_obj = PropertyUnitMix(
-                property_id=property_obj.id,
-                floorplan_name=unit.floorplan_name,
-                unit_type=unit.unit_type,
-                bedroom_count=unit.bedroom_count,
-                bathroom_count=unit.bathroom_count,
-                num_units=unit.num_units,
-                unit_sf=unit.unit_sf,
-                in_place_rent=unit.in_place_rent,
-                proforma_rent=unit.proforma_rent,
-                proforma_rent_psf=unit.proforma_rent_psf,
-                renovation_premium=unit.renovation_premium
-            )
-            db.add(unit_obj)
+        for idx, unit in enumerate(property_data.unit_mix):
+            try:
+                unit_obj = PropertyUnitMix(
+                    property_id=property_obj.id,
+                    floorplan_name=unit.floorplan_name,
+                    unit_type=unit.unit_type,
+                    bedroom_count=unit.bedroom_count,
+                    bathroom_count=unit.bathroom_count,
+                    num_units=unit.num_units,
+                    unit_sf=unit.unit_sf,
+                    in_place_rent=unit.in_place_rent,
+                    proforma_rent=unit.proforma_rent,
+                    proforma_rent_psf=unit.proforma_rent_psf,
+                    renovation_premium=unit.renovation_premium
+                )
+                db.add(unit_obj)
+            except Exception as e:
+                logger.error("Failed to save unit_mix item %d: %s", idx, e)
 
     # Save rent comps if provided
     if property_data.rent_comps:
         from app.models.property import PropertyRentComp
-        for comp in property_data.rent_comps:
-            comp_obj = PropertyRentComp(
-                property_id=property_obj.id,
-                comp_name=comp.comp_name,
-                location=comp.location,
-                num_units=comp.num_units,
-                avg_unit_sf=comp.avg_unit_sf,
-                in_place_rent=comp.in_place_rent,
-                in_place_rent_psf=comp.in_place_rent_psf,
-                bedroom_type=comp.bedroom_type,
-                is_new_construction=comp.is_new_construction
-            )
-            db.add(comp_obj)
+        for idx, comp in enumerate(property_data.rent_comps):
+            try:
+                comp_obj = PropertyRentComp(
+                    property_id=property_obj.id,
+                    comp_name=comp.comp_name or "Unknown",
+                    location=comp.location,
+                    num_units=comp.num_units,
+                    avg_unit_sf=comp.avg_unit_sf,
+                    in_place_rent=comp.in_place_rent,
+                    in_place_rent_psf=comp.in_place_rent_psf,
+                    bedroom_type=comp.bedroom_type,
+                    is_new_construction=comp.is_new_construction
+                )
+                db.add(comp_obj)
+            except Exception as e:
+                logger.error("Failed to save rent_comp item %d: %s", idx, e)
 
     # Log the analysis
     log = AnalysisLog(
