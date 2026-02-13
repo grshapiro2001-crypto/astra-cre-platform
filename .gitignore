@@ -8,7 +8,9 @@ env/
 # Environment variables (NEVER commit these!)
 .env
 .env.local
-.env.production
+
+# Allow frontend .env.production (contains only public API URL, no secrets)
+!frontend/.env.production
 
 # Database (don't commit your local data)
 *.db
