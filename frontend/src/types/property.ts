@@ -129,6 +129,15 @@ export interface RentCompItem {
   is_new_construction: boolean;
 }
 
+export interface RenovationData {
+  renovation_cost_per_unit?: number | null;
+  renovation_total_cost?: number | null;
+  renovation_rent_premium?: number | null;
+  renovation_roi_pct?: number | null;
+  renovation_duration_years?: number | null;
+  renovation_stabilized_revenue?: number | null;
+}
+
 export interface ExtractionResult {
   document_type: 'OM' | 'BOV' | 'Unknown';
   confidence: 'high' | 'medium' | 'low';
@@ -145,6 +154,9 @@ export interface ExtractionResult {
     y1?: CalculatedMetrics;
   };
   bov_pricing_tiers?: BOVPricingTier[];  // Phase 3A: BOV pricing tiers
+  renovation?: RenovationData;  // Renovation assumptions from extraction
+  unit_mix?: UnitMixItem[];  // Unit mix floorplan data from extraction
+  rent_comps?: RentCompItem[];  // Rent comparable properties from extraction
   source_notes?: SourceNotes;
   missing_fields: string[];
 }
