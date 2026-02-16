@@ -150,6 +150,18 @@ export const propertyService = {
     return response.data;
   },
 
+  /** Upload a document (PDF or Excel) to a specific property */
+  async uploadPropertyDocument(propertyId: number | string, file: File): Promise<any> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post(
+      `/properties/${propertyId}/upload-document`,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    );
+    return response.data;
+  },
+
   /**
    * Download a professional PDF summary for a property (NO LLM - server-side PDF generation)
    */

@@ -169,6 +169,29 @@ export interface UploadResponse {
   extraction_result: ExtractionResult;
 }
 
+export interface PropertyDocument {
+  id: number;
+  filename: string;
+  file_type: string;
+  document_category: string; // "om", "bov", "rent_roll", "t12", "operating_statement", "other"
+  document_date: string | null;
+  uploaded_at: string;
+  extraction_status: string; // "pending", "processing", "completed", "failed"
+  extraction_summary: string | null;
+}
+
+export interface RentRollSummary {
+  rr_total_units: number | null;
+  rr_occupied_units: number | null;
+  rr_vacancy_count: number | null;
+  rr_physical_occupancy_pct: number | null;
+  rr_avg_market_rent: number | null;
+  rr_avg_in_place_rent: number | null;
+  rr_avg_sqft: number | null;
+  rr_loss_to_lease_pct: number | null;
+  rr_as_of_date: string | null;
+}
+
 /** Alias for backwards compatibility */
 export type FinancialPeriodData = FinancialPeriod;
 
@@ -220,6 +243,22 @@ export interface PropertyDetail {
   screening_score?: number | null;
   screening_details_json?: string | null;
   user_guidance_price?: number | null;
+  // Excel Integration (Phase 2)
+  documents?: PropertyDocument[];
+  financial_data_source?: string | null;
+  financial_data_updated_at?: string | null;
+  rr_total_units?: number | null;
+  rr_occupied_units?: number | null;
+  rr_vacancy_count?: number | null;
+  rr_physical_occupancy_pct?: number | null;
+  rr_avg_market_rent?: number | null;
+  rr_avg_in_place_rent?: number | null;
+  rr_avg_sqft?: number | null;
+  rr_loss_to_lease_pct?: number | null;
+  rr_as_of_date?: string | null;
+  t12_revenue?: number | null;
+  t12_total_expenses?: number | null;
+  t12_gsr?: number | null;
 }
 
 /** Property list item for library views */
