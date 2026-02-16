@@ -1786,7 +1786,7 @@ export const PropertyDetail = () => {
         {property.property_address && (
           <section className="animate-fade-in" style={{ animationDelay: '295ms' }}>
             <h2 className="font-display text-lg font-bold mb-4 text-foreground">
-              Location
+              Location &amp; Comparables
             </h2>
 
             {/* Submarket and Metro info */}
@@ -1809,6 +1809,7 @@ export const PropertyDetail = () => {
             <CompMap
               address={property.property_address}
               propertyName={property.deal_name}
+              totalUnits={property.total_units ?? undefined}
               rentComps={rentComps}
               salesComps={property.bov_pricing_tiers}
             />

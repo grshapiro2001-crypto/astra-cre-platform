@@ -1,22 +1,29 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { GoogleMap, Marker, InfoWindow, useLoadScript } from '@react-google-maps/api';
 import { MapPin } from 'lucide-react';
 import type { RentCompItem, BOVPricingTier } from '../../types/property';
 import { fmtCapRate } from '../../utils/formatUtils';
 
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
 interface CompMapProps {
   address: string;
   propertyName: string;
+  totalUnits?: number;
   rentComps?: RentCompItem[];
   salesComps?: BOVPricingTier[];
 }
 
-interface MapPin {
+interface CompMapPin {
   id: string;
   type: 'subject' | 'rent' | 'sales';
   position: { lat: number; lng: number };
   name: string;
+  address?: string;
   details: {
+    totalUnits?: number | null;
     units?: number | null;
     avgRent?: number | null;
     rentPerSF?: number | null;
@@ -26,51 +33,22 @@ interface MapPin {
   };
 }
 
-interface GeocodedLocation {
-  location: string;
-  coordinates: { lat: number; lng: number } | null;
-}
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
 
-const darkMapStyles = [
-  { elementType: "geometry", stylers: [{ color: "#242f3e" }] },
-  { elementType: "labels.text.stroke", stylers: [{ color: "#242f3e" }] },
-  { elementType: "labels.text.fill", stylers: [{ color: "#746855" }] },
-  { featureType: "water", elementType: "geometry", stylers: [{ color: "#17263c" }] },
-  {
-    featureType: "administrative",
-    elementType: "geometry.stroke",
-    stylers: [{ color: "#4b6878" }],
-  },
-  {
-    featureType: "road",
-    elementType: "geometry",
-    stylers: [{ color: "#38414e" }],
-  },
-  {
-    featureType: "road",
-    elementType: "geometry.stroke",
-    stylers: [{ color: "#212a37" }],
-  },
-  {
-    featureType: "road",
-    elementType: "labels.text.fill",
-    stylers: [{ color: "#9ca5b3" }],
-  },
-  {
-    featureType: "poi",
-    elementType: "geometry",
-    stylers: [{ color: "#283d4a" }],
-  },
-  {
-    featureType: "poi",
-    elementType: "labels.text.fill",
-    stylers: [{ color: "#6f7d87" }],
-  },
-  {
-    featureType: "transit",
-    elementType: "geometry",
-    stylers: [{ color: "#2f3948" }],
-  },
+const LIBRARIES: ('places')[] = ['places'];
+
+const darkMapStyles: google.maps.MapTypeStyle[] = [
+  { elementType: "geometry", stylers: [{ color: "#1a1a2e" }] },
+  { elementType: "labels.text.stroke", stylers: [{ color: "#1a1a2e" }] },
+  { elementType: "labels.text.fill", stylers: [{ color: "#8B8B9E" }] },
+  { featureType: "administrative", elementType: "geometry.stroke", stylers: [{ color: "#2d2d44" }] },
+  { featureType: "road", elementType: "geometry", stylers: [{ color: "#2d2d44" }] },
+  { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: "#1a1a2e" }] },
+  { featureType: "water", elementType: "geometry", stylers: [{ color: "#0f0f23" }] },
+  { featureType: "poi", elementType: "geometry", stylers: [{ color: "#1e1e35" }] },
+  { featureType: "transit", elementType: "geometry", stylers: [{ color: "#1e1e35" }] },
 ];
 
 const containerStyle = {
@@ -78,98 +56,213 @@ const containerStyle = {
   height: '400px',
 };
 
+const PIN_COLORS = {
+  subject: '#8B5CF6',
+  rent: '#3B82F6',
+  sales: '#10B981',
+} as const;
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
 const formatCurrency = (value: number | null | undefined): string => {
   if (value == null) return '—';
   return `$${value.toLocaleString()}`;
 };
 
+const createMarkerIcon = (color: string) => ({
+  url: `data:image/svg+xml,${encodeURIComponent(`
+    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="40" viewBox="0 0 32 40">
+      <path d="M16 0C7.16 0 0 7.16 0 16c0 12 16 24 16 24s16-12 16-24C32 7.16 24.84 0 16 0z" fill="${color}"/>
+      <circle cx="16" cy="16" r="6" fill="white"/>
+    </svg>
+  `)}`,
+  scaledSize: new google.maps.Size(32, 40),
+  anchor: new google.maps.Point(16, 40),
+});
+
+/**
+ * Extract a rough city/state suffix from a full street address.
+ * E.g. "123 Main St, Atlanta, GA 30301" → ", Atlanta, GA"
+ */
+const extractCityState = (fullAddress: string): string => {
+  const parts = fullAddress.split(',').map(p => p.trim());
+  if (parts.length >= 3) {
+    // Take the last two meaningful parts (city, state+zip)
+    return `, ${parts.slice(1).join(', ')}`;
+  }
+  if (parts.length === 2) {
+    return `, ${parts[1]}`;
+  }
+  return '';
+};
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
 export const CompMap: React.FC<CompMapProps> = ({
   address,
   propertyName,
+  totalUnits,
   rentComps = [],
-  salesComps: _salesComps = [],
+  salesComps = [],
 }) => {
-  void _salesComps;
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
   const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: apiKey || '',
+    libraries: LIBRARIES,
   });
 
   const [subjectCoords, setSubjectCoords] = useState<{ lat: number; lng: number } | null>(null);
-  const [geocodedRentComps, setGeocodedRentComps] = useState<GeocodedLocation[]>([]);
+  const [subjectFailed, setSubjectFailed] = useState(false);
+  const [compCoords, setCompCoords] = useState<Map<string, { lat: number; lng: number }>>(new Map());
   const [selectedPin, setSelectedPin] = useState<string | null>(null);
   const [map, setMap] = useState<google.maps.Map | null>(null);
+
+  // Geocoding cache – persists across re-renders, avoids redundant API calls
+  const geocodeCache = useRef<Map<string, { lat: number; lng: number } | null>>(new Map());
+
+  /**
+   * Geocode a single address string with caching.
+   * Returns null if geocoding fails.
+   */
+  const geocodeAddress = useCallback(
+    (addr: string): Promise<{ lat: number; lng: number } | null> => {
+      const cached = geocodeCache.current.get(addr);
+      if (cached !== undefined) return Promise.resolve(cached);
+
+      return new Promise((resolve) => {
+        const geocoder = new google.maps.Geocoder();
+        geocoder.geocode({ address: addr }, (results, status) => {
+          if (status === 'OK' && results && results[0]) {
+            const loc = results[0].geometry.location;
+            const coords = { lat: loc.lat(), lng: loc.lng() };
+            geocodeCache.current.set(addr, coords);
+            resolve(coords);
+          } else {
+            geocodeCache.current.set(addr, null);
+            resolve(null);
+          }
+        });
+      });
+    },
+    [],
+  );
 
   // Geocode the subject property address
   useEffect(() => {
     if (!isLoaded || !apiKey || !address) return;
 
-    const geocoder = new google.maps.Geocoder();
-    geocoder.geocode({ address }, (results, status) => {
-      if (status === 'OK' && results && results[0]) {
-        const location = results[0].geometry.location;
-        setSubjectCoords({ lat: location.lat(), lng: location.lng() });
+    geocodeAddress(address).then((coords) => {
+      if (coords) {
+        setSubjectCoords(coords);
+        setSubjectFailed(false);
       } else {
-        console.warn('Geocoding failed for subject property:', status);
+        setSubjectFailed(true);
       }
     });
-  }, [isLoaded, apiKey, address]);
+  }, [isLoaded, apiKey, address, geocodeAddress]);
 
-  // Geocode rent comp locations
+  // Geocode rent comp locations (append city/state for neighbourhood names)
   useEffect(() => {
     if (!isLoaded || !apiKey || rentComps.length === 0) return;
 
-    const geocoder = new google.maps.Geocoder();
-    const locations = rentComps
-      .filter((comp, idx, arr) => {
-        // Only geocode unique locations
-        return comp.location && arr.findIndex(c => c.location === comp.location) === idx;
-      })
-      .map(comp => comp.location!);
+    const citySuffix = extractCityState(address);
 
-    const geocodePromises = locations.map(location =>
-      new Promise<GeocodedLocation>((resolve) => {
-        geocoder.geocode({ address: location }, (results, status) => {
-          if (status === 'OK' && results && results[0]) {
-            const loc = results[0].geometry.location;
-            resolve({
-              location,
-              coordinates: { lat: loc.lat(), lng: loc.lng() },
-            });
-          } else {
-            resolve({ location, coordinates: null });
-          }
-        });
-      })
+    // Deduplicate by location string
+    const uniqueLocations = Array.from(
+      new Set(
+        rentComps
+          .map((c) => c.location)
+          .filter((loc): loc is string => !!loc),
+      ),
     );
 
-    Promise.all(geocodePromises).then(setGeocodedRentComps);
-  }, [isLoaded, apiKey, rentComps]);
+    Promise.all(
+      uniqueLocations.map(async (loc) => {
+        // Try with city/state appended first for neighbourhood names
+        const fullQuery = loc + citySuffix;
+        let coords = await geocodeAddress(fullQuery);
+        if (!coords) {
+          // Fallback: try the raw location string
+          coords = await geocodeAddress(loc);
+        }
+        return [loc, coords] as const;
+      }),
+    ).then((results) => {
+      const newMap = new Map<string, { lat: number; lng: number }>();
+      for (const [loc, coords] of results) {
+        if (coords) newMap.set(loc, coords);
+      }
+      setCompCoords((prev) => {
+        const merged = new Map(prev);
+        newMap.forEach((v, k) => merged.set(k, v));
+        return merged;
+      });
+    });
+  }, [isLoaded, apiKey, rentComps, address, geocodeAddress]);
+
+  // Geocode sales comps (from address or tier_label if available)
+  useEffect(() => {
+    if (!isLoaded || !apiKey || salesComps.length === 0) return;
+
+    const citySuffix = extractCityState(address);
+
+    // BOVPricingTier doesn't have a dedicated address field, but tier_label
+    // sometimes contains a location-like name. Try geocoding those.
+    const compEntries = salesComps
+      .map((comp) => {
+        const geocodeStr = comp.tier_label;
+        return geocodeStr ? { key: `sales-${comp.pricing_tier_id}`, query: geocodeStr } : null;
+      })
+      .filter((e): e is { key: string; query: string } => e != null);
+
+    if (compEntries.length === 0) return;
+
+    Promise.all(
+      compEntries.map(async ({ key, query }) => {
+        let coords = await geocodeAddress(query + citySuffix);
+        if (!coords) coords = await geocodeAddress(query);
+        return [key, coords] as const;
+      }),
+    ).then((results) => {
+      const newMap = new Map<string, { lat: number; lng: number }>();
+      for (const [key, coords] of results) {
+        if (coords) newMap.set(key, coords);
+      }
+      if (newMap.size > 0) {
+        setCompCoords((prev) => {
+          const merged = new Map(prev);
+          newMap.forEach((v, k) => merged.set(k, v));
+          return merged;
+        });
+      }
+    });
+  }, [isLoaded, apiKey, salesComps, address, geocodeAddress]);
 
   // Build map pins from all data
-  const mapPins = useMemo<MapPin[]>(() => {
-    const pins: MapPin[] = [];
+  const mapPins = useMemo<CompMapPin[]>(() => {
+    const pins: CompMapPin[] = [];
 
-    // Add subject property
+    // Subject property
     if (subjectCoords) {
       pins.push({
         id: 'subject',
         type: 'subject',
         position: subjectCoords,
         name: propertyName,
-        details: {},
+        address,
+        details: { totalUnits },
       });
     }
 
-    // Add rent comps
-    const locationMap = new Map(
-      geocodedRentComps.map(gl => [gl.location, gl.coordinates])
-    );
-
+    // Rent comps
     rentComps.forEach((comp, idx) => {
       if (!comp.location) return;
-      const coords = locationMap.get(comp.location);
+      const coords = compCoords.get(comp.location);
       if (!coords) return;
 
       pins.push({
@@ -185,175 +278,231 @@ export const CompMap: React.FC<CompMapProps> = ({
       });
     });
 
-    // Add sales comps (from BOV pricing tiers if available)
-    // Note: BOV pricing tiers don't have location data, so we'll skip for now
-    // This can be enhanced if location data becomes available
+    // Sales comps
+    salesComps.forEach((comp) => {
+      const key = `sales-${comp.pricing_tier_id}`;
+      const coords = compCoords.get(key);
+      if (!coords) return;
+
+      const topCapRate = comp.cap_rates?.[0]?.cap_rate_value ?? null;
+
+      pins.push({
+        id: key,
+        type: 'sales',
+        position: coords,
+        name: comp.tier_label || 'Sales Comp',
+        details: {
+          salePrice: comp.pricing,
+          pricePerUnit: comp.price_per_unit,
+          capRate: topCapRate,
+        },
+      });
+    });
 
     return pins;
-  }, [subjectCoords, geocodedRentComps, rentComps, propertyName]);
+  }, [subjectCoords, compCoords, rentComps, salesComps, propertyName, address, totalUnits]);
 
-  // Fit bounds when pins are loaded
+  // Fit bounds when pins change
   useEffect(() => {
     if (!map || mapPins.length === 0) return;
 
     const bounds = new google.maps.LatLngBounds();
-    mapPins.forEach(pin => bounds.extend(pin.position));
-    map.fitBounds(bounds);
+    mapPins.forEach((pin) => bounds.extend(pin.position));
 
-    // Add some padding
-    const padding = { top: 50, right: 50, bottom: 50, left: 50 };
-    map.fitBounds(bounds, padding);
+    if (mapPins.length === 1) {
+      map.setCenter(mapPins[0].position);
+      map.setZoom(14);
+    } else {
+      map.fitBounds(bounds, { top: 50, right: 50, bottom: 50, left: 50 });
+    }
   }, [map, mapPins]);
 
-  const onLoad = useCallback((map: google.maps.Map) => {
-    setMap(map);
+  const onLoad = useCallback((m: google.maps.Map) => {
+    setMap(m);
   }, []);
 
   const onUnmount = useCallback(() => {
     setMap(null);
   }, []);
 
-  const getMarkerIcon = (type: 'subject' | 'rent' | 'sales'): google.maps.Symbol => {
-    const colors = {
-      subject: '#a855f7', // Purple
-      rent: '#3b82f6',    // Blue
-      sales: '#22c55e',   // Green
-    };
+  // ------------------------------------------------------------------
+  // Render states
+  // ------------------------------------------------------------------
 
-    return {
-      path: google.maps.SymbolPath.CIRCLE,
-      fillColor: colors[type],
-      fillOpacity: 0.9,
-      strokeColor: '#ffffff',
-      strokeWeight: 2,
-      scale: 10,
-    };
-  };
-
-  // Show placeholder if no API key
+  // No API key → placeholder
   if (!apiKey) {
     return (
-      <div className="bg-card/30 border-border/40 border-dashed rounded-2xl p-8 text-center border">
-        <MapPin className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
-        <p className="text-muted-foreground text-sm">
+      <div className="bg-card/50 border border-border/60 rounded-2xl p-8 text-center">
+        <MapPin className="mx-auto h-8 w-8 text-muted-foreground mb-3" />
+        <p className="text-muted-foreground">
           Add a Google Maps API key to enable the interactive map
         </p>
-        <p className="text-xs text-muted-foreground/60 mt-2">
-          Set VITE_GOOGLE_MAPS_API_KEY in your .env file
-        </p>
       </div>
     );
   }
 
+  // Script load error
   if (loadError) {
     return (
-      <div className="bg-card/30 border-border/40 border-dashed rounded-2xl p-8 text-center border">
-        <MapPin className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
-        <p className="text-muted-foreground text-sm">
-          Error loading Google Maps
-        </p>
+      <div className="bg-card/50 border border-border/60 rounded-2xl p-8 text-center">
+        <MapPin className="mx-auto h-8 w-8 text-muted-foreground mb-3" />
+        <p className="text-muted-foreground">Unable to load Google Maps</p>
       </div>
     );
   }
 
+  // Loading
   if (!isLoaded) {
     return (
-      <div className="bg-card/30 border-border/40 border-dashed rounded-2xl p-8 text-center border">
-        <MapPin className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3 animate-pulse" />
-        <p className="text-muted-foreground text-sm">
-          Loading map...
-        </p>
+      <div className="bg-card/50 border border-border/60 rounded-2xl p-8 text-center">
+        <MapPin className="mx-auto h-8 w-8 text-muted-foreground mb-3 animate-pulse" />
+        <p className="text-muted-foreground">Loading map…</p>
       </div>
     );
   }
 
-  return (
-    <div className="rounded-xl overflow-hidden border border-border/60">
-      <GoogleMap
-        mapContainerStyle={containerStyle}
-        options={{
-          styles: darkMapStyles,
-          disableDefaultUI: false,
-          zoomControl: true,
-          mapTypeControl: false,
-          streetViewControl: false,
-          fullscreenControl: true,
-        }}
-        onLoad={onLoad}
-        onUnmount={onUnmount}
-      >
-        {mapPins.map((pin) => (
-          <Marker
-            key={pin.id}
-            position={pin.position}
-            icon={getMarkerIcon(pin.type)}
-            onClick={() => setSelectedPin(pin.id)}
-            title={pin.name}
-          />
-        ))}
+  // Subject geocoding failed
+  if (subjectFailed && mapPins.length === 0) {
+    return (
+      <div className="bg-card/50 border border-border/60 rounded-2xl p-8 text-center">
+        <MapPin className="mx-auto h-8 w-8 text-muted-foreground mb-3" />
+        <p className="text-muted-foreground">Unable to load map for this address</p>
+      </div>
+    );
+  }
 
-        {selectedPin && mapPins.find(p => p.id === selectedPin) && (
-          <InfoWindow
-            position={mapPins.find(p => p.id === selectedPin)!.position}
-            onCloseClick={() => setSelectedPin(null)}
-          >
-            <div className="p-2 min-w-[200px]">
-              {(() => {
-                const pin = mapPins.find(p => p.id === selectedPin)!;
-                return (
-                  <div>
-                    <h3 className="font-bold text-sm mb-2 text-gray-900">
-                      {pin.name}
-                    </h3>
-                    <div className="text-xs text-gray-700 space-y-1">
-                      {pin.type === 'subject' && (
-                        <div className="flex items-center gap-1">
-                          <span className="inline-block w-2 h-2 rounded-full bg-purple-500"></span>
-                          <span className="font-semibold">Subject Property</span>
-                        </div>
+  // ------------------------------------------------------------------
+  // Map
+  // ------------------------------------------------------------------
+
+  const selectedPinData = selectedPin ? mapPins.find((p) => p.id === selectedPin) : null;
+
+  return (
+    <div>
+      <div className="rounded-2xl overflow-hidden border border-border/60">
+        <GoogleMap
+          mapContainerStyle={containerStyle}
+          options={{
+            styles: darkMapStyles,
+            disableDefaultUI: false,
+            zoomControl: true,
+            mapTypeControl: false,
+            streetViewControl: false,
+            fullscreenControl: true,
+          }}
+          onLoad={onLoad}
+          onUnmount={onUnmount}
+        >
+          {mapPins.map((pin) => (
+            <Marker
+              key={pin.id}
+              position={pin.position}
+              icon={createMarkerIcon(PIN_COLORS[pin.type])}
+              onClick={() => setSelectedPin(pin.id)}
+              title={pin.name}
+            />
+          ))}
+
+          {selectedPinData && (
+            <InfoWindow
+              position={selectedPinData.position}
+              onCloseClick={() => setSelectedPin(null)}
+            >
+              <div className="p-2 min-w-[200px]">
+                <h3 className="font-bold text-sm mb-2 text-gray-900">
+                  {selectedPinData.name}
+                </h3>
+                <div className="text-xs text-gray-700 space-y-1">
+                  {selectedPinData.type === 'subject' && (
+                    <>
+                      <div className="flex items-center gap-1">
+                        <span
+                          className="inline-block w-2 h-2 rounded-full"
+                          style={{ backgroundColor: PIN_COLORS.subject }}
+                        />
+                        <span className="font-semibold">Subject Property</span>
+                      </div>
+                      {selectedPinData.address && (
+                        <div>{selectedPinData.address}</div>
                       )}
-                      {pin.type === 'rent' && (
-                        <>
-                          <div className="flex items-center gap-1">
-                            <span className="inline-block w-2 h-2 rounded-full bg-blue-500"></span>
-                            <span className="font-semibold">Rent Comp</span>
-                          </div>
-                          {pin.details.units != null && (
-                            <div>Units: {pin.details.units.toLocaleString()}</div>
-                          )}
-                          {pin.details.avgRent != null && (
-                            <div>Avg Rent: {formatCurrency(pin.details.avgRent)}</div>
-                          )}
-                          {pin.details.rentPerSF != null && (
-                            <div>Rent/SF: ${pin.details.rentPerSF.toFixed(2)}</div>
-                          )}
-                        </>
+                      {selectedPinData.details.totalUnits != null && (
+                        <div>Total Units: {selectedPinData.details.totalUnits.toLocaleString()}</div>
                       )}
-                      {pin.type === 'sales' && (
-                        <>
-                          <div className="flex items-center gap-1">
-                            <span className="inline-block w-2 h-2 rounded-full bg-green-500"></span>
-                            <span className="font-semibold">Sales Comp</span>
-                          </div>
-                          {pin.details.salePrice != null && (
-                            <div>Sale Price: {formatCurrency(pin.details.salePrice)}</div>
-                          )}
-                          {pin.details.pricePerUnit != null && (
-                            <div>Price/Unit: {formatCurrency(pin.details.pricePerUnit)}</div>
-                          )}
-                          {pin.details.capRate != null && (
-                            <div>Cap Rate: {fmtCapRate(pin.details.capRate)}</div>
-                          )}
-                        </>
+                    </>
+                  )}
+
+                  {selectedPinData.type === 'rent' && (
+                    <>
+                      <div className="flex items-center gap-1">
+                        <span
+                          className="inline-block w-2 h-2 rounded-full"
+                          style={{ backgroundColor: PIN_COLORS.rent }}
+                        />
+                        <span className="font-semibold">Rent Comp</span>
+                      </div>
+                      {selectedPinData.details.units != null && (
+                        <div>Units: {selectedPinData.details.units.toLocaleString()}</div>
                       )}
-                    </div>
-                  </div>
-                );
-              })()}
-            </div>
-          </InfoWindow>
-        )}
-      </GoogleMap>
+                      {selectedPinData.details.avgRent != null && (
+                        <div>Avg Rent: {formatCurrency(selectedPinData.details.avgRent)}</div>
+                      )}
+                      {selectedPinData.details.rentPerSF != null && (
+                        <div>Rent/SF: ${selectedPinData.details.rentPerSF.toFixed(2)}</div>
+                      )}
+                    </>
+                  )}
+
+                  {selectedPinData.type === 'sales' && (
+                    <>
+                      <div className="flex items-center gap-1">
+                        <span
+                          className="inline-block w-2 h-2 rounded-full"
+                          style={{ backgroundColor: PIN_COLORS.sales }}
+                        />
+                        <span className="font-semibold">Sales Comp</span>
+                      </div>
+                      {selectedPinData.details.salePrice != null && (
+                        <div>Sale Price: {formatCurrency(selectedPinData.details.salePrice)}</div>
+                      )}
+                      {selectedPinData.details.pricePerUnit != null && (
+                        <div>Price/Unit: {formatCurrency(selectedPinData.details.pricePerUnit)}</div>
+                      )}
+                      {selectedPinData.details.capRate != null && (
+                        <div>Cap Rate: {fmtCapRate(selectedPinData.details.capRate)}</div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+            </InfoWindow>
+          )}
+        </GoogleMap>
+      </div>
+
+      {/* Legend */}
+      <div className="flex items-center gap-6 mt-3 text-sm text-muted-foreground">
+        <div className="flex items-center gap-1.5">
+          <span
+            className="inline-block w-3 h-3 rounded-full"
+            style={{ backgroundColor: PIN_COLORS.subject }}
+          />
+          <span>Subject</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span
+            className="inline-block w-3 h-3 rounded-full"
+            style={{ backgroundColor: PIN_COLORS.rent }}
+          />
+          <span>Rent Comps</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span
+            className="inline-block w-3 h-3 rounded-full"
+            style={{ backgroundColor: PIN_COLORS.sales }}
+          />
+          <span>Sales Comps</span>
+        </div>
+      </div>
     </div>
   );
 };
