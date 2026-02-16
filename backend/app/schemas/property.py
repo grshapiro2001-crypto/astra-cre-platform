@@ -416,3 +416,6 @@ class T12SummaryResponse(BaseModel):
     net_operating_income: Optional[float] = None
     expense_ratio_pct: Optional[float] = None
     noi_margin_pct: Optional[float] = None
+
+# Rebuild models with forward references
+PropertyDetail.model_rebuild()
