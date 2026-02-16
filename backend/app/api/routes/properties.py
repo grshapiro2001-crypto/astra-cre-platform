@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 import os
 import re
 
@@ -385,7 +385,7 @@ def update_property_notes(
 # ==================== UPDATE GUIDANCE PRICE (NO LLM) ====================
 
 class GuidancePriceUpdate(BaseModel):
-    guidance_price: float | None = None
+    guidance_price: Optional[float] = None
 
 
 @router.patch("/{property_id}/guidance-price", response_model=PropertyDetail)

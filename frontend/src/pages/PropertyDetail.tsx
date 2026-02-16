@@ -1850,8 +1850,8 @@ export const PropertyDetail = () => {
 
             {/* Interactive map with property and comps */}
             <CompMap
-              address={property.property_address}
-              propertyName={property.deal_name}
+              address={property.property_address || ''}
+              propertyName={property.deal_name || ''}
               totalUnits={property.total_units ?? undefined}
               rentComps={rentComps || []}
               salesComps={property.bov_pricing_tiers || []}

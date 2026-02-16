@@ -74,7 +74,7 @@ export const DealCard = ({ deal, isSelected, onClick, onDoubleClick }: DealCardP
       <div className="flex items-start justify-between mb-2">
         <div className="min-w-0 flex-1">
           <p className="font-semibold text-sm text-foreground truncate">
-            {deal.name}
+            {deal.name || 'Untitled Property'}
           </p>
           <p className="text-xs text-muted-foreground truncate">
             {deal.submarket || '\u2014'}
