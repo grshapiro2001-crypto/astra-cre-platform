@@ -1925,7 +1925,7 @@ export const PropertyDetail = () => {
             </h2>
             <ChevronDown className={`w-5 h-5 text-muted-foreground transition-transform ${unitMixOpen ? 'rotate-180' : ''}`} />
           </button>
-          {unitMixOpen && unitMix.length > 0 ? (
+          {unitMix.length > 0 ? (unitMixOpen ? (
             <div className="border border-border rounded-2xl bg-card overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -1976,6 +1976,10 @@ export const PropertyDetail = () => {
               </div>
             </div>
           ) : (
+            <div className="border border-border rounded-2xl bg-card p-4 text-center">
+              <p className="text-sm text-muted-foreground">{unitMix.length} floorplans · Click to expand</p>
+            </div>
+          )) : (
             <div className="bg-card/30 border-border/40 border-dashed rounded-2xl p-8 text-center border">
               <Building2 className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
               <p className="text-muted-foreground text-sm">
