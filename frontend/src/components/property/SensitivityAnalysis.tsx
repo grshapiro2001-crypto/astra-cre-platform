@@ -268,6 +268,12 @@ export const SensitivityAnalysis = ({ property }: SensitivityAnalysisProps) => {
                 <input
                   type="text"
                   value={`${rentGrowth}%`}
+                  onFocus={(e) => { e.target.value = String(rentGrowth); e.target.select(); }}
+                  onBlur={(e) => { 
+                    const v = e.target.value.replace(/[^0-9.]/g, '');
+                    setRentGrowth(v === '' ? 0 : Number(v));
+                    e.target.value = `${rentGrowth}%`;
+                  }}
                   onChange={(e) => {
                     const v = e.target.value.replace(/[^0-9.]/g, '');
                     if (v === '' || !isNaN(Number(v))) setRentGrowth(v === '' ? 0 : Number(v));
@@ -296,6 +302,12 @@ export const SensitivityAnalysis = ({ property }: SensitivityAnalysisProps) => {
                 <input
                   type="text"
                   value={`${expenseGrowth}%`}
+                  onFocus={(e) => { e.target.value = String(expenseGrowth); e.target.select(); }}
+                  onBlur={(e) => { 
+                    const v = e.target.value.replace(/[^0-9.]/g, '');
+                    setExpenseGrowth(v === '' ? 0 : Number(v));
+                    e.target.value = `${expenseGrowth}%`;
+                  }}
                   onChange={(e) => {
                     const v = e.target.value.replace(/[^0-9.]/g, '');
                     if (v === '' || !isNaN(Number(v))) setExpenseGrowth(v === '' ? 0 : Number(v));
@@ -324,6 +336,12 @@ export const SensitivityAnalysis = ({ property }: SensitivityAnalysisProps) => {
                 <input
                   type="text"
                   value={`${exitCap}%`}
+                  onFocus={(e) => { e.target.value = String(exitCap); e.target.select(); }}
+                  onBlur={(e) => { 
+                    const v = e.target.value.replace(/[^0-9.]/g, '');
+                    setExitCap(v === '' ? 0 : Number(v));
+                    e.target.value = `${exitCap}%`;
+                  }}
                   onChange={(e) => {
                     const v = e.target.value.replace(/[^0-9.]/g, '');
                     if (v === '' || !isNaN(Number(v))) setExitCap(v === '' ? 0 : Number(v));
@@ -377,6 +395,12 @@ export const SensitivityAnalysis = ({ property }: SensitivityAnalysisProps) => {
                 <input
                   type="text"
                   value={`${ltv}%`}
+                  onFocus={(e) => { e.target.value = String(ltv); e.target.select(); }}
+                  onBlur={(e) => { 
+                    const v = e.target.value.replace(/[^0-9.]/g, '');
+                    setLtv(v === '' ? 0 : Number(v));
+                    e.target.value = `${ltv}%`;
+                  }}
                   onChange={(e) => {
                     const v = e.target.value.replace(/[^0-9.]/g, '');
                     if (v === '' || !isNaN(Number(v))) setLtv(v === '' ? 0 : Number(v));
@@ -405,6 +429,12 @@ export const SensitivityAnalysis = ({ property }: SensitivityAnalysisProps) => {
                 <input
                   type="text"
                   value={`${interestRate}%`}
+                  onFocus={(e) => { e.target.value = String(interestRate); e.target.select(); }}
+                  onBlur={(e) => { 
+                    const v = e.target.value.replace(/[^0-9.]/g, '');
+                    setInterestRate(v === '' ? 0 : Number(v));
+                    e.target.value = `${interestRate}%`;
+                  }}
                   onChange={(e) => {
                     const v = e.target.value.replace(/[^0-9.]/g, '');
                     if (v === '' || !isNaN(Number(v))) setInterestRate(v === '' ? 0 : Number(v));
