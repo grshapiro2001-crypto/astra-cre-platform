@@ -1119,7 +1119,7 @@ async def upload_document_to_property(
                     "vacancy": abs(summary.get("vacancy_loss", 0)) if summary.get("vacancy_loss") else None,
                     "concessions": summary.get("concessions"),
                     "bad_debt": summary.get("bad_debt"),
-                    "non_revenue_units": None,
+                    "non_revenue_units": summary.get("non_revenue_units"),
                     "total_opex": summary.get("total_operating_expenses"),
                     "noi": summary.get("net_operating_income"),
                     "opex_ratio": extraction.get("expense_ratio_pct"),

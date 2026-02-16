@@ -761,6 +761,7 @@ def _extract_t12_summary(line_items: Dict[str, Dict[str, Any]], total_col: Optio
         "concessions": ["concession", "concessions"],
         "vacancy_loss": ["vacancy", "vacancy loss"],
         "bad_debt": ["bad debt", "credit loss"],
+        "non_revenue_units": ["non revenue units", "non-revenue units", "non revenue"],
         "net_rental_income": ["net rental income", "nri"],
         "other_income": ["other income"],
         "total_revenue": ["total revenue", "gross revenue", "effective gross income"],
