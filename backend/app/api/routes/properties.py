@@ -1111,7 +1111,84 @@ async def upload_document_to_property(
                 property_obj.financial_data_source = "t12_excel"
                 property_obj.financial_data_updated_at = datetime.utcnow()
 
-                extraction_summary = f"T-12 FY{extraction.get('fiscal_year')}. NOI: ${summary.get('net_operating_income', 0):,.0f}"
+                # Build t12_financials_json from Excel extraction
+                t12_fin = {
+                    "period_label": "T-12 FY" + str(extraction.get("fiscal_year", "")),
+                    "gsr": summary.get("gross_potential_rent"),
+                    "vacancy": abs(summary.get("vacancy_loss", 0)) if summary.get("vacancy_loss") else None,
+                    "concessions": summary.get("concessions"),
+                    "bad_debt": summary.get("bad_debt"),
+                    "non_revenue_units": None,
+                    "total_opex": summary.get("total_operating_expenses"),
+                    "noi": summary.get("net_operating_income"),
+                    "opex_ratio": extraction.get("expense_ratio_pct"),
+                    "loss_to_lease": summary.get("loss_to_lease"),
+                    "vacancy_rate_pct": property_obj.t12_vacancy_rate_pct,
+                    "credit_loss": summary.get("bad_debt"),
+                    "net_rental_income": summary.get("net_rental_income"),
+                    "real_estate_taxes": summary.get("real_estate_taxes"),
+                    "insurance": summary.get("insurance"),
+                    "management_fee_pct": property_obj.t12_management_fee_pct,
+                }
+                property_obj.t12_financials_json = json.dumps(t12_fin)
+
+                # Calculate T3 from monthly data (last 3 months annualized)
+                t3_calculated = False
+                if monthly.get("noi") and monthly.get("revenue") and monthly.get("expenses"):
+                    month_order = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+                    noi_monthly = monthly["noi"]
+                    rev_monthly = monthly["revenue"]
+                    exp_monthly = monthly["expenses"]
+
+                    # Get last 3 months that have data
+                    last_3 = []
+                    for m in reversed(month_order):
+                        if m in noi_monthly and noi_monthly[m] is not None:
+                            last_3.append(m)
+                            if len(last_3) == 3:
+                                break
+
+                    if len(last_3) == 3:
+                        t3_noi_sum = sum(noi_monthly.get(m, 0) or 0 for m in last_3)
+                        t3_rev_sum = sum(rev_monthly.get(m, 0) or 0 for m in last_3)
+                        t3_exp_sum = sum(exp_monthly.get(m, 0) or 0 for m in last_3)
+
+                        # Annualize (multiply by 4)
+                        t3_noi_annual = t3_noi_sum * 4
+                        t3_rev_annual = t3_rev_sum * 4
+                        t3_exp_annual = t3_exp_sum * 4
+
+                        property_obj.t3_noi = t3_noi_annual
+
+                        t3_gsr = (property_obj.t12_gsr / 12 * 3 * 4) if property_obj.t12_gsr else t3_rev_annual
+                        t3_opex_ratio = (t3_exp_annual / t3_rev_annual * 100) if t3_rev_annual > 0 else None
+
+                        t3_fin = {
+                            "period_label": "Trailing 3 Month (Annualized) - " + ", ".join(reversed(last_3)),
+                            "gsr": t3_gsr,
+                            "vacancy": None,
+                            "concessions": None,
+                            "bad_debt": None,
+                            "non_revenue_units": None,
+                            "total_opex": t3_exp_annual,
+                            "noi": t3_noi_annual,
+                            "opex_ratio": t3_opex_ratio,
+                            "loss_to_lease": None,
+                            "vacancy_rate_pct": property_obj.t12_vacancy_rate_pct,
+                            "credit_loss": None,
+                            "net_rental_income": t3_rev_annual,
+                            "real_estate_taxes": None,
+                            "insurance": None,
+                            "management_fee_pct": None,
+                        }
+                        property_obj.t3_financials_json = json.dumps(t3_fin)
+                        property_obj.t3_expense_ratio_pct = t3_opex_ratio
+                        t3_calculated = True
+
+                if t3_calculated:
+                    extraction_summary = "T-12 FY" + str(extraction.get("fiscal_year", "")) + ". NOI: $" + "{:,.0f}".format(summary.get("net_operating_income", 0)) + ". T3 NOI: $" + "{:,.0f}".format(t3_noi_annual)
+                else:
+                    extraction_summary = "T-12 FY" + str(extraction.get("fiscal_year", "")) + ". NOI: $" + "{:,.0f}".format(summary.get("net_operating_income", 0))
 
             else:
                 # Unknown Excel document type
