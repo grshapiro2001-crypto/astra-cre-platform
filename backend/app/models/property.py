@@ -1,7 +1,7 @@
 """
 Property model for storing analyzed property data
 """
-from sqlalchemy import Column, Integer, String, Text, Float, Numeric, Boolean, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, Float, Numeric, Boolean, DateTime, ForeignKey, JSON
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
@@ -128,9 +128,30 @@ class Property(Base):
     pipeline_notes = Column(Text, nullable=True)
     pipeline_updated_at = Column(DateTime(timezone=True), nullable=True)
 
+    # Source tracking — which document last updated these financials
+    financial_data_source = Column(String(50), nullable=True)  # "om", "bov", "t12_excel", "rent_roll_excel"
+    financial_data_updated_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Rent roll summary fields (populated from latest rent roll)
+    rr_total_units = Column(Integer, nullable=True)
+    rr_occupied_units = Column(Integer, nullable=True)
+    rr_vacancy_count = Column(Integer, nullable=True)
+    rr_physical_occupancy_pct = Column(Float, nullable=True)  # occupied / total * 100
+    rr_avg_market_rent = Column(Float, nullable=True)
+    rr_avg_in_place_rent = Column(Float, nullable=True)
+    rr_avg_sqft = Column(Float, nullable=True)
+    rr_loss_to_lease_pct = Column(Float, nullable=True)  # (market - in_place) / market * 100
+    rr_as_of_date = Column(DateTime(timezone=True), nullable=True)  # Date of the rent roll
+
+    # T12 additional fields (for Excel-extracted T12s)
+    t12_revenue = Column(Numeric, nullable=True)
+    t12_total_expenses = Column(Numeric, nullable=True)
+    t12_gsr = Column(Numeric, nullable=True)
+
     # Relationships
     unit_mix = relationship("PropertyUnitMix", backref="property", cascade="all, delete-orphan")
     rent_comps = relationship("PropertyRentComp", backref="property", cascade="all, delete-orphan")
+    documents = relationship("PropertyDocument", back_populates="property", cascade="all, delete-orphan")
 
 
 class AnalysisLog(Base):
@@ -185,3 +206,117 @@ class PropertyRentComp(Base):
     is_new_construction = Column(Boolean, default=False)
 
     created_at = Column(DateTime, default=func.now())
+
+
+class PropertyDocument(Base):
+    """Tracks all documents uploaded to a property (PDFs and Excel files)"""
+    __tablename__ = "property_documents"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    property_id = Column(Integer, ForeignKey("properties.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(String(36), ForeignKey("users.id"), nullable=False)
+
+    # File info
+    filename = Column(String(500), nullable=False)
+    file_path = Column(Text, nullable=True)
+    file_type = Column(String(10), nullable=False)  # "pdf", "xlsx", "xlsm", "csv"
+
+    # Classification
+    document_category = Column(String(50), nullable=False)  # "om", "bov", "rent_roll", "t12", "operating_statement", "other"
+
+    # Date handling for rent rolls — IMPORTANT
+    # The "as-of" date of the document (e.g., rent roll date: 01/28/2026)
+    # Priority: 1) parsed from filename, 2) parsed from file content, 3) upload timestamp
+    document_date = Column(DateTime(timezone=True), nullable=True)
+
+    # Tracking
+    uploaded_at = Column(DateTime(timezone=True), server_default=func.now())
+    analyzed_at = Column(DateTime(timezone=True), nullable=True)
+    extraction_status = Column(String(20), default="pending")  # "pending", "processing", "completed", "failed"
+    extraction_summary = Column(Text, nullable=True)  # Brief summary of what was extracted
+
+    # Relationship
+    property = relationship("Property", back_populates="documents")
+
+
+class RentRollUnit(Base):
+    """Individual unit data from a rent roll upload"""
+    __tablename__ = "rent_roll_units"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    property_id = Column(Integer, ForeignKey("properties.id", ondelete="CASCADE"), nullable=False)
+    document_id = Column(Integer, ForeignKey("property_documents.id", ondelete="CASCADE"), nullable=False)
+
+    # Unit identification
+    unit_number = Column(String(20), nullable=True)
+    unit_type = Column(String(20), nullable=True)  # e.g., "A9", "B3B", "S5"
+    sqft = Column(Integer, nullable=True)
+
+    # Occupancy
+    status = Column(String(100), nullable=True)  # "Occupied No Notice", "Vacant Unrented Ready", etc.
+    is_occupied = Column(Boolean, default=True)
+    resident_name = Column(String(255), nullable=True)
+
+    # Lease info
+    move_in_date = Column(DateTime(timezone=True), nullable=True)
+    lease_start = Column(DateTime(timezone=True), nullable=True)
+    lease_end = Column(DateTime(timezone=True), nullable=True)
+
+    # Rents
+    market_rent = Column(Float, nullable=True)
+    in_place_rent = Column(Float, nullable=True)  # Total scheduled charges for this unit
+
+    # Charge breakdown (stored as JSON for flexibility — different properties have different charges)
+    charge_details = Column(JSON, nullable=True)  # e.g., {"Rent": 1410, "Internet": 60, "Parking": 15, ...}
+
+
+class T12Financial(Base):
+    """T-12 operating statement data — monthly line items"""
+    __tablename__ = "t12_financials"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    property_id = Column(Integer, ForeignKey("properties.id", ondelete="CASCADE"), nullable=False)
+    document_id = Column(Integer, ForeignKey("property_documents.id", ondelete="CASCADE"), nullable=False)
+
+    # Period info
+    fiscal_year = Column(Integer, nullable=True)  # e.g., 2025
+    period_start = Column(DateTime(timezone=True), nullable=True)
+    period_end = Column(DateTime(timezone=True), nullable=True)
+
+    # Revenue summary (annual totals)
+    gross_potential_rent = Column(Float, nullable=True)
+    loss_to_lease = Column(Float, nullable=True)
+    concessions = Column(Float, nullable=True)
+    vacancy_loss = Column(Float, nullable=True)
+    bad_debt = Column(Float, nullable=True)
+    net_rental_income = Column(Float, nullable=True)
+    other_income = Column(Float, nullable=True)
+    total_revenue = Column(Float, nullable=True)
+
+    # Expense summary (annual totals)
+    payroll = Column(Float, nullable=True)
+    utilities = Column(Float, nullable=True)
+    repairs_maintenance = Column(Float, nullable=True)
+    turnover = Column(Float, nullable=True)
+    contract_services = Column(Float, nullable=True)
+    marketing = Column(Float, nullable=True)
+    administrative = Column(Float, nullable=True)
+    management_fee = Column(Float, nullable=True)
+    controllable_expenses = Column(Float, nullable=True)
+    real_estate_taxes = Column(Float, nullable=True)
+    insurance = Column(Float, nullable=True)
+    non_controllable_expenses = Column(Float, nullable=True)
+    total_operating_expenses = Column(Float, nullable=True)
+
+    # Bottom line
+    net_operating_income = Column(Float, nullable=True)
+
+    # Monthly breakdown stored as JSON for charting/detail views
+    # Format: {"Jan": 337758, "Feb": 392536, ...}
+    monthly_noi = Column(JSON, nullable=True)
+    monthly_revenue = Column(JSON, nullable=True)
+    monthly_expenses = Column(JSON, nullable=True)
+
+    # Full line-item detail as JSON (for drill-down)
+    # Format: {"Gross Potential Rent": {"Jan": 615652, "Feb": 621978, ...}, ...}
+    line_items = Column(JSON, nullable=True)

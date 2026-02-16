@@ -6,17 +6,18 @@ CRITICAL ARCHITECTURE:
 - Reanalyze endpoint: ONLY endpoint that calls LLM after initial upload
 """
 import logging
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 from datetime import datetime
 from typing import List, Optional
 import os
 import re
+import shutil
 
 from app.database import get_db
 from app.models.user import User
-from app.models.property import Property, AnalysisLog
+from app.models.property import Property, AnalysisLog, PropertyDocument, RentRollUnit, T12Financial
 from app.api.deps import get_current_user
 from pydantic import BaseModel
 from app.schemas.property import (
@@ -27,9 +28,13 @@ from app.schemas.property import (
     PropertyListResponse,
     FinancialPeriodData,
     ComparisonRequest,
-    ComparisonResponse
+    ComparisonResponse,
+    PropertyDocumentResponse,
+    RentRollSummaryResponse,
+    T12SummaryResponse
 )
 from app.services import property_service
+from app.services import excel_extraction_service
 
 logger = logging.getLogger(__name__)
 
@@ -666,6 +671,15 @@ def build_property_detail_response(property_obj: Property, db: Session) -> Prope
         property_obj.renovation_cost_per_unit,
     )
 
+    # Build documents list
+    document_items = []
+    if hasattr(property_obj, 'documents') and property_obj.documents:
+        for d in property_obj.documents:
+            try:
+                document_items.append(PropertyDocumentResponse.model_validate(d))
+            except Exception as e:
+                logger.error("Failed to validate document item id=%s: %s", getattr(d, 'id', '?'), e)
+
     return PropertyDetail(
         id=property_obj.id,
         deal_name=property_obj.deal_name,
@@ -708,6 +722,16 @@ def build_property_detail_response(property_obj: Property, db: Session) -> Prope
         pipeline_stage=property_obj.pipeline_stage,
         pipeline_notes=property_obj.pipeline_notes,
         pipeline_updated_at=property_obj.pipeline_updated_at,
+        documents=document_items,  # Phase 1: Excel Integration
+        rr_total_units=property_obj.rr_total_units,
+        rr_occupied_units=property_obj.rr_occupied_units,
+        rr_vacancy_count=property_obj.rr_vacancy_count,
+        rr_physical_occupancy_pct=property_obj.rr_physical_occupancy_pct,
+        rr_avg_market_rent=property_obj.rr_avg_market_rent,
+        rr_avg_in_place_rent=property_obj.rr_avg_in_place_rent,
+        rr_avg_sqft=property_obj.rr_avg_sqft,
+        rr_loss_to_lease_pct=property_obj.rr_loss_to_lease_pct,
+        rr_as_of_date=property_obj.rr_as_of_date,
     )
 
 
@@ -846,6 +870,284 @@ def update_property_from_extraction(property_obj: Property, extraction_result: d
                     bedroom_type=comp.get("bedroom_type"),
                     is_new_construction=comp.get("is_new_construction", False),
                 ))
+
+
+# ==================== UPLOAD DOCUMENT TO PROPERTY (Phase 1: Excel Integration) ====================
+
+@router.post("/{property_id}/upload-document", response_model=PropertyDetail)
+async def upload_document_to_property(
+    property_id: int,
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Upload an Excel document (Rent Roll or T-12) to an existing property.
+
+    This endpoint:
+    1. Validates file type (Excel: .xlsx, .xlsm, .csv, or PDF: .pdf)
+    2. Saves the file to uploads directory
+    3. Creates PropertyDocument record
+    4. Classifies the document (rent_roll, t12, om, bov, other)
+    5. For Excel files: extracts data and updates property record
+    6. For PDFs: marks for future processing
+    7. Returns updated property with new document
+
+    Phase 1: Rent Rolls and T-12 Operating Statements
+    """
+    # Get property
+    property_obj = property_service.get_property(
+        db,
+        property_id,
+        str(current_user.id),
+        update_view_date=False
+    )
+
+    if not property_obj:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Property not found"
+        )
+
+    # Validate file type
+    if not file.filename:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Filename is required"
+        )
+
+    file_ext = os.path.splitext(file.filename)[1].lower()
+    allowed_extensions = [".xlsx", ".xlsm", ".csv", ".pdf"]
+
+    if file_ext not in allowed_extensions:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid file type. Allowed: {', '.join(allowed_extensions)}"
+        )
+
+    # Determine file type
+    if file_ext in [".xlsx", ".xlsm", ".csv"]:
+        file_type = "xlsx"
+    else:
+        file_type = "pdf"
+
+    # Create uploads directory for this property if it doesn't exist
+    uploads_dir = os.path.join("uploads", str(current_user.id), f"property_{property_id}")
+    os.makedirs(uploads_dir, exist_ok=True)
+
+    # Save file
+    file_path = os.path.join(uploads_dir, file.filename)
+    try:
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to save file: {str(e)}"
+        )
+
+    # Create PropertyDocument record
+    doc = PropertyDocument(
+        property_id=property_id,
+        user_id=str(current_user.id),
+        filename=file.filename,
+        file_path=file_path,
+        file_type=file_type,
+        document_category="unknown",  # Will be updated below
+        extraction_status="processing"
+    )
+    db.add(doc)
+    db.flush()  # Get doc.id
+
+    # Parse date from filename
+    document_date = excel_extraction_service.parse_date_from_filename(file.filename)
+    if document_date:
+        doc.document_date = document_date
+
+    # Process based on file type
+    extraction_summary = ""
+    try:
+        if file_type == "xlsx":
+            # Classify Excel document
+            doc_category = excel_extraction_service.classify_excel_document(file_path)
+            doc.document_category = doc_category
+
+            if doc_category == "rent_roll":
+                # Extract rent roll
+                extraction = excel_extraction_service.extract_rent_roll(file_path)
+
+                if extraction.get("error"):
+                    doc.extraction_status = "failed"
+                    doc.extraction_summary = f"Extraction failed: {extraction['error']}"
+                    db.commit()
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail=f"Rent roll extraction failed: {extraction['error']}"
+                    )
+
+                # Use extracted date if available
+                if extraction.get("document_date") and not document_date:
+                    try:
+                        doc.document_date = datetime.fromisoformat(extraction["document_date"])
+                    except (ValueError, TypeError):
+                        pass
+
+                # Save unit-level data
+                for unit in extraction.get("units", []):
+                    rr_unit = RentRollUnit(
+                        property_id=property_id,
+                        document_id=doc.id,
+                        unit_number=unit.get("unit_number"),
+                        unit_type=unit.get("unit_type"),
+                        sqft=unit.get("sqft"),
+                        status=unit.get("status"),
+                        is_occupied=unit.get("is_occupied", True),
+                        resident_name=unit.get("resident_name"),
+                        move_in_date=unit.get("move_in_date"),
+                        lease_start=unit.get("lease_start"),
+                        lease_end=unit.get("lease_end"),
+                        market_rent=unit.get("market_rent"),
+                        in_place_rent=unit.get("in_place_rent"),
+                        charge_details=unit.get("charge_details")
+                    )
+                    db.add(rr_unit)
+
+                # Check if this is the most recent rent roll
+                summary = extraction.get("summary", {})
+                existing_rr_date = property_obj.rr_as_of_date
+                is_most_recent = True
+
+                if existing_rr_date and doc.document_date:
+                    is_most_recent = doc.document_date >= existing_rr_date
+
+                # Update property summary fields if this is the most recent
+                if is_most_recent and summary:
+                    property_obj.rr_total_units = summary.get("total_units")
+                    property_obj.rr_occupied_units = summary.get("occupied_units")
+                    property_obj.rr_vacancy_count = summary.get("vacant_units")
+                    property_obj.rr_physical_occupancy_pct = summary.get("physical_occupancy_pct")
+                    property_obj.rr_avg_market_rent = summary.get("avg_market_rent")
+                    property_obj.rr_avg_in_place_rent = summary.get("avg_in_place_rent")
+                    property_obj.rr_avg_sqft = summary.get("avg_sqft")
+                    property_obj.rr_loss_to_lease_pct = summary.get("loss_to_lease_pct")
+                    property_obj.rr_as_of_date = doc.document_date
+
+                    # Also override these existing property fields (Excel > OM)
+                    property_obj.total_units = summary.get("total_units")
+                    property_obj.average_in_place_rent = summary.get("avg_in_place_rent")
+                    property_obj.average_market_rent = summary.get("avg_market_rent")
+                    property_obj.financial_data_source = "rent_roll_excel"
+                    property_obj.financial_data_updated_at = datetime.utcnow()
+
+                extraction_summary = f"Extracted {len(extraction.get('units', []))} units. " + \
+                                    f"Occupancy: {summary.get('physical_occupancy_pct')}%"
+
+            elif doc_category == "t12":
+                # Extract T-12
+                extraction = excel_extraction_service.extract_t12(file_path)
+
+                if extraction.get("error"):
+                    doc.extraction_status = "failed"
+                    doc.extraction_summary = f"Extraction failed: {extraction['error']}"
+                    db.commit()
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail=f"T-12 extraction failed: {extraction['error']}"
+                    )
+
+                # Save T-12 financial data
+                summary = extraction.get("summary", {})
+                monthly = extraction.get("monthly", {})
+                line_items = extraction.get("line_items", {})
+
+                t12 = T12Financial(
+                    property_id=property_id,
+                    document_id=doc.id,
+                    fiscal_year=extraction.get("fiscal_year"),
+                    gross_potential_rent=summary.get("gross_potential_rent"),
+                    loss_to_lease=summary.get("loss_to_lease"),
+                    concessions=summary.get("concessions"),
+                    vacancy_loss=summary.get("vacancy_loss"),
+                    bad_debt=summary.get("bad_debt"),
+                    net_rental_income=summary.get("net_rental_income"),
+                    other_income=summary.get("other_income"),
+                    total_revenue=summary.get("total_revenue"),
+                    payroll=summary.get("payroll"),
+                    utilities=summary.get("utilities"),
+                    repairs_maintenance=summary.get("repairs_maintenance"),
+                    turnover=summary.get("turnover"),
+                    contract_services=summary.get("contract_services"),
+                    marketing=summary.get("marketing"),
+                    administrative=summary.get("administrative"),
+                    management_fee=summary.get("management_fee"),
+                    controllable_expenses=summary.get("controllable_expenses"),
+                    real_estate_taxes=summary.get("real_estate_taxes"),
+                    insurance=summary.get("insurance"),
+                    non_controllable_expenses=summary.get("non_controllable_expenses"),
+                    total_operating_expenses=summary.get("total_operating_expenses"),
+                    net_operating_income=summary.get("net_operating_income"),
+                    monthly_noi=monthly.get("noi"),
+                    monthly_revenue=monthly.get("revenue"),
+                    monthly_expenses=monthly.get("expenses"),
+                    line_items=line_items
+                )
+                db.add(t12)
+
+                # Update property T12 fields
+                property_obj.t12_noi = summary.get("net_operating_income")
+                property_obj.t12_revenue = summary.get("total_revenue")
+                property_obj.t12_total_expenses = summary.get("total_operating_expenses")
+                property_obj.t12_expense_ratio_pct = extraction.get("expense_ratio_pct")
+                property_obj.t12_gsr = summary.get("gross_potential_rent")
+                property_obj.t12_loss_to_lease = summary.get("loss_to_lease")
+                property_obj.t12_concessions = summary.get("concessions")
+                property_obj.t12_vacancy_rate_pct = (abs(summary.get("vacancy_loss", 0)) / summary.get("gross_potential_rent", 1) * 100) if summary.get("gross_potential_rent") else None
+                property_obj.t12_credit_loss = summary.get("bad_debt")
+                property_obj.t12_net_rental_income = summary.get("net_rental_income")
+                property_obj.t12_real_estate_taxes = summary.get("real_estate_taxes")
+                property_obj.t12_insurance = summary.get("insurance")
+                property_obj.t12_management_fee_pct = (summary.get("management_fee", 0) / summary.get("total_revenue", 1) * 100) if summary.get("total_revenue") else None
+
+                property_obj.financial_data_source = "t12_excel"
+                property_obj.financial_data_updated_at = datetime.utcnow()
+
+                extraction_summary = f"T-12 FY{extraction.get('fiscal_year')}. NOI: ${summary.get('net_operating_income', 0):,.0f}"
+
+            else:
+                # Unknown Excel document type
+                doc.extraction_status = "completed"
+                doc.extraction_summary = "Document uploaded but type could not be determined"
+                extraction_summary = "Unknown document type"
+
+        else:
+            # PDF file
+            doc.document_category = "other"
+            doc.extraction_status = "completed"
+            doc.extraction_summary = "PDF uploaded — extraction not yet implemented"
+            extraction_summary = "PDF uploaded"
+
+        # Mark document as completed
+        doc.extraction_status = "completed"
+        doc.extraction_summary = extraction_summary
+        doc.analyzed_at = datetime.utcnow()
+
+        db.commit()
+        db.refresh(property_obj)
+
+        # Return updated property detail
+        return build_property_detail_response(property_obj, db)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Error processing document upload: {e}")
+        doc.extraction_status = "failed"
+        doc.extraction_summary = f"Error: {str(e)}"
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Document processing failed: {str(e)}"
+        )
 
 
 # ==================== COMPARISON ENDPOINT (Phase 3B) ====================

@@ -255,6 +255,20 @@ class PropertyDetail(BaseModel):
     pipeline_notes: Optional[str] = None
     pipeline_updated_at: Optional[datetime] = None
 
+    # Documents (Phase 1: Excel Integration)
+    documents: List["PropertyDocumentResponse"] = []
+
+    # Rent roll summary (Phase 1: Excel Integration)
+    rr_total_units: Optional[int] = None
+    rr_occupied_units: Optional[int] = None
+    rr_vacancy_count: Optional[int] = None
+    rr_physical_occupancy_pct: Optional[float] = None
+    rr_avg_market_rent: Optional[float] = None
+    rr_avg_in_place_rent: Optional[float] = None
+    rr_avg_sqft: Optional[float] = None
+    rr_loss_to_lease_pct: Optional[float] = None
+    rr_as_of_date: Optional[datetime] = None
+
     class Config:
         from_attributes = True
 
@@ -356,3 +370,49 @@ class ComparisonRequest(BaseModel):
 class ComparisonResponse(BaseModel):
     properties: List[PropertyComparisonItem]
     best_values: BestValues
+
+
+# ==================== DOCUMENT SCHEMAS (Phase 1: Excel Integration) ====================
+
+class PropertyDocumentResponse(BaseModel):
+    """Response for a single property document"""
+    id: int
+    filename: str
+    file_type: str
+    document_category: str
+    document_date: Optional[datetime] = None
+    uploaded_at: datetime
+    extraction_status: str
+    extraction_summary: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class RentRollSummaryResponse(BaseModel):
+    """Summary data from a rent roll extraction"""
+    total_units: Optional[int] = None
+    occupied_units: Optional[int] = None
+    vacant_units: Optional[int] = None
+    physical_occupancy_pct: Optional[float] = None
+    avg_market_rent: Optional[float] = None
+    avg_in_place_rent: Optional[float] = None
+    avg_sqft: Optional[float] = None
+    loss_to_lease_pct: Optional[float] = None
+
+
+class T12SummaryResponse(BaseModel):
+    """Summary data from a T-12 extraction"""
+    fiscal_year: Optional[int] = None
+    gross_potential_rent: Optional[float] = None
+    loss_to_lease: Optional[float] = None
+    concessions: Optional[float] = None
+    vacancy_loss: Optional[float] = None
+    bad_debt: Optional[float] = None
+    net_rental_income: Optional[float] = None
+    other_income: Optional[float] = None
+    total_revenue: Optional[float] = None
+    total_operating_expenses: Optional[float] = None
+    net_operating_income: Optional[float] = None
+    expense_ratio_pct: Optional[float] = None
+    noi_margin_pct: Optional[float] = None
