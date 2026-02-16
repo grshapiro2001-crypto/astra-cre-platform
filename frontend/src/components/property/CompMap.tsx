@@ -113,6 +113,7 @@ export const CompMap: React.FC<CompMapProps> = ({
 
   const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: apiKey || '',
+    version: '3.55',
     libraries: LIBRARIES,
   });
 
@@ -260,7 +261,7 @@ export const CompMap: React.FC<CompMapProps> = ({
     }
 
     // Rent comps
-    rentComps.forEach((comp, idx) => {
+    (rentComps || []).forEach((comp, idx) => {
       if (!comp.location) return;
       const coords = compCoords.get(comp.location);
       if (!coords) return;
@@ -279,7 +280,7 @@ export const CompMap: React.FC<CompMapProps> = ({
     });
 
     // Sales comps
-    salesComps.forEach((comp) => {
+    (salesComps || []).forEach((comp) => {
       const key = `sales-${comp.pricing_tier_id}`;
       const coords = compCoords.get(key);
       if (!coords) return;

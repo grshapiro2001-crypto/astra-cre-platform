@@ -32,6 +32,7 @@ import { useAuthStore } from '@/store/authSlice';
 import { Button } from '@/components/ui/button';
 import { DashboardSkeleton } from '@/components/ui/PageSkeleton';
 import { propertyService } from '@/services/propertyService';
+import { scoringService } from '@/services/scoringService';
 import { criteriaService } from '@/services/criteriaService';
 import { api } from '@/services/api';
 import type { PropertyListItem, ScreeningSummaryItem, BOVPricingTier } from '@/types/property';
@@ -137,6 +138,7 @@ export const Dashboard = () => {
     new Map(),
   );
   const [selectedDealId, setSelectedDealId] = useState<number | null>(null);
+  const [scoresMap, setScoresMap] = useState<Record<number, number | null>>({});
 
   // --- UI State ---
   const [mounted, setMounted] = useState(false);
@@ -159,6 +161,20 @@ export const Dashboard = () => {
         .getScreeningSummary()
         .then(setScreeningSummary)
         .catch(() => {});
+
+      // Non-blocking: deal scores
+      if (props.length > 0) {
+        scoringService
+          .getScores(props.map((p) => p.id))
+          .then((scores) => {
+            const map: Record<number, number | null> = {};
+            Object.entries(scores).forEach(([id, result]) => {
+              map[Number(id)] = result?.total_score ?? null;
+            });
+            setScoresMap(map);
+          })
+          .catch(() => {});
+      }
 
       // Non-blocking: property details for BOV pricing tiers
       if (props.length > 0) {
@@ -215,12 +231,12 @@ export const Dashboard = () => {
         submarket: p.submarket || '',
         units: p.total_units || 0,
         dealValue: getDealValue(p, bovPricingMap),
-        dealScore: p.screening_score ?? null,
+        dealScore: scoresMap[p.id] ?? null,
         documentType: p.document_type,
         propertyType: p.property_type || null,
       }))
       .sort((a, b) => (b.dealScore ?? -1) - (a.dealScore ?? -1));
-  }, [properties, bovPricingMap]);
+  }, [properties, bovPricingMap, scoresMap]);
 
   // --- Metrics ---
   const totalVolume = useMemo(

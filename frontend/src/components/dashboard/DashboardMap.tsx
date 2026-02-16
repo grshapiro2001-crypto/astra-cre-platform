@@ -58,6 +58,9 @@ const darkMapStyles: google.maps.MapTypeStyle[] = [
   { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0f0f23' }] },
   { featureType: 'poi', elementType: 'geometry', stylers: [{ color: '#1e1e35' }] },
   { featureType: 'transit', elementType: 'geometry', stylers: [{ color: '#1e1e35' }] },
+  { featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] },
+  { featureType: 'road.highway', elementType: 'labels', stylers: [{ color: '#555566' }] },
+  { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{ color: '#9999aa' }] },
 ];
 
 const containerStyle = { width: '100%', height: '450px' };
@@ -117,6 +120,7 @@ export const DashboardMap: React.FC<DashboardMapProps> = ({
 
   const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: apiKey || '',
+    version: '3.55',
     libraries: LIBRARIES,
   });
 
