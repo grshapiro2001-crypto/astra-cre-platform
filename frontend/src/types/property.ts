@@ -219,6 +219,7 @@ export interface PropertyDetail {
   screening_verdict?: string | null;
   screening_score?: number | null;
   screening_details_json?: string | null;
+  user_guidance_price?: number | null;
 }
 
 /** Property list item for library views */
@@ -236,6 +237,7 @@ export interface PropertyListItem {
   upload_date?: string;
   screening_verdict?: string | null;
   screening_score?: number | null;
+  user_guidance_price?: number | null;
   pipeline_stage?: string;
   pipeline_notes?: string | null;
   t12_noi?: number | null;

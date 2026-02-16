@@ -141,6 +141,16 @@ export const propertyService = {
   },
 
   /**
+   * Update guidance price for a property (NO LLM - just updates database)
+   */
+  async updateGuidancePrice(propertyId: number, guidancePrice: number | null): Promise<PropertyDetail> {
+    const response = await api.patch(`/properties/${propertyId}/guidance-price`, {
+      guidance_price: guidancePrice,
+    });
+    return response.data;
+  },
+
+  /**
    * Download a professional PDF summary for a property (NO LLM - server-side PDF generation)
    */
   async downloadSummaryPdf(propertyId: number): Promise<void> {

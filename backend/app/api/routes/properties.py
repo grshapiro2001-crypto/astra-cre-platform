@@ -18,6 +18,7 @@ from app.database import get_db
 from app.models.user import User
 from app.models.property import Property, AnalysisLog
 from app.api.deps import get_current_user
+from pydantic import BaseModel
 from app.schemas.property import (
     PropertyCreate,
     PropertyListItem,
@@ -169,6 +170,7 @@ def list_properties(
             document_subtype=p.document_subtype,
             screening_verdict=p.screening_verdict,
             screening_score=p.screening_score,
+            user_guidance_price=p.user_guidance_price,
             pipeline_stage=p.pipeline_stage,
             pipeline_notes=p.pipeline_notes,
         )
@@ -373,6 +375,55 @@ def update_property_notes(
     # Update notes
     property_obj.pipeline_notes = notes
     property_obj.pipeline_updated_at = datetime.now()
+
+    db.commit()
+    db.refresh(property_obj)
+
+    return build_property_detail_response(property_obj, db)
+
+
+# ==================== UPDATE GUIDANCE PRICE (NO LLM) ====================
+
+class GuidancePriceUpdate(BaseModel):
+    guidance_price: float | None = None
+
+
+@router.patch("/{property_id}/guidance-price", response_model=PropertyDetail)
+def update_guidance_price(
+    property_id: int,
+    body: GuidancePriceUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Update property's user-entered guidance price (NO LLM CALLS)
+
+    Body: { "guidance_price": 45000000 }  (or null to clear)
+    Validates that guidance_price is a positive number or null.
+    """
+    # Validate: must be positive or null
+    if body.guidance_price is not None and body.guidance_price <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="guidance_price must be a positive number or null"
+        )
+
+    # Get property
+    property_obj = property_service.get_property(
+        db,
+        property_id,
+        str(current_user.id),
+        update_view_date=False
+    )
+
+    if not property_obj:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Property not found"
+        )
+
+    # Update guidance price
+    property_obj.user_guidance_price = body.guidance_price
 
     db.commit()
     db.refresh(property_obj)
@@ -653,6 +704,7 @@ def build_property_detail_response(property_obj: Property, db: Session) -> Prope
         screening_verdict=property_obj.screening_verdict,
         screening_score=property_obj.screening_score,
         screening_details_json=property_obj.screening_details_json,
+        user_guidance_price=property_obj.user_guidance_price,
         pipeline_stage=property_obj.pipeline_stage,
         pipeline_notes=property_obj.pipeline_notes,
         pipeline_updated_at=property_obj.pipeline_updated_at,
