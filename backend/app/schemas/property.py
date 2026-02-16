@@ -184,6 +184,7 @@ class PropertyListItem(BaseModel):
     document_subtype: Optional[str] = None  # Phase 3A
     screening_verdict: Optional[str] = None
     screening_score: Optional[int] = None
+    user_guidance_price: Optional[float] = None
     pipeline_stage: str = "screening"  # Pipeline Kanban board
     pipeline_notes: Optional[str] = None
 
@@ -245,6 +246,9 @@ class PropertyDetail(BaseModel):
     screening_verdict: Optional[str] = None
     screening_score: Optional[int] = None
     screening_details_json: Optional[str] = None
+
+    # User-entered pricing guidance
+    user_guidance_price: Optional[float] = None
 
     # Pipeline management
     pipeline_stage: str = "screening"

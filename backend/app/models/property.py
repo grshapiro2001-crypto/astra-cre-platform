@@ -120,6 +120,9 @@ class Property(Base):
     screening_score = Column(Integer, nullable=True)
     screening_details_json = Column(Text, nullable=True)  # JSON of checks array
 
+    # User-entered pricing guidance (persisted from PropertyDetail page)
+    user_guidance_price = Column(Float, nullable=True)
+
     # Pipeline management (Kanban board)
     pipeline_stage = Column(String, nullable=False, server_default='screening')  # screening, under_review, loi, under_contract, closed, passed
     pipeline_notes = Column(Text, nullable=True)

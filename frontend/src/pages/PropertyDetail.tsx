@@ -258,6 +258,9 @@ export const PropertyDetail = () => {
   const [selectedTierIdx, setSelectedTierIdx] = useState(0);
   const [capRateSlider, setCapRateSlider] = useState(5.0);
   const [pricingGuidance, setPricingGuidance] = useState(0);
+  const [isSavingGuidance, setIsSavingGuidance] = useState(false);
+  const [guidanceSaved, setGuidanceSaved] = useState(false);
+  const [savedGuidanceValue, setSavedGuidanceValue] = useState(0);
   const [showSourcesPanel, setShowSourcesPanel] = useState(false);
   const [showAIPanel, setShowAIPanel] = useState(false);
   const [newNote, setNewNote] = useState('');
@@ -293,6 +296,12 @@ export const PropertyDetail = () => {
       try {
         const data = await propertyService.getProperty(parseInt(id));
         setProperty(data);
+
+        // Initialise pricing guidance from persisted value
+        if (data.user_guidance_price != null && data.user_guidance_price > 0) {
+          setPricingGuidance(data.user_guidance_price);
+          setSavedGuidanceValue(data.user_guidance_price);
+        }
 
         // Initialise cap rate from first BOV tier if available
         if (data.bov_pricing_tiers?.length) {
@@ -1113,21 +1122,55 @@ export const PropertyDetail = () => {
                     <label className="text-sm font-medium mb-2 block text-muted-foreground">
                       Pricing Guidance (User Input)
                     </label>
-                    <div className="relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg text-muted-foreground">
-                        $
-                      </span>
-                      <input
-                        type="text"
-                        value={pricingGuidance > 0 ? pricingGuidance.toLocaleString() : ''}
-                        placeholder="Enter asking price..."
-                        onChange={(e) =>
-                          setPricingGuidance(
-                            parseInt(e.target.value.replace(/,/g, '')) || 0,
-                          )
-                        }
-                        className="w-full pl-8 pr-4 py-4 rounded-xl text-2xl font-mono font-bold bg-muted border border-border text-foreground placeholder:text-muted-foreground/50 placeholder:font-normal placeholder:text-lg outline-none focus:ring-2 focus:ring-ring"
-                      />
+                    <div className="flex items-center gap-3">
+                      <div className="relative flex-1">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg text-muted-foreground">
+                          $
+                        </span>
+                        <input
+                          type="text"
+                          value={pricingGuidance > 0 ? pricingGuidance.toLocaleString() : ''}
+                          placeholder="Enter asking price..."
+                          onChange={(e) => {
+                            setPricingGuidance(
+                              parseInt(e.target.value.replace(/,/g, '')) || 0,
+                            );
+                            setGuidanceSaved(false);
+                          }}
+                          className="w-full pl-8 pr-4 py-4 rounded-xl text-2xl font-mono font-bold bg-muted border border-border text-foreground placeholder:text-muted-foreground/50 placeholder:font-normal placeholder:text-lg outline-none focus:ring-2 focus:ring-ring"
+                        />
+                      </div>
+                      {pricingGuidance !== savedGuidanceValue && (
+                        <button
+                          disabled={isSavingGuidance}
+                          onClick={async () => {
+                            if (!property) return;
+                            setIsSavingGuidance(true);
+                            try {
+                              const updated = await propertyService.updateGuidancePrice(
+                                property.id,
+                                pricingGuidance > 0 ? pricingGuidance : null,
+                              );
+                              setProperty(updated);
+                              setSavedGuidanceValue(pricingGuidance);
+                              setGuidanceSaved(true);
+                              setTimeout(() => setGuidanceSaved(false), 2000);
+                            } catch {
+                              toast.error('Failed to save pricing guidance');
+                            } finally {
+                              setIsSavingGuidance(false);
+                            }
+                          }}
+                          className="bg-primary text-primary-foreground rounded-lg px-4 py-2 text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-opacity whitespace-nowrap self-center"
+                        >
+                          {isSavingGuidance ? 'Saving...' : 'Save'}
+                        </button>
+                      )}
+                      {guidanceSaved && pricingGuidance === savedGuidanceValue && (
+                        <span className="flex items-center gap-1 text-sm text-emerald-600 dark:text-emerald-400 whitespace-nowrap animate-fade-in">
+                          <CheckCircle className="h-4 w-4" /> Saved!
+                        </span>
+                      )}
                     </div>
 
                     {pricingMetrics && (
