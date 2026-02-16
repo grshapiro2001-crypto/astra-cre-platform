@@ -126,8 +126,11 @@ export const CompMap: React.FC<CompMapProps> = ({
   // Geocoding cache – persists across re-renders, avoids redundant API calls
   const geocodeCache = useRef<Map<string, { lat: number; lng: number } | null>>(new Map());
 
+  // Track which locations we've already started processing (to avoid duplicates)
+  const processingLocations = useRef<Set<string>>(new Set());
+
   /**
-   * Geocode a single address string with caching.
+   * Geocode a single address string with caching (for subject property only).
    * Returns null if geocoding fails.
    */
   const geocodeAddress = useCallback(
@@ -153,6 +156,55 @@ export const CompMap: React.FC<CompMapProps> = ({
     [],
   );
 
+  /**
+   * Geocode using Places API findPlaceFromQuery (for rent comps).
+   * Returns null if geocoding fails.
+   */
+  const geocodePlacesAPI = useCallback(
+    (query: string, mapInstance: google.maps.Map): Promise<{ lat: number; lng: number } | null> => {
+      const cached = geocodeCache.current.get(query);
+      if (cached !== undefined) return Promise.resolve(cached);
+
+      return new Promise((resolve) => {
+        const service = new google.maps.places.PlacesService(mapInstance);
+        service.findPlaceFromQuery(
+          {
+            query: query,
+            fields: ['geometry', 'name', 'formatted_address'],
+          },
+          (results, status) => {
+            if (status === google.maps.places.PlacesServiceStatus.OK && results?.[0]?.geometry?.location) {
+              const location = results[0].geometry.location;
+              const coords = { lat: location.lat(), lng: location.lng() };
+              geocodeCache.current.set(query, coords);
+              resolve(coords);
+            } else {
+              geocodeCache.current.set(query, null);
+              resolve(null);
+            }
+          }
+        );
+      });
+    },
+    [],
+  );
+
+  /**
+   * Calculate distance between two lat/lng points using Haversine formula.
+   * Returns distance in miles.
+   */
+  const calculateDistance = useCallback((lat1: number, lng1: number, lat2: number, lng2: number): number => {
+    const R = 3959; // Earth's radius in miles
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  }, []);
+
   // Geocode the subject property address
   useEffect(() => {
     if (!isLoaded || !apiKey || !address) return;
@@ -167,44 +219,54 @@ export const CompMap: React.FC<CompMapProps> = ({
     });
   }, [isLoaded, apiKey, address, geocodeAddress]);
 
-  // Geocode rent comp locations (append city/state for neighbourhood names)
+  // Geocode rent comp locations using Places API
   useEffect(() => {
-    if (!isLoaded || !apiKey || rentComps.length === 0) return;
+    if (!isLoaded || !apiKey || !map || !subjectCoords || rentComps.length === 0) return;
 
     const citySuffix = extractCityState(address);
 
-    // Deduplicate by location string
-    const uniqueLocations = Array.from(
-      new Set(
-        rentComps
-          .map((c) => c.location)
-          .filter((loc): loc is string => !!loc),
-      ),
-    );
+    // Find locations that haven't been processed yet
+    const locationsToProcess = rentComps
+      .filter((comp) => comp.location && !processingLocations.current.has(comp.location))
+      .map((comp) => ({
+        location: comp.location!,
+        comp_name: comp.comp_name,
+      }));
 
-    Promise.all(
-      uniqueLocations.map(async (loc) => {
-        // Try with city/state appended first for neighbourhood names
-        const fullQuery = loc + citySuffix;
-        let coords = await geocodeAddress(fullQuery);
-        if (!coords) {
-          // Fallback: try the raw location string
-          coords = await geocodeAddress(loc);
+    if (locationsToProcess.length === 0) return;
+
+    // Mark as processing to avoid duplicates
+    locationsToProcess.forEach(({ location }) => processingLocations.current.add(location));
+
+    // Process sequentially to avoid rate limits
+    (async () => {
+      for (const { location, comp_name } of locationsToProcess) {
+        // Build query: prefer comp_name, fall back to location
+        const searchName = comp_name || location;
+        const query = `${searchName} apartments${citySuffix}`;
+
+        const coords = await geocodePlacesAPI(query, map);
+
+        // Validate distance from subject (< 50 miles)
+        if (coords) {
+          const distance = calculateDistance(
+            subjectCoords.lat,
+            subjectCoords.lng,
+            coords.lat,
+            coords.lng
+          );
+
+          if (distance <= 50) {
+            // Update state progressively (pins appear one by one)
+            setCompCoords((prev) => new Map(prev).set(location, coords));
+          }
         }
-        return [loc, coords] as const;
-      }),
-    ).then((results) => {
-      const newMap = new Map<string, { lat: number; lng: number }>();
-      for (const [loc, coords] of results) {
-        if (coords) newMap.set(loc, coords);
+
+        // Rate limiting: 100ms delay between requests
+        await new Promise((resolve) => setTimeout(resolve, 100));
       }
-      setCompCoords((prev) => {
-        const merged = new Map(prev);
-        newMap.forEach((v, k) => merged.set(k, v));
-        return merged;
-      });
-    });
-  }, [isLoaded, apiKey, rentComps, address, geocodeAddress]);
+    })();
+  }, [isLoaded, apiKey, map, subjectCoords, rentComps, address, geocodePlacesAPI, calculateDistance]);
 
   // Geocode sales comps (from address or tier_label if available)
   useEffect(() => {
