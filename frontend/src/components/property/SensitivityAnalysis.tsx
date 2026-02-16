@@ -98,6 +98,7 @@ export const SensitivityAnalysis = ({ property }: SensitivityAnalysisProps) => {
   const [holdPeriod, setHoldPeriod] = useState(5);
   const [ltv, setLtv] = useState(65);
   const [interestRate, setInterestRate] = useState(6.5);
+  const [debtType, setDebtType] = useState<'io' | 'amort'>('io');
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [rawInput, setRawInput] = useState<string>('');
 
@@ -113,16 +114,23 @@ export const SensitivityAnalysis = ({ property }: SensitivityAnalysisProps) => {
     const equity = purchasePrice - loanAmount;
     const goingInCap = t3NOI ? (t3NOI / purchasePrice) * 100 : (y1NOI / purchasePrice) * 100;
 
-    // Monthly interest rate and number of payments (30-year amortization)
-    const monthlyRate = interestRate / 100 / 12;
-    const numPayments = 30 * 12;
-
-    // Calculate annual debt service (monthly payment * 12)
+    // Debt service calculation
+    const annualRate = interestRate / 100;
     let annualDebtService = 0;
-    if (loanAmount > 0 && monthlyRate > 0) {
-      const monthlyPayment = loanAmount * (monthlyRate * Math.pow(1 + monthlyRate, numPayments)) /
-                            (Math.pow(1 + monthlyRate, numPayments) - 1);
-      annualDebtService = monthlyPayment * 12;
+    let monthlyPayment = 0;
+    const monthlyRate = annualRate / 12;
+
+    if (loanAmount > 0 && annualRate > 0) {
+      if (debtType === 'io') {
+        // Interest Only: just interest, no principal
+        annualDebtService = loanAmount * annualRate;
+      } else {
+        // 30-year amortizing
+        const numPayments = 30 * 12;
+        monthlyPayment = loanAmount * (monthlyRate * Math.pow(1 + monthlyRate, numPayments)) /
+                          (Math.pow(1 + monthlyRate, numPayments) - 1);
+        annualDebtService = monthlyPayment * 12;
+      }
     }
 
     // Year-by-year projections
@@ -158,7 +166,16 @@ export const SensitivityAnalysis = ({ property }: SensitivityAnalysisProps) => {
     const finalYearNOI = years[years.length - 1].noi;
     const nextYearNOI = finalYearNOI * (1 + rentGrowth / 100);
     const terminalValue = nextYearNOI / (exitCap / 100);
-    const saleProceeds = terminalValue - loanAmount; // Simplified - no loan paydown
+    // Calculate remaining loan balance at sale
+    let remainingLoanBalance = loanAmount;
+    if (debtType === 'amort' && monthlyPayment > 0 && monthlyRate > 0) {
+      // Remaining balance after holdPeriod years of amortization
+      const paymentsMade = holdPeriod * 12;
+      const numPayments = 30 * 12;
+      remainingLoanBalance = loanAmount * (Math.pow(1 + monthlyRate, numPayments) - Math.pow(1 + monthlyRate, paymentsMade)) /
+                              (Math.pow(1 + monthlyRate, numPayments) - 1);
+    }
+    const saleProceeds = terminalValue - remainingLoanBalance;
 
     // IRR Calculations
     // Unlevered: [-purchasePrice, noi1, noi2, ..., noiN + terminalValue]
@@ -193,7 +210,7 @@ export const SensitivityAnalysis = ({ property }: SensitivityAnalysisProps) => {
       avgCashOnCash,
       year1CashOnCash: years[0]?.cashOnCash || 0,
     };
-  }, [hasFinancials, y1NOI, y1GSR, y1OpEx, purchasePrice, rentGrowth, expenseGrowth, exitCap, holdPeriod, ltv, interestRate]);
+  }, [hasFinancials, y1NOI, y1GSR, y1OpEx, purchasePrice, rentGrowth, expenseGrowth, exitCap, holdPeriod, ltv, interestRate, debtType]);
 
   // If no financials, show empty state
   if (!hasFinancials) {
@@ -423,6 +440,35 @@ export const SensitivityAnalysis = ({ property }: SensitivityAnalysisProps) => {
                 onChange={(e) => setLtv(Number(e.target.value))}
                 className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-purple-600"
               />
+            </div>
+
+            {/* Debt Type Toggle */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium text-foreground">Debt Structure</label>
+                <div className="flex items-center rounded-lg p-0.5 bg-muted">
+                  <button
+                    onClick={() => setDebtType('io')}
+                    className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                      debtType === 'io'
+                        ? 'bg-purple-600 text-white'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    Interest Only
+                  </button>
+                  <button
+                    onClick={() => setDebtType('amort')}
+                    className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                      debtType === 'amort'
+                        ? 'bg-purple-600 text-white'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    30yr Amort
+                  </button>
+                </div>
+              </div>
             </div>
 
             {/* Interest Rate */}
