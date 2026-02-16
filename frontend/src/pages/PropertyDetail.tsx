@@ -1076,7 +1076,7 @@ export const PropertyDetail = () => {
                       Economic Occupancy ({financialPeriod.toUpperCase()})
                     </p>
                     <p className="text-xs mt-0.5 text-muted-foreground">
-                      GSR minus Vacancy, Concessions, Bad Debt, Non-Revenue
+                      Net Rental Income / Gross Potential Rent (GSR − Loss to Lease)
                     </p>
                   </div>
                   <div className="text-right">
@@ -1649,34 +1649,39 @@ export const PropertyDetail = () => {
                     totalUnits={totalUnits}
                     viewMode={financialView}
                   />
-                  <FinancialRow
-                    label="Vacancy"
-                    value={currentFinancials.vacancy}
-                    isDeduction
-                    totalUnits={totalUnits}
-                    viewMode={financialView}
-                  />
-                  <FinancialRow
-                    label="Concessions"
-                    value={currentFinancials.concessions}
-                    isDeduction
-                    totalUnits={totalUnits}
-                    viewMode={financialView}
-                  />
-                  <FinancialRow
-                    label="Bad Debt"
-                    value={currentFinancials.bad_debt}
-                    isDeduction
-                    totalUnits={totalUnits}
-                    viewMode={financialView}
-                  />
-                  <FinancialRow
-                    label="Non-Revenue Units"
-                    value={currentFinancials.non_revenue_units}
-                    isDeduction
-                    totalUnits={totalUnits}
-                    viewMode={financialView}
-                  />
+                  {/* Only show deduction line items when at least one has data */}
+                  {(currentFinancials.vacancy != null || currentFinancials.concessions != null || currentFinancials.bad_debt != null || currentFinancials.non_revenue_units != null) && (
+                    <>
+                      <FinancialRow
+                        label="Vacancy"
+                        value={currentFinancials.vacancy}
+                        isDeduction
+                        totalUnits={totalUnits}
+                        viewMode={financialView}
+                      />
+                      <FinancialRow
+                        label="Concessions"
+                        value={currentFinancials.concessions}
+                        isDeduction
+                        totalUnits={totalUnits}
+                        viewMode={financialView}
+                      />
+                      <FinancialRow
+                        label="Bad Debt"
+                        value={currentFinancials.bad_debt}
+                        isDeduction
+                        totalUnits={totalUnits}
+                        viewMode={financialView}
+                      />
+                      <FinancialRow
+                        label="Non-Revenue Units"
+                        value={currentFinancials.non_revenue_units}
+                        isDeduction
+                        totalUnits={totalUnits}
+                        viewMode={financialView}
+                      />
+                    </>
+                  )}
 
                   {/* Economic occupancy highlight row */}
                   {economicOccupancy.percent > 0 &&
