@@ -569,7 +569,8 @@ export const PropertyDetail = () => {
     const metrics = property?.calculated_metrics?.[financialPeriod];
     if (metrics?.opex_ratio != null) return metrics.opex_ratio;
     if (!currentFinancials?.gsr || !currentFinancials?.total_opex) return 0;
-    return (currentFinancials.total_opex / currentFinancials.gsr) * 100;
+    const gpr = currentFinancials.gsr - Math.abs(currentFinancials.loss_to_lease ?? 0);
+    return gpr > 0 ? (currentFinancials.total_opex / gpr) * 100 : 0;
   }, [property, financialPeriod, currentFinancials]);
 
   const lossToLease = useMemo(() => {
@@ -1775,7 +1776,7 @@ export const PropertyDetail = () => {
                   {opexPercent > 0 && (
                     <div className="mt-6 p-4 rounded-xl bg-muted flex items-center justify-between">
                       <span className="text-muted-foreground">
-                        OpEx Ratio (% of GSR)
+                        OpEx Ratio (% of GPR)
                       </span>
                       <span className="font-mono text-xl font-bold text-foreground">
                         {opexPercent.toFixed(1)}%
