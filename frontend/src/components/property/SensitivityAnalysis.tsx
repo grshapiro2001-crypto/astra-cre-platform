@@ -61,6 +61,7 @@ const calculateIRR = (cashFlows: number[], guess = 0.1): number | null => {
 
 export const SensitivityAnalysis = ({ property }: SensitivityAnalysisProps) => {
   const y1NOI = property.y1_financials?.noi;
+  const t3NOI = property.t3_financials?.noi ?? property.t3_noi;
   const y1GSR = property.y1_financials?.gsr;
   const y1OpEx = property.y1_financials?.total_opex;
 
@@ -110,7 +111,7 @@ export const SensitivityAnalysis = ({ property }: SensitivityAnalysisProps) => {
     const ltvDecimal = ltv / 100;
     const loanAmount = purchasePrice * ltvDecimal;
     const equity = purchasePrice - loanAmount;
-    const goingInCap = (y1NOI / purchasePrice) * 100;
+    const goingInCap = t3NOI ? (t3NOI / purchasePrice) * 100 : (y1NOI / purchasePrice) * 100;
 
     // Monthly interest rate and number of payments (30-year amortization)
     const monthlyRate = interestRate / 100 / 12;
@@ -253,7 +254,7 @@ export const SensitivityAnalysis = ({ property }: SensitivityAnalysisProps) => {
             {/* Going-In Cap Rate - Display Only */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <label className="text-sm font-medium text-muted-foreground">Going-In Cap Rate</label>
+                <label className="text-sm font-medium text-muted-foreground">Going-In Cap (T3)</label>
                 <span className="text-sm font-mono text-muted-foreground">
                   {fmtPercent(calculations?.goingInCap)}
                 </span>
