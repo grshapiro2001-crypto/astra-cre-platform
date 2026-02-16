@@ -299,6 +299,7 @@ export const PropertyDetail = () => {
   const [financialPeriod, setFinancialPeriod] =
     useState<FinancialPeriodKey>('t12');
   const [financialView, setFinancialView] =
+  const [unitMixOpen, setUnitMixOpen] = useState(false);
     useState<FinancialViewMode>('total');
   const [selectedTierIdx, setSelectedTierIdx] = useState(0);
   const [capRateSlider, setCapRateSlider] = useState(5.0);
@@ -1915,10 +1916,16 @@ export const PropertyDetail = () => {
         {/* UNIT MIX                                                         */}
         {/* --------------------------------------------------------------- */}
         <section className="animate-fade-in" style={{ animationDelay: '270ms' }}>
-          <h2 className="font-display text-lg font-bold mb-4 text-foreground">
-            Unit Mix
-          </h2>
-          {unitMix.length > 0 ? (
+          <button
+            onClick={() => setUnitMixOpen(!unitMixOpen)}
+            className="flex items-center justify-between w-full mb-4"
+          >
+            <h2 className="font-display text-lg font-bold text-foreground">
+              Unit Mix
+            </h2>
+            <ChevronDown className={`w-5 h-5 text-muted-foreground transition-transform ${unitMixOpen ? 'rotate-180' : ''}`} />
+          </button>
+          {unitMixOpen && unitMix.length > 0 ? (
             <div className="border border-border rounded-2xl bg-card overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
