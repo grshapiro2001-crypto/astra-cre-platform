@@ -329,8 +329,8 @@ export const PropertyDetail = () => {
 
   // --- Document upload state ---
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
+  const [isUploadingDoc, setIsUploadingDoc] = useState(false);
+  const [uploadMessage, setUploadMessage] = useState<{ text: string; isError: boolean } | null>(null);
 
   // --- Comparison state from uiStore ---
   const comparisonPropertyIds = useUIStore((state) => state.comparisonPropertyIds);
@@ -467,33 +467,28 @@ export const PropertyDetail = () => {
 
   const handleDocumentUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !property) return;
+    if (!file || !property?.id) return;
 
-    setIsUploading(true);
-    setUploadSuccess(null);
+    setIsUploadingDoc(true);
+    setUploadMessage(null);
+
     try {
-      const updatedProperty = await propertyService.uploadPropertyDocument(property.id, file);
-      setProperty(updatedProperty);
-
-      // Show success message from extraction summary
-      const docs: PropertyDocument[] = updatedProperty.documents ?? [];
-      const latestDoc = docs.length > 0 ? docs[docs.length - 1] : null;
-      const summary = latestDoc?.extraction_summary || 'Document uploaded successfully';
-      setUploadSuccess(summary);
-      toast.success(summary, { duration: 4000 });
-
-      // Clear success after 5 seconds
-      setTimeout(() => setUploadSuccess(null), 5000);
-    } catch (err: unknown) {
-      const e = err as { response?: { data?: { detail?: string } } };
-      const errMsg = e.response?.data?.detail || 'Upload failed. Please try again.';
-      toast.error(errMsg, { duration: 5000 });
+      const result = await propertyService.uploadPropertyDocument(property.id, file);
+      setUploadMessage({
+        text: result.extraction_summary || `${file.name} uploaded and extracted successfully`,
+        isError: false,
+      });
+      // Re-fetch property data to show updated fields
+      const updated = await propertyService.getProperty(property.id);
+      setProperty(updated);
+    } catch (err: any) {
+      setUploadMessage({
+        text: `Upload failed: ${err?.response?.data?.detail || err?.message || 'Unknown error'}`,
+        isError: true,
+      });
     } finally {
-      setIsUploading(false);
-      // Clear the file input so the same file can be re-uploaded
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
+      setIsUploadingDoc(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
@@ -1570,6 +1565,81 @@ export const PropertyDetail = () => {
           </section>
         )}
 
+        {/* RENT ROLL SUMMARY */}
+        {property.rr_total_units != null && (
+          <section className="animate-fade-in" style={{ animationDelay: '150ms' }}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-display text-lg font-bold text-foreground">Rent Roll Summary</h2>
+              {property.rr_as_of_date && (
+                <span className="text-sm text-muted-foreground">
+                  As of {new Date(property.rr_as_of_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                </span>
+              )}
+            </div>
+            <div className="border border-border rounded-2xl bg-card p-6">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 mb-6">
+                <div>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Total Units</p>
+                  <p className="text-2xl font-bold font-mono text-foreground">{property.rr_total_units}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Occupied</p>
+                  <p className="text-2xl font-bold font-mono text-foreground">{property.rr_occupied_units ?? '—'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Vacant</p>
+                  <p className="text-2xl font-bold font-mono text-foreground">{property.rr_vacancy_count ?? '—'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Physical Occupancy</p>
+                  <p className={`text-2xl font-bold font-mono ${
+                    (property.rr_physical_occupancy_pct ?? 0) >= 95 ? 'text-emerald-400' :
+                    (property.rr_physical_occupancy_pct ?? 0) >= 90 ? 'text-amber-400' : 'text-red-400'
+                  }`}>
+                    {property.rr_physical_occupancy_pct != null ? `${property.rr_physical_occupancy_pct.toFixed(1)}%` : '—'}
+                  </p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
+                <div>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Avg Market Rent</p>
+                  <p className="text-2xl font-bold font-mono text-foreground">
+                    {property.rr_avg_market_rent != null ? `$${Math.round(property.rr_avg_market_rent).toLocaleString()}` : '—'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Avg In-Place Rent</p>
+                  <p className="text-2xl font-bold font-mono text-foreground">
+                    {property.rr_avg_in_place_rent != null ? `$${Math.round(property.rr_avg_in_place_rent).toLocaleString()}` : '—'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Avg SF</p>
+                  <p className="text-2xl font-bold font-mono text-foreground">
+                    {property.rr_avg_sqft != null ? Math.round(property.rr_avg_sqft).toLocaleString() : '—'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Loss to Lease</p>
+                  <p className={`text-2xl font-bold font-mono ${
+                    (property.rr_loss_to_lease_pct ?? 0) < 5 ? 'text-emerald-400' :
+                    (property.rr_loss_to_lease_pct ?? 0) <= 10 ? 'text-amber-400' : 'text-red-400'
+                  }`}>
+                    {property.rr_loss_to_lease_pct != null ? `${property.rr_loss_to_lease_pct.toFixed(1)}%` : '—'}
+                  </p>
+                </div>
+              </div>
+              <div className="mt-4 pt-3 border-t border-border">
+                <p className="text-xs text-muted-foreground">
+                  Source: Rent Roll (Excel) · Updated {property.financial_data_updated_at
+                    ? new Date(property.financial_data_updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                    : 'recently'}
+                </p>
+              </div>
+            </div>
+          </section>
+        )}
+
         {/* --------------------------------------------------------------- */}
         {/* OPERATING FINANCIALS                                             */}
         {/* --------------------------------------------------------------- */}
@@ -2197,34 +2267,42 @@ export const PropertyDetail = () => {
             <h2 className="font-display text-lg font-bold text-foreground">
               Documents
             </h2>
-            <div className="flex items-center gap-2">
-              {uploadSuccess && (
-                <span className="flex items-center gap-1 text-sm text-emerald-600 dark:text-emerald-400 animate-fade-in">
-                  <CheckCircle className="w-4 h-4" />
-                  Uploaded
-                </span>
-              )}
+            <div>
               <input
                 ref={fileInputRef}
                 type="file"
                 accept=".pdf,.xlsx,.xlsm,.csv"
-                onChange={handleDocumentUpload}
                 className="hidden"
+                onChange={handleDocumentUpload}
               />
               <button
                 onClick={() => fileInputRef.current?.click()}
-                disabled={isUploading}
-                className="flex items-center gap-2 bg-primary text-primary-foreground rounded-xl px-4 py-2.5 text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50"
+                disabled={isUploadingDoc}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
               >
-                {isUploading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                {isUploadingDoc ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Extracting...
+                  </>
                 ) : (
-                  <Upload className="w-4 h-4" />
+                  <>
+                    <Upload className="w-4 h-4" />
+                    Upload Document
+                  </>
                 )}
-                {isUploading ? 'Uploading...' : 'Upload Document'}
               </button>
             </div>
           </div>
+          {uploadMessage && (
+            <div className={`mb-4 p-3 rounded-xl text-sm border ${
+              uploadMessage.isError
+                ? 'bg-red-500/10 text-red-400 border-red-500/20'
+                : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+            }`}>
+              {uploadMessage.text}
+            </div>
+          )}
           <div className="border border-border rounded-2xl bg-card p-5 space-y-3">
             {/* Original OM document (if not already in the documents array) */}
             {property.uploaded_filename && !(property.documents ?? []).some(
