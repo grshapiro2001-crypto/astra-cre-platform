@@ -786,6 +786,10 @@ def _extract_t12_summary(line_items: Dict[str, Dict[str, Any]], total_col: Optio
             item_lower = item_name.lower()
             # Check if any keyword matches
             if any(kw in item_lower for kw in keywords):
+                # Skip false positives: lines containing "excl" or "net potential" that happen to match
+                skip_words = ["excl ", "excluding", "net potential", "after "]
+                if any(sw in item_lower for sw in skip_words):
+                    continue
                 # Prefer exact or close matches
                 if values.get("Total") is not None:
                     summary[field] = values["Total"]
