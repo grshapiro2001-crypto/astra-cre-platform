@@ -232,7 +232,7 @@ export const SensitivityAnalysis = ({ property }: SensitivityAnalysisProps) => {
                   value={fmtCurrency(purchasePrice)}
                   onChange={(e) => {
                     const numericValue = e.target.value.replace(/[^0-9]/g, '');
-                    if (numericValue) setPurchasePrice(parseInt(numericValue, 10));
+                    setPurchasePrice(numericValue ? parseInt(numericValue, 10) : 0);
                   }}
                   className="w-32 px-2 py-1 text-sm text-right border border-border rounded bg-background"
                 />
@@ -266,9 +266,12 @@ export const SensitivityAnalysis = ({ property }: SensitivityAnalysisProps) => {
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium text-foreground">Annual Rent Growth</label>
                 <input
-                  type="number"
-                  value={rentGrowth}
-                  onChange={(e) => setRentGrowth(Number(e.target.value))}
+                  type="text"
+                  value={`${rentGrowth}%`}
+                  onChange={(e) => {
+                    const v = e.target.value.replace(/[^0-9.]/g, '');
+                    if (v === '' || !isNaN(Number(v))) setRentGrowth(v === '' ? 0 : Number(v));
+                  }}
                   step={0.25}
                   min={0}
                   max={8}
@@ -291,9 +294,12 @@ export const SensitivityAnalysis = ({ property }: SensitivityAnalysisProps) => {
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium text-foreground">Annual Expense Growth</label>
                 <input
-                  type="number"
-                  value={expenseGrowth}
-                  onChange={(e) => setExpenseGrowth(Number(e.target.value))}
+                  type="text"
+                  value={`${expenseGrowth}%`}
+                  onChange={(e) => {
+                    const v = e.target.value.replace(/[^0-9.]/g, '');
+                    if (v === '' || !isNaN(Number(v))) setExpenseGrowth(v === '' ? 0 : Number(v));
+                  }}
                   step={0.25}
                   min={0}
                   max={6}
@@ -316,9 +322,12 @@ export const SensitivityAnalysis = ({ property }: SensitivityAnalysisProps) => {
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium text-foreground">Exit Cap Rate</label>
                 <input
-                  type="number"
-                  value={exitCap}
-                  onChange={(e) => setExitCap(Number(e.target.value))}
+                  type="text"
+                  value={`${exitCap}%`}
+                  onChange={(e) => {
+                    const v = e.target.value.replace(/[^0-9.]/g, '');
+                    if (v === '' || !isNaN(Number(v))) setExitCap(v === '' ? 0 : Number(v));
+                  }}
                   step={0.25}
                   min={4}
                   max={8}
@@ -339,7 +348,7 @@ export const SensitivityAnalysis = ({ property }: SensitivityAnalysisProps) => {
             {/* Hold Period */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <label className="text-sm font-medium text-foreground">Hold Period</label>
+                <label className="text-sm font-medium text-foreground">Hold Period (Years)</label>
                 <input
                   type="number"
                   value={holdPeriod}
@@ -366,9 +375,12 @@ export const SensitivityAnalysis = ({ property }: SensitivityAnalysisProps) => {
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium text-foreground">LTV</label>
                 <input
-                  type="number"
-                  value={ltv}
-                  onChange={(e) => setLtv(Number(e.target.value))}
+                  type="text"
+                  value={`${ltv}%`}
+                  onChange={(e) => {
+                    const v = e.target.value.replace(/[^0-9.]/g, '');
+                    if (v === '' || !isNaN(Number(v))) setLtv(v === '' ? 0 : Number(v));
+                  }}
                   step={5}
                   min={0}
                   max={80}
@@ -391,9 +403,12 @@ export const SensitivityAnalysis = ({ property }: SensitivityAnalysisProps) => {
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium text-foreground">Interest Rate</label>
                 <input
-                  type="number"
-                  value={interestRate}
-                  onChange={(e) => setInterestRate(Number(e.target.value))}
+                  type="text"
+                  value={`${interestRate}%`}
+                  onChange={(e) => {
+                    const v = e.target.value.replace(/[^0-9.]/g, '');
+                    if (v === '' || !isNaN(Number(v))) setInterestRate(v === '' ? 0 : Number(v));
+                  }}
                   step={0.25}
                   min={4}
                   max={9}
