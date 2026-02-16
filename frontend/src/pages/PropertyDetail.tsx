@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { useLoadScript } from '@react-google-maps/api';
 import {
   ArrowLeft,
   ArrowRight,
@@ -265,6 +266,8 @@ export const PropertyDetail = () => {
   const [showAIPanel, setShowAIPanel] = useState(false);
   const [newNote, setNewNote] = useState('');
   const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [propertyPhotoUrl, setPropertyPhotoUrl] = useState<string | null>(null);
+  const [photoLoadFailed, setPhotoLoadFailed] = useState(false);
 
   // --- Scoring state ---
   const [dealScore, setDealScore] = useState<DealScoreResult | null>(null);
@@ -283,6 +286,12 @@ export const PropertyDetail = () => {
   // --- Comparison state from uiStore ---
   const comparisonPropertyIds = useUIStore((state) => state.comparisonPropertyIds);
   const togglePropertyComparison = useUIStore((state) => state.togglePropertyComparison);
+
+  // --- Google Maps API ---
+  const { isLoaded: mapsLoaded } = useLoadScript({
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '',
+    libraries: ['places'],
+  });
 
   // -----------------------------------------------------------------------
   // Data fetching
@@ -332,6 +341,42 @@ export const PropertyDetail = () => {
     };
     fetchScore();
   }, [id]);
+
+  // Fetch Google Places photo when property loads and Maps API is ready
+  useEffect(() => {
+    if (!property || !mapsLoaded || !property.property_address) return;
+    if (!import.meta.env.VITE_GOOGLE_MAPS_API_KEY) return;
+
+    // Reset states for new property
+    setPropertyPhotoUrl(null);
+    setPhotoLoadFailed(false);
+
+    // Create a PlacesService instance
+    const service = new google.maps.places.PlacesService(document.createElement('div'));
+    const query = `${property.deal_name} ${property.property_address}`;
+
+    service.findPlaceFromQuery(
+      {
+        query: query,
+        fields: ['photos', 'name'],
+      },
+      (results, status) => {
+        if (status === google.maps.places.PlacesServiceStatus.OK && results?.[0]?.photos?.length) {
+          try {
+            // Get the URL of the first (best) photo
+            const photoUrl = results[0].photos[0].getUrl({ maxWidth: 800, maxHeight: 600 });
+            setPropertyPhotoUrl(photoUrl);
+          } catch (error) {
+            console.error('Error getting photo URL:', error);
+            setPhotoLoadFailed(true);
+          }
+        } else {
+          // No photos found or API error
+          setPhotoLoadFailed(true);
+        }
+      }
+    );
+  }, [property, mapsLoaded]);
 
   // -----------------------------------------------------------------------
   // Actions
@@ -879,7 +924,7 @@ export const PropertyDetail = () => {
                 </div>
               </div>
 
-              {/* Right side - Google Street View */}
+              {/* Right side - Google Places Photo */}
               <div className="relative h-full min-h-[200px] md:min-h-[320px]">
                 {import.meta.env.VITE_GOOGLE_MAPS_API_KEY ? (
                   <a
@@ -888,35 +933,41 @@ export const PropertyDetail = () => {
                     rel="noopener noreferrer"
                     className="block w-full h-full relative group"
                   >
-                    <img
-                      src={`https://maps.googleapis.com/maps/api/streetview?size=800x600&location=${encodeURIComponent(property.property_address || '')}&key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}`}
-                      alt={`Street view of ${property.property_address}`}
-                      loading="lazy"
-                      className="w-full h-full object-cover md:rounded-r-2xl"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        target.style.display = 'none';
-                        const fallback = target.nextElementSibling as HTMLElement;
-                        if (fallback) fallback.style.display = 'flex';
-                      }}
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-card/80 via-transparent to-transparent md:rounded-r-2xl pointer-events-none" />
-                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors md:rounded-r-2xl" />
-                    <div
-                      className="hidden w-full h-full items-center justify-center bg-accent md:rounded-r-2xl"
-                      style={{ display: 'none' }}
-                    >
-                      <div className="text-center">
-                        <Building2 className="w-12 h-12 mx-auto mb-2 text-muted-foreground" />
-                        <p className="text-sm text-muted-foreground">No Street View Available</p>
+                    {propertyPhotoUrl && !photoLoadFailed ? (
+                      <>
+                        <img
+                          src={propertyPhotoUrl}
+                          alt={`Photo of ${property.property_address}`}
+                          loading="lazy"
+                          className="w-full h-full object-cover md:rounded-r-2xl"
+                          onError={() => {
+                            setPhotoLoadFailed(true);
+                          }}
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-card/80 via-transparent to-transparent md:rounded-r-2xl pointer-events-none" />
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors md:rounded-r-2xl" />
+                      </>
+                    ) : photoLoadFailed ? (
+                      <div className="w-full h-full flex items-center justify-center bg-accent md:rounded-r-2xl">
+                        <div className="text-center">
+                          <Building2 className="w-12 h-12 mx-auto mb-2 text-muted-foreground" />
+                          <p className="text-sm text-muted-foreground">No Photo Available</p>
+                        </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-accent md:rounded-r-2xl">
+                        <div className="text-center">
+                          <Loader2 className="w-12 h-12 mx-auto mb-2 text-muted-foreground animate-spin" />
+                          <p className="text-sm text-muted-foreground">Loading photo...</p>
+                        </div>
+                      </div>
+                    )}
                   </a>
                 ) : (
                   <div className="w-full h-full flex items-center justify-center bg-accent md:rounded-r-2xl">
                     <div className="text-center">
                       <Building2 className="w-12 h-12 mx-auto mb-2 text-muted-foreground" />
-                      <p className="text-sm text-muted-foreground">No Street View Available</p>
+                      <p className="text-sm text-muted-foreground">No Photo Available</p>
                     </div>
                   </div>
                 )}
