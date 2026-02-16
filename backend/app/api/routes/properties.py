@@ -1164,22 +1164,62 @@ async def upload_document_to_property(
                         t3_gsr = (property_obj.t12_gsr / 12 * 3 * 4) if property_obj.t12_gsr else t3_rev_annual
                         t3_opex_ratio = (t12_total_exp / t3_rev_annual * 100) if t3_rev_annual > 0 else None
 
+                        # Extract T3 granular line items from T-12 line_items
+                        t3_line_items = {}
+                        if line_items:
+                            li = line_items if isinstance(line_items, dict) else (json.loads(line_items) if isinstance(line_items, str) else {})
+                            def t3_annualize(item_name):
+                                """Find a line item and annualize its last 3 months"""
+                                for name, vals in li.items():
+                                    if isinstance(vals, dict) and name.lower() == item_name.lower():
+                                        s = sum((vals.get(m, 0) or 0) for m in last_3)
+                                        return s * 4
+                                # Fuzzy match
+                                for name, vals in li.items():
+                                    if isinstance(vals, dict) and item_name.lower() in name.lower():
+                                        # Skip false positives
+                                        skip = ["excl ", "excluding", "net potential", "after "]
+                                        if any(sw in name.lower() for sw in skip):
+                                            continue
+                                        s = sum((vals.get(m, 0) or 0) for m in last_3)
+                                        return s * 4
+                                return None
+
+                            t3_line_items["gsr"] = t3_annualize("Gross Potential Rent") or t3_annualize("Residential Income")
+                            t3_line_items["loss_to_lease"] = t3_annualize("Gain Loss to Lease") or t3_annualize("Gain / Loss To Lease")
+                            t3_line_items["vacancy"] = t3_annualize("Vacancy Loss")
+                            t3_line_items["concessions"] = t3_annualize("Concessions")
+                            t3_line_items["non_revenue_units"] = t3_annualize("Non Revenue Units")
+                            t3_line_items["bad_debt"] = t3_annualize("Bad debt")
+                            t3_line_items["net_rental_income"] = t3_annualize("Net Rental Income")
+                            t3_line_items["real_estate_taxes"] = t3_annualize("Real Estate Taxes")
+                            t3_line_items["insurance"] = t3_annualize("Insurance")
+                            t3_line_items["management_fee"] = t3_annualize("Management Fee")
+
+                        t3_gsr_actual = t3_line_items.get("gsr") or t3_gsr
+                        t3_loss_to_lease = t3_line_items.get("loss_to_lease")
+                        t3_vacancy = t3_line_items.get("vacancy")
+                        t3_concessions = t3_line_items.get("concessions")
+                        t3_non_rev = t3_line_items.get("non_revenue_units")
+                        t3_bad_debt = t3_line_items.get("bad_debt")
+                        t3_nri = t3_line_items.get("net_rental_income")
+
                         t3_fin = {
                             "period_label": "Trailing 3 Month (Annualized) - " + ", ".join(reversed(last_3)),
-                            "gsr": t3_gsr,
-                            "vacancy": None,
-                            "concessions": None,
-                            "bad_debt": None,
-                            "non_revenue_units": None,
+                            "gsr": t3_gsr_actual,
+                            "vacancy": t3_vacancy,
+                            "concessions": t3_concessions,
+                            "bad_debt": t3_bad_debt,
+                            "non_revenue_units": t3_non_rev,
                             "total_opex": t12_total_exp,
                             "noi": t3_noi_annual,
                             "opex_ratio": t3_opex_ratio,
-                            "loss_to_lease": None,
+                            "loss_to_lease": t3_loss_to_lease,
                             "vacancy_rate_pct": property_obj.t12_vacancy_rate_pct,
-                            "credit_loss": None,
-                            "net_rental_income": t3_rev_annual,
-                            "real_estate_taxes": None,
-                            "insurance": None,
+                            "credit_loss": t3_bad_debt,
+                            "net_rental_income": t3_nri or t3_rev_annual,
+                            "real_estate_taxes": t3_line_items.get("real_estate_taxes"),
+                            "insurance": t3_line_items.get("insurance"),
                             "management_fee_pct": None,
                         }
                         property_obj.t3_financials_json = json.dumps(t3_fin)
