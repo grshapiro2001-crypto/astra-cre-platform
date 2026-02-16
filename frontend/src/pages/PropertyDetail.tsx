@@ -1516,7 +1516,7 @@ export const PropertyDetail = () => {
                 <div>
                   <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Avg In-Place Rent</p>
                   <p className="text-2xl font-bold font-mono text-foreground">
-                    {property.rr_avg_in_place_rent != null ? `$${Math.round(property.rr_avg_in_place_rent).toLocaleString()}` : '—'}
+                    {(property.rr_avg_in_place_rent ?? property.average_inplace_rent) != null ? `$${Math.round((property.rr_avg_in_place_rent ?? property.average_inplace_rent)!).toLocaleString()}` : '—'}
                   </p>
                 </div>
                 <div>
@@ -1528,10 +1528,10 @@ export const PropertyDetail = () => {
                 <div>
                   <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Loss to Lease</p>
                   <p className={`text-2xl font-bold font-mono ${
-                    (property.rr_loss_to_lease_pct ?? 0) < 5 ? 'text-emerald-400' :
-                    (property.rr_loss_to_lease_pct ?? 0) <= 10 ? 'text-amber-400' : 'text-red-400'
+                    ((property.rr_loss_to_lease_pct ?? (property.average_market_rent && property.average_inplace_rent ? ((property.average_market_rent - property.average_inplace_rent) / property.average_market_rent * 100) : 0)) ?? 0) < 5 ? 'text-emerald-400' :
+                    ((property.rr_loss_to_lease_pct ?? (property.average_market_rent && property.average_inplace_rent ? ((property.average_market_rent - property.average_inplace_rent) / property.average_market_rent * 100) : 0)) ?? 0) <= 10 ? 'text-amber-400' : 'text-red-400'
                   }`}>
-                    {property.rr_loss_to_lease_pct != null ? `${property.rr_loss_to_lease_pct.toFixed(1)}%` : '—'}
+                    {(property.rr_loss_to_lease_pct ?? (property.average_market_rent && property.average_inplace_rent ? ((property.average_market_rent - property.average_inplace_rent) / property.average_market_rent * 100) : null)) != null ? `${(property.rr_loss_to_lease_pct ?? ((property.average_market_rent! - property.average_inplace_rent!) / property.average_market_rent! * 100)).toFixed(1)}%` : '—'}
                   </p>
                 </div>
               </div>
