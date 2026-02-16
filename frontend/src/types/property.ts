@@ -259,6 +259,10 @@ export interface PropertyDetail {
   t12_revenue?: number | null;
   t12_total_expenses?: number | null;
   t12_gsr?: number | null;
+  // Flat NOI fields (fallback for OM properties)
+  t3_noi?: number | null;
+  t12_noi?: number | null;
+  y1_noi?: number | null;
 }
 
 /** Property list item for library views */
