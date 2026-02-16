@@ -500,9 +500,18 @@ export const PropertyDetail = () => {
     key: FinancialPeriodKey,
   ): FinancialPeriod | null | undefined => {
     if (!property) return null;
-    if (key === 't3') return property.t3_financials;
-    if (key === 't12') return property.t12_financials;
-    return property.y1_financials;
+    const nested = key === 't3' ? property.t3_financials
+      : key === 't12' ? property.t12_financials
+      : property.y1_financials;
+    if (nested) return nested;
+
+    // Fall back to flat NOI fields for OM properties
+    const noi = key === 't3' ? property.t3_noi
+      : key === 't12' ? property.t12_noi
+      : property.y1_noi;
+    if (noi == null) return null;
+
+    return { period_label: key, noi };
   };
 
   const currentFinancials = getFinancials(financialPeriod);
@@ -510,9 +519,10 @@ export const PropertyDetail = () => {
   const availablePeriods = useMemo((): FinancialPeriodKey[] => {
     if (!property) return [];
     const out: FinancialPeriodKey[] = [];
-    if (property.t3_financials) out.push('t3');
-    if (property.t12_financials) out.push('t12');
-    if (property.y1_financials) out.push('y1');
+    // Check both nested financials objects AND flat NOI fields
+    if (property.t3_financials || property.t3_noi != null) out.push('t3');
+    if (property.t12_financials || property.t12_noi != null) out.push('t12');
+    if (property.y1_financials || property.y1_noi != null) out.push('y1');
     return out;
   }, [property]);
 
@@ -659,12 +669,12 @@ export const PropertyDetail = () => {
 
   const pricingMetrics = useMemo(() => {
     if (pricingGuidance <= 0 || !property) return null;
-    const t12Noi = property.t12_financials?.noi;
-    const y1Noi = property.y1_financials?.noi;
+    const t3Noi = property.t3_financials?.noi ?? property.t3_noi;
+    const y1Noi = property.y1_financials?.noi ?? property.y1_noi;
     return {
       goingInCap:
-        t12Noi != null
-          ? ((t12Noi / pricingGuidance) * 100).toFixed(2)
+        t3Noi != null
+          ? ((t3Noi / pricingGuidance) * 100).toFixed(2)
           : '---',
       y1Cap:
         y1Noi != null
@@ -1089,113 +1099,6 @@ export const PropertyDetail = () => {
         </section>
 
         {/* --------------------------------------------------------------- */}
-        {/* RENT ROLL SUMMARY (from Excel upload)                            */}
-        {/* --------------------------------------------------------------- */}
-        {property.rr_total_units != null && (
-          <section className="animate-fade-in" style={{ animationDelay: '80ms' }}>
-            <div className="border border-border rounded-2xl bg-card p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="font-display text-lg font-bold text-foreground">
-                  Rent Roll Summary
-                </h2>
-                {property.rr_as_of_date && (
-                  <span className="text-sm text-muted-foreground">
-                    As of: {fmtShortDate(property.rr_as_of_date)}
-                  </span>
-                )}
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {/* Row 1 */}
-                <div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider">Total Units</p>
-                  <p className="text-2xl font-bold font-mono text-foreground mt-1">
-                    {property.rr_total_units?.toLocaleString() ?? '---'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider">Occupied</p>
-                  <p className="text-2xl font-bold font-mono text-foreground mt-1">
-                    {property.rr_occupied_units?.toLocaleString() ?? '---'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider">Vacant</p>
-                  <p className="text-2xl font-bold font-mono text-foreground mt-1">
-                    {property.rr_vacancy_count?.toLocaleString() ?? '---'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider">Physical Occupancy</p>
-                  <p className={cn(
-                    'text-2xl font-bold font-mono mt-1',
-                    property.rr_physical_occupancy_pct != null
-                      ? property.rr_physical_occupancy_pct >= 95
-                        ? 'text-emerald-400'
-                        : property.rr_physical_occupancy_pct >= 90
-                          ? 'text-amber-400'
-                          : 'text-red-400'
-                      : 'text-foreground'
-                  )}>
-                    {property.rr_physical_occupancy_pct != null
-                      ? `${property.rr_physical_occupancy_pct.toFixed(1)}%`
-                      : '---'}
-                  </p>
-                </div>
-                {/* Row 2 */}
-                <div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider">Avg Market Rent</p>
-                  <p className="text-2xl font-bold font-mono text-foreground mt-1">
-                    {property.rr_avg_market_rent != null
-                      ? `$${property.rr_avg_market_rent.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
-                      : '---'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider">Avg In-Place Rent</p>
-                  <p className="text-2xl font-bold font-mono text-foreground mt-1">
-                    {property.rr_avg_in_place_rent != null
-                      ? `$${property.rr_avg_in_place_rent.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
-                      : '---'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider">Avg SF</p>
-                  <p className="text-2xl font-bold font-mono text-foreground mt-1">
-                    {property.rr_avg_sqft != null
-                      ? property.rr_avg_sqft.toLocaleString(undefined, { maximumFractionDigits: 0 })
-                      : '---'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wider">Loss to Lease</p>
-                  <p className={cn(
-                    'text-2xl font-bold font-mono mt-1',
-                    property.rr_loss_to_lease_pct != null
-                      ? property.rr_loss_to_lease_pct < 5
-                        ? 'text-emerald-400'
-                        : property.rr_loss_to_lease_pct <= 10
-                          ? 'text-amber-400'
-                          : 'text-red-400'
-                      : 'text-foreground'
-                  )}>
-                    {property.rr_loss_to_lease_pct != null
-                      ? `${property.rr_loss_to_lease_pct.toFixed(1)}%`
-                      : '---'}
-                  </p>
-                </div>
-              </div>
-              {/* Data source indicator */}
-              <div className="text-xs text-muted-foreground mt-4 pt-3 border-t border-border">
-                Source: Rent Roll (Excel)
-                {property.financial_data_updated_at && (
-                  <> &middot; Updated {fmtShortDate(property.financial_data_updated_at)}</>
-                )}
-              </div>
-            </div>
-          </section>
-        )}
-
-        {/* --------------------------------------------------------------- */}
         {/* PRICING ANALYSIS                                                 */}
         {/* --------------------------------------------------------------- */}
         {(hasBOV || currentFinancials?.noi != null) && (
@@ -1461,7 +1364,7 @@ export const PropertyDetail = () => {
                         {(
                           [
                             {
-                              label: 'Going-In Cap (T12)',
+                              label: 'Going-In Cap (T3)',
                               value: `${pricingMetrics.goingInCap}%`,
                               hl: true,
                             },
