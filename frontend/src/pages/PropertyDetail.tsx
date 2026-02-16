@@ -769,10 +769,11 @@ export const PropertyDetail = () => {
         {/* --------------------------------------------------------------- */}
         <section className="animate-fade-in">
           <div className="border border-border rounded-2xl bg-card overflow-hidden">
-            <div className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* Col 1 - Address */}
-                <div>
+            <div className="grid grid-cols-1 md:grid-cols-[1fr_0.55fr]">
+              {/* Left side - Property Info */}
+              <div className="p-6">
+                {/* Row 1 - Address */}
+                <div className="mb-6">
                   <h3 className="text-xs font-semibold uppercase tracking-wider mb-3 text-muted-foreground">
                     Property Address
                   </h3>
@@ -798,84 +799,132 @@ export const PropertyDetail = () => {
                   </div>
                 </div>
 
-                {/* Col 2 - Stats */}
-                <div>
-                  <h3 className="text-xs font-semibold uppercase tracking-wider mb-3 text-muted-foreground">
-                    Property Details
-                  </h3>
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Units</span>
-                      <span className="font-mono font-semibold text-foreground">
-                        {fmtNumber(property.total_units)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Total SF</span>
-                      <span className="font-mono font-semibold text-foreground">
-                        {fmtNumber(property.total_residential_sf)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Year Built</span>
-                      <span className="font-mono font-semibold text-foreground">
-                        {property.year_built ?? 'N/A'}
-                      </span>
-                    </div>
-                    {totalUnits > 0 && totalSF > 0 && (
+                {/* Row 2 - Two columns side by side */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  {/* Property Details */}
+                  <div>
+                    <h3 className="text-xs font-semibold uppercase tracking-wider mb-3 text-muted-foreground">
+                      Property Details
+                    </h3>
+                    <div className="space-y-2">
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">
-                          Avg Unit SF
-                        </span>
+                        <span className="text-muted-foreground">Units</span>
                         <span className="font-mono font-semibold text-foreground">
-                          {Math.round(totalSF / totalUnits).toLocaleString()}
+                          {fmtNumber(property.total_units)}
                         </span>
                       </div>
-                    )}
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Total SF</span>
+                        <span className="font-mono font-semibold text-foreground">
+                          {fmtNumber(property.total_residential_sf)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Year Built</span>
+                        <span className="font-mono font-semibold text-foreground">
+                          {property.year_built ?? 'N/A'}
+                        </span>
+                      </div>
+                      {totalUnits > 0 && totalSF > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">
+                            Avg Unit SF
+                          </span>
+                          <span className="font-mono font-semibold text-foreground">
+                            {Math.round(totalSF / totalUnits).toLocaleString()}
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
 
-                {/* Col 3 - Rents */}
-                <div>
-                  <h3 className="text-xs font-semibold uppercase tracking-wider mb-3 text-muted-foreground">
-                    Rent Analysis
-                  </h3>
-                  <div className="space-y-3">
-                    {property.average_market_rent != null && (
-                      <div className="p-3 rounded-xl bg-accent">
-                        <p className="text-xs text-primary">Market Rent</p>
-                        <p className="font-mono text-xl font-bold text-foreground">
-                          ${property.average_market_rent.toLocaleString()}
-                          <span className="text-sm font-normal">/unit</span>
-                        </p>
-                      </div>
-                    )}
-                    {property.average_inplace_rent != null && (
-                      <div className="p-3 rounded-xl bg-muted">
-                        <p className="text-xs text-muted-foreground">
-                          In-Place Rent
-                        </p>
-                        <p className="font-mono text-xl font-bold text-foreground">
-                          ${property.average_inplace_rent.toLocaleString()}
-                          <span className="text-sm font-normal">/unit</span>
-                        </p>
-                      </div>
-                    )}
-                    {lossToLease && (
-                      <div className="flex items-center justify-between px-1">
-                        <span className="text-sm text-muted-foreground">
-                          Loss to Lease
-                        </span>
-                        <span className="font-mono font-semibold text-amber-600 dark:text-amber-400">
-                          {lossToLease.percent.toFixed(1)}%
-                        </span>
-                      </div>
-                    )}
+                  {/* Rent Analysis */}
+                  <div>
+                    <h3 className="text-xs font-semibold uppercase tracking-wider mb-3 text-muted-foreground">
+                      Rent Analysis
+                    </h3>
+                    <div className="space-y-3">
+                      {property.average_market_rent != null && (
+                        <div className="p-3 rounded-xl bg-accent">
+                          <p className="text-xs text-primary">Market Rent</p>
+                          <p className="font-mono text-xl font-bold text-foreground">
+                            ${property.average_market_rent.toLocaleString()}
+                            <span className="text-sm font-normal">/unit</span>
+                          </p>
+                        </div>
+                      )}
+                      {property.average_inplace_rent != null && (
+                        <div className="p-3 rounded-xl bg-muted">
+                          <p className="text-xs text-muted-foreground">
+                            In-Place Rent
+                          </p>
+                          <p className="font-mono text-xl font-bold text-foreground">
+                            ${property.average_inplace_rent.toLocaleString()}
+                            <span className="text-sm font-normal">/unit</span>
+                          </p>
+                        </div>
+                      )}
+                      {lossToLease && (
+                        <div className="flex items-center justify-between px-1">
+                          <span className="text-sm text-muted-foreground">
+                            Loss to Lease
+                          </span>
+                          <span className="font-mono font-semibold text-amber-600 dark:text-amber-400">
+                            {lossToLease.percent.toFixed(1)}%
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* Economic Occupancy banner */}
+              {/* Right side - Google Street View */}
+              <div className="relative h-full min-h-[200px] md:min-h-[320px]">
+                {import.meta.env.VITE_GOOGLE_MAPS_API_KEY ? (
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(property.property_address || '')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block w-full h-full relative group"
+                  >
+                    <img
+                      src={`https://maps.googleapis.com/maps/api/streetview?size=800x600&location=${encodeURIComponent(property.property_address || '')}&key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}`}
+                      alt={`Street view of ${property.property_address}`}
+                      loading="lazy"
+                      className="w-full h-full object-cover md:rounded-r-2xl"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
+                        const fallback = target.nextElementSibling as HTMLElement;
+                        if (fallback) fallback.style.display = 'flex';
+                      }}
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-card/80 via-transparent to-transparent md:rounded-r-2xl pointer-events-none" />
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors md:rounded-r-2xl" />
+                    <div
+                      className="hidden w-full h-full items-center justify-center bg-accent md:rounded-r-2xl"
+                      style={{ display: 'none' }}
+                    >
+                      <div className="text-center">
+                        <Building2 className="w-12 h-12 mx-auto mb-2 text-muted-foreground" />
+                        <p className="text-sm text-muted-foreground">No Street View Available</p>
+                      </div>
+                    </div>
+                  </a>
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-accent md:rounded-r-2xl">
+                    <div className="text-center">
+                      <Building2 className="w-12 h-12 mx-auto mb-2 text-muted-foreground" />
+                      <p className="text-sm text-muted-foreground">No Street View Available</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Economic Occupancy banner - kept separate */}
+            <div className="p-6 pt-0">
               {economicOccupancy.percent > 0 && (
                 <div
                   className={cn(
