@@ -550,16 +550,18 @@ export const PropertyDetail = () => {
       };
     }
     if (!currentFinancials?.gsr) return { percent: 0, amount: null };
-    const gpr = currentFinancials.gsr;
-    const deductions =
-      (currentFinancials.vacancy ?? 0) +
-      (currentFinancials.concessions ?? 0) +
-      (currentFinancials.bad_debt ?? 0) +
-      (currentFinancials.non_revenue_units ?? 0);
-    const amt = gpr - deductions;
+    // GPR = GSR - Loss to Lease
+    const gpr = currentFinancials.gsr - Math.abs(currentFinancials.loss_to_lease ?? 0);
+    // Net Rental Income = GPR - Vacancy - Concessions - Non-Revenue Units - Bad Debt
+    const nri = gpr
+      - Math.abs(currentFinancials.vacancy ?? 0)
+      - Math.abs(currentFinancials.concessions ?? 0)
+      - Math.abs(currentFinancials.non_revenue_units ?? 0)
+      - Math.abs(currentFinancials.bad_debt ?? 0);
+    // Economic Occupancy = NRI / GPR
     return {
-      percent: gpr > 0 ? (amt / gpr) * 100 : 0,
-      amount: amt,
+      percent: gpr > 0 ? (nri / gpr) * 100 : 0,
+      amount: nri,
     };
   }, [property, financialPeriod, currentFinancials]);
 
