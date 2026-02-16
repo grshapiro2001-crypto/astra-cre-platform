@@ -1853,8 +1853,8 @@ export const PropertyDetail = () => {
               address={property.property_address}
               propertyName={property.deal_name}
               totalUnits={property.total_units ?? undefined}
-              rentComps={rentComps}
-              salesComps={property.bov_pricing_tiers}
+              rentComps={rentComps || []}
+              salesComps={property.bov_pricing_tiers || []}
             />
           </section>
         )}
