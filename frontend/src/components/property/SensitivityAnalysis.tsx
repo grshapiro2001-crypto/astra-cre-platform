@@ -98,6 +98,7 @@ export const SensitivityAnalysis = ({ property }: SensitivityAnalysisProps) => {
   const [ltv, setLtv] = useState(65);
   const [interestRate, setInterestRate] = useState(6.5);
   const [focusedField, setFocusedField] = useState<string | null>(null);
+  const [rawInput, setRawInput] = useState<string>('');
 
   // Calculate all metrics
   const calculations = useMemo(() => {
@@ -268,17 +269,16 @@ export const SensitivityAnalysis = ({ property }: SensitivityAnalysisProps) => {
                 <label className="text-sm font-medium text-foreground">Annual Rent Growth</label>
                 <input
                   type="text"
-                  value={focusedField === 'rentGrowth' ? String(rentGrowth) : `${rentGrowth}%`}
-                  onFocus={() => setFocusedField('rentGrowth')}
-                  onBlur={(e) => {
+                  value={focusedField === 'rentGrowth' ? rawInput : `${rentGrowth}%`}
+                  onFocus={() => { setFocusedField('rentGrowth'); setRawInput(String(rentGrowth)); }}
+                  onBlur={() => {
                     setFocusedField(null);
-                    const v = e.target.value.replace(/[^0-9.]/g, '');
-                    setRentGrowth(v === '' ? 0 : Number(v));
+                    const v = parseFloat(rawInput);
+                    setRentGrowth(isNaN(v) ? 0 : v);
                   }}
                   onChange={(e) => {
-                    const raw = e.target.value;
-                    const v = raw.replace(/[^0-9.]/g, '');
-                    setRentGrowth(v === '' ? 0 : Number(v));
+                    const v = e.target.value.replace(/[^0-9.]/g, '');
+                    setRawInput(v);
                   }}
                   step={0.25}
                   min={0}
@@ -303,17 +303,16 @@ export const SensitivityAnalysis = ({ property }: SensitivityAnalysisProps) => {
                 <label className="text-sm font-medium text-foreground">Annual Expense Growth</label>
                 <input
                   type="text"
-                  value={focusedField === 'expenseGrowth' ? String(expenseGrowth) : `${expenseGrowth}%`}
-                  onFocus={() => setFocusedField('expenseGrowth')}
-                  onBlur={(e) => {
+                  value={focusedField === 'expenseGrowth' ? rawInput : `${expenseGrowth}%`}
+                  onFocus={() => { setFocusedField('expenseGrowth'); setRawInput(String(expenseGrowth)); }}
+                  onBlur={() => {
                     setFocusedField(null);
-                    const v = e.target.value.replace(/[^0-9.]/g, '');
-                    setExpenseGrowth(v === '' ? 0 : Number(v));
+                    const v = parseFloat(rawInput);
+                    setExpenseGrowth(isNaN(v) ? 0 : v);
                   }}
                   onChange={(e) => {
-                    const raw = e.target.value;
-                    const v = raw.replace(/[^0-9.]/g, '');
-                    setExpenseGrowth(v === '' ? 0 : Number(v));
+                    const v = e.target.value.replace(/[^0-9.]/g, '');
+                    setRawInput(v);
                   }}
                   step={0.25}
                   min={0}
@@ -338,17 +337,16 @@ export const SensitivityAnalysis = ({ property }: SensitivityAnalysisProps) => {
                 <label className="text-sm font-medium text-foreground">Exit Cap Rate</label>
                 <input
                   type="text"
-                  value={focusedField === 'exitCap' ? String(exitCap) : `${exitCap}%`}
-                  onFocus={() => setFocusedField('exitCap')}
-                  onBlur={(e) => {
+                  value={focusedField === 'exitCap' ? rawInput : `${exitCap}%`}
+                  onFocus={() => { setFocusedField('exitCap'); setRawInput(String(exitCap)); }}
+                  onBlur={() => {
                     setFocusedField(null);
-                    const v = e.target.value.replace(/[^0-9.]/g, '');
-                    setExitCap(v === '' ? 0 : Number(v));
+                    const v = parseFloat(rawInput);
+                    setExitCap(isNaN(v) ? 0 : v);
                   }}
                   onChange={(e) => {
-                    const raw = e.target.value;
-                    const v = raw.replace(/[^0-9.]/g, '');
-                    setExitCap(v === '' ? 0 : Number(v));
+                    const v = e.target.value.replace(/[^0-9.]/g, '');
+                    setRawInput(v);
                   }}
                   step={0.25}
                   min={4}
@@ -398,17 +396,16 @@ export const SensitivityAnalysis = ({ property }: SensitivityAnalysisProps) => {
                 <label className="text-sm font-medium text-foreground">LTV</label>
                 <input
                   type="text"
-                  value={focusedField === 'ltv' ? String(ltv) : `${ltv}%`}
-                  onFocus={() => setFocusedField('ltv')}
-                  onBlur={(e) => {
+                  value={focusedField === 'ltv' ? rawInput : `${ltv}%`}
+                  onFocus={() => { setFocusedField('ltv'); setRawInput(String(ltv)); }}
+                  onBlur={() => {
                     setFocusedField(null);
-                    const v = e.target.value.replace(/[^0-9.]/g, '');
-                    setLtv(v === '' ? 0 : Number(v));
+                    const v = parseFloat(rawInput);
+                    setLtv(isNaN(v) ? 0 : v);
                   }}
                   onChange={(e) => {
-                    const raw = e.target.value;
-                    const v = raw.replace(/[^0-9.]/g, '');
-                    setLtv(v === '' ? 0 : Number(v));
+                    const v = e.target.value.replace(/[^0-9.]/g, '');
+                    setRawInput(v);
                   }}
                   step={5}
                   min={0}
@@ -433,17 +430,16 @@ export const SensitivityAnalysis = ({ property }: SensitivityAnalysisProps) => {
                 <label className="text-sm font-medium text-foreground">Interest Rate</label>
                 <input
                   type="text"
-                  value={focusedField === 'interestRate' ? String(interestRate) : `${interestRate}%`}
-                  onFocus={() => setFocusedField('interestRate')}
-                  onBlur={(e) => {
+                  value={focusedField === 'interestRate' ? rawInput : `${interestRate}%`}
+                  onFocus={() => { setFocusedField('interestRate'); setRawInput(String(interestRate)); }}
+                  onBlur={() => {
                     setFocusedField(null);
-                    const v = e.target.value.replace(/[^0-9.]/g, '');
-                    setInterestRate(v === '' ? 0 : Number(v));
+                    const v = parseFloat(rawInput);
+                    setInterestRate(isNaN(v) ? 0 : v);
                   }}
                   onChange={(e) => {
-                    const raw = e.target.value;
-                    const v = raw.replace(/[^0-9.]/g, '');
-                    setInterestRate(v === '' ? 0 : Number(v));
+                    const v = e.target.value.replace(/[^0-9.]/g, '');
+                    setRawInput(v);
                   }}
                   step={0.25}
                   min={4}
