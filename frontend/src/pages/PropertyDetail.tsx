@@ -299,8 +299,8 @@ export const PropertyDetail = () => {
   const [financialPeriod, setFinancialPeriod] =
     useState<FinancialPeriodKey>('t12');
   const [financialView, setFinancialView] =
-  const [unitMixOpen, setUnitMixOpen] = useState(false);
     useState<FinancialViewMode>('total');
+  const [unitMixOpen, setUnitMixOpen] = useState(false);
   const [selectedTierIdx, setSelectedTierIdx] = useState(0);
   const [capRateSlider, setCapRateSlider] = useState(5.0);
   const [pricingGuidance, setPricingGuidance] = useState(0);
