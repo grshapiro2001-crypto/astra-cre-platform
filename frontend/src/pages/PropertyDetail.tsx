@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useLoadScript } from '@react-google-maps/api';
@@ -24,6 +24,9 @@ import {
   BarChart3,
   Upload,
   FileDown,
+  Clock,
+  XCircle,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { propertyService } from '@/services/propertyService';
@@ -37,6 +40,7 @@ import { ScreeningModal } from '@/components/screening/ScreeningModal';
 import { useUIStore } from '@/store/uiStore';
 import type {
   PropertyDetail as PropertyDetailType,
+  PropertyDocument,
   FinancialPeriod,
   BOVPricingTier,
   UnitMixItem,
@@ -157,6 +161,46 @@ const docBadgeClass = (docType: string): string => {
   if (d === 'OM')
     return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400';
   return 'bg-muted text-muted-foreground';
+};
+
+const docCategoryBadge = (category: string): { label: string; className: string } => {
+  switch (category.toLowerCase()) {
+    case 'om':
+      return { label: 'OM', className: 'bg-red-500/20 text-red-400' };
+    case 'bov':
+      return { label: 'BOV', className: 'bg-blue-500/20 text-blue-400' };
+    case 'rent_roll':
+      return { label: 'Rent Roll', className: 'bg-emerald-500/20 text-emerald-400' };
+    case 't12':
+      return { label: 'T-12', className: 'bg-amber-500/20 text-amber-400' };
+    default:
+      return { label: category || 'Other', className: 'bg-gray-500/20 text-gray-400' };
+  }
+};
+
+const fmtShortDate = (dateStr: string | null | undefined): string => {
+  if (!dateStr) return '';
+  return new Date(dateStr).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+};
+
+const financialSourceBadge = (source: string | null | undefined): { label: string; className: string } | null => {
+  if (!source) return null;
+  switch (source) {
+    case 't12_excel':
+      return { label: 'T-12 Excel', className: 'bg-emerald-500/20 text-emerald-400' };
+    case 'rent_roll_excel':
+      return { label: 'Rent Roll Excel', className: 'bg-emerald-500/20 text-emerald-400' };
+    case 'om':
+      return { label: 'From OM', className: 'bg-gray-500/20 text-gray-400' };
+    case 'bov':
+      return { label: 'From BOV', className: 'bg-gray-500/20 text-gray-400' };
+    default:
+      return null;
+  }
 };
 
 const ecoOccTextClass = (pct: number): string => {
@@ -282,6 +326,11 @@ export const PropertyDetail = () => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+
+  // --- Document upload state ---
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
 
   // --- Comparison state from uiStore ---
   const comparisonPropertyIds = useUIStore((state) => state.comparisonPropertyIds);
@@ -413,6 +462,38 @@ export const PropertyDetail = () => {
         `Delete failed: ${e.response?.data?.detail || 'Unknown error'}`,
       );
       setIsDeleting(false);
+    }
+  };
+
+  const handleDocumentUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !property) return;
+
+    setIsUploading(true);
+    setUploadSuccess(null);
+    try {
+      const updatedProperty = await propertyService.uploadPropertyDocument(property.id, file);
+      setProperty(updatedProperty);
+
+      // Show success message from extraction summary
+      const docs: PropertyDocument[] = updatedProperty.documents ?? [];
+      const latestDoc = docs.length > 0 ? docs[docs.length - 1] : null;
+      const summary = latestDoc?.extraction_summary || 'Document uploaded successfully';
+      setUploadSuccess(summary);
+      toast.success(summary, { duration: 4000 });
+
+      // Clear success after 5 seconds
+      setTimeout(() => setUploadSuccess(null), 5000);
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { detail?: string } } };
+      const errMsg = e.response?.data?.detail || 'Upload failed. Please try again.';
+      toast.error(errMsg, { duration: 5000 });
+    } finally {
+      setIsUploading(false);
+      // Clear the file input so the same file can be re-uploaded
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
 
@@ -1013,6 +1094,113 @@ export const PropertyDetail = () => {
         </section>
 
         {/* --------------------------------------------------------------- */}
+        {/* RENT ROLL SUMMARY (from Excel upload)                            */}
+        {/* --------------------------------------------------------------- */}
+        {property.rr_total_units != null && (
+          <section className="animate-fade-in" style={{ animationDelay: '80ms' }}>
+            <div className="border border-border rounded-2xl bg-card p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="font-display text-lg font-bold text-foreground">
+                  Rent Roll Summary
+                </h2>
+                {property.rr_as_of_date && (
+                  <span className="text-sm text-muted-foreground">
+                    As of: {fmtShortDate(property.rr_as_of_date)}
+                  </span>
+                )}
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {/* Row 1 */}
+                <div>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider">Total Units</p>
+                  <p className="text-2xl font-bold font-mono text-foreground mt-1">
+                    {property.rr_total_units?.toLocaleString() ?? '---'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider">Occupied</p>
+                  <p className="text-2xl font-bold font-mono text-foreground mt-1">
+                    {property.rr_occupied_units?.toLocaleString() ?? '---'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider">Vacant</p>
+                  <p className="text-2xl font-bold font-mono text-foreground mt-1">
+                    {property.rr_vacancy_count?.toLocaleString() ?? '---'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider">Physical Occupancy</p>
+                  <p className={cn(
+                    'text-2xl font-bold font-mono mt-1',
+                    property.rr_physical_occupancy_pct != null
+                      ? property.rr_physical_occupancy_pct >= 95
+                        ? 'text-emerald-400'
+                        : property.rr_physical_occupancy_pct >= 90
+                          ? 'text-amber-400'
+                          : 'text-red-400'
+                      : 'text-foreground'
+                  )}>
+                    {property.rr_physical_occupancy_pct != null
+                      ? `${property.rr_physical_occupancy_pct.toFixed(1)}%`
+                      : '---'}
+                  </p>
+                </div>
+                {/* Row 2 */}
+                <div>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider">Avg Market Rent</p>
+                  <p className="text-2xl font-bold font-mono text-foreground mt-1">
+                    {property.rr_avg_market_rent != null
+                      ? `$${property.rr_avg_market_rent.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+                      : '---'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider">Avg In-Place Rent</p>
+                  <p className="text-2xl font-bold font-mono text-foreground mt-1">
+                    {property.rr_avg_in_place_rent != null
+                      ? `$${property.rr_avg_in_place_rent.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+                      : '---'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider">Avg SF</p>
+                  <p className="text-2xl font-bold font-mono text-foreground mt-1">
+                    {property.rr_avg_sqft != null
+                      ? property.rr_avg_sqft.toLocaleString(undefined, { maximumFractionDigits: 0 })
+                      : '---'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider">Loss to Lease</p>
+                  <p className={cn(
+                    'text-2xl font-bold font-mono mt-1',
+                    property.rr_loss_to_lease_pct != null
+                      ? property.rr_loss_to_lease_pct < 5
+                        ? 'text-emerald-400'
+                        : property.rr_loss_to_lease_pct <= 10
+                          ? 'text-amber-400'
+                          : 'text-red-400'
+                      : 'text-foreground'
+                  )}>
+                    {property.rr_loss_to_lease_pct != null
+                      ? `${property.rr_loss_to_lease_pct.toFixed(1)}%`
+                      : '---'}
+                  </p>
+                </div>
+              </div>
+              {/* Data source indicator */}
+              <div className="text-xs text-muted-foreground mt-4 pt-3 border-t border-border">
+                Source: Rent Roll (Excel)
+                {property.financial_data_updated_at && (
+                  <> &middot; Updated {fmtShortDate(property.financial_data_updated_at)}</>
+                )}
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* --------------------------------------------------------------- */}
         {/* PRICING ANALYSIS                                                 */}
         {/* --------------------------------------------------------------- */}
         {(hasBOV || currentFinancials?.noi != null) && (
@@ -1411,9 +1599,19 @@ export const PropertyDetail = () => {
             style={{ animationDelay: '200ms' }}
           >
             <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
-              <h2 className="font-display text-lg font-bold text-foreground">
-                Operating Financials
-              </h2>
+              <div className="flex items-center gap-2">
+                <h2 className="font-display text-lg font-bold text-foreground">
+                  Operating Financials
+                </h2>
+                {financialSourceBadge(property.financial_data_source) && (
+                  <span className={cn(
+                    'text-xs px-2 py-0.5 rounded-full font-medium',
+                    financialSourceBadge(property.financial_data_source)!.className
+                  )}>
+                    {financialSourceBadge(property.financial_data_source)!.label}
+                  </span>
+                )}
+              </div>
               <div className="flex items-center gap-3">
                 {/* Period toggle */}
                 <div className="flex items-center rounded-xl p-1 bg-muted">
@@ -1999,15 +2197,45 @@ export const PropertyDetail = () => {
             <h2 className="font-display text-lg font-bold text-foreground">
               Documents
             </h2>
+            <div className="flex items-center gap-2">
+              {uploadSuccess && (
+                <span className="flex items-center gap-1 text-sm text-emerald-600 dark:text-emerald-400 animate-fade-in">
+                  <CheckCircle className="w-4 h-4" />
+                  Uploaded
+                </span>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.xlsx,.xlsm,.csv"
+                onChange={handleDocumentUpload}
+                className="hidden"
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+                className="flex items-center gap-2 bg-primary text-primary-foreground rounded-xl px-4 py-2.5 text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50"
+              >
+                {isUploading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Upload className="w-4 h-4" />
+                )}
+                {isUploading ? 'Uploading...' : 'Upload Document'}
+              </button>
+            </div>
           </div>
-          <div className="border border-border rounded-2xl bg-card p-5">
-            {property.uploaded_filename ? (
-              <div className="flex items-start gap-3">
-                <div className="w-12 h-12 rounded-lg flex items-center justify-center shrink-0 bg-blue-500/10">
-                  <FileText className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+          <div className="border border-border rounded-2xl bg-card p-5 space-y-3">
+            {/* Original OM document (if not already in the documents array) */}
+            {property.uploaded_filename && !(property.documents ?? []).some(
+              (d: PropertyDocument) => d.filename === property.uploaded_filename
+            ) && (
+              <div className="flex items-start gap-3 p-3 rounded-xl bg-muted/50">
+                <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 bg-blue-500/10">
+                  <FileText className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium truncate text-foreground">
+                  <p className="font-medium truncate text-foreground text-sm">
                     {property.uploaded_filename}
                   </p>
                   <div className="flex items-center gap-2 mt-1">
@@ -2020,22 +2248,77 @@ export const PropertyDetail = () => {
                       {property.document_type}
                     </span>
                     <span className="text-xs text-muted-foreground">
-                      Uploaded {fmtDate(property.upload_date)}
+                      Uploaded {fmtShortDate(property.upload_date)}
                     </span>
                   </div>
                   {property.analysis_count != null && (
-                    <p className="text-xs mt-2 text-muted-foreground">
+                    <p className="text-xs mt-1 text-muted-foreground">
                       Analyzed {property.analysis_count} time
                       {property.analysis_count !== 1 ? 's' : ''}
                     </p>
                   )}
                 </div>
+                <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0 mt-1" />
               </div>
-            ) : (
+            )}
+
+            {/* PropertyDocument records from backend */}
+            {(property.documents ?? []).map((doc: PropertyDocument) => {
+              const badge = docCategoryBadge(doc.document_category);
+              return (
+                <div key={doc.id} className="flex items-start gap-3 p-3 rounded-xl bg-muted/50">
+                  <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 bg-blue-500/10">
+                    {doc.file_type === 'xlsx' ? (
+                      <FileSpreadsheet className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                    ) : (
+                      <FileText className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium truncate text-foreground text-sm">
+                      {doc.filename}
+                    </p>
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      <span className={cn('px-2 py-0.5 rounded text-2xs font-bold uppercase', badge.className)}>
+                        {badge.label}
+                      </span>
+                      {doc.document_date && (
+                        <span className="text-xs text-muted-foreground">
+                          {fmtShortDate(doc.document_date)}
+                        </span>
+                      )}
+                      <span className="text-xs text-muted-foreground">
+                        Uploaded {fmtShortDate(doc.uploaded_at)}
+                      </span>
+                    </div>
+                    {doc.extraction_status === 'failed' && doc.extraction_summary && (
+                      <p className="text-xs mt-1 text-red-400">{doc.extraction_summary}</p>
+                    )}
+                  </div>
+                  <div className="shrink-0 mt-1">
+                    {doc.extraction_status === 'completed' && (
+                      <CheckCircle className="w-4 h-4 text-emerald-500" />
+                    )}
+                    {doc.extraction_status === 'processing' && (
+                      <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />
+                    )}
+                    {doc.extraction_status === 'failed' && (
+                      <XCircle className="w-4 h-4 text-red-500" />
+                    )}
+                    {doc.extraction_status === 'pending' && (
+                      <Clock className="w-4 h-4 text-gray-400" />
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Empty state */}
+            {!property.uploaded_filename && (property.documents ?? []).length === 0 && (
               <div className="text-center py-6">
                 <FileText className="w-8 h-8 text-muted-foreground/50 mx-auto mb-2" />
                 <p className="text-sm text-muted-foreground">
-                  No documents available.
+                  No documents available. Upload a Rent Roll or T-12 Excel file.
                 </p>
               </div>
             )}
