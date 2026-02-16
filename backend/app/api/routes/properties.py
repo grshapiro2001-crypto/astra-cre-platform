@@ -1154,15 +1154,15 @@ async def upload_document_to_property(
                         t3_rev_sum = sum(rev_monthly.get(m, 0) or 0 for m in last_3)
                         t3_exp_sum = sum(exp_monthly.get(m, 0) or 0 for m in last_3)
 
-                        # Annualize (multiply by 4)
-                        t3_noi_annual = t3_noi_sum * 4
+                        # T3 NOI = T3 Revenue (annualized) - T12 Expenses
                         t3_rev_annual = t3_rev_sum * 4
-                        t3_exp_annual = t3_exp_sum * 4
+                        t12_total_exp = summary.get("total_operating_expenses", 0) or 0
+                        t3_noi_annual = t3_rev_annual - t12_total_exp
 
                         property_obj.t3_noi = t3_noi_annual
 
                         t3_gsr = (property_obj.t12_gsr / 12 * 3 * 4) if property_obj.t12_gsr else t3_rev_annual
-                        t3_opex_ratio = (t3_exp_annual / t3_rev_annual * 100) if t3_rev_annual > 0 else None
+                        t3_opex_ratio = (t12_total_exp / t3_rev_annual * 100) if t3_rev_annual > 0 else None
 
                         t3_fin = {
                             "period_label": "Trailing 3 Month (Annualized) - " + ", ".join(reversed(last_3)),
@@ -1171,7 +1171,7 @@ async def upload_document_to_property(
                             "concessions": None,
                             "bad_debt": None,
                             "non_revenue_units": None,
-                            "total_opex": t3_exp_annual,
+                            "total_opex": t12_total_exp,
                             "noi": t3_noi_annual,
                             "opex_ratio": t3_opex_ratio,
                             "loss_to_lease": None,
