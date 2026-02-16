@@ -326,7 +326,7 @@ def generate_deal_summary(property_id: int, db: Session) -> bytes:
 
     snapshot_rows = [
         ["Address", prop.property_address or "\u2014"],
-        ["Metro / Submarket", f"{prop.metro or '\u2014'} / {prop.submarket or '\u2014'}"],
+        ["Metro / Submarket", (prop.metro or "—") + " / " + (prop.submarket or "—")],
         ["Property Type", prop.property_type or "\u2014"],
         ["Units", _fmt_number(total_units)],
         ["Year Built", _fmt_number(prop.year_built)],
