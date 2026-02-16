@@ -245,7 +245,7 @@ export const CompMap: React.FC<CompMapProps> = ({
         const searchName = comp_name || location;
         const query = `${searchName} apartments${citySuffix}`;
 
-        const coords = await geocodePlacesAPI(query, map);
+        console.log(`[CompMap] Searching: "${query}"`); const coords = await geocodePlacesAPI(query, map); console.log(`[CompMap] Result for "${searchName}":`, coords);
 
         // Validate distance from subject (< 50 miles)
         if (coords) {
@@ -258,7 +258,7 @@ export const CompMap: React.FC<CompMapProps> = ({
 
           if (distance <= 50) {
             // Update state progressively (pins appear one by one)
-            setCompCoords((prev) => new Map(prev).set(location, coords));
+            setCompCoords((prev) => new Map(prev).set(comp_name || location, coords));
           }
         }
 
@@ -325,7 +325,7 @@ export const CompMap: React.FC<CompMapProps> = ({
     // Rent comps
     (rentComps || []).forEach((comp, idx) => {
       if (!comp.location) return;
-      const coords = compCoords.get(comp.location);
+      const coords = compCoords.get(comp.comp_name || comp.location);
       if (!coords) return;
 
       pins.push({
