@@ -907,6 +907,8 @@ export const PropertyDetail = () => {
         <div className="relative w-full h-64 overflow-hidden">
           <StreetViewImage
             address={property.property_address}
+            lat={property.latitude}
+            lng={property.longitude}
             width={1200}
             height={400}
             className="w-full h-full object-cover"
@@ -1063,6 +1065,8 @@ export const PropertyDetail = () => {
                       property.property_address ? (
                         <StreetViewImage
                           address={property.property_address}
+                          lat={property.latitude}
+                          lng={property.longitude}
                           width={800}
                           height={600}
                           className="w-full h-full object-cover md:rounded-r-2xl"

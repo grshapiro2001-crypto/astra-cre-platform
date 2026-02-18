@@ -5,9 +5,9 @@
  * Single click → selects card (highlights on map)
  * Double click → navigates to PropertyDetail
  */
-import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Award } from 'lucide-react';
+import { StreetViewImage } from '@/components/property/StreetViewImage';
 
 // ============================================================
 // Shared type used by Dashboard, DealCard, and DashboardMap
@@ -62,10 +62,6 @@ interface DealCardProps {
 }
 
 export const DealCard = ({ deal, isSelected, onClick, onDoubleClick }: DealCardProps) => {
-  const [thumbFailed, setThumbFailed] = useState(false);
-  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-  const showThumb = apiKey && deal.address && !thumbFailed;
-
   return (
     <div
       id={`deal-card-${deal.id}`}
@@ -78,13 +74,15 @@ export const DealCard = ({ deal, isSelected, onClick, onDoubleClick }: DealCardP
           : 'border-border hover:border-border/80',
       )}
     >
-      {showThumb && (
-        <img
-          src={`https://maps.googleapis.com/maps/api/streetview?size=400x150&location=${encodeURIComponent(deal.address)}&key=${apiKey}&fov=90&pitch=5`}
-          alt=""
+      {deal.address && (
+        <StreetViewImage
+          address={deal.address}
+          lat={deal.latitude}
+          lng={deal.longitude}
+          width={400}
+          height={150}
           className="w-full h-20 object-cover"
-          loading="lazy"
-          onError={() => setThumbFailed(true)}
+          hideOnError={true}
         />
       )}
       <div className="p-3">
