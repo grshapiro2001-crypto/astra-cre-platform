@@ -11,6 +11,31 @@ logger = logging.getLogger(__name__)
 # Create all database tables on startup (ensures tables exist for fresh deployments)
 logger.warning("Creating database tables... (tables registered: %s)", list(Base.metadata.tables.keys()))
 Base.metadata.create_all(bind=engine)
+
+# Auto-migrate: add missing columns to existing tables
+def run_migrations():
+    """Add columns that create_all can't add to existing tables."""
+    from sqlalchemy import text, inspect
+    with engine.connect() as conn:
+        inspector = inspect(engine)
+        existing_cols = [c['name'] for c in inspector.get_columns('properties')]
+        migrations = [
+            ("user_guidance_price", "FLOAT"),
+            ("non_revenue_units", "FLOAT"),
+        ]
+        for col_name, col_type in migrations:
+            if col_name not in existing_cols:
+                try:
+                    conn.execute(text(f"ALTER TABLE properties ADD COLUMN {col_name} {col_type}"))
+                    conn.commit()
+                    logger.warning(f"Migration: added column properties.{col_name}")
+                except Exception as e:
+                    logger.warning(f"Migration skip {col_name}: {e}")
+
+try:
+    run_migrations()
+except Exception as e:
+    logger.warning(f"Migration error: {e}")
 logger.warning("Database tables created successfully.")
 
 # Create FastAPI app
