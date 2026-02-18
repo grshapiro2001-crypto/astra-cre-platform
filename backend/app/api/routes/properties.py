@@ -179,6 +179,8 @@ def list_properties(
             user_guidance_price=p.user_guidance_price,
             pipeline_stage=p.pipeline_stage,
             pipeline_notes=p.pipeline_notes,
+            latitude=p.latitude,
+            longitude=p.longitude,
         )
         for p in properties
     ]
@@ -693,6 +695,8 @@ def build_property_detail_response(property_obj: Property, db: Session) -> Prope
         property_type=property_obj.property_type,
         submarket=property_obj.submarket,
         metro=property_obj.metro,
+        latitude=property_obj.latitude,
+        longitude=property_obj.longitude,
         year_built=property_obj.year_built,
         total_units=property_obj.total_units,
         total_residential_sf=property_obj.total_residential_sf,
@@ -828,6 +832,13 @@ def update_property_from_extraction(property_obj: Property, extraction_result: d
             property_obj.y1_replacement_reserves = periods["y1"].get("replacement_reserves")
             property_obj.y1_net_cash_flow = periods["y1"].get("net_cash_flow")
             property_obj.y1_expense_ratio_pct = periods["y1"].get("expense_ratio_pct")
+
+    # Geocode updated address
+    if property_obj.property_address:
+        from app.services.geocoding_service import geocode_address
+        coords = geocode_address(property_obj.property_address)
+        if coords:
+            property_obj.latitude, property_obj.longitude = coords
 
     # Update search text
     search_parts = [
@@ -1266,6 +1277,72 @@ async def upload_document_to_property(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Document processing failed: {str(e)}"
         )
+
+
+# ==================== GEOCODING ENDPOINTS ====================
+
+@router.post("/{property_id}/geocode")
+def geocode_property(
+    property_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Geocode (or re-geocode) a single property's address (NO LLM CALLS)
+    """
+    from app.services.geocoding_service import geocode_address
+
+    property_obj = property_service.get_property(
+        db, property_id, str(current_user.id), update_view_date=False
+    )
+    if not property_obj or not property_obj.property_address:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Property not found or no address"
+        )
+
+    coords = geocode_address(property_obj.property_address)
+    if coords:
+        property_obj.latitude, property_obj.longitude = coords
+        db.commit()
+        return {"latitude": coords[0], "longitude": coords[1]}
+
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Could not geocode address"
+    )
+
+
+@router.post("/admin/geocode-all")
+def geocode_all_properties(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Geocode all properties that have an address but no lat/lng (NO LLM CALLS)
+    """
+    from app.services.geocoding_service import geocode_address
+
+    props = db.query(Property).filter(
+        Property.user_id == str(current_user.id),
+        Property.property_address.isnot(None),
+        Property.latitude.is_(None)
+    ).all()
+
+    results = []
+    for prop in props:
+        coords = geocode_address(prop.property_address)
+        if coords:
+            prop.latitude, prop.longitude = coords
+            results.append({
+                "id": prop.id,
+                "address": prop.property_address,
+                "lat": coords[0],
+                "lng": coords[1]
+            })
+
+    db.commit()
+    return {"geocoded": len(results), "results": results}
 
 
 # ==================== COMPARISON ENDPOINT (Phase 3B) ====================

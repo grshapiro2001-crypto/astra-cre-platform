@@ -50,6 +50,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { PropertyDetailSkeleton } from '@/components/ui/PageSkeleton';
 import { SensitivityAnalysis } from '@/components/property/SensitivityAnalysis';
 import { CompMap } from '@/components/property/CompMap';
+import { StreetViewImage } from '@/components/property/StreetViewImage';
 import {
   Dialog,
   DialogContent,
@@ -898,6 +899,27 @@ export const PropertyDetail = () => {
       {/* ================================================================= */}
       {/* MAIN CONTENT                                                       */}
       {/* ================================================================= */}
+
+      {/* ================================================================= */}
+      {/* STREET VIEW HERO BANNER                                            */}
+      {/* ================================================================= */}
+      {property.property_address && import.meta.env.VITE_GOOGLE_MAPS_API_KEY && (
+        <div className="relative w-full h-64 overflow-hidden">
+          <StreetViewImage
+            address={property.property_address}
+            width={1200}
+            height={400}
+            className="w-full h-full object-cover"
+            hideOnError
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+          <div className="absolute bottom-4 left-6 max-w-6xl mx-auto">
+            <h1 className="text-2xl font-bold text-white">{property.deal_name}</h1>
+            <p className="text-white/80">{property.property_address}</p>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-6xl mx-auto px-6 lg:px-8 py-8 space-y-8">
         {/* --------------------------------------------------------------- */}
         {/* PROPERTY SNAPSHOT                                                */}
@@ -1038,12 +1060,21 @@ export const PropertyDetail = () => {
                         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors md:rounded-r-2xl" />
                       </>
                     ) : photoLoadFailed ? (
-                      <div className="w-full h-full flex items-center justify-center bg-accent md:rounded-r-2xl">
-                        <div className="text-center">
-                          <Building2 className="w-12 h-12 mx-auto mb-2 text-muted-foreground" />
-                          <p className="text-sm text-muted-foreground">No Photo Available</p>
+                      property.property_address ? (
+                        <StreetViewImage
+                          address={property.property_address}
+                          width={800}
+                          height={600}
+                          className="w-full h-full object-cover md:rounded-r-2xl"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-accent md:rounded-r-2xl">
+                          <div className="text-center">
+                            <Building2 className="w-12 h-12 mx-auto mb-2 text-muted-foreground" />
+                            <p className="text-sm text-muted-foreground">No Photo Available</p>
+                          </div>
                         </div>
-                      </div>
+                      )
                     ) : (
                       <div className="w-full h-full flex items-center justify-center bg-accent md:rounded-r-2xl">
                         <div className="text-center">

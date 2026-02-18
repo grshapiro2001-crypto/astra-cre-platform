@@ -207,6 +207,8 @@ export interface PropertyDetail {
   property_type?: string | null;
   submarket?: string | null;
   metro?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
   year_built?: number | null;
   total_units?: number | null;
   total_residential_sf?: number | null;
@@ -283,6 +285,8 @@ export interface PropertyListItem {
   user_guidance_price?: number | null;
   pipeline_stage?: string;
   pipeline_notes?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
   t12_noi?: number | null;
   y1_noi?: number | null;
   t3_noi?: number | null;

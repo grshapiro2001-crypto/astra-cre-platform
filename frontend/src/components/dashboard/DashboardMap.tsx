@@ -157,24 +157,41 @@ export const DashboardMap: React.FC<DashboardMapProps> = ({
     [],
   );
 
-  // Geocode all deal addresses once the map script is loaded
+  // Use backend lat/lng when available, geocode only as fallback
   useEffect(() => {
     if (!isLoaded || !apiKey) return;
 
     const dealsWithAddress = deals.filter((d) => d.address);
     if (dealsWithAddress.length === 0) return;
 
+    // Separate deals with backend coords from those needing geocoding
+    const coordMap = new Map<number, { lat: number; lng: number }>();
+    const needsGeocoding: typeof dealsWithAddress = [];
+
+    for (const deal of dealsWithAddress) {
+      if (deal.latitude != null && deal.longitude != null) {
+        coordMap.set(deal.id, { lat: deal.latitude, lng: deal.longitude });
+      } else {
+        needsGeocoding.push(deal);
+      }
+    }
+
+    if (needsGeocoding.length === 0) {
+      setDealCoords(coordMap);
+      return;
+    }
+
+    // Geocode remaining deals client-side as fallback
     Promise.all(
-      dealsWithAddress.map(async (deal) => {
+      needsGeocoding.map(async (deal) => {
         const coords = await geocodeAddress(deal.address);
         return { id: deal.id, coords };
       }),
     ).then((results) => {
-      const coordMap = new Map<number, { lat: number; lng: number }>();
       results.forEach(({ id, coords }) => {
         if (coords) coordMap.set(id, coords);
       });
-      setDealCoords(coordMap);
+      setDealCoords(new Map(coordMap));
     });
   }, [isLoaded, apiKey, deals, geocodeAddress]);
 

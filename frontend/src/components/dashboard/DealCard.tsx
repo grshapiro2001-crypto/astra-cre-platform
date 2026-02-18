@@ -5,6 +5,7 @@
  * Single click → selects card (highlights on map)
  * Double click → navigates to PropertyDetail
  */
+import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Award } from 'lucide-react';
 
@@ -22,6 +23,8 @@ export interface DashboardDeal {
   dealScore: number | null;
   documentType: string;
   propertyType: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 // ============================================================
@@ -59,18 +62,32 @@ interface DealCardProps {
 }
 
 export const DealCard = ({ deal, isSelected, onClick, onDoubleClick }: DealCardProps) => {
+  const [thumbFailed, setThumbFailed] = useState(false);
+  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+  const showThumb = apiKey && deal.address && !thumbFailed;
+
   return (
     <div
       id={`deal-card-${deal.id}`}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
       className={cn(
-        'rounded-xl p-3 border bg-card transition-all duration-200 cursor-pointer hover:shadow-md',
+        'rounded-xl border bg-card transition-all duration-200 cursor-pointer hover:shadow-md overflow-hidden',
         isSelected
           ? 'border-l-4 border-l-primary border-t-border border-r-border border-b-border shadow-md'
           : 'border-border hover:border-border/80',
       )}
     >
+      {showThumb && (
+        <img
+          src={`https://maps.googleapis.com/maps/api/streetview?size=400x150&location=${encodeURIComponent(deal.address)}&key=${apiKey}&fov=90&pitch=5`}
+          alt=""
+          className="w-full h-20 object-cover"
+          loading="lazy"
+          onError={() => setThumbFailed(true)}
+        />
+      )}
+      <div className="p-3">
       <div className="flex items-start justify-between mb-2">
         <div className="min-w-0 flex-1">
           <p className="font-semibold text-sm text-foreground truncate">
@@ -123,6 +140,7 @@ export const DealCard = ({ deal, isSelected, onClick, onDoubleClick }: DealCardP
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 };

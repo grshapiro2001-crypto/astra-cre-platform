@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     # AI/ML
     ANTHROPIC_API_KEY: str = "your-api-key-here"
 
+    # Google Maps
+    GOOGLE_MAPS_API_KEY: str = ""
+
     # Application
     APP_NAME: str = "CRE Platform"
     DEBUG: bool = False

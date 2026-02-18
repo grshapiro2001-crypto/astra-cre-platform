@@ -234,6 +234,8 @@ export const Dashboard = () => {
         dealScore: scoresMap[p.id] ?? null,
         documentType: p.document_type,
         propertyType: p.property_type || null,
+        latitude: p.latitude ?? null,
+        longitude: p.longitude ?? null,
       }))
       .sort((a, b) => (b.dealScore ?? -1) - (a.dealScore ?? -1));
   }, [properties, bovPricingMap, scoresMap]);

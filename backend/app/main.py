@@ -24,6 +24,8 @@ def run_migrations():
         new_columns = [
             ("user_guidance_price", "FLOAT"),
             ("non_revenue_units", "FLOAT"),
+            ("latitude", "FLOAT"),
+            ("longitude", "FLOAT"),
         ]
         for col_name, col_type in new_columns:
             if col_name not in existing_cols:

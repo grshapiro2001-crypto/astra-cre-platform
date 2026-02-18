@@ -33,6 +33,8 @@ class Property(Base):
 
     # Geography (fixes comp matching — metro was missing)
     metro = Column(String, nullable=True)  # e.g. "Atlanta" — MSA-level
+    latitude = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
 
     # Renovation assumptions (from value-add OMs/BOVs)
     renovation_cost_per_unit = Column(Numeric(20, 6), nullable=True)

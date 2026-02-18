@@ -178,6 +178,13 @@ def save_property(
         search_text=search_text
     )
 
+    # Geocode the address if available
+    if property_data.property_address:
+        from app.services.geocoding_service import geocode_address
+        coords = geocode_address(property_data.property_address)
+        if coords:
+            property_obj.latitude, property_obj.longitude = coords
+
     db.add(property_obj)
     db.flush()  # Get ID without committing
 

@@ -187,6 +187,8 @@ class PropertyListItem(BaseModel):
     user_guidance_price: Optional[float] = None
     pipeline_stage: str = "screening"  # Pipeline Kanban board
     pipeline_notes: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
 
     class Config:
         from_attributes = True
@@ -208,6 +210,8 @@ class PropertyDetail(BaseModel):
     property_type: Optional[str]
     submarket: Optional[str]
     metro: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
     year_built: Optional[int]
     total_units: Optional[int]
     total_residential_sf: Optional[int]
