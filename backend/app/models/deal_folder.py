@@ -45,23 +45,23 @@ class BOVPricingTier(Base):
     # Pricing fields
     pricing = Column(Integer, nullable=True)  # Valuation for this tier
     price_per_unit = Column(Integer, nullable=True)
-    price_per_sf = Column(Numeric, nullable=True)
+    price_per_sf = Column(Numeric(20, 6), nullable=True)
 
     # Loan assumptions
-    leverage = Column(Numeric, nullable=True)  # LTV %
+    leverage = Column(Numeric(20, 6), nullable=True)  # LTV %
     loan_amount = Column(Integer, nullable=True)
-    interest_rate = Column(Numeric, nullable=True)  # 5.25
+    interest_rate = Column(Numeric(20, 6), nullable=True)  # 5.25
     io_period_months = Column(Integer, nullable=True)
     amortization_years = Column(Integer, nullable=True)
 
     # Return metrics
-    unlevered_irr = Column(Numeric, nullable=True)
-    levered_irr = Column(Numeric, nullable=True)
-    equity_multiple = Column(Numeric, nullable=True)
-    avg_cash_on_cash = Column(Numeric, nullable=True)
+    unlevered_irr = Column(Numeric(20, 6), nullable=True)
+    levered_irr = Column(Numeric(20, 6), nullable=True)
+    equity_multiple = Column(Numeric(20, 6), nullable=True)
+    avg_cash_on_cash = Column(Numeric(20, 6), nullable=True)
 
     # Terminal assumptions
-    terminal_cap_rate = Column(Numeric, nullable=True)
+    terminal_cap_rate = Column(Numeric(20, 6), nullable=True)
     hold_period_years = Column(Integer, nullable=True)
 
 
@@ -73,6 +73,6 @@ class BOVCapRate(Base):
     id = Column(Integer, primary_key=True, autoincrement=True, index=True)
     pricing_tier_id = Column(Integer, ForeignKey("bov_pricing_tiers.id", ondelete='CASCADE'), nullable=False)
     cap_rate_type = Column(String(50), nullable=False)  # "trailing", "proforma", "stabilized", etc.
-    cap_rate_value = Column(Numeric, nullable=True)  # 4.75
+    cap_rate_value = Column(Numeric(20, 6), nullable=True)  # 4.75
     noi_basis = Column(Integer, nullable=True)  # NOI value used for calculation
     qualifier = Column(String(100), nullable=True)  # "as-is", "stabilized", etc.

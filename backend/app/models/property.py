@@ -35,12 +35,12 @@ class Property(Base):
     metro = Column(String, nullable=True)  # e.g. "Atlanta" — MSA-level
 
     # Renovation assumptions (from value-add OMs/BOVs)
-    renovation_cost_per_unit = Column(Numeric, nullable=True)
-    renovation_total_cost = Column(Numeric, nullable=True)
-    renovation_rent_premium = Column(Numeric, nullable=True)
+    renovation_cost_per_unit = Column(Numeric(20, 6), nullable=True)
+    renovation_total_cost = Column(Numeric(20, 6), nullable=True)
+    renovation_rent_premium = Column(Numeric(20, 6), nullable=True)
     renovation_roi_pct = Column(Float, nullable=True)
     renovation_duration_years = Column(Integer, nullable=True)
-    renovation_stabilized_revenue = Column(Numeric, nullable=True)
+    renovation_stabilized_revenue = Column(Numeric(20, 6), nullable=True)
 
     # Financials stored as JSON (simpler MVP)
     t12_financials_json = Column(Text)  # JSON string
@@ -53,51 +53,51 @@ class Property(Base):
     y1_noi = Column(Float)
 
     # Additional Y1 financial line items (from detailed OM proformas)
-    y1_loss_to_lease = Column(Numeric, nullable=True)
+    y1_loss_to_lease = Column(Numeric(20, 6), nullable=True)
     y1_vacancy_rate_pct = Column(Float, nullable=True)
-    y1_concessions = Column(Numeric, nullable=True)
-    y1_credit_loss = Column(Numeric, nullable=True)
-    y1_net_rental_income = Column(Numeric, nullable=True)
-    y1_utility_reimbursements = Column(Numeric, nullable=True)
-    y1_parking_storage_income = Column(Numeric, nullable=True)
-    y1_other_income = Column(Numeric, nullable=True)
+    y1_concessions = Column(Numeric(20, 6), nullable=True)
+    y1_credit_loss = Column(Numeric(20, 6), nullable=True)
+    y1_net_rental_income = Column(Numeric(20, 6), nullable=True)
+    y1_utility_reimbursements = Column(Numeric(20, 6), nullable=True)
+    y1_parking_storage_income = Column(Numeric(20, 6), nullable=True)
+    y1_other_income = Column(Numeric(20, 6), nullable=True)
     y1_management_fee_pct = Column(Float, nullable=True)
-    y1_real_estate_taxes = Column(Numeric, nullable=True)
-    y1_insurance = Column(Numeric, nullable=True)
-    y1_replacement_reserves = Column(Numeric, nullable=True)
-    y1_net_cash_flow = Column(Numeric, nullable=True)
+    y1_real_estate_taxes = Column(Numeric(20, 6), nullable=True)
+    y1_insurance = Column(Numeric(20, 6), nullable=True)
+    y1_replacement_reserves = Column(Numeric(20, 6), nullable=True)
+    y1_net_cash_flow = Column(Numeric(20, 6), nullable=True)
     y1_expense_ratio_pct = Column(Float, nullable=True)
 
     # Granular T12 financial line items
-    t12_loss_to_lease = Column(Numeric, nullable=True)
+    t12_loss_to_lease = Column(Numeric(20, 6), nullable=True)
     t12_vacancy_rate_pct = Column(Float, nullable=True)
-    t12_concessions = Column(Numeric, nullable=True)
-    t12_credit_loss = Column(Numeric, nullable=True)
-    t12_net_rental_income = Column(Numeric, nullable=True)
-    t12_utility_reimbursements = Column(Numeric, nullable=True)
-    t12_parking_storage_income = Column(Numeric, nullable=True)
-    t12_other_income = Column(Numeric, nullable=True)
+    t12_concessions = Column(Numeric(20, 6), nullable=True)
+    t12_credit_loss = Column(Numeric(20, 6), nullable=True)
+    t12_net_rental_income = Column(Numeric(20, 6), nullable=True)
+    t12_utility_reimbursements = Column(Numeric(20, 6), nullable=True)
+    t12_parking_storage_income = Column(Numeric(20, 6), nullable=True)
+    t12_other_income = Column(Numeric(20, 6), nullable=True)
     t12_management_fee_pct = Column(Float, nullable=True)
-    t12_real_estate_taxes = Column(Numeric, nullable=True)
-    t12_insurance = Column(Numeric, nullable=True)
-    t12_replacement_reserves = Column(Numeric, nullable=True)
-    t12_net_cash_flow = Column(Numeric, nullable=True)
+    t12_real_estate_taxes = Column(Numeric(20, 6), nullable=True)
+    t12_insurance = Column(Numeric(20, 6), nullable=True)
+    t12_replacement_reserves = Column(Numeric(20, 6), nullable=True)
+    t12_net_cash_flow = Column(Numeric(20, 6), nullable=True)
     t12_expense_ratio_pct = Column(Float, nullable=True)
 
     # Granular T3 financial line items
-    t3_loss_to_lease = Column(Numeric, nullable=True)
+    t3_loss_to_lease = Column(Numeric(20, 6), nullable=True)
     t3_vacancy_rate_pct = Column(Float, nullable=True)
-    t3_concessions = Column(Numeric, nullable=True)
-    t3_credit_loss = Column(Numeric, nullable=True)
-    t3_net_rental_income = Column(Numeric, nullable=True)
-    t3_utility_reimbursements = Column(Numeric, nullable=True)
-    t3_parking_storage_income = Column(Numeric, nullable=True)
-    t3_other_income = Column(Numeric, nullable=True)
+    t3_concessions = Column(Numeric(20, 6), nullable=True)
+    t3_credit_loss = Column(Numeric(20, 6), nullable=True)
+    t3_net_rental_income = Column(Numeric(20, 6), nullable=True)
+    t3_utility_reimbursements = Column(Numeric(20, 6), nullable=True)
+    t3_parking_storage_income = Column(Numeric(20, 6), nullable=True)
+    t3_other_income = Column(Numeric(20, 6), nullable=True)
     t3_management_fee_pct = Column(Float, nullable=True)
-    t3_real_estate_taxes = Column(Numeric, nullable=True)
-    t3_insurance = Column(Numeric, nullable=True)
-    t3_replacement_reserves = Column(Numeric, nullable=True)
-    t3_net_cash_flow = Column(Numeric, nullable=True)
+    t3_real_estate_taxes = Column(Numeric(20, 6), nullable=True)
+    t3_insurance = Column(Numeric(20, 6), nullable=True)
+    t3_replacement_reserves = Column(Numeric(20, 6), nullable=True)
+    t3_net_cash_flow = Column(Numeric(20, 6), nullable=True)
     t3_expense_ratio_pct = Column(Float, nullable=True)
 
     # Metadata
@@ -144,9 +144,9 @@ class Property(Base):
     rr_as_of_date = Column(DateTime(timezone=True), nullable=True)  # Date of the rent roll
 
     # T12 additional fields (for Excel-extracted T12s)
-    t12_revenue = Column(Numeric, nullable=True)
-    t12_total_expenses = Column(Numeric, nullable=True)
-    t12_gsr = Column(Numeric, nullable=True)
+    t12_revenue = Column(Numeric(20, 6), nullable=True)
+    t12_total_expenses = Column(Numeric(20, 6), nullable=True)
+    t12_gsr = Column(Numeric(20, 6), nullable=True)
 
     # Relationships
     unit_mix = relationship("PropertyUnitMix", backref="property", cascade="all, delete-orphan")
@@ -181,10 +181,10 @@ class PropertyUnitMix(Base):
     bathroom_count = Column(Integer, nullable=True)       # 1, 2
     num_units = Column(Integer, nullable=True)            # 41
     unit_sf = Column(Integer, nullable=True)              # 824
-    in_place_rent = Column(Numeric, nullable=True)        # 1616.00
-    proforma_rent = Column(Numeric, nullable=True)        # 1664.00
+    in_place_rent = Column(Numeric(20, 6), nullable=True)        # 1616.00
+    proforma_rent = Column(Numeric(20, 6), nullable=True)        # 1664.00
     proforma_rent_psf = Column(Float, nullable=True)      # 2.02
-    renovation_premium = Column(Numeric, nullable=True)   # 150 (per unit type)
+    renovation_premium = Column(Numeric(20, 6), nullable=True)   # 150 (per unit type)
 
     created_at = Column(DateTime, default=func.now())
 
@@ -200,7 +200,7 @@ class PropertyRentComp(Base):
     location = Column(String, nullable=True)              # "Brookhaven"
     num_units = Column(Integer, nullable=True)            # 300
     avg_unit_sf = Column(Integer, nullable=True)          # 939
-    in_place_rent = Column(Numeric, nullable=True)        # 2130.00
+    in_place_rent = Column(Numeric(20, 6), nullable=True)        # 2130.00
     in_place_rent_psf = Column(Float, nullable=True)      # 2.27
     bedroom_type = Column(String, nullable=True)          # "All", "Studio", "1BR", "2BR", "3BR"
     is_new_construction = Column(Boolean, default=False)
