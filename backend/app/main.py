@@ -12,18 +12,20 @@ logger = logging.getLogger(__name__)
 logger.warning("Creating database tables... (tables registered: %s)", list(Base.metadata.tables.keys()))
 Base.metadata.create_all(bind=engine)
 
-# Auto-migrate: add missing columns to existing tables
+# Auto-migrate: add missing columns and fix column types on existing tables
 def run_migrations():
-    """Add columns that create_all can't add to existing tables."""
+    """Add columns and fix types that create_all can't handle on existing tables."""
     from sqlalchemy import text, inspect
     with engine.connect() as conn:
         inspector = inspect(engine)
-        existing_cols = [c['name'] for c in inspector.get_columns('properties')]
-        migrations = [
+        existing_cols = {c['name']: c for c in inspector.get_columns('properties')}
+
+        # Add missing columns
+        new_columns = [
             ("user_guidance_price", "FLOAT"),
             ("non_revenue_units", "FLOAT"),
         ]
-        for col_name, col_type in migrations:
+        for col_name, col_type in new_columns:
             if col_name not in existing_cols:
                 try:
                     conn.execute(text(f"ALTER TABLE properties ADD COLUMN {col_name} {col_type}"))
@@ -32,10 +34,70 @@ def run_migrations():
                 except Exception as e:
                     logger.warning(f"Migration skip {col_name}: {e}")
 
+        # Fix columns that may be stored as TEXT but should be NUMERIC(20,6)
+        numeric_columns = [
+            "renovation_cost_per_unit", "renovation_total_cost", "renovation_rent_premium",
+            "renovation_stabilized_revenue",
+            "y1_loss_to_lease", "y1_concessions", "y1_credit_loss", "y1_net_rental_income",
+            "y1_utility_reimbursements", "y1_parking_storage_income", "y1_other_income",
+            "y1_real_estate_taxes", "y1_insurance", "y1_replacement_reserves", "y1_net_cash_flow",
+            "t12_loss_to_lease", "t12_concessions", "t12_credit_loss", "t12_net_rental_income",
+            "t12_utility_reimbursements", "t12_parking_storage_income", "t12_other_income",
+            "t12_real_estate_taxes", "t12_insurance", "t12_replacement_reserves", "t12_net_cash_flow",
+            "t12_revenue", "t12_total_expenses", "t12_gsr",
+            "t3_loss_to_lease", "t3_concessions", "t3_credit_loss", "t3_net_rental_income",
+            "t3_utility_reimbursements", "t3_parking_storage_income", "t3_other_income",
+            "t3_real_estate_taxes", "t3_insurance", "t3_replacement_reserves", "t3_net_cash_flow",
+        ]
+        for col_name in numeric_columns:
+            if col_name in existing_cols:
+                col_info = existing_cols[col_name]
+                col_type_str = str(col_info['type']).upper()
+                # If stored as TEXT or VARCHAR, convert to NUMERIC
+                if 'TEXT' in col_type_str or 'VARCHAR' in col_type_str or 'CHAR' in col_type_str:
+                    try:
+                        conn.execute(text(
+                            f"ALTER TABLE properties ALTER COLUMN {col_name} "
+                            f"TYPE NUMERIC(20,6) USING NULLIF({col_name}, '')::NUMERIC(20,6)"
+                        ))
+                        conn.commit()
+                        logger.warning(f"Migration: converted properties.{col_name} from TEXT to NUMERIC(20,6)")
+                    except Exception as e:
+                        logger.warning(f"Migration type fix skip {col_name}: {e}")
+            else:
+                # Column doesn't exist yet, add it
+                try:
+                    conn.execute(text(f"ALTER TABLE properties ADD COLUMN {col_name} NUMERIC(20,6)"))
+                    conn.commit()
+                    logger.warning(f"Migration: added NUMERIC column properties.{col_name}")
+                except Exception as e:
+                    logger.warning(f"Migration add skip {col_name}: {e}")
+
+        # Also fix unit_mix numeric columns
+        try:
+            unit_mix_cols = {c['name']: c for c in inspector.get_columns('property_unit_mix')}
+            unit_mix_numeric = ["in_place_rent", "proforma_rent", "renovation_premium"]
+            for col_name in unit_mix_numeric:
+                if col_name in unit_mix_cols:
+                    col_type_str = str(unit_mix_cols[col_name]['type']).upper()
+                    if 'TEXT' in col_type_str or 'VARCHAR' in col_type_str or 'CHAR' in col_type_str:
+                        try:
+                            conn.execute(text(
+                                f"ALTER TABLE property_unit_mix ALTER COLUMN {col_name} "
+                                f"TYPE NUMERIC(20,6) USING NULLIF({col_name}, '')::NUMERIC(20,6)"
+                            ))
+                            conn.commit()
+                            logger.warning(f"Migration: converted property_unit_mix.{col_name} to NUMERIC(20,6)")
+                        except Exception as e:
+                            logger.warning(f"Migration unit_mix skip {col_name}: {e}")
+        except Exception as e:
+            logger.warning(f"Migration unit_mix error: {e}")
+
 try:
     run_migrations()
 except Exception as e:
     logger.warning(f"Migration error: {e}")
+
 logger.warning("Database tables created successfully.")
 
 # Create FastAPI app
@@ -64,7 +126,6 @@ app.include_router(data_bank.router, prefix="/api/v1")
 app.include_router(criteria.router, prefix="/api/v1")
 app.include_router(chat.router, prefix="/api/v1")
 
-
 @app.get("/")
 def root():
     """Root endpoint."""
@@ -73,7 +134,6 @@ def root():
         "version": "1.0.0",
         "docs": "/docs"
     }
-
 
 @app.get("/health")
 def health_check():
