@@ -8,12 +8,12 @@ from app.database import Base
 
 
 class DealFolder(Base):
-        """Deal Folder model - organizes documents by deal/property"""
-        __tablename__ = "deal_folders"
+    """Deal Folder model - organizes documents by deal/property"""
+    __tablename__ = "deal_folders"
 
     # Core identifiers
-        id = Column(Integer, primary_key=True, autoincrement=True, index=True)
-        user_id = Column(String(36), ForeignKey("users.id"), nullable=False)  # Fixed: User.id is UUID string
+    id = Column(Integer, primary_key=True, autoincrement=True, index=True)
+    user_id = Column(String(36), ForeignKey("users.id"), nullable=False)  # Fixed: User.id is UUID string
     folder_name = Column(String(255), nullable=False)
 
     # Property summary fields (for display optimization)
@@ -32,13 +32,13 @@ class DealFolder(Base):
 
 
 class BOVPricingTier(Base):
-        """BOV Pricing Tier model - each tier is a complete isolated package of metrics"""
-        __tablename__ = "bov_pricing_tiers"
+    """BOV Pricing Tier model - each tier is a complete isolated package of metrics"""
+    __tablename__ = "bov_pricing_tiers"
 
     # Core identifiers
-        id = Column(Integer, primary_key=True, autoincrement=True, index=True)
-        property_id = Column(Integer, ForeignKey("properties.id", ondelete='CASCADE'), nullable=False)
-        pricing_tier_id = Column(String(50), nullable=False)  # "tier_1", "tier_2", "tier_3", etc.
+    id = Column(Integer, primary_key=True, autoincrement=True, index=True)
+    property_id = Column(Integer, ForeignKey("properties.id", ondelete='CASCADE'), nullable=False)
+    pricing_tier_id = Column(String(50), nullable=False)  # "tier_1", "tier_2", "tier_3", etc.
     tier_label = Column(String(255), nullable=True)  # "Premium Pricing", "Market Assumptions", etc.
     tier_type = Column(String(50), nullable=True)  # "market_assumption", "asking_price", or NULL
 
@@ -66,13 +66,13 @@ class BOVPricingTier(Base):
 
 
 class BOVCapRate(Base):
-        """BOV Cap Rate model - cap rates linked to pricing tiers"""
-        __tablename__ = "bov_cap_rates"
+    """BOV Cap Rate model - cap rates linked to pricing tiers"""
+    __tablename__ = "bov_cap_rates"
 
     # Core identifiers
-        id = Column(Integer, primary_key=True, autoincrement=True, index=True)
-        pricing_tier_id = Column(Integer, ForeignKey("bov_pricing_tiers.id", ondelete='CASCADE'), nullable=False)
-        cap_rate_type = Column(String(50), nullable=False)  # "trailing", "proforma", "stabilized", etc.
+    id = Column(Integer, primary_key=True, autoincrement=True, index=True)
+    pricing_tier_id = Column(Integer, ForeignKey("bov_pricing_tiers.id", ondelete='CASCADE'), nullable=False)
+    cap_rate_type = Column(String(50), nullable=False)  # "trailing", "proforma", "stabilized", etc.
     cap_rate_value = Column(Float, nullable=True)  # 4.75
     noi_basis = Column(Integer, nullable=True)  # NOI value used for calculation
     qualifier = Column(String(100), nullable=True)  # "as-is", "stabilized", etc.
