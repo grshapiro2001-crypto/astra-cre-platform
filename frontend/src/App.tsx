@@ -16,6 +16,7 @@ import { ComparisonPage } from './pages/ComparisonPage';
 import { Settings } from './pages/Settings';
 import { DataBankPage } from './pages/DataBankPage';
 import { OnboardingWizard } from './components/onboarding/OnboardingWizard';
+import { Landing } from './pages/Landing';
 
 function App() {
   const checkAuth = useAuthStore((state) => state.checkAuth);
