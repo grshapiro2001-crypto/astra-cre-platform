@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence, useInView, useMotionValue, useSpring } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
@@ -514,8 +514,6 @@ function StatCounter({ value, label, prefix = '', suffix = '' }: {
 // Landing — main export
 // ─────────────────────────────────────────────────────────────────
 export function Landing() {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const heroRef = useRef(null);
 
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
@@ -546,7 +544,7 @@ export function Landing() {
       </nav>
 
       {/* ── Hero ─────────────────────────────────────────────── */}
-      <section ref={heroRef} className="relative min-h-screen flex flex-col items-center justify-center text-center pt-16 overflow-hidden">
+      <section className="relative min-h-screen flex flex-col items-center justify-center text-center pt-16 overflow-hidden">
         {/* Aurora background */}
         <div className="absolute inset-0 bg-[hsl(263,30%,5%)]">
           <AuroraCanvas />
