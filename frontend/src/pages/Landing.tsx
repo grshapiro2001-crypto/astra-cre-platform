@@ -39,17 +39,17 @@ const TECH_STRIP_ITEMS = [
 const DEMO_DEALS: DealCardData[] = [
   {
     id: 1, name: 'Parkview Terrace', address: '1420 NW 23rd Ave, Portland OR',
-    submarket: 'Pearl District', units: 124, dealValue: 18_500_000,
+    submarket: 'Pearl District', units: 124, dealValue: 18500000,
     dealScore: 82, capRate: '5.4%', irr: '14.2%', type: 'Multifamily',
   },
   {
     id: 2, name: 'Riverside Commons', address: '340 River Rd, Austin TX',
-    submarket: 'East Austin', units: 96, dealValue: 14_200_000,
+    submarket: 'East Austin', units: 96, dealValue: 14200000,
     dealScore: 76, capRate: '4.9%', irr: '12.8%', type: 'Multifamily',
   },
   {
     id: 3, name: 'Vantage Lofts', address: '810 Colfax St, Denver CO',
-    submarket: 'Five Points', units: 72, dealValue: 11_800_000,
+    submarket: 'Five Points', units: 72, dealValue: 11800000,
     dealScore: 91, capRate: '6.1%', irr: '16.4%', type: 'Multifamily',
   },
 ];
@@ -258,7 +258,7 @@ function ScoreRing({ score, size = 56 }: { score: number; size?: number }) {
 function DemoCard({ deal, delay = 0 }: { deal: DealCardData; delay?: number }) {
   const ref = useRef(null);
   const inView = useInView(ref, { once: true, margin: '-60px' });
-  const fmt = (v: number) => v >= 1_000_000 ? `$${(v / 1_000_000).toFixed(1)}M` : `$${(v / 1_000).toFixed(0)}K`;
+  const fmt = (v: number) => v >= 1000000 ? `$${(v / 1000000).toFixed(1)}M` : `$${(v / 1000).toFixed(0)}K`;
 
   return (
     <motion.div
