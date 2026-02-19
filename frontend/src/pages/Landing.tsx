@@ -60,7 +60,7 @@ const FEATURE_TABS: FeatureTab[] = [
     label: 'AI Deal Scoring',
     icon: '⚡',
     headline: 'Know if a deal is worth your time in seconds.',
-    body: 'ASTRA's proprietary scoring model ingests rent rolls, T-12s, market data, and submarket comps to produce an 0–100 deal score with full factor breakdown. No more spreadsheet roulette.',
+    body: "ASTRA's proprietary scoring model ingests rent rolls, T-12s, market data, and submarket comps to produce a 0-100 deal score with full factor breakdown. No more spreadsheet roulette.",
     stats: [
       { label: 'Avg. underwriting time', value: '4 min' },
       { label: 'Deals scored to date', value: '12,400+' },
@@ -71,8 +71,8 @@ const FEATURE_TABS: FeatureTab[] = [
     id: 'document-ai',
     label: 'Document AI',
     icon: '📄',
-    headline: 'Upload a OM. Get a model.',
-    body: 'Drop any PDF — offering memorandum, rent roll, or T-12 — and ASTRA's extraction pipeline parses every line item, cross-references market data, and populates your underwriting model automatically.',
+    headline: 'Upload an OM. Get a model.',
+    body: "Drop any PDF — offering memorandum, rent roll, or T-12 — and ASTRA's extraction pipeline parses every line item, cross-references market data, and populates your underwriting model automatically.",
     stats: [
       { label: 'Document types supported', value: '28+' },
       { label: 'Extraction accuracy', value: '97.3%' },
@@ -84,7 +84,7 @@ const FEATURE_TABS: FeatureTab[] = [
     label: 'Market Intel',
     icon: '🗺️',
     headline: 'Submarket data that moves with the market.',
-    body: 'Live CoStar & Yardi feeds, refreshed daily. Vacancy trends, effective rent growth, new supply pipeline, cap rate compression — all visualized at the submarket level for 150+ MSAs.',
+    body: 'Live CoStar and Yardi feeds, refreshed daily. Vacancy trends, effective rent growth, new supply pipeline, cap rate compression — all visualized at the submarket level for 150+ MSAs.',
     stats: [
       { label: 'MSAs covered', value: '150+' },
       { label: 'Data refresh frequency', value: 'Daily' },
@@ -104,7 +104,6 @@ const FEATURE_TABS: FeatureTab[] = [
     ],
   },
 ];
-
 const FOOTER_LINKS = {
   Product: ['Deal Scoring', 'Document AI', 'Market Intel', 'Portfolio', 'Integrations', 'API'],
   Company: ['About', 'Blog', 'Careers', 'Press', 'Contact'],
