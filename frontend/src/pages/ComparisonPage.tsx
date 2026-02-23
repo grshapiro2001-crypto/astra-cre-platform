@@ -32,7 +32,7 @@ import {
   Check,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { propertyService, type PropertyDetail } from '@/services/propertyService';
+import { propertyService, type PropertyDetail, type PropertyListItem } from '@/services/propertyService';
 import { scoringService } from '@/services/scoringService';
 import type { DealScoreResult } from '@/services/scoringService';
 import { DealScoreBadge } from '@/components/scoring/DealScoreBadge';
@@ -1024,32 +1024,63 @@ export const ComparisonPage = () => {
   // Deep table sort by deal score
   const [tableSortByScore, setTableSortByScore] = useState<'asc' | 'desc' | null>(null);
 
+  // Property picker (shown when no IDs are in the URL)
+  const [showPicker, setShowPicker] = useState(false);
+  const [allProperties, setAllProperties] = useState<PropertyListItem[]>([]);
+  const [pickerLoading, setPickerLoading] = useState(false);
+  const [pickerSelected, setPickerSelected] = useState<Set<number>>(new Set());
+
   // Trigger animation after mount
   useEffect(() => {
     const timer = setTimeout(() => setAnimated(true), 150);
     return () => clearTimeout(timer);
   }, []);
 
+  // Picker helpers
+  const togglePicker = useCallback((id: number) => {
+    setPickerSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else if (next.size < 5) {
+        next.add(id);
+      }
+      return next;
+    });
+  }, []);
+
+  const startComparison = useCallback(() => {
+    if (pickerSelected.size < 2) return;
+    navigate(`/compare?ids=${[...pickerSelected].join(',')}`);
+  }, [pickerSelected, navigate]);
+
   // Fetch comparison data from API
   useEffect(() => {
     const fetchComparison = async () => {
       const idsParam = searchParams.get('ids');
-      if (!idsParam) {
-        setError('No properties selected');
-        setIsLoading(false);
-        return;
-      }
-
       const propertyIds = idsParam
-        .split(',')
-        .map(Number)
-        .filter((n) => !isNaN(n));
+        ? idsParam.split(',').map(Number).filter((n) => !isNaN(n))
+        : [];
 
       if (propertyIds.length < 2) {
-        setError('Please select at least 2 properties');
+        // Not enough IDs — show the property picker instead
+        setShowPicker(true);
         setIsLoading(false);
+        setPickerLoading(true);
+        try {
+          const result = await propertyService.listProperties({});
+          setAllProperties(result.properties);
+        } catch {
+          setAllProperties([]);
+        } finally {
+          setPickerLoading(false);
+        }
         return;
       }
+
+      // Valid IDs — switch to comparison mode
+      setShowPicker(false);
+      setPickerSelected(new Set());
 
       if (propertyIds.length > 5) {
         setError('Cannot compare more than 5 properties');
@@ -1268,39 +1299,108 @@ export const ComparisonPage = () => {
         <motion.div key="skeleton" initial={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
           <ComparisonSkeleton />
         </motion.div>
-      ) : error ? (
-        <motion.div key="error" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}>
-          <div className="max-w-4xl mx-auto">
-            {error === 'No properties selected' || error === 'Please select at least 2 properties' ? (
-              <div className="border border-border rounded-2xl bg-card p-12 text-center">
+      ) : showPicker ? (
+        <motion.div key="picker" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}>
+          <div className="max-w-2xl mx-auto">
+            <div className="mb-6">
+              <h2 className="font-display text-xl font-bold text-foreground mb-1">Compare Properties</h2>
+              <p className="text-sm text-muted-foreground">Select 2–5 deals to compare side-by-side.</p>
+            </div>
+
+            {pickerLoading ? (
+              <div className="py-16 text-center text-sm text-muted-foreground">Loading your deals…</div>
+            ) : allProperties.length === 0 ? (
+              <div className="border border-dashed border-border rounded-2xl p-12 text-center">
                 <Layers className="w-12 h-12 text-muted-foreground/40 mx-auto mb-4" />
-                <h2 className="text-lg font-display font-semibold text-foreground mb-2">
-                  Compare Properties
-                </h2>
+                <h3 className="text-base font-semibold text-foreground mb-2">No deals yet</h3>
                 <p className="text-sm text-muted-foreground mb-6">
-                  Select properties from your library to compare them side-by-side.
+                  Upload a deal to get started.
                 </p>
                 <button
-                  onClick={() => navigate('/library')}
+                  onClick={() => navigate('/upload')}
                   className="px-5 py-2.5 rounded-xl bg-primary text-white text-sm font-medium hover:bg-primary/90 transition-colors"
                 >
-                  Go to Library
+                  Upload Deal
                 </button>
               </div>
             ) : (
-              <div className="border border-rose-200 dark:border-rose-800 rounded-2xl bg-rose-50 dark:bg-rose-950/30 p-6">
-                <h2 className="text-lg font-display font-semibold text-rose-900 dark:text-rose-200 mb-2">
-                  Error
-                </h2>
-                <p className="text-sm text-rose-800 dark:text-rose-300">{error}</p>
-                <button
-                  onClick={() => navigate('/library')}
-                  className="mt-4 px-4 py-2.5 rounded-xl bg-primary text-white text-sm font-medium hover:bg-primary/90 transition-colors"
-                >
-                  Back to Library
-                </button>
-              </div>
+              <>
+                <div className="space-y-2 mb-6">
+                  {allProperties.map((p) => {
+                    const isSelected = pickerSelected.has(p.id);
+                    const isDisabled = !isSelected && pickerSelected.size >= 5;
+                    return (
+                      <button
+                        key={p.id}
+                        onClick={() => togglePicker(p.id)}
+                        disabled={isDisabled}
+                        className={cn(
+                          'w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-left transition-all',
+                          isSelected
+                            ? 'border-primary bg-primary/5'
+                            : 'border-border bg-card hover:border-primary/50',
+                          isDisabled && 'opacity-40 cursor-not-allowed',
+                        )}
+                      >
+                        <div
+                          className={cn(
+                            'w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-colors',
+                            isSelected ? 'bg-primary border-primary' : 'border-muted-foreground/40',
+                          )}
+                        >
+                          {isSelected && <Check className="w-3 h-3 text-white" />}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-foreground truncate">
+                            {p.property_name || p.deal_name}
+                          </p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {p.property_address || p.submarket || p.document_type}
+                          </p>
+                        </div>
+                        {p.total_units != null && p.total_units > 0 && (
+                          <span className="text-xs text-muted-foreground flex-shrink-0">
+                            {p.total_units} units
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-muted-foreground">
+                    {pickerSelected.size === 0
+                      ? 'Select at least 2 deals'
+                      : `${pickerSelected.size} selected`}
+                  </p>
+                  <button
+                    onClick={startComparison}
+                    disabled={pickerSelected.size < 2}
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-white text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    Compare {pickerSelected.size >= 2 ? pickerSelected.size : ''} Deals
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </>
             )}
+          </div>
+        </motion.div>
+      ) : error ? (
+        <motion.div key="error" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}>
+          <div className="max-w-4xl mx-auto">
+            <div className="border border-rose-200 dark:border-rose-800 rounded-2xl bg-rose-50 dark:bg-rose-950/30 p-6">
+              <h2 className="text-lg font-display font-semibold text-rose-900 dark:text-rose-200 mb-2">
+                Error
+              </h2>
+              <p className="text-sm text-rose-800 dark:text-rose-300">{error}</p>
+              <button
+                onClick={() => navigate('/library')}
+                className="mt-4 px-4 py-2.5 rounded-xl bg-primary text-white text-sm font-medium hover:bg-primary/90 transition-colors"
+              >
+                Back to Library
+              </button>
+            </div>
           </div>
         </motion.div>
       ) : !data ? null : (
