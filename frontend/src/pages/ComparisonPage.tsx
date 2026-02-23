@@ -48,6 +48,7 @@ import {
   getGradientColor,
 } from '@/utils/criteriaEvaluation';
 import { ComparisonSkeleton } from '@/components/ui/PageSkeleton';
+import { SlowLoadBanner } from '@/components/common/SlowLoadBanner';
 
 // ============================================================
 // Types
@@ -1298,6 +1299,7 @@ export const ComparisonPage = () => {
       {isLoading ? (
         <motion.div key="skeleton" initial={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
           <ComparisonSkeleton />
+          <SlowLoadBanner />
         </motion.div>
       ) : showPicker ? (
         <motion.div key="picker" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}>

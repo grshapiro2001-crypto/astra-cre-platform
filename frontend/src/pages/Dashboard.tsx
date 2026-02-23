@@ -31,6 +31,7 @@ import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/authSlice';
 import { Button } from '@/components/ui/button';
 import { DashboardSkeleton } from '@/components/ui/PageSkeleton';
+import { SlowLoadBanner } from '@/components/common/SlowLoadBanner';
 import { propertyService } from '@/services/propertyService';
 import { scoringService } from '@/services/scoringService';
 import { criteriaService } from '@/services/criteriaService';
@@ -329,6 +330,7 @@ export const Dashboard = () => {
           transition={{ duration: 0.15 }}
         >
           <DashboardSkeleton />
+          <SlowLoadBanner />
         </motion.div>
       ) : (
         <motion.div

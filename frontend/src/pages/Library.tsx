@@ -33,6 +33,7 @@ import type { PropertyListItem } from '@/types/property';
 import { CreateFolderModal } from '@/components/library/CreateFolderModal';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { LibrarySkeleton } from '@/components/ui/PageSkeleton';
+import { SlowLoadBanner } from '@/components/common/SlowLoadBanner';
 import { useUIStore } from '@/store/uiStore';
 
 // ---------------------------------------------------------------------------
@@ -558,6 +559,7 @@ export const Library = () => {
         {isLoading ? (
           <motion.div key="skeleton" initial={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
             <LibrarySkeleton />
+            <SlowLoadBanner />
           </motion.div>
         ) : (
           <motion.div key="content" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}>
