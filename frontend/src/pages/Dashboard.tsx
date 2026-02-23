@@ -254,11 +254,7 @@ export const Dashboard = () => {
     totalVolume > 0 && totalUnits > 0 ? Math.round(totalVolume / totalUnits) : null;
 
   // --- Card / Map interaction ---
-  const handleCardClick = useCallback((dealId: number) => {
-    setSelectedDealId((prev) => (prev === dealId ? null : dealId));
-  }, []);
-
-  const handleCardDoubleClick = useCallback(
+  const handleCardClick = useCallback(
     (dealId: number) => {
       navigate(`/library/${dealId}`);
     },
@@ -555,7 +551,6 @@ export const Dashboard = () => {
                           deal={deal}
                           isSelected={selectedDealId === deal.id}
                           onClick={() => handleCardClick(deal.id)}
-                          onDoubleClick={() => handleCardDoubleClick(deal.id)}
                         />
                       ))
                     ) : (
