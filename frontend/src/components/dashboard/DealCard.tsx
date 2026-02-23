@@ -58,7 +58,7 @@ interface DealCardProps {
   deal: DashboardDeal;
   isSelected: boolean;
   onClick: () => void;
-  onDoubleClick: () => void;
+  onDoubleClick?: () => void;
 }
 
 export const DealCard = ({ deal, isSelected, onClick, onDoubleClick }: DealCardProps) => {
