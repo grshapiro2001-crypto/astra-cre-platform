@@ -997,7 +997,7 @@ function RadarChart({ properties, metrics, scoresByProperty }: RadarChartProps) 
 // ============================================================
 
 export const ComparisonPage = () => {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
 
   // API State
@@ -1051,8 +1051,8 @@ export const ComparisonPage = () => {
 
   const startComparison = useCallback(() => {
     if (pickerSelected.size < 2) return;
-    navigate(`/compare?ids=${[...pickerSelected].join(',')}`);
-  }, [pickerSelected, navigate]);
+    setSearchParams({ ids: [...pickerSelected].join(',') });
+  }, [pickerSelected, setSearchParams]);
 
   // Fetch comparison data from API
   useEffect(() => {
