@@ -635,7 +635,7 @@ def build_property_detail_response(property_obj: Property, db: Session) -> Prope
     """
     # Import bov_service here to avoid circular imports
     from app.services import bov_service
-    from app.schemas.property import UnitMixItem, RentCompItem
+    from app.schemas.property import UnitMixItem, RentCompItem, SalesCompItem
 
     # Get BOV pricing tiers if this is a BOV document
     bov_tiers = None
@@ -664,13 +664,22 @@ def build_property_detail_response(property_obj: Property, db: Session) -> Prope
             except Exception as e:
                 logger.error("Failed to validate rent_comp item id=%s: %s", getattr(c, 'id', '?'), e)
 
+    sales_comp_items = []
+    if hasattr(property_obj, 'sales_comps') and property_obj.sales_comps:
+        for sc in property_obj.sales_comps:
+            try:
+                sales_comp_items.append(SalesCompItem.model_validate(sc))
+            except Exception as e:
+                logger.error("Failed to validate sales_comp item id=%s: %s", getattr(sc, 'id', '?'), e)
+
     logger.warning(
         "BUILD_RESPONSE id=%d: unit_mix=%d (raw=%d), rent_comps=%d (raw=%d), "
-        "renovation_cost_per_unit=%s",
+        "sales_comps=%d, renovation_cost_per_unit=%s",
         property_obj.id, len(unit_mix_items),
         len(property_obj.unit_mix) if hasattr(property_obj, 'unit_mix') and property_obj.unit_mix else 0,
         len(rent_comp_items),
         len(property_obj.rent_comps) if hasattr(property_obj, 'rent_comps') and property_obj.rent_comps else 0,
+        len(sales_comp_items),
         property_obj.renovation_cost_per_unit,
     )
 
@@ -714,6 +723,7 @@ def build_property_detail_response(property_obj: Property, db: Session) -> Prope
         bov_pricing_tiers=bov_tiers,  # Phase 3A
         unit_mix=unit_mix_items,
         rent_comps=rent_comp_items,
+        sales_comps=sales_comp_items,
         analysis_date=property_obj.analysis_date,
         last_viewed_date=property_obj.last_viewed_date,
         analysis_count=property_obj.analysis_count,
@@ -743,7 +753,7 @@ def build_property_detail_response(property_obj: Property, db: Session) -> Prope
 def update_property_from_extraction(property_obj: Property, extraction_result: dict, db: Session = None):
     """Update property with new extraction data"""
     import json
-    from app.models.property import PropertyUnitMix, PropertyRentComp
+    from app.models.property import PropertyUnitMix, PropertyRentComp, PropertySalesComp
 
     # Update property info
     if "property_info" in extraction_result:
@@ -881,6 +891,25 @@ def update_property_from_extraction(property_obj: Property, extraction_result: d
                     in_place_rent_psf=comp.get("in_place_rent_psf"),
                     bedroom_type=comp.get("bedroom_type"),
                     is_new_construction=comp.get("is_new_construction", False),
+                ))
+
+        if extraction_result.get("sales_comps"):
+            db.query(PropertySalesComp).filter(PropertySalesComp.property_id == property_obj.id).delete()
+            for sc in extraction_result["sales_comps"]:
+                db.add(PropertySalesComp(
+                    property_id=property_obj.id,
+                    property_name=sc.get("property_name"),
+                    location=sc.get("location"),
+                    year_built=sc.get("year_built"),
+                    units=sc.get("units"),
+                    avg_rent=sc.get("avg_rent"),
+                    sale_date=sc.get("sale_date"),
+                    sale_price=sc.get("sale_price"),
+                    price_per_unit=sc.get("price_per_unit"),
+                    cap_rate=sc.get("cap_rate"),
+                    cap_rate_qualifier=sc.get("cap_rate_qualifier"),
+                    buyer=sc.get("buyer"),
+                    seller=sc.get("seller"),
                 ))
 
 

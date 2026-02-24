@@ -130,6 +130,22 @@ export interface RentCompItem {
   is_new_construction: boolean;
 }
 
+export interface SalesCompItem {
+  id: number;
+  property_name: string | null;
+  location: string | null;
+  year_built: number | null;
+  units: number | null;
+  avg_rent: number | null;
+  sale_date: string | null;
+  sale_price: number | null;
+  price_per_unit: number | null;
+  cap_rate: number | null;           // Decimal: 0.055
+  cap_rate_qualifier: string | null;
+  buyer: string | null;
+  seller: string | null;
+}
+
 export interface RenovationData {
   renovation_cost_per_unit?: number | null;
   renovation_total_cost?: number | null;
@@ -158,6 +174,7 @@ export interface ExtractionResult {
   renovation?: RenovationData;  // Renovation assumptions from extraction
   unit_mix?: UnitMixItem[];  // Unit mix floorplan data from extraction
   rent_comps?: RentCompItem[];  // Rent comparable properties from extraction
+  sales_comps?: SalesCompItem[];  // Sales comparable properties from extraction
   source_notes?: SourceNotes;
   missing_fields: string[];
 }
@@ -231,9 +248,10 @@ export interface PropertyDetail {
     y1?: CalculatedMetrics;
   };
   bov_pricing_tiers?: BOVPricingTier[];
-  // Unit mix and rent comps
+  // Unit mix, rent comps, and sales comps
   unit_mix?: UnitMixItem[];
   rent_comps?: RentCompItem[];
+  sales_comps?: SalesCompItem[];
   source_notes?: SourceNotes;
   missing_fields?: string[];
   upload_date?: string;
@@ -265,6 +283,9 @@ export interface PropertyDetail {
   t3_noi?: number | null;
   t12_noi?: number | null;
   y1_noi?: number | null;
+  // Pipeline management
+  pipeline_stage?: string;
+  pipeline_notes?: string | null;
 }
 
 /** Property list item for library views */

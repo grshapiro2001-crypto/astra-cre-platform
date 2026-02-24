@@ -92,6 +92,7 @@ export const propertyService = {
       bov_pricing_tiers: ext?.bov_pricing_tiers,  // Phase 3A - BOV pricing tiers
       unit_mix: unitMixPayload,  // Always send array (never undefined)
       rent_comps: rentCompsPayload,  // Always send array (never undefined)
+      sales_comps: ext?.sales_comps ?? [],  // Sales comps from OM/BOV extraction
       raw_pdf_path: pdfPath || '',  // Required by backend — fallback to empty string
       analysis_model: 'claude-sonnet-4-5-20250929',
     };
@@ -147,6 +148,14 @@ export const propertyService = {
     const response = await api.patch(`/properties/${propertyId}/guidance-price`, {
       guidance_price: guidancePrice,
     });
+    return response.data;
+  },
+
+  /**
+   * Update pipeline notes for a property (NO LLM - just updates database)
+   */
+  async updateNotes(propertyId: number, notes: string): Promise<PropertyDetail> {
+    const response = await api.patch(`/properties/${propertyId}/notes?notes=${encodeURIComponent(notes)}`);
     return response.data;
   },
 

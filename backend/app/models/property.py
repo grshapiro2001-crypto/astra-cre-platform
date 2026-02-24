@@ -153,6 +153,7 @@ class Property(Base):
     # Relationships
     unit_mix = relationship("PropertyUnitMix", backref="property", cascade="all, delete-orphan")
     rent_comps = relationship("PropertyRentComp", backref="property", cascade="all, delete-orphan")
+    sales_comps = relationship("PropertySalesComp", backref="property", cascade="all, delete-orphan")
     documents = relationship("PropertyDocument", back_populates="property", cascade="all, delete-orphan")
 
 
@@ -206,6 +207,29 @@ class PropertyRentComp(Base):
     in_place_rent_psf = Column(Float, nullable=True)      # 2.27
     bedroom_type = Column(String, nullable=True)          # "All", "Studio", "1BR", "2BR", "3BR"
     is_new_construction = Column(Boolean, default=False)
+
+    created_at = Column(DateTime, default=func.now())
+
+
+class PropertySalesComp(Base):
+    """Sales comps extracted from OM/BOV documents"""
+    __tablename__ = "property_sales_comps"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    property_id = Column(Integer, ForeignKey("properties.id", ondelete="CASCADE"), nullable=False)
+
+    property_name = Column(String(255), nullable=True)
+    location = Column(String(255), nullable=True)       # City/submarket
+    year_built = Column(Integer, nullable=True)
+    units = Column(Integer, nullable=True)
+    avg_rent = Column(Float, nullable=True)             # Avg rent at time of sale
+    sale_date = Column(String(50), nullable=True)       # "Q3 2024", "Sep 2024", etc.
+    sale_price = Column(Float, nullable=True)            # Total sale price
+    price_per_unit = Column(Float, nullable=True)
+    cap_rate = Column(Float, nullable=True)              # Decimal: 0.055 = 5.5%
+    cap_rate_qualifier = Column(String(100), nullable=True)  # "T12", "T3 Ann.", "Proforma", "Stabilized"
+    buyer = Column(String(255), nullable=True)
+    seller = Column(String(255), nullable=True)
 
     created_at = Column(DateTime, default=func.now())
 
