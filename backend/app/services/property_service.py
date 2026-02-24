@@ -248,6 +248,30 @@ def save_property(
             except Exception as e:
                 logger.error("Failed to save rent_comp item %d: %s", idx, e)
 
+    # Save sales comps if provided
+    if property_data.sales_comps:
+        from app.models.property import PropertySalesComp
+        for idx, sc in enumerate(property_data.sales_comps):
+            try:
+                sc_obj = PropertySalesComp(
+                    property_id=property_obj.id,
+                    property_name=sc.property_name,
+                    location=sc.location,
+                    year_built=sc.year_built,
+                    units=sc.units,
+                    avg_rent=sc.avg_rent,
+                    sale_date=sc.sale_date,
+                    sale_price=sc.sale_price,
+                    price_per_unit=sc.price_per_unit,
+                    cap_rate=sc.cap_rate,
+                    cap_rate_qualifier=sc.cap_rate_qualifier,
+                    buyer=sc.buyer,
+                    seller=sc.seller,
+                )
+                db.add(sc_obj)
+            except Exception as e:
+                logger.error("Failed to save sales_comp item %d: %s", idx, e)
+
     # Log the analysis
     log = AnalysisLog(
         property_id=property_obj.id,

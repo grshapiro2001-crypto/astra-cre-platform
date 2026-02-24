@@ -45,6 +45,7 @@ import type {
   BOVPricingTier,
   UnitMixItem,
   RentCompItem,
+  SalesCompItem,
 } from '@/types/property';
 import { AnimatePresence, motion } from 'framer-motion';
 import { PropertyDetailSkeleton } from '@/components/ui/PageSkeleton';
@@ -583,16 +584,11 @@ export const PropertyDetail = () => {
     return { amount: diff, percent: (diff / mkt) * 100 };
   }, [property]);
 
-  const derivedPrice = useMemo(() => {
-    const noi = currentFinancials?.noi;
-    if (noi == null || capRateSlider === 0) return 0;
-    return Math.round(noi / (capRateSlider / 100));
-  }, [currentFinancials, capRateSlider]);
-
   const [rentCompTab, setRentCompTab] = useState<string>('All');
 
   const unitMix: UnitMixItem[] = property?.unit_mix ?? [];
   const rentComps: RentCompItem[] = property?.rent_comps ?? [];
+  const salesComps: SalesCompItem[] = property?.sales_comps ?? [];
 
   const hasRenovation = property != null && (
     property.renovation_cost_per_unit != null ||
@@ -674,13 +670,44 @@ export const PropertyDetail = () => {
 
   const pricingMetrics = useMemo(() => {
     if (pricingGuidance <= 0 || !property) return null;
-    const t3Noi = property.t3_financials?.noi ?? property.t3_noi;
+
+    // Hybrid NOI: T3 annualized income - T12 annualized expenses
+    // This gives most recent revenue trends with full-year expense history
+    const t3Income = property.t3_financials?.gsr
+      ? (property.t3_financials.gsr
+        - Math.abs(property.t3_financials.vacancy ?? 0)
+        - Math.abs(property.t3_financials.concessions ?? 0)
+        - Math.abs(property.t3_financials.loss_to_lease ?? 0)
+        - Math.abs(property.t3_financials.bad_debt ?? 0)
+        - Math.abs(property.t3_financials.non_revenue_units ?? 0)
+        + (property.t3_financials.utility_reimbursements ?? 0)
+        + (property.t3_financials.parking_storage_income ?? 0)
+        + (property.t3_financials.other_income ?? 0))
+      : null;
+    const t12Expenses = property.t12_financials?.total_opex ?? null;
+
+    // Hybrid NOI = T3 EGI - T12 OpEx
+    // Fall back to straight T3 NOI if we can't compute hybrid
+    let goingInNoi: number | null = null;
+    let goingInLabel = 'Going-In Cap (T3)';
+
+    if (t3Income != null && t12Expenses != null) {
+      goingInNoi = t3Income - Math.abs(t12Expenses);
+      goingInLabel = 'Going-In Cap (T3)';
+    } else {
+      // Fallback: use T3 NOI directly
+      goingInNoi = property.t3_financials?.noi ?? property.t3_noi ?? null;
+    }
+
     const y1Noi = property.y1_financials?.noi ?? property.y1_noi;
+
     return {
       goingInCap:
-        t3Noi != null
-          ? ((t3Noi / pricingGuidance) * 100).toFixed(2)
+        goingInNoi != null
+          ? ((goingInNoi / pricingGuidance) * 100).toFixed(2)
           : '---',
+      goingInLabel,
+      goingInNoi,
       y1Cap:
         y1Noi != null
           ? ((y1Noi / pricingGuidance) * 100).toFixed(2)
@@ -690,6 +717,13 @@ export const PropertyDetail = () => {
       pricePerSF: totalSF > 0 ? Math.round(pricingGuidance / totalSF) : 0,
     };
   }, [pricingGuidance, property, totalUnits, totalSF]);
+
+  const derivedPrice = useMemo(() => {
+    // Use hybrid NOI (T3 income / T12 expenses) if available, else current period NOI
+    const noi = pricingMetrics?.goingInNoi ?? currentFinancials?.noi;
+    if (noi == null || capRateSlider === 0) return 0;
+    return Math.round(noi / (capRateSlider / 100));
+  }, [currentFinancials, capRateSlider, pricingMetrics]);
 
   // -----------------------------------------------------------------------
   // Render
@@ -1007,7 +1041,7 @@ export const PropertyDetail = () => {
                         <div className="p-3 rounded-xl bg-accent">
                           <p className="text-xs text-primary">Market Rent</p>
                           <p className="font-mono text-xl font-bold text-foreground">
-                            ${property.average_market_rent.toLocaleString()}
+                            ${Math.round(property.average_market_rent).toLocaleString()}
                             <span className="text-sm font-normal">/unit</span>
                           </p>
                         </div>
@@ -1018,7 +1052,7 @@ export const PropertyDetail = () => {
                             In-Place Rent
                           </p>
                           <p className="font-mono text-xl font-bold text-foreground">
-                            ${property.average_inplace_rent.toLocaleString()}
+                            ${Math.round(property.average_inplace_rent).toLocaleString()}
                             <span className="text-sm font-normal">/unit</span>
                           </p>
                         </div>
@@ -1111,9 +1145,6 @@ export const PropertyDetail = () => {
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">
                       Economic Occupancy ({financialPeriod.toUpperCase()})
-                    </p>
-                    <p className="text-xs mt-0.5 text-muted-foreground">
-                      Net Rental Income / Gross Potential Rent (GSR − Loss to Lease)
                     </p>
                   </div>
                   <div className="text-right">
@@ -1403,7 +1434,7 @@ export const PropertyDetail = () => {
                         {(
                           [
                             {
-                              label: 'Going-In Cap (T3)',
+                              label: pricingMetrics.goingInLabel,
                               value: `${pricingMetrics.goingInCap}%`,
                               hl: true,
                             },
@@ -1425,7 +1456,7 @@ export const PropertyDetail = () => {
                               value: `$${pricingMetrics.pricePerSF}`,
                               hl: false,
                             },
-                          ] as const
+                          ] as { label: string; value: string; hl: boolean }[]
                         ).map((m) => (
                           <div
                             key={m.label}
@@ -1456,6 +1487,9 @@ export const PropertyDetail = () => {
                     <h4 className="font-semibold mb-4 text-foreground">
                       What Cap Rate Gets Me There?
                     </h4>
+                    <p className="text-xs text-muted-foreground mt-1 mb-2">
+                      Based on T3 NOI
+                    </p>
                     <div className="mb-6">
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-sm text-muted-foreground">
@@ -2149,6 +2183,62 @@ export const PropertyDetail = () => {
         </section>
 
         {/* --------------------------------------------------------------- */}
+        {/* SALES COMPARABLES                                                */}
+        {/* --------------------------------------------------------------- */}
+        {salesComps.length > 0 && (
+          <section className="animate-fade-in" style={{ animationDelay: '292ms' }}>
+            <h2 className="font-display text-lg font-bold mb-4 text-foreground">
+              Sales Comparables
+            </h2>
+            <div className="border border-border rounded-2xl bg-card overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border bg-muted/50">
+                      <th className="text-left px-4 py-3 font-medium text-muted-foreground">Property</th>
+                      <th className="text-left px-4 py-3 font-medium text-muted-foreground">Location</th>
+                      <th className="text-right px-4 py-3 font-medium text-muted-foreground">Units</th>
+                      <th className="text-right px-4 py-3 font-medium text-muted-foreground">Year Built</th>
+                      <th className="text-right px-4 py-3 font-medium text-muted-foreground">Sale Date</th>
+                      <th className="text-right px-4 py-3 font-medium text-muted-foreground">Sale Price</th>
+                      <th className="text-right px-4 py-3 font-medium text-muted-foreground">$/Unit</th>
+                      <th className="text-right px-4 py-3 font-medium text-muted-foreground">Cap Rate</th>
+                      <th className="text-right px-4 py-3 font-medium text-muted-foreground">Buyer</th>
+                      <th className="text-right px-4 py-3 font-medium text-muted-foreground">Seller</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {salesComps.map((sc) => (
+                      <tr key={sc.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                        <td className="px-4 py-3 font-medium text-foreground">{sc.property_name ?? '\u2014'}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{sc.location ?? '\u2014'}</td>
+                        <td className="px-4 py-3 text-right font-mono">{sc.units?.toLocaleString() ?? '\u2014'}</td>
+                        <td className="px-4 py-3 text-right font-mono">{sc.year_built ?? '\u2014'}</td>
+                        <td className="px-4 py-3 text-right text-muted-foreground">{sc.sale_date ?? '\u2014'}</td>
+                        <td className="px-4 py-3 text-right font-mono">
+                          {sc.sale_price != null ? fmtCurrency(sc.sale_price, true) : '\u2014'}
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono">
+                          {sc.price_per_unit != null ? `$${Math.round(sc.price_per_unit).toLocaleString()}` : '\u2014'}
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono">
+                          {sc.cap_rate != null ? `${(sc.cap_rate * 100).toFixed(2)}%` : '\u2014'}
+                          {sc.cap_rate_qualifier && (
+                            <span className="text-xs text-muted-foreground ml-1">({sc.cap_rate_qualifier})</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-right text-muted-foreground text-xs">{sc.buyer ?? '\u2014'}</td>
+                        <td className="px-4 py-3 text-right text-muted-foreground text-xs">{sc.seller ?? '\u2014'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* --------------------------------------------------------------- */}
         {/* LOCATION / DEMOGRAPHICS                                          */}
         {/* --------------------------------------------------------------- */}
         {property.property_address && (
@@ -2381,12 +2471,27 @@ export const PropertyDetail = () => {
               />
               <div className="flex justify-end mt-2">
                 <button
-                  onClick={() => {
-                    if (newNote.trim()) {
-                      toast.info('Coming soon', {
-                        description: 'Note persistence will be available in a future update.'
-                      });
-                      setNewNote('');
+                  onClick={async () => {
+                    if (newNote.trim() && property) {
+                      try {
+                        const timestamp = new Date().toLocaleDateString('en-US', {
+                          month: 'short', day: 'numeric', year: 'numeric',
+                          hour: '2-digit', minute: '2-digit'
+                        });
+                        const existingNotes = property.pipeline_notes || '';
+                        const updatedNotes = existingNotes
+                          ? `${existingNotes}\n\n[${timestamp}]\n${newNote.trim()}`
+                          : `[${timestamp}]\n${newNote.trim()}`;
+
+                        await propertyService.updateNotes(property.id, updatedNotes);
+
+                        const updated = await propertyService.getProperty(property.id);
+                        setProperty(updated);
+                        setNewNote('');
+                        toast.success('Note saved');
+                      } catch {
+                        toast.error('Failed to save note');
+                      }
                     }
                   }}
                   disabled={!newNote.trim()}
@@ -2396,12 +2501,22 @@ export const PropertyDetail = () => {
                 </button>
               </div>
             </div>
-            <div className="text-center py-6">
-              <StickyNote className="w-8 h-8 text-muted-foreground/50 mx-auto mb-2" />
-              <p className="text-sm text-muted-foreground">
-                No notes yet. Add a note above to get started.
-              </p>
-            </div>
+            {property.pipeline_notes ? (
+              <div className="space-y-3 mt-4">
+                {property.pipeline_notes.split('\n\n').map((note, idx) => (
+                  <div key={idx} className="p-3 rounded-lg bg-muted/50 border border-border/40">
+                    <p className="text-sm text-foreground whitespace-pre-wrap">{note}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-6">
+                <StickyNote className="w-8 h-8 text-muted-foreground/50 mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground">
+                  No notes yet. Add a note above to get started.
+                </p>
+              </div>
+            )}
           </div>
         </section>
 

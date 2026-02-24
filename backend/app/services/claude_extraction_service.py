@@ -112,6 +112,15 @@ RENT COMP EXTRACTION:
 - is_new_construction = true if comp is labeled as "New Construction"
 - Do NOT include the subject property itself as a comp
 - Return empty array if no rent comps found
+
+SALES COMP EXTRACTION:
+- Usually in "Investment Sales Comparables" or "Sales Comparison" section
+- Extract all comparable sales listed
+- cap_rate: Store as decimal (0.055 not 5.5)
+- cap_rate_qualifier: Extract what type of cap rate it is (e.g. "T12", "T3 Annualized", "Proforma", "Actual", "Stabilized")
+- sale_date: Keep the format as found in document (e.g. "Q3 2024", "Sep 2024", "2024")
+- Do NOT include the subject property itself as a sales comp
+- Return empty array if no sales comps found
 """
 
 # OM-specific extraction prompt
@@ -131,8 +140,9 @@ EXTRACTION PRIORITIES FOR OMs:
 2. Y1 Proforma financials (this is the MAIN financial data — extract every line item)
 3. Unit mix (CRITICAL — every floorplan with units, SF, in-place rent, proforma rent)
 4. Rent comps (extract the "All Unit" summary table AND per-bedroom tables if present)
-5. Renovation assumptions (if this is a value-add OM — cost/unit, ROI, premiums)
-6. T12/T3 financials — ONLY if they appear in-document. Do NOT fabricate. Most OMs put these in the data room.
+5. Sales comps (if present in "Investment Sales" or "Sales Comparison" section)
+6. Renovation assumptions (if this is a value-add OM — cost/unit, ROI, premiums)
+7. T12/T3 financials — ONLY if they appear in-document. Do NOT fabricate. Most OMs put these in the data room.
 
 FINANCIAL EXTRACTION FOR Y1 PROFORMA:
 Extract the FULL income waterfall:
@@ -275,6 +285,22 @@ Return JSON format:
       "is_new_construction": boolean
     }}
   ],
+  "sales_comps": [
+    {{
+      "property_name": "string",
+      "location": "string or null",
+      "year_built": number or null,
+      "units": number or null,
+      "avg_rent": number or null,
+      "sale_date": "string or null",
+      "sale_price": number or null,
+      "price_per_unit": number or null,
+      "cap_rate": "decimal or null (0.055 not 5.5)",
+      "cap_rate_qualifier": "string or null",
+      "buyer": "string or null",
+      "seller": "string or null"
+    }}
+  ],
   "bov_pricing_tiers": [],
   "source_notes": {{
     "property_info_source": "e.g., Page 2, Executive Summary",
@@ -307,7 +333,8 @@ EXTRACTION PRIORITIES FOR BOVs:
 6. Terminal assumptions (exit cap rate, terminal value, hold period)
 7. Debt assumptions if present (LTV, interest rate, IO period, amortization)
 8. Unit mix and rent comps (if present — BOVs sometimes include these, sometimes not)
-9. Renovation assumptions (if present)
+9. Sales comps (if present in "Investment Sales" or "Sales Comparison" section)
+10. Renovation assumptions (if present)
 
 FINANCIAL EXTRACTION FOR EACH PERIOD (T3, T12, Y1):
 Extract the FULL income waterfall for EACH period:
@@ -463,6 +490,22 @@ Return JSON format:
       "in_place_rent_psf": number or null,
       "bedroom_type": "All" | "Studio" | "1BR" | "2BR" | "3BR",
       "is_new_construction": boolean
+    }}
+  ],
+  "sales_comps": [
+    {{
+      "property_name": "string",
+      "location": "string or null",
+      "year_built": number or null,
+      "units": number or null,
+      "avg_rent": number or null,
+      "sale_date": "string or null",
+      "sale_price": number or null,
+      "price_per_unit": number or null,
+      "cap_rate": "decimal or null (0.055 not 5.5)",
+      "cap_rate_qualifier": "string or null",
+      "buyer": "string or null",
+      "seller": "string or null"
     }}
   ],
   "bov_pricing_tiers": [
@@ -708,6 +751,15 @@ RENT COMP EXTRACTION:
 - Do NOT include the subject property itself as a comp
 - Return empty array if no rent comps found
 
+SALES COMP EXTRACTION:
+- Usually in "Investment Sales Comparables" or "Sales Comparison" section
+- Extract all comparable sales listed
+- cap_rate: Store as decimal (0.055 not 5.5)
+- cap_rate_qualifier: Extract what type of cap rate it is (e.g. "T12", "T3 Annualized", "Proforma", "Actual", "Stabilized")
+- sale_date: Keep the format as found in document (e.g. "Q3 2024", "Sep 2024", "2024")
+- Do NOT include the subject property itself as a sales comp
+- Return empty array if no sales comps found
+
 VERIFICATION - CRITICAL STEP:
 - Verify: GSR - Vacancy - Concessions - Bad Debt - Non-Revenue Units ≈ EGI
 - If numbers don't match, double-check which row you're reading from
@@ -808,6 +860,22 @@ Return JSON format:
       "in_place_rent_psf": number or null,
       "bedroom_type": "All" | "Studio" | "1BR" | "2BR" | "3BR",
       "is_new_construction": boolean
+    }}
+  ],
+  "sales_comps": [
+    {{
+      "property_name": "string",
+      "location": "string or null",
+      "year_built": number or null,
+      "units": number or null,
+      "avg_rent": number or null,
+      "sale_date": "string or null",
+      "sale_price": number or null,
+      "price_per_unit": number or null,
+      "cap_rate": "decimal or null (0.055 not 5.5)",
+      "cap_rate_qualifier": "string or null",
+      "buyer": "string or null",
+      "seller": "string or null"
     }}
   ],
   "bov_pricing_tiers": [

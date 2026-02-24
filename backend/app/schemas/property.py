@@ -118,6 +118,26 @@ class RentCompItem(BaseModel):
         from_attributes = True
 
 
+class SalesCompItem(BaseModel):
+    """Sales comp extracted from OM/BOV"""
+    id: Optional[int] = None
+    property_name: Optional[str] = None
+    location: Optional[str] = None
+    year_built: Optional[int] = None
+    units: Optional[int] = None
+    avg_rent: Optional[float] = None
+    sale_date: Optional[str] = None
+    sale_price: Optional[float] = None
+    price_per_unit: Optional[float] = None
+    cap_rate: Optional[float] = None           # Decimal: 0.055
+    cap_rate_qualifier: Optional[str] = None
+    buyer: Optional[str] = None
+    seller: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
 # ==================== SAVE PROPERTY REQUEST ====================
 
 class PropertyCreate(BaseModel):
@@ -159,6 +179,7 @@ class PropertyCreate(BaseModel):
     # Unit mix and rent comps
     unit_mix: Optional[List[UnitMixItem]] = None
     rent_comps: Optional[List[RentCompItem]] = None
+    sales_comps: Optional[List[SalesCompItem]] = None
 
     # Metadata
     raw_pdf_path: str
@@ -234,9 +255,10 @@ class PropertyDetail(BaseModel):
     # BOV pricing tiers (Phase 3A - only for BOV documents)
     bov_pricing_tiers: Optional[List[BOVPricingTierData]] = None
 
-    # Unit mix and rent comps
+    # Unit mix, rent comps, and sales comps
     unit_mix: List[UnitMixItem] = []
     rent_comps: List[RentCompItem] = []
+    sales_comps: List[SalesCompItem] = []
 
     # Metadata
     analysis_date: Optional[datetime]
