@@ -1031,17 +1031,20 @@ async def extract_with_claude(
             extraction_data['unit_mix'] = extraction_data.get('unit_mix') or []
         if not isinstance(extraction_data.get('rent_comps'), list):
             extraction_data['rent_comps'] = extraction_data.get('rent_comps') or []
+        if not isinstance(extraction_data.get('sales_comps'), list):
+            extraction_data['sales_comps'] = extraction_data.get('sales_comps') or []
         if not isinstance(extraction_data.get('renovation'), dict):
             extraction_data['renovation'] = extraction_data.get('renovation') or {}
 
         logger.warning(
             "EXTRACTION_RESULT file=%s doc_type=%s: "
             "unit_mix=%d items, rent_comps=%d items, "
-            "renovation_keys=%s",
+            "sales_comps=%d items, renovation_keys=%s",
             filename,
             extraction_data.get('document_type'),
             len(extraction_data.get('unit_mix', [])),
             len(extraction_data.get('rent_comps', [])),
+            len(extraction_data.get('sales_comps', [])),
             list(extraction_data.get('renovation', {}).keys()),
         )
 

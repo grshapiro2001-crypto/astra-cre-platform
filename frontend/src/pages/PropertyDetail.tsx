@@ -443,11 +443,26 @@ export const PropertyDetail = () => {
       );
       setProperty(updated);
       setShowReanalyzeDialog(false);
+      toast.success('Re-analysis complete', {
+        description: 'Property data has been refreshed from the original PDF.',
+      });
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { detail?: string } } };
-      alert(
-        `Re-analysis failed: ${e.response?.data?.detail || 'Unknown error'}`,
-      );
+      const e = err as { response?: { data?: { detail?: string }; status?: number } };
+      const detail = e.response?.data?.detail || 'Unknown error';
+      if (e.response?.status === 404) {
+        toast.error('PDF file not found', {
+          description: 'The original PDF is no longer available. Upload the document again to re-analyze.',
+        });
+      } else if (e.response?.status === 429) {
+        toast.warning('Please wait', {
+          description: detail,
+        });
+      } else {
+        toast.error('Re-analysis failed', {
+          description: detail,
+        });
+      }
+      setShowReanalyzeDialog(false);
     } finally {
       setIsReanalyzing(false);
     }
@@ -671,32 +686,25 @@ export const PropertyDetail = () => {
   const pricingMetrics = useMemo(() => {
     if (pricingGuidance <= 0 || !property) return null;
 
-    // Hybrid NOI: T3 annualized income - T12 annualized expenses
-    // This gives most recent revenue trends with full-year expense history
-    const t3Income = property.t3_financials?.gsr
-      ? (property.t3_financials.gsr
-        - Math.abs(property.t3_financials.vacancy ?? 0)
-        - Math.abs(property.t3_financials.concessions ?? 0)
-        - Math.abs(property.t3_financials.loss_to_lease ?? 0)
-        - Math.abs(property.t3_financials.bad_debt ?? 0)
-        - Math.abs(property.t3_financials.non_revenue_units ?? 0)
-        + (property.t3_financials.utility_reimbursements ?? 0)
-        + (property.t3_financials.parking_storage_income ?? 0)
-        + (property.t3_financials.other_income ?? 0))
-      : null;
-    const t12Expenses = property.t12_financials?.total_opex ?? null;
-
-    // Hybrid NOI = T3 EGI - T12 OpEx
-    // Fall back to straight T3 NOI if we can't compute hybrid
+    // Use the pre-calculated T3 NOI directly — this matches what's shown
+    // in the Operating Financials section.
     let goingInNoi: number | null = null;
     let goingInLabel = 'Going-In Cap (T3)';
 
-    if (t3Income != null && t12Expenses != null) {
-      goingInNoi = t3Income - Math.abs(t12Expenses);
+    // Priority 1: Use T3 NOI directly (most reliable)
+    const t3Noi = property.t3_financials?.noi ?? property.t3_noi;
+    if (t3Noi != null) {
+      goingInNoi = t3Noi;
       goingInLabel = 'Going-In Cap (T3)';
-    } else {
-      // Fallback: use T3 NOI directly
-      goingInNoi = property.t3_financials?.noi ?? property.t3_noi ?? null;
+    }
+
+    // Priority 2: If no T3, try T12 NOI
+    if (goingInNoi == null) {
+      const t12Noi = property.t12_financials?.noi ?? property.t12_noi;
+      if (t12Noi != null) {
+        goingInNoi = t12Noi;
+        goingInLabel = 'Going-In Cap (T12)';
+      }
     }
 
     const y1Noi = property.y1_financials?.noi ?? property.y1_noi;
@@ -719,7 +727,7 @@ export const PropertyDetail = () => {
   }, [pricingGuidance, property, totalUnits, totalSF]);
 
   const derivedPrice = useMemo(() => {
-    // Use hybrid NOI (T3 income / T12 expenses) if available, else current period NOI
+    // Use the same NOI as Going-In Cap, else fall back to current period NOI
     const noi = pricingMetrics?.goingInNoi ?? currentFinancials?.noi;
     if (noi == null || capRateSlider === 0) return 0;
     return Math.round(noi / (capRateSlider / 100));
