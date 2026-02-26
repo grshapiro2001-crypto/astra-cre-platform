@@ -15,6 +15,7 @@ class Property(Base):
     id = Column(Integer, primary_key=True, autoincrement=True, index=True)
     user_id = Column(String(36), ForeignKey("users.id"), nullable=False)
     deal_folder_id = Column(Integer, ForeignKey("deal_folders.id"), nullable=True)  # Phase 3A - folder organization
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True, index=True)
     deal_name = Column(String(255), nullable=False)
     uploaded_filename = Column(String(255))
     upload_date = Column(DateTime(timezone=True), server_default=func.now())

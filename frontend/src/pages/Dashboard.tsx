@@ -9,9 +9,13 @@
  */
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus } from 'lucide-react';
+import { Plus, Users, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAuthStore } from '@/store/authSlice';
+import { Button } from '@/components/ui/button';
+import organizationService from '@/services/organizationService';
+import type { Organization } from '@/services/organizationService';
+import { MigrateDealModal } from '@/components/organization/MigrateDealModal';
 import { PageTransition } from '@/components/layout/PageTransition';
 
 const DEAL_STAGES_KEY = 'astra-deal-stages';
@@ -136,6 +140,13 @@ export const Dashboard = () => {
   });
   const [stageMap, setStageMap] = useState<Record<number, string>>({});
 
+  // --- Org State ---
+  const [userOrg, setUserOrg] = useState<Organization | null>(null);
+  const [bannerDismissed, setBannerDismissed] = useState(() =>
+    localStorage.getItem('astra_org_banner_dismissed') === 'true'
+  );
+  const [showMigrationModal, setShowMigrationModal] = useState(false);
+
   // --- UI State ---
   const [mounted, setMounted] = useState(false);
 
@@ -210,6 +221,17 @@ export const Dashboard = () => {
   }, [activePresetId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  // Fetch org status & trigger migration modal
+  useEffect(() => {
+    organizationService.getMyOrg().then((org) => {
+      setUserOrg(org);
+      const migrationSeen = localStorage.getItem('astra_migration_seen');
+      if (!migrationSeen && org.your_role === 'member') {
+        setShowMigrationModal(true);
+      }
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!isLoading) {
@@ -319,6 +341,39 @@ export const Dashboard = () => {
                 <div className="p-4 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm">
                   {error}
                 </div>
+              )}
+
+              {/* Org Onboarding Banner */}
+              {!userOrg && !bannerDismissed && (
+                <div className="mb-1 flex items-center justify-between bg-primary/10 border border-primary/20 rounded-xl px-5 py-4">
+                  <div className="flex items-center gap-3">
+                    <Users className="h-5 w-5 text-primary shrink-0" />
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Set up your team workspace</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Create or join an organization to share deals with your colleagues.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 ml-4">
+                    <Button size="sm" onClick={() => navigate('/organization')}>Set Up Organization</Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        localStorage.setItem('astra_org_banner_dismissed', 'true');
+                        setBannerDismissed(true);
+                      }}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Migration Modal */}
+              {showMigrationModal && userOrg && (
+                <MigrateDealModal org={userOrg} onClose={() => setShowMigrationModal(false)} />
               )}
 
               {/* ============== HEADER ============== */}

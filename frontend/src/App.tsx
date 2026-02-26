@@ -17,6 +17,8 @@ import { Settings } from './pages/Settings';
 import { DataBankPage } from './pages/DataBankPage';
 import { OnboardingWizard } from './components/onboarding/OnboardingWizard';
 import { Landing } from './pages/Landing';
+import { OrganizationSettings } from './pages/OrganizationSettings';
+import { Welcome } from './pages/Welcome';
 
 function App() {
   const checkAuth = useAuthStore((state) => state.checkAuth);
@@ -73,6 +75,7 @@ function App() {
 
           {/* Protected routes */}
           <Route element={<ProtectedRoute />}>
+            <Route path="/welcome" element={<Welcome />} />
             <Route element={<MainLayout />}>
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/library" element={<Library />} />
@@ -82,6 +85,7 @@ function App() {
               <Route path="/data-bank" element={<DataBankPage />} />
               <Route path="/compare" element={<ComparisonPage />} />
               <Route path="/settings" element={<Settings />} />
+              <Route path="/organization" element={<OrganizationSettings />} />
             </Route>
           </Route>
 

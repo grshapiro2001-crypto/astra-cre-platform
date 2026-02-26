@@ -26,7 +26,8 @@ logger = logging.getLogger(__name__)
 def save_property(
     db: Session,
     user_id: str,
-    property_data: PropertyCreate
+    property_data: PropertyCreate,
+    org_id: Optional[int] = None,
 ) -> Property:
     """
     Save analyzed property to database (NO LLM CALLS)
@@ -137,6 +138,7 @@ def save_property(
     property_obj = Property(
         user_id=user_id,
         deal_folder_id=property_data.deal_folder_id,  # Phase 3A
+        organization_id=org_id,
         document_subtype=property_data.document_subtype,  # Phase 3A
         deal_name=property_data.deal_name,
         uploaded_filename=property_data.uploaded_filename,
@@ -297,12 +299,15 @@ def save_property(
 def list_properties(
     db: Session,
     user_id: str,
-    filters: PropertyFilters
+    filters: PropertyFilters,
+    org_id: Optional[int] = None,
 ) -> tuple[List[Property], int]:
     """
     List properties with filters and sorting (NO LLM CALLS)
 
     Returns: (properties, total_count)
+
+    If org_id is provided, returns personal (non-org) properties PLUS all org properties.
     """
     # Validate sort_by (prevent SQL injection)
     ALLOWED_SORT_COLUMNS = ["upload_date", "deal_name", "t3_noi", "y1_noi", "t12_noi"]
@@ -311,8 +316,16 @@ def list_properties(
     # Validate sort_direction
     sort_dir = filters.sort_direction.lower() if filters.sort_direction.lower() in ["asc", "desc"] else "desc"
 
-    # Build query
-    query = db.query(Property).filter(Property.user_id == user_id)
+    # Build query — personal + org properties
+    if org_id:
+        query = db.query(Property).filter(
+            or_(
+                and_(Property.user_id == user_id, Property.organization_id == None),  # noqa: E711
+                Property.organization_id == org_id,
+            )
+        )
+    else:
+        query = db.query(Property).filter(Property.user_id == user_id)
 
     # Apply filters
     if filters.search:
@@ -368,21 +381,35 @@ def get_property(
     db: Session,
     property_id: int,
     user_id: str,
-    update_view_date: bool = True
+    update_view_date: bool = True,
+    org_id: Optional[int] = None,
 ) -> Optional[Property]:
     """
     Get property by ID (NO LLM CALLS)
 
     Optionally updates last_viewed_date.
     Returns None if not found or wrong user.
+    If org_id is provided, also allows access to org-scoped properties.
     """
-    property_obj = db.query(Property).options(
-        joinedload(Property.unit_mix),
-        joinedload(Property.rent_comps),
-    ).filter(
-        Property.id == property_id,
-        Property.user_id == user_id
-    ).first()
+    if org_id:
+        property_obj = db.query(Property).options(
+            joinedload(Property.unit_mix),
+            joinedload(Property.rent_comps),
+        ).filter(
+            Property.id == property_id,
+            or_(
+                Property.user_id == user_id,
+                Property.organization_id == org_id,
+            )
+        ).first()
+    else:
+        property_obj = db.query(Property).options(
+            joinedload(Property.unit_mix),
+            joinedload(Property.rent_comps),
+        ).filter(
+            Property.id == property_id,
+            Property.user_id == user_id
+        ).first()
 
     if property_obj and update_view_date:
         property_obj.last_viewed_date = datetime.now()

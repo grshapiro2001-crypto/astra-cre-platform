@@ -14,6 +14,7 @@ class DealFolder(Base):
     # Core identifiers
     id = Column(Integer, primary_key=True, autoincrement=True, index=True)
     user_id = Column(String(36), ForeignKey("users.id"), nullable=False)  # Fixed: User.id is UUID string
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True, index=True)
     folder_name = Column(String(255), nullable=False)
 
     # Property summary fields (for display optimization)

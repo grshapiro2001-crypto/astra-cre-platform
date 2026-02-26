@@ -12,12 +12,15 @@ import {
   ChevronsLeft,
   ChevronsRight,
   TrendingUp,
+  Users,
 } from 'lucide-react';
 import { useUIStore } from '@/store/uiStore';
 import { useAuthStore } from '@/store/authSlice';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { propertyService } from '@/services/propertyService';
+import organizationService from '@/services/organizationService';
+import type { Organization } from '@/services/organizationService';
 
 const navItems = [
   { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
@@ -25,6 +28,7 @@ const navItems = [
   { name: 'Upload', path: '/upload', icon: Upload },
   { name: 'Data Bank', path: '/data-bank', icon: Database },
   { name: 'Comparisons', path: '/compare', icon: BarChart3 },
+  { name: 'Organization', path: '/organization', icon: Users },
   { name: 'Settings', path: '/settings', icon: Settings },
 ];
 
@@ -32,11 +36,13 @@ export const Sidebar = () => {
   const { theme, toggleTheme, sidebarCollapsed, toggleSidebar } = useUIStore();
   const user = useAuthStore((s) => s.user);
   const [dealCount, setDealCount] = useState<number | null>(null);
+  const [userOrg, setUserOrg] = useState<Organization | null>(null);
 
   useEffect(() => {
     propertyService.listProperties({}).then((res) => {
       setDealCount(res.total);
     }).catch(() => {});
+    organizationService.getMyOrg().then(setUserOrg).catch(() => {});
   }, []);
 
   const initials = user?.full_name
@@ -119,6 +125,16 @@ export const Sidebar = () => {
           );
         })}
       </nav>
+
+      {/* Org Pill */}
+      {userOrg && !sidebarCollapsed && (
+        <div className="px-4 mx-3 mb-2">
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-primary/10 rounded-full">
+            <Users className="h-3 w-3 text-primary shrink-0" />
+            <span className="text-xs text-primary font-medium truncate">{userOrg.name}</span>
+          </div>
+        </div>
+      )}
 
       {/* Pipeline Stats */}
       {!sidebarCollapsed && (

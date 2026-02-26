@@ -16,6 +16,8 @@ from app.schemas.deal_folder import (
     DealFolderResponse,
 )
 from app.api.deps import get_current_user
+from app.api.routes.organizations import _get_user_org_id
+from sqlalchemy import or_
 
 router = APIRouter(prefix="/deal-folders", tags=["Deal Folders"])
 
@@ -93,7 +95,16 @@ def list_deal_folders(
 
     Handles both /deal-folders and /deal-folders/ to prevent trailing slash issues
     """
-    query = db.query(DealFolder).filter(DealFolder.user_id == current_user.id)
+    org_id = _get_user_org_id(db, str(current_user.id))
+    if org_id:
+        query = db.query(DealFolder).filter(
+            or_(
+                DealFolder.user_id == current_user.id,
+                DealFolder.organization_id == org_id,
+            )
+        )
+    else:
+        query = db.query(DealFolder).filter(DealFolder.user_id == current_user.id)
 
     if status_filter:
         query = query.filter(DealFolder.status == status_filter)
