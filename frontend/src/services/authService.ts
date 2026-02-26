@@ -26,6 +26,12 @@ export const authService = {
     return response.data;
   },
 
+  async updateProfile(data: { full_name?: string; email?: string }): Promise<User> {
+    const response = await api.patch<User>('/auth/me', data);
+    localStorage.setItem('user', JSON.stringify(response.data));
+    return response.data;
+  },
+
   getStoredUser(): User | null {
     const userStr = localStorage.getItem('user');
     return userStr ? JSON.parse(userStr) : null;

@@ -9,6 +9,7 @@
  */
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { authService } from '@/services/authService';
 import {
   User,
   Palette,
@@ -116,7 +117,32 @@ const SECTIONS: SectionMeta[] = [
 // ============================================================
 
 const ProfileSection = () => {
-  const user = useAuthStore((s) => s.user);
+  const { user, setUser } = useAuthStore();
+  const [fullName, setFullName] = useState(user?.full_name || '');
+  const [email, setEmail] = useState(user?.email || '');
+  const [isSaving, setIsSaving] = useState(false);
+
+  const isDirty = fullName !== (user?.full_name || '') || email !== (user?.email || '');
+
+  const handleSave = async () => {
+    if (!isDirty || isSaving) return;
+    setIsSaving(true);
+    try {
+      const updated = await authService.updateProfile({
+        full_name: fullName,
+        email,
+      });
+      setUser(updated);
+      toast.success('Profile updated successfully');
+    } catch (err: unknown) {
+      const detail = err != null && typeof err === 'object' && 'response' in err
+        ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
+        : null;
+      toast.error(detail || 'Failed to update profile');
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -125,8 +151,8 @@ const ProfileSection = () => {
           Full Name
         </Label>
         <Input
-          readOnly
-          value={user?.full_name || ''}
+          value={fullName}
+          onChange={(e) => setFullName(e.target.value)}
           placeholder="Not set"
           className="bg-muted/50 border-border"
         />
@@ -136,8 +162,8 @@ const ProfileSection = () => {
           Email
         </Label>
         <Input
-          readOnly
-          value={user?.email || ''}
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
           className="bg-muted/50 border-border"
         />
       </div>
@@ -145,13 +171,10 @@ const ProfileSection = () => {
         variant="outline"
         size="sm"
         className="mt-2"
-        onClick={() => {
-          toast.info('Coming soon', {
-            description: 'Profile editing will be available in a future update.'
-          });
-        }}
+        disabled={!isDirty || isSaving}
+        onClick={handleSave}
       >
-        Save Changes
+        {isSaving ? 'Saving...' : 'Save Changes'}
       </Button>
     </div>
   );

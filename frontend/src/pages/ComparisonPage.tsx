@@ -33,6 +33,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { propertyService, type PropertyDetail, type PropertyListItem } from '@/services/propertyService';
+import { dealFolderService } from '@/services/dealFolderService';
 import { scoringService } from '@/services/scoringService';
 import type { DealScoreResult } from '@/services/scoringService';
 import { DealScoreBadge } from '@/components/scoring/DealScoreBadge';
@@ -1012,6 +1013,10 @@ export const ComparisonPage = () => {
   const [selectedPreset, setSelectedPreset] = useState<string>('value-add');
   const [sensitivityCapRate, setSensitivityCapRate] = useState(5.15);
   const [showSaveModal, setShowSaveModal] = useState(false);
+  const [saveCompName, setSaveCompName] = useState('');
+  const [saveCompTags, setSaveCompTags] = useState('');
+  const [saveCompNotes, setSaveCompNotes] = useState('');
+  const [isSavingComp, setIsSavingComp] = useState(false);
 
   // Real API scores
   const [apiScores, setApiScores] = useState<Record<number, DealScoreResult>>({});
@@ -2376,6 +2381,8 @@ export const ComparisonPage = () => {
                 </label>
                 <input
                   type="text"
+                  value={saveCompName}
+                  onChange={(e) => setSaveCompName(e.target.value)}
                   placeholder="e.g., Q1 Southeast Value-Add Pipeline"
                   className="w-full px-4 py-3 rounded-xl text-sm outline-none transition-all bg-muted border border-border text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary"
                 />
@@ -2387,6 +2394,8 @@ export const ComparisonPage = () => {
                 </label>
                 <input
                   type="text"
+                  value={saveCompTags}
+                  onChange={(e) => setSaveCompTags(e.target.value)}
                   placeholder="e.g., Georgia, Value-Add, 2024"
                   className="w-full px-4 py-3 rounded-xl text-sm outline-none transition-all bg-muted border border-border text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary"
                 />
@@ -2397,6 +2406,8 @@ export const ComparisonPage = () => {
                   Notes
                 </label>
                 <textarea
+                  value={saveCompNotes}
+                  onChange={(e) => setSaveCompNotes(e.target.value)}
                   placeholder="Add notes about this comparison..."
                   rows={3}
                   className="w-full px-4 py-3 rounded-xl text-sm outline-none transition-all resize-none bg-muted border border-border text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary"
@@ -2407,20 +2418,48 @@ export const ComparisonPage = () => {
             <div className="flex gap-3 mt-6">
               <button
                 onClick={() => setShowSaveModal(false)}
-                className="flex-1 py-3 rounded-xl text-sm font-medium bg-muted text-muted-foreground hover:bg-accent transition-colors"
+                disabled={isSavingComp}
+                className="flex-1 py-3 rounded-xl text-sm font-medium bg-muted text-muted-foreground hover:bg-accent transition-colors disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
-                onClick={() => {
-                  toast.info('Coming soon', {
-                    description: 'Comparison saving will be available in a future update.'
-                  });
-                  setShowSaveModal(false);
+                onClick={async () => {
+                  if (!saveCompName.trim()) {
+                    toast.error('Please enter a comparison name');
+                    return;
+                  }
+                  setIsSavingComp(true);
+                  try {
+                    const propertyIds = properties.map((p) => p.id);
+                    const propertyNames = properties.map((p) => p.property_name).join(', ');
+                    const notesContent = [
+                      saveCompTags.trim() ? `Tags: ${saveCompTags.trim()}` : '',
+                      saveCompNotes.trim() ? saveCompNotes.trim() : '',
+                      `Compared properties (IDs: ${propertyIds.join(', ')}): ${propertyNames}`,
+                    ].filter(Boolean).join('\n\n');
+
+                    await dealFolderService.createFolder({
+                      folder_name: saveCompName.trim(),
+                      notes: notesContent,
+                      status: 'active',
+                    });
+
+                    toast.success('Comparison saved to Deal Library');
+                    setSaveCompName('');
+                    setSaveCompTags('');
+                    setSaveCompNotes('');
+                    setShowSaveModal(false);
+                  } catch {
+                    toast.error('Failed to save comparison');
+                  } finally {
+                    setIsSavingComp(false);
+                  }
                 }}
-                className="flex-1 py-3 rounded-xl text-sm font-semibold text-white bg-primary hover:bg-primary/90 shadow-md shadow-primary/30 transition-colors"
+                disabled={isSavingComp || !saveCompName.trim()}
+                className="flex-1 py-3 rounded-xl text-sm font-semibold text-white bg-primary hover:bg-primary/90 shadow-md shadow-primary/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Save Comparison
+                {isSavingComp ? 'Saving...' : 'Save Comparison'}
               </button>
             </div>
           </div>

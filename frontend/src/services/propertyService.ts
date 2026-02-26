@@ -159,6 +159,13 @@ export const propertyService = {
     return response.data;
   },
 
+  /**
+   * Update pipeline stage for a property (NO LLM - just updates database)
+   */
+  async updateStage(propertyId: number, stage: string): Promise<void> {
+    await api.patch(`/properties/${propertyId}/stage?stage=${encodeURIComponent(stage)}`);
+  },
+
   /** Upload a document (PDF or Excel) to a specific property */
   async uploadPropertyDocument(propertyId: number | string, file: File): Promise<any> {
     const formData = new FormData();
