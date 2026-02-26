@@ -9,7 +9,7 @@
  */
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Users, X } from 'lucide-react';
+import { Plus, Users, X, Building2, ArrowRight } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAuthStore } from '@/store/authSlice';
 import { Button } from '@/components/ui/button';
@@ -371,6 +371,27 @@ export const Dashboard = () => {
                 </div>
               )}
 
+              {/* Org Context Bar — shown when user IS in an org */}
+              {userOrg && (
+                <div className="mb-1 flex items-center justify-between bg-primary/5 border border-primary/10 rounded-xl px-5 py-3">
+                  <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                    <Building2 className="h-4 w-4 text-primary/60 shrink-0" />
+                    <span className="font-medium text-foreground">{userOrg.name} workspace</span>
+                    <span className="text-muted-foreground/60">&middot;</span>
+                    <span>{properties.filter(p => p.organization_id != null).length} shared deals</span>
+                    <span className="text-muted-foreground/60">&middot;</span>
+                    <span>{userOrg.member_count} {userOrg.member_count === 1 ? 'member' : 'members'}</span>
+                  </div>
+                  <button
+                    onClick={() => navigate('/organization')}
+                    className="flex items-center gap-1 text-xs font-medium text-primary hover:text-primary/80 transition-colors"
+                  >
+                    Manage
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+
               {/* Migration Modal */}
               {showMigrationModal && userOrg && (
                 <MigrateDealModal org={userOrg} onClose={() => setShowMigrationModal(false)} />
@@ -388,6 +409,18 @@ export const Dashboard = () => {
                       <span className="text-white">{getGreeting()}, </span>
                       <span className="text-primary">{firstName}</span>
                     </h1>
+                    {userOrg && (
+                      <a
+                        href="/organization"
+                        onClick={(e) => { e.preventDefault(); navigate('/organization'); }}
+                        className="flex items-center gap-1.5 mt-1 text-xs text-muted-foreground hover:text-primary transition-colors"
+                      >
+                        <Building2 className="w-3.5 h-3.5" />
+                        <span>{userOrg.name}</span>
+                        <span className="text-muted-foreground/60">&middot;</span>
+                        <span>{userOrg.member_count} {userOrg.member_count === 1 ? 'member' : 'members'}</span>
+                      </a>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-3">
