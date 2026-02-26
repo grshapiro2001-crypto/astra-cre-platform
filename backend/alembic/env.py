@@ -13,6 +13,7 @@ from app.models import (  # noqa: F401 — Import all models so Alembic can see 
     UserScoringWeights,
     DataBankDocument, SalesComp, PipelineProject, SubmarketInventory,
     UserInvestmentCriteria,
+    Organization, OrganizationMember,
 )
 from app.config import settings
 

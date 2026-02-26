@@ -20,6 +20,7 @@ from app.database import get_db
 from app.models.user import User
 from app.models.property import Property, AnalysisLog, PropertyDocument, RentRollUnit, T12Financial
 from app.api.deps import get_current_user
+from app.api.routes.organizations import _get_user_org_id
 from pydantic import BaseModel
 from app.schemas.property import (
     PropertyCreate,
@@ -103,11 +104,13 @@ def save_property_to_library(
         property_data.renovation_cost_per_unit,
     )
 
-    # Save property
+    # Save property (auto-scope to org if user is in one)
+    org_id = _get_user_org_id(db, str(current_user.id))
     property_obj = property_service.save_property(
         db,
         str(current_user.id),
-        property_data
+        property_data,
+        org_id=org_id,
     )
 
     # Re-query with eager loading to ensure unit_mix/rent_comps relationships
@@ -152,10 +155,12 @@ def list_properties(
         sort_direction=sort_direction
     )
 
+    org_id = _get_user_org_id(db, str(current_user.id))
     properties, total = property_service.list_properties(
         db,
         str(current_user.id),
-        filters
+        filters,
+        org_id=org_id,
     )
 
     # Convert to response format
@@ -209,11 +214,13 @@ def get_property_detail(
     - Does NOT call LLM
     - Does NOT re-read PDF
     """
+    org_id = _get_user_org_id(db, str(current_user.id))
     property_obj = property_service.get_property(
         db,
         property_id,
         str(current_user.id),
-        update_view_date=True
+        update_view_date=True,
+        org_id=org_id,
     )
 
     if not property_obj:

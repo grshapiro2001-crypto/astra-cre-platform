@@ -32,7 +32,7 @@ export const RegisterForm = () => {
 
     try {
       await register(email, password, fullName || undefined);
-      navigate('/dashboard');
+      navigate('/welcome');
     } catch (error) {
       // Error is handled by the store
     }
