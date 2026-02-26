@@ -1,48 +1,30 @@
 /**
- * Dashboard Page — Portfolio Command Center
+ * Dashboard Page V2 — Kanban Pipeline + Chat Bar + Full-Height Map
  *
- * Features:
- * - Time-aware greeting (Good Morning / Afternoon / Evening)
- * - Key metrics: Total Volume, Total Units, Active Deals, Avg Price/Unit
- * - Compact screening results badge row
- * - Two-column layout: scrollable Deal Cards + Portfolio Map
- * - Card ↔ Map pin interaction (click sync, scroll-into-view)
- * - AI Summary side panel
- *
- * Data is fetched from /api/v1/properties.
+ * Layout (top to bottom):
+ * 1. Header — Greeting, subtitle, screening badge, +New Deal button
+ * 2. Metrics Row — Total Volume | Total Units | Chat Bar | (Map starts right column)
+ * 3. Kanban Pipeline — Preset selector + draggable stage columns  | (Map continues)
+ * 4. Analytics Row — Donut + Submarket Bars + Score Distribution
  */
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  Sparkles,
-  Plus,
-  DollarSign,
-  Building2,
-  Zap,
-  Calculator,
-  ArrowRight,
-  X,
-  CheckCircle,
-  AlertTriangle,
-  XCircle,
-  LayoutGrid,
-  List,
-} from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/authSlice';
-import { Button } from '@/components/ui/button';
+import { PageTransition } from '@/components/layout/PageTransition';
 import { DashboardSkeleton } from '@/components/ui/PageSkeleton';
 import { SlowLoadBanner } from '@/components/common/SlowLoadBanner';
 import { propertyService } from '@/services/propertyService';
 import { scoringService } from '@/services/scoringService';
 import { criteriaService } from '@/services/criteriaService';
-import { api } from '@/services/api';
 import type { PropertyListItem, ScreeningSummaryItem, BOVPricingTier } from '@/types/property';
 import { DashboardMap } from '@/components/dashboard/DashboardMap';
-import { DealCard } from '@/components/dashboard/DealCard';
 import type { DashboardDeal } from '@/components/dashboard/DealCard';
 import { KanbanBoard } from '@/components/dashboard/KanbanBoard';
+import { ChatBar } from '@/components/dashboard/ChatBar';
+import { PresetDropdown, PIPELINE_PRESETS, STORAGE_KEY } from '@/components/dashboard/PresetDropdown';
+import { AnalyticsRow } from '@/components/dashboard/AnalyticsRow';
 
 // ============================================================
 // TYPES
@@ -56,23 +38,6 @@ interface PropertyWithFinancials extends PropertyListItem {
   status?: string;
 }
 
-interface ChatMessage {
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: Date;
-}
-
-// ============================================================
-// CONSTANTS
-// ============================================================
-
-const AI_QUICK_PROMPTS = [
-  'Which deals pass my screening criteria?',
-  'Compare my top 3 deals by NOI',
-  'What are the risks in my pipeline?',
-  'Summarize my portfolio',
-];
-
 // ============================================================
 // HELPERS
 // ============================================================
@@ -85,19 +50,12 @@ const getGreeting = (): string => {
 };
 
 const formatDollarCompact = (num: number): string => {
+  if (num >= 1_000_000_000) return `$${(num / 1_000_000_000).toFixed(1)}B`;
   if (num >= 1_000_000) return `$${(num / 1_000_000).toFixed(1)}M`;
   if (num >= 1_000) return `$${(num / 1_000).toFixed(0)}K`;
   return `$${num}`;
 };
 
-const formatDollarFull = (num: number): string => {
-  return `$${num.toLocaleString()}`;
-};
-
-/**
- * Determine deal value for a property.
- * Priority: user_guidance_price → BOV premium pricing tier → null (skip).
- */
 const getDealValue = (
   property: PropertyWithFinancials,
   bovPricingMap: Map<number, BOVPricingTier[]>,
@@ -105,10 +63,8 @@ const getDealValue = (
   if (property.user_guidance_price && property.user_guidance_price > 0) {
     return property.user_guidance_price;
   }
-
   const bovTiers = bovPricingMap.get(property.id);
   if (bovTiers && bovTiers.length > 0) {
-    // Use the highest-priced ("premium") tier
     let best: BOVPricingTier | null = null;
     for (const tier of bovTiers) {
       if (tier.pricing && tier.pricing > 0) {
@@ -119,8 +75,39 @@ const getDealValue = (
     }
     if (best?.pricing && best.pricing > 0) return best.pricing;
   }
-
   return null;
+};
+
+const getBestNoi = (p: PropertyWithFinancials): number | null => {
+  return p.t12_noi ?? p.y1_noi ?? p.t3_noi ?? null;
+};
+
+const getCapRate = (noi: number | null, dealValue: number | null): number | null => {
+  if (!noi || !dealValue || dealValue === 0) return null;
+  return (noi / dealValue) * 100;
+};
+
+// ============================================================
+// Sparkline SVG
+// ============================================================
+
+const Sparkline: React.FC<{ values: number[]; color?: string }> = ({ values, color = 'currentColor' }) => {
+  if (values.length < 2) return null;
+  const max = Math.max(...values);
+  const min = Math.min(...values);
+  const range = max - min || 1;
+  const w = 60;
+  const h = 24;
+  const points = values.map((v, i) => {
+    const x = (i / (values.length - 1)) * w;
+    const y = h - ((v - min) / range) * h;
+    return `${x},${y}`;
+  });
+  return (
+    <svg width={w} height={h} className="shrink-0 opacity-40">
+      <polyline points={points.join(' ')} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
 };
 
 // ============================================================
@@ -130,27 +117,30 @@ const getDealValue = (
 export const Dashboard = () => {
   const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
-  const firstName =
-    user?.full_name?.split(' ')[0] || user?.email?.split('@')[0] || 'there';
+  const firstName = user?.full_name?.split(' ')[0] || user?.email?.split('@')[0] || 'there';
 
   // --- Data State ---
   const [properties, setProperties] = useState<PropertyWithFinancials[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [screeningSummary, setScreeningSummary] = useState<ScreeningSummaryItem[]>([]);
-  const [bovPricingMap, setBovPricingMap] = useState<Map<number, BOVPricingTier[]>>(
-    new Map(),
-  );
+  const [bovPricingMap, setBovPricingMap] = useState<Map<number, BOVPricingTier[]>>(new Map());
   const [selectedDealId, setSelectedDealId] = useState<number | null>(null);
   const [scoresMap, setScoresMap] = useState<Record<number, number | null>>({});
 
+  // --- Pipeline State ---
+  const [activePresetId, setActivePresetId] = useState<string>(() => {
+    try { return localStorage.getItem(STORAGE_KEY) || 'acquisitions'; } catch { return 'acquisitions'; }
+  });
+  const [stageMap, setStageMap] = useState<Record<number, string>>({});
+
   // --- UI State ---
   const [mounted, setMounted] = useState(false);
-  const [showAIPanel, setShowAIPanel] = useState(false);
-  const [aiQuery, setAiQuery] = useState('');
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
-  const [isTyping, setIsTyping] = useState(false);
-  const [dashboardView, setDashboardView] = useState<'cards' | 'kanban'>('cards');
+
+  const activePreset = useMemo(
+    () => PIPELINE_PRESETS.find((p) => p.id === activePresetId) ?? PIPELINE_PRESETS[0],
+    [activePresetId],
+  );
 
   // --- Data Fetching ---
   const fetchData = useCallback(async () => {
@@ -161,13 +151,15 @@ export const Dashboard = () => {
       const props = propertiesResult.properties as PropertyWithFinancials[];
       setProperties(props);
 
-      // Non-blocking: screening summary
-      criteriaService
-        .getScreeningSummary()
-        .then(setScreeningSummary)
-        .catch(() => {});
+      const defaultStageId = PIPELINE_PRESETS.find((p) => p.id === activePresetId)?.stages[0]?.id || 'screening';
+      const initialStageMap: Record<number, string> = {};
+      props.forEach((p) => {
+        initialStageMap[p.id] = p.pipeline_stage || defaultStageId;
+      });
+      setStageMap(initialStageMap);
 
-      // Non-blocking: deal scores
+      criteriaService.getScreeningSummary().then(setScreeningSummary).catch(() => {});
+
       if (props.length > 0) {
         scoringService
           .getScores(props.map((p) => p.id))
@@ -181,7 +173,6 @@ export const Dashboard = () => {
           .catch(() => {});
       }
 
-      // Non-blocking: property details for BOV pricing tiers
       if (props.length > 0) {
         Promise.allSettled(
           props.map(async (p) => {
@@ -203,21 +194,15 @@ export const Dashboard = () => {
         });
       }
     } catch (err: unknown) {
-      const message =
-        err instanceof Error
-          ? err.message
-          : 'Failed to load dashboard data. Please try again.';
+      const message = err instanceof Error ? err.message : 'Failed to load dashboard data. Please try again.';
       setError(message);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [activePresetId]);
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
-  // Mount animation trigger
   useEffect(() => {
     if (!isLoading) {
       const timer = setTimeout(() => setMounted(true), 50);
@@ -226,126 +211,81 @@ export const Dashboard = () => {
     setMounted(false);
   }, [isLoading]);
 
-  // --- Transform to DashboardDeal (sorted by deal score desc) ---
+  // --- Transform to DashboardDeal ---
   const deals = useMemo((): DashboardDeal[] => {
     return properties
-      .map((p) => ({
-        id: p.id,
-        name: p.property_name || p.deal_name,
-        address: p.property_address || '',
-        submarket: p.submarket || '',
-        units: p.total_units || 0,
-        dealValue: getDealValue(p, bovPricingMap),
-        dealScore: scoresMap[p.id] ?? null,
-        documentType: p.document_type,
-        propertyType: p.property_type || null,
-        latitude: p.latitude ?? null,
-        longitude: p.longitude ?? null,
-      }))
+      .map((p) => {
+        const dealValue = getDealValue(p, bovPricingMap);
+        const noi = getBestNoi(p);
+        const capRate = getCapRate(noi, dealValue);
+        return {
+          id: p.id,
+          name: p.property_name || p.deal_name,
+          address: p.property_address || '',
+          submarket: p.submarket || '',
+          units: p.total_units || 0,
+          dealValue,
+          dealScore: scoresMap[p.id] ?? null,
+          documentType: p.document_type,
+          propertyType: p.property_type || null,
+          latitude: p.latitude ?? null,
+          longitude: p.longitude ?? null,
+          noi,
+          capRate,
+          stage: stageMap[p.id],
+        };
+      })
       .sort((a, b) => (b.dealScore ?? -1) - (a.dealScore ?? -1));
-  }, [properties, bovPricingMap, scoresMap]);
+  }, [properties, bovPricingMap, scoresMap, stageMap]);
 
   // --- Metrics ---
-  const totalVolume = useMemo(
-    () => deals.reduce((sum, d) => sum + (d.dealValue || 0), 0),
-    [deals],
-  );
-  const totalUnits = useMemo(
-    () => deals.reduce((sum, d) => sum + d.units, 0),
-    [deals],
-  );
-  const activeDeals = deals.length;
-  const avgPricePerUnit =
-    totalVolume > 0 && totalUnits > 0 ? Math.round(totalVolume / totalUnits) : null;
+  const totalVolume = useMemo(() => deals.reduce((sum, d) => sum + (d.dealValue || 0), 0), [deals]);
+  const totalUnits = useMemo(() => deals.reduce((sum, d) => sum + d.units, 0), [deals]);
 
-  // --- Card / Map interaction ---
-  const handleCardClick = useCallback(
-    (dealId: number) => {
-      navigate(`/library/${dealId}`);
-    },
-    [navigate],
-  );
+  const screeningCounts = useMemo(() => {
+    if (screeningSummary.length > 0) {
+      return {
+        pass: screeningSummary.filter((s) => s.verdict === 'PASS').length,
+        review: screeningSummary.filter((s) => s.verdict === 'REVIEW').length,
+        fail: screeningSummary.filter((s) => s.verdict === 'FAIL').length,
+      };
+    }
+    const scored = deals.filter((d) => d.dealScore != null);
+    return {
+      pass: scored.filter((d) => (d.dealScore ?? 0) >= 80).length,
+      review: scored.filter((d) => (d.dealScore ?? 0) >= 60 && (d.dealScore ?? 0) < 80).length,
+      fail: scored.filter((d) => (d.dealScore ?? 0) < 60).length,
+    };
+  }, [screeningSummary, deals]);
 
-  const handlePinClick = useCallback((dealId: number) => {
+  const volumeSparkline = useMemo(() => {
+    const vals = deals.slice(0, 8).map((d) => d.dealValue ?? 0);
+    return vals.length >= 2 ? vals : [0, 1];
+  }, [deals]);
+
+  const unitSparkline = useMemo(() => {
+    const vals = deals.slice(0, 8).map((d) => d.units);
+    return vals.length >= 2 ? vals : [0, 1];
+  }, [deals]);
+
+  // --- Interactions ---
+  const handleCardClick = useCallback((dealId: number) => {
     setSelectedDealId(dealId);
   }, []);
 
-  // Scroll selected card into view when selectedDealId changes (e.g. from map pin click)
-  useEffect(() => {
-    if (selectedDealId != null) {
-      const el = document.getElementById(`deal-card-${selectedDealId}`);
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }
-    }
-  }, [selectedDealId]);
-
-  // --- Chat ---
-  const sendChatMessage = useCallback(async (message: string) => {
-    if (!message.trim()) return;
-
-    const userMessage: ChatMessage = {
-      role: 'user',
-      content: message.trim(),
-      timestamp: new Date(),
-    };
-    setChatMessages((prev) => [...prev, userMessage].slice(-10));
-    setAiQuery('');
-    setIsTyping(true);
-
-    try {
-      const response = await api.post('/chat', { message: message.trim() });
-      const assistantMessage: ChatMessage = {
-        role: 'assistant',
-        content: response.data.response,
-        timestamp: new Date(),
-      };
-      setChatMessages((prev) => [...prev, assistantMessage].slice(-10));
-    } catch (err: unknown) {
-      const detail =
-        err != null &&
-        typeof err === 'object' &&
-        'response' in err &&
-        (err as { response?: { data?: { detail?: string } } }).response?.data?.detail;
-      const errorMessage: ChatMessage = {
-        role: 'assistant',
-        content:
-          detail ||
-          'Sorry, I encountered an error. Please make sure the ANTHROPIC_API_KEY is configured in your backend .env file.',
-        timestamp: new Date(),
-      };
-      setChatMessages((prev) => [...prev, errorMessage].slice(-10));
-    } finally {
-      setIsTyping(false);
-    }
+  const handlePinClick = useCallback((dealId: number) => {
+    setSelectedDealId(dealId);
+    const el = document.getElementById(`deal-card-${dealId}`);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }, []);
 
-  // --- Kanban handlers ---
-  const handleStageChange = useCallback(async (propertyId: number, newStage: string) => {
-    const prev = properties.find((p) => p.id === propertyId);
-    const oldStage = prev?.pipeline_stage || 'screening';
+  const handleStageChange = useCallback((dealId: number, newStageId: string) => {
+    setStageMap((prev) => ({ ...prev, [dealId]: newStageId }));
+  }, []);
 
-    // Optimistic update
-    setProperties((props) =>
-      props.map((p) => (p.id === propertyId ? { ...p, pipeline_stage: newStage } : p)),
-    );
-
-    try {
-      await propertyService.updateStage(propertyId, newStage);
-    } catch {
-      // Revert on failure
-      setProperties((props) =>
-        props.map((p) => (p.id === propertyId ? { ...p, pipeline_stage: oldStage } : p)),
-      );
-      throw new Error('Failed to update stage');
-    }
-  }, [properties]);
-
-  const handleNotesUpdate = useCallback(async (propertyId: number, notes: string) => {
-    await propertyService.updateNotes(propertyId, notes);
-    setProperties((props) =>
-      props.map((p) => (p.id === propertyId ? { ...p, pipeline_notes: notes } : p)),
-    );
+  const handlePresetChange = useCallback((presetId: string) => {
+    setActivePresetId(presetId);
+    try { localStorage.setItem(STORAGE_KEY, presetId); } catch { /* noop */ }
   }, []);
 
   // ============================================================
@@ -353,473 +293,155 @@ export const Dashboard = () => {
   // ============================================================
 
   return (
-    <AnimatePresence mode="wait">
-      {isLoading ? (
-        <motion.div
-          key="skeleton"
-          initial={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.15 }}
-        >
-          <DashboardSkeleton />
-          <SlowLoadBanner />
-        </motion.div>
-      ) : (
-        <motion.div
-          key="content"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.2 }}
-        >
-          <div className="space-y-6">
-            {/* ============== ERROR BANNER ============== */}
-            {error && (
-              <div className="p-4 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm">
-                {error}
-              </div>
-            )}
-
-            {/* ============== PAGE HEADER ============== */}
-            <div
-              className={cn(
-                'flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 transition-all duration-500',
-                mounted
-                  ? 'opacity-100 translate-y-0'
-                  : 'opacity-0 translate-y-2',
+    <PageTransition>
+      <AnimatePresence mode="wait">
+        {isLoading ? (
+          <motion.div key="skeleton" initial={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
+            <DashboardSkeleton />
+            <SlowLoadBanner />
+          </motion.div>
+        ) : (
+          <motion.div key="content" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }}>
+            <div className="space-y-5">
+              {error && (
+                <div className="p-4 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+                  {error}
+                </div>
               )}
-            >
-              <div>
-                <h1 className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
-                  {getGreeting()}, {firstName}
-                </h1>
-                <p className="text-sm mt-1 text-muted-foreground">
-                  Your deal pipeline at a glance
-                </p>
-              </div>
 
-              <div
-                className={cn(
-                  'flex items-center gap-3 transition-all duration-500',
-                  mounted
-                    ? 'opacity-100 translate-x-0'
-                    : 'opacity-0 translate-x-5',
-                )}
+              {/* ============== HEADER ============== */}
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: 0 }}
               >
-                <Button
-                  onClick={() => setShowAIPanel(true)}
-                  className="bg-gradient-to-br from-primary to-primary/70 text-white shadow-lg shadow-primary/25 hover:shadow-primary/40 hover:brightness-110"
-                >
-                  <Sparkles className="w-4 h-4" />
-                  AI Summary
-                </Button>
-
-                <Button
-                  variant="outline"
-                  className="border-border text-muted-foreground hover:text-foreground"
-                  onClick={() => navigate('/upload')}
-                >
-                  <Plus className="w-4 h-4" />
-                  New Deal
-                </Button>
-              </div>
-            </div>
-
-            {/* ============== KEY METRICS — 4 cards ============== */}
-            <section
-              className={cn(
-                'transition-all duration-500 delay-200',
-                mounted
-                  ? 'opacity-100 translate-y-0'
-                  : 'opacity-0 translate-y-5',
-              )}
-            >
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                {/* Total Volume */}
-                <div
-                  className={cn(
-                    'border border-border rounded-2xl bg-card p-4 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:shadow-primary/5',
-                    mounted
-                      ? 'opacity-100 translate-y-0'
-                      : 'opacity-0 translate-y-4',
-                  )}
-                  style={{ transitionDelay: '200ms' }}
-                >
-                  <div className="flex items-center gap-2 mb-2">
-                    <DollarSign className="w-4 h-4 text-primary" />
-                    <span className="text-2xs uppercase tracking-wider font-semibold text-muted-foreground">
-                      Total Volume
-                    </span>
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                  <div>
+                    <h1 className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+                      {getGreeting()}, {firstName}
+                    </h1>
+                    <p className="font-mono text-sm mt-1 text-muted-foreground">
+                      {deals.length} deals in pipeline &middot; {totalVolume > 0 ? formatDollarCompact(totalVolume) : '$0'} total volume
+                    </p>
                   </div>
-                  <p className="font-mono text-2xl font-bold text-foreground">
-                    {totalVolume > 0 ? formatDollarCompact(totalVolume) : '\u2014'}
-                  </p>
-                </div>
 
-                {/* Total Units */}
-                <div
-                  className={cn(
-                    'border border-border rounded-2xl bg-card p-4 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:shadow-primary/5',
-                    mounted
-                      ? 'opacity-100 translate-y-0'
-                      : 'opacity-0 translate-y-4',
-                  )}
-                  style={{ transitionDelay: '260ms' }}
-                >
-                  <div className="flex items-center gap-2 mb-2">
-                    <Building2 className="w-4 h-4 text-primary" />
-                    <span className="text-2xs uppercase tracking-wider font-semibold text-muted-foreground">
-                      Total Units
-                    </span>
-                  </div>
-                  <p className="font-mono text-2xl font-bold text-foreground">
-                    {totalUnits.toLocaleString()}
-                  </p>
-                </div>
-
-                {/* Active Deals */}
-                <div
-                  className={cn(
-                    'border border-border rounded-2xl bg-card p-4 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:shadow-primary/5',
-                    mounted
-                      ? 'opacity-100 translate-y-0'
-                      : 'opacity-0 translate-y-4',
-                  )}
-                  style={{ transitionDelay: '320ms' }}
-                >
-                  <div className="flex items-center gap-2 mb-2">
-                    <Zap className="w-4 h-4 text-primary" />
-                    <span className="text-2xs uppercase tracking-wider font-semibold text-muted-foreground">
-                      Active Deals
-                    </span>
-                  </div>
-                  <p className="font-mono text-2xl font-bold text-foreground">
-                    {activeDeals}
-                  </p>
-                </div>
-
-                {/* Avg Price / Unit */}
-                <div
-                  className={cn(
-                    'border border-border rounded-2xl bg-card p-4 transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:shadow-primary/5',
-                    mounted
-                      ? 'opacity-100 translate-y-0'
-                      : 'opacity-0 translate-y-4',
-                  )}
-                  style={{ transitionDelay: '380ms' }}
-                >
-                  <div className="flex items-center gap-2 mb-2">
-                    <Calculator className="w-4 h-4 text-primary" />
-                    <span className="text-2xs uppercase tracking-wider font-semibold text-muted-foreground">
-                      Avg Price / Unit
-                    </span>
-                  </div>
-                  <p className="font-mono text-2xl font-bold text-foreground">
-                    {avgPricePerUnit != null
-                      ? formatDollarFull(avgPricePerUnit)
-                      : '\u2014'}
-                  </p>
-                </div>
-              </div>
-            </section>
-
-            {/* ============== SCREENING BADGE ROW ============== */}
-            {screeningSummary.length > 0 && (
-              <div
-                className={cn(
-                  'flex items-center gap-4 text-sm transition-all duration-500 delay-200',
-                  mounted
-                    ? 'opacity-100 translate-y-0'
-                    : 'opacity-0 translate-y-2',
-                )}
-              >
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  Screening:
-                </span>
-                <div className="flex items-center gap-1.5">
-                  <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
-                  <span className="font-mono text-xs font-semibold text-foreground">
-                    {screeningSummary.filter((s) => s.verdict === 'PASS').length}
-                  </span>
-                  <span className="text-xs text-muted-foreground">Pass</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
-                  <span className="font-mono text-xs font-semibold text-foreground">
-                    {screeningSummary.filter((s) => s.verdict === 'REVIEW').length}
-                  </span>
-                  <span className="text-xs text-muted-foreground">Review</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <XCircle className="w-3.5 h-3.5 text-rose-500" />
-                  <span className="font-mono text-xs font-semibold text-foreground">
-                    {screeningSummary.filter((s) => s.verdict === 'FAIL').length}
-                  </span>
-                  <span className="text-xs text-muted-foreground">Fail</span>
-                </div>
-              </div>
-            )}
-
-            {/* ============== VIEW TOGGLE ============== */}
-            <div className="flex items-center gap-2">
-              <div className="flex items-center rounded-xl p-1 bg-muted">
-                <button
-                  onClick={() => setDashboardView('cards')}
-                  className={cn(
-                    'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
-                    dashboardView === 'cards'
-                      ? 'bg-accent text-primary'
-                      : 'text-muted-foreground hover:text-foreground',
-                  )}
-                >
-                  <List className="w-4 h-4" />
-                  Cards
-                </button>
-                <button
-                  onClick={() => setDashboardView('kanban')}
-                  className={cn(
-                    'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
-                    dashboardView === 'kanban'
-                      ? 'bg-accent text-primary'
-                      : 'text-muted-foreground hover:text-foreground',
-                  )}
-                >
-                  <LayoutGrid className="w-4 h-4" />
-                  Pipeline
-                </button>
-              </div>
-            </div>
-
-            {/* ============== KANBAN VIEW ============== */}
-            {dashboardView === 'kanban' && (
-              <section
-                className={cn(
-                  'transition-all duration-500 delay-300',
-                  mounted
-                    ? 'opacity-100 translate-y-0'
-                    : 'opacity-0 translate-y-5',
-                )}
-              >
-                <KanbanBoard
-                  properties={properties}
-                  onStageChange={handleStageChange}
-                  onNotesUpdate={handleNotesUpdate}
-                  mounted={mounted}
-                />
-              </section>
-            )}
-
-            {/* ============== MAIN CONTENT — Deal Cards + Map ============== */}
-            {dashboardView === 'cards' && (
-            <section
-              className={cn(
-                'transition-all duration-500 delay-300',
-                mounted
-                  ? 'opacity-100 translate-y-0'
-                  : 'opacity-0 translate-y-5',
-              )}
-            >
-              <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-                {/* Left Column — Deal Cards (2/5 ≈ 40%) */}
-                <div className="lg:col-span-2">
-                  <h2 className="font-display text-lg font-bold text-foreground mb-4">
-                    Deal Cards
-                  </h2>
-                  <div
-                    className="space-y-3 overflow-y-auto pr-1"
-                    style={{ maxHeight: '450px' }}
-                  >
-                    {deals.length > 0 ? (
-                      deals.map((deal) => (
-                        <DealCard
-                          key={deal.id}
-                          deal={deal}
-                          isSelected={selectedDealId === deal.id}
-                          onClick={() => handleCardClick(deal.id)}
-                        />
-                      ))
-                    ) : (
-                      <div className="border border-dashed border-border rounded-2xl p-8 text-center">
-                        <p className="text-sm text-muted-foreground">
-                          No deals in your pipeline yet
-                        </p>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="mt-3"
-                          onClick={() => navigate('/upload')}
-                        >
-                          <Plus className="w-3.5 h-3.5 mr-1" />
-                          Upload Deal
-                        </Button>
+                  <div className="flex items-center gap-3">
+                    {(screeningCounts.pass + screeningCounts.review + screeningCounts.fail) > 0 && (
+                      <div className="hidden sm:flex items-center gap-1 px-3 py-1.5 rounded-lg bg-card border border-border/60 text-xs">
+                        <span className="text-muted-foreground font-medium mr-1">Screening:</span>
+                        <span className="px-1.5 py-0.5 rounded bg-green-500/10 text-green-400 font-mono font-bold">{screeningCounts.pass} Pass</span>
+                        <span className="px-1.5 py-0.5 rounded bg-yellow-500/10 text-yellow-400 font-mono font-bold">{screeningCounts.review} Review</span>
+                        <span className="px-1.5 py-0.5 rounded bg-red-500/10 text-red-400 font-mono font-bold">{screeningCounts.fail} Fail</span>
                       </div>
                     )}
+
+                    <button
+                      onClick={() => navigate('/upload')}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold bg-primary text-primary-foreground shadow-sm hover:brightness-110 transition-all"
+                    >
+                      <Plus className="w-4 h-4" />
+                      New Deal
+                    </button>
                   </div>
                 </div>
+              </motion.div>
 
-                {/* Right Column — Portfolio Map (3/5 = 60%) */}
-                <div className="lg:col-span-3">
-                  <h2 className="font-display text-lg font-bold text-foreground mb-4">
-                    Portfolio Map
-                  </h2>
+              {/* ============== MAIN GRID: Left + Right Map ============== */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+                {/* Left Column — 7/12 */}
+                <div className="lg:col-span-7 space-y-5">
+                  {/* Metrics + Chat Bar */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.4, delay: 0.1 }}
+                  >
+                    <div className="flex gap-3 items-start">
+                      <div className="flex-shrink-0 w-[195px] border border-border/60 rounded-2xl bg-card/50 p-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-mono text-2xs uppercase tracking-wider text-muted-foreground font-semibold">
+                            Total Volume
+                          </span>
+                          <Sparkline values={volumeSparkline} color="hsl(var(--primary))" />
+                        </div>
+                        <p className="font-display text-xl font-bold text-foreground">
+                          {totalVolume > 0 ? formatDollarCompact(totalVolume) : '\u2014'}
+                        </p>
+                      </div>
+
+                      <div className="flex-shrink-0 w-[195px] border border-border/60 rounded-2xl bg-card/50 p-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-mono text-2xs uppercase tracking-wider text-muted-foreground font-semibold">
+                            Total Units
+                          </span>
+                          <Sparkline values={unitSparkline} color="#60A5FA" />
+                        </div>
+                        <p className="font-display text-xl font-bold text-blue-400">
+                          {totalUnits.toLocaleString()}
+                        </p>
+                        <p className="font-mono text-2xs text-muted-foreground mt-0.5">
+                          {deals.length} properties
+                        </p>
+                      </div>
+
+                      <ChatBar deals={deals} />
+                    </div>
+                  </motion.div>
+
+                  {/* Pipeline by Stage */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.4, delay: 0.2 }}
+                  >
+                    <div className="flex items-center gap-3 mb-3">
+                      <h2 className="font-display text-lg font-bold text-foreground">Pipeline by Stage</h2>
+                      <PresetDropdown
+                        presets={PIPELINE_PRESETS}
+                        activePresetId={activePresetId}
+                        onPresetChange={handlePresetChange}
+                      />
+                    </div>
+                    <KanbanBoard
+                      deals={deals}
+                      stages={activePreset.stages}
+                      stageMap={stageMap}
+                      onStageChange={handleStageChange}
+                      onCardClick={handleCardClick}
+                      selectedDealId={selectedDealId}
+                      mounted={mounted}
+                    />
+                  </motion.div>
+                </div>
+
+                {/* Right Column — Map (5/12, full height) */}
+                <motion.div
+                  className="lg:col-span-5 self-stretch"
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4, delay: 0.15 }}
+                  style={{ minHeight: '500px' }}
+                >
                   <DashboardMap
                     deals={deals}
                     selectedDealId={selectedDealId}
                     onPinClick={handlePinClick}
                   />
-                </div>
-              </div>
-            </section>
-            )}
-          </div>
-
-          {/* ============== AI SUMMARY PANEL ============== */}
-          <div
-            className={cn(
-              'fixed inset-0 z-50 transition-opacity duration-300',
-              showAIPanel
-                ? 'opacity-100 pointer-events-auto'
-                : 'opacity-0 pointer-events-none',
-            )}
-          >
-            {/* Backdrop */}
-            <div
-              className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-              onClick={() => setShowAIPanel(false)}
-            />
-
-            {/* Panel */}
-            <div
-              className={cn(
-                'absolute right-0 top-0 h-full w-full max-w-lg bg-card border-l border-border overflow-y-auto transition-transform duration-300 ease-out',
-                showAIPanel ? 'translate-x-0' : 'translate-x-full',
-              )}
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Header */}
-              <div className="sticky top-0 px-6 py-4 flex items-center justify-between bg-card border-b border-border z-10">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-gradient-to-br from-primary to-primary/70">
-                    <Sparkles className="w-5 h-5 text-white" />
-                  </div>
-                  <div>
-                    <h3 className="font-display font-bold text-foreground">
-                      AI Pipeline Analyst
-                    </h3>
-                    <p className="text-xs text-muted-foreground">All Deals</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setShowAIPanel(false)}
-                  className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
+                </motion.div>
               </div>
 
-              {/* Content */}
-              <div className="p-6">
-                {/* Quick Prompts */}
-                {chatMessages.length === 0 && (
-                  <div className="mb-6">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
-                      Quick Prompts
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {AI_QUICK_PROMPTS.map((prompt) => (
-                        <button
-                          key={prompt}
-                          onClick={() => sendChatMessage(prompt)}
-                          disabled={isTyping}
-                          className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all bg-muted text-muted-foreground border border-border hover:border-primary hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {prompt}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Chat Messages */}
-                {chatMessages.length > 0 && (
-                  <div className="mb-6 space-y-4 max-h-[400px] overflow-y-auto">
-                    {chatMessages.map((msg, idx) => (
-                      <div
-                        key={idx}
-                        className={cn(
-                          'flex',
-                          msg.role === 'user' ? 'justify-end' : 'justify-start',
-                        )}
-                      >
-                        <div
-                          className={cn(
-                            'max-w-[85%] px-4 py-3 rounded-2xl',
-                            msg.role === 'user'
-                              ? 'bg-primary text-primary-foreground rounded-br-sm'
-                              : 'bg-card border border-border rounded-bl-sm',
-                          )}
-                        >
-                          <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                            {msg.content}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-
-                    {/* Typing Indicator */}
-                    {isTyping && (
-                      <div className="flex justify-start">
-                        <div className="bg-card border border-border px-4 py-3 rounded-2xl rounded-bl-sm">
-                          <div className="flex gap-1.5">
-                            <div
-                              className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce"
-                              style={{ animationDelay: '0ms' }}
-                            />
-                            <div
-                              className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce"
-                              style={{ animationDelay: '150ms' }}
-                            />
-                            <div
-                              className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce"
-                              style={{ animationDelay: '300ms' }}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Input */}
-                <div className="mb-6">
-                  <div className="relative">
-                    <input
-                      type="text"
-                      placeholder="Ask about your portfolio..."
-                      value={aiQuery}
-                      onChange={(e) => setAiQuery(e.target.value)}
-                      onKeyDown={(e) =>
-                        e.key === 'Enter' &&
-                        aiQuery &&
-                        !isTyping &&
-                        sendChatMessage(aiQuery)
-                      }
-                      disabled={isTyping}
-                      className="w-full px-4 py-3 pr-12 rounded-xl text-sm outline-none bg-muted border border-border text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary transition-all disabled:opacity-50"
-                    />
-                    <button
-                      onClick={() => aiQuery && sendChatMessage(aiQuery)}
-                      disabled={isTyping || !aiQuery}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg bg-primary text-primary-foreground hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <ArrowRight className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              </div>
+              {/* ============== ANALYTICS ROW ============== */}
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: 0.3 }}
+              >
+                <AnalyticsRow deals={deals} stages={activePreset.stages} stageMap={stageMap} />
+              </motion.div>
             </div>
-          </div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </PageTransition>
   );
 };

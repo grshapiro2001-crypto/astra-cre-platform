@@ -1,16 +1,14 @@
 /**
- * KanbanBoard - Drag-and-drop pipeline board for property management
+ * KanbanBoard — Drag-and-drop pipeline board for the redesigned dashboard
  *
  * Features:
- * - 6 pipeline stages with drag-and-drop
- * - Property cards with key metrics
- * - Quick notes editing
- * - Optimistic UI updates
- * - Toast notifications on stage changes
+ * - Configurable stages via presets
+ * - Deal cards with score ring, price, doc type badge
+ * - Drag between columns (client-side state)
+ * - Click card → sets selectedDealId (syncs with map)
+ * - Empty column placeholder
  */
 import { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { toast } from 'sonner';
 import {
   DndContext,
   DragEndEvent,
@@ -24,291 +22,221 @@ import {
 import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { cn } from '@/lib/utils';
-import { MessageSquare, Award, Shield } from 'lucide-react';
-import type { PropertyListItem } from '@/types/property';
+import type { DashboardDeal } from '@/components/dashboard/DealCard';
+import type { PipelineStage } from '@/components/dashboard/PresetDropdown';
 
 // ============================================================
-// TYPES
+// Types
 // ============================================================
-
-interface PipelineStage {
-  id: string;
-  label: string;
-  color: string;
-}
 
 interface KanbanBoardProps {
-  properties: PropertyListItem[];
-  onStageChange: (propertyId: number, newStage: string) => Promise<void>;
-  onNotesUpdate: (propertyId: number, notes: string) => Promise<void>;
+  deals: DashboardDeal[];
+  stages: PipelineStage[];
+  stageMap: Record<number, string>;
+  onStageChange: (dealId: number, newStageId: string) => void;
+  onCardClick: (dealId: number) => void;
+  selectedDealId: number | null;
   mounted: boolean;
 }
 
 // ============================================================
-// CONSTANTS
+// Helpers
 // ============================================================
 
-const PIPELINE_STAGES: PipelineStage[] = [
-  { id: 'screening', label: 'Screening', color: '#A78BFA' },  // purple
-  { id: 'under_review', label: 'Under Review', color: '#60A5FA' },  // blue
-  { id: 'loi', label: 'LOI', color: '#FBBF24' },  // yellow
-  { id: 'under_contract', label: 'Under Contract', color: '#F97316' },  // orange
-  { id: 'closed', label: 'Closed', color: '#10B981' },  // green
-  { id: 'passed', label: 'Passed', color: '#94A3B8' },  // gray
-];
-
-// ============================================================
-// HELPERS
-// ============================================================
-
-const formatPrice = (num: number | null | undefined): string => {
-  if (!num) return '—';
+const formatDollarCompact = (num: number): string => {
   if (num >= 1_000_000) return `$${(num / 1_000_000).toFixed(1)}M`;
   if (num >= 1_000) return `$${(num / 1_000).toFixed(0)}K`;
   return `$${num}`;
 };
 
+const SCORE_COLORS = {
+  high: '#10B981',
+  medium: '#F59E0B',
+  low: '#EF4444',
+} as const;
+
 // ============================================================
-// DRAGGABLE CARD COMPONENT
+// Score Ring
+// ============================================================
+
+const ScoreRing: React.FC<{ score: number; size?: number }> = ({ score, size = 30 }) => {
+  const radius = (size - 4) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const pct = Math.min(100, Math.max(0, score)) / 100;
+  const offset = circumference * (1 - pct);
+  const color = score >= 80 ? SCORE_COLORS.high : score >= 60 ? SCORE_COLORS.medium : SCORE_COLORS.low;
+
+  return (
+    <svg width={size} height={size} className="shrink-0">
+      <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="currentColor" strokeWidth={2} className="text-border" />
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        fill="none"
+        stroke={color}
+        strokeWidth={2.5}
+        strokeDasharray={circumference}
+        strokeDashoffset={offset}
+        strokeLinecap="round"
+        transform={`rotate(-90 ${size / 2} ${size / 2})`}
+      />
+      <text x={size / 2} y={size / 2} textAnchor="middle" dominantBaseline="central" fill={color} fontSize={size * 0.32} fontWeight="bold" fontFamily="JetBrains Mono, monospace">
+        {Math.round(score)}
+      </text>
+    </svg>
+  );
+};
+
+// ============================================================
+// Draggable Deal Card
 // ============================================================
 
 interface DraggableCardProps {
-  property: PropertyListItem;
-  onNotesUpdate: (propertyId: number, notes: string) => Promise<void>;
-  onClick: (id: number) => void;
+  deal: DashboardDeal;
+  isSelected: boolean;
+  onClick: () => void;
 }
 
-const DraggableCard = ({ property, onNotesUpdate, onClick }: DraggableCardProps) => {
-  const [showNotesInput, setShowNotesInput] = useState(false);
-  const [notesValue, setNotesValue] = useState(property.pipeline_notes || '');
-  const [isSavingNotes, setIsSavingNotes] = useState(false);
-
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: property.id });
+const DraggableCard: React.FC<DraggableCardProps> = ({ deal, isSelected, onClick }) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: deal.id,
+  });
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
   };
 
-  const handleSaveNotes = async () => {
-    if (notesValue === (property.pipeline_notes || '')) {
-      setShowNotesInput(false);
-      return;
-    }
-
-    setIsSavingNotes(true);
-    try {
-      await onNotesUpdate(property.id, notesValue);
-      setShowNotesInput(false);
-      toast.success('Notes updated');
-    } catch (error) {
-      toast.error('Failed to update notes');
-      console.error('Failed to update notes:', error);
-    } finally {
-      setIsSavingNotes(false);
-    }
-  };
-
-  const dealScore = property.screening_score || 0;
-  const verdict = property.screening_verdict;
-
   return (
     <div ref={setNodeRef} style={style} {...attributes}>
       <div
+        {...listeners}
+        onClick={(e) => {
+          e.stopPropagation();
+          onClick();
+        }}
         className={cn(
-          'rounded-xl p-3 border border-border bg-muted transition-all duration-200 hover:scale-[1.02] hover:shadow-md',
+          'rounded-xl p-3 border bg-muted/50 cursor-grab active:cursor-grabbing transition-all duration-200 hover:shadow-md',
           isDragging && 'opacity-50 scale-105 shadow-lg',
+          isSelected ? 'border-primary ring-1 ring-primary/30' : 'border-border/60',
         )}
       >
-        {/* Draggable handle and card content */}
-        <div
-          {...listeners}
-          className="cursor-grab active:cursor-grabbing"
-          onClick={(e) => {
-            // Only navigate if not clicking on the notes icon
-            if (!(e.target as HTMLElement).closest('.notes-icon')) {
-              onClick(property.id);
-            }
-          }}
-        >
-          <div className="flex items-start justify-between mb-2">
-            <div className="min-w-0 flex-1">
-              <p className="font-semibold text-sm text-foreground truncate">
-                {property.deal_name}
-              </p>
-              <p className="text-xs text-muted-foreground truncate">
-                {property.submarket || property.property_address || '—'}
-              </p>
-            </div>
-            {property.document_type && (
-              <span className="text-[10px] font-mono font-bold px-2 py-1 rounded-lg bg-primary/10 text-primary shrink-0 ml-2">
-                {property.document_type}
-              </span>
-            )}
+        {/* Row 1: Name + submarket/units */}
+        <div className="flex items-start justify-between gap-2 mb-1.5">
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold text-sm text-foreground truncate">{deal.name || 'Untitled'}</p>
+            <p className="font-mono text-2xs text-muted-foreground truncate">
+              {deal.submarket || '\u2014'} &middot; {deal.units > 0 ? `${deal.units} units` : '\u2014'}
+            </p>
           </div>
-
-          <div className="flex items-center justify-between text-xs mb-2">
-            <span className="text-muted-foreground">
-              {property.total_units && property.total_units > 0 ? `${property.total_units} units` : '—'}
-            </span>
-            <span className={cn(
-              "font-mono font-semibold",
-              (property.t12_noi || property.y1_noi) ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"
-            )}>
-              {property.t12_noi ? formatPrice(property.t12_noi) : property.y1_noi ? formatPrice(property.y1_noi) : 'No Pricing'}
-            </span>
-          </div>
-
-          {/* Deal score and verdict badges */}
-          <div className="flex items-center gap-2 mb-2">
-            {dealScore > 0 && (
-              <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-primary/10">
-                <Award className="w-3 h-3 text-primary" />
-                <span className="text-xs font-mono font-bold text-primary">{dealScore}</span>
-              </div>
-            )}
-            {verdict && (
-              <div className={cn(
-                "flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold",
-                verdict === 'PASS' && "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-                verdict === 'REVIEW' && "bg-amber-500/10 text-amber-600 dark:text-amber-400",
-                verdict === 'FAIL' && "bg-rose-500/10 text-rose-600 dark:text-rose-400"
-              )}>
-                <Shield className="w-3 h-3" />
-                <span>{verdict}</span>
-              </div>
-            )}
-          </div>
+          {deal.dealScore != null && <ScoreRing score={deal.dealScore} size={30} />}
         </div>
 
-        {/* Notes section */}
-        <div className="border-t border-border pt-2 mt-2">
-          {!showNotesInput ? (
-            <div className="flex items-center justify-between">
-              {property.pipeline_notes ? (
-                <p className="text-xs text-muted-foreground truncate flex-1">
-                  {property.pipeline_notes.length > 50
-                    ? `${property.pipeline_notes.slice(0, 50)}...`
-                    : property.pipeline_notes}
-                </p>
-              ) : (
-                <p className="text-xs text-muted-foreground/60 italic">No notes</p>
+        {/* Row 2: Price + doc type */}
+        <div className="flex items-center justify-between">
+          <span className="font-mono text-xs font-bold text-foreground">
+            {deal.dealValue ? formatDollarCompact(deal.dealValue) : '\u2014'}
+          </span>
+          {deal.documentType && (
+            <span
+              className={cn(
+                'text-2xs font-mono font-bold px-1.5 py-0.5 rounded',
+                deal.documentType === 'OM' ? 'bg-primary/10 text-primary' : 'bg-blue-500/10 text-blue-400',
               )}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowNotesInput(true);
-                }}
-                className="notes-icon ml-2 p-1 rounded hover:bg-muted-foreground/10 transition-colors"
-              >
-                <MessageSquare className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground" />
-              </button>
-            </div>
-          ) : (
-            <div onClick={(e) => e.stopPropagation()}>
-              <input
-                type="text"
-                value={notesValue}
-                onChange={(e) => setNotesValue(e.target.value)}
-                onBlur={handleSaveNotes}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    handleSaveNotes();
-                  } else if (e.key === 'Escape') {
-                    setNotesValue(property.pipeline_notes || '');
-                    setShowNotesInput(false);
-                  }
-                }}
-                disabled={isSavingNotes}
-                placeholder="Add notes..."
-                autoFocus
-                className="w-full px-2 py-1 text-xs rounded border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-              />
-            </div>
+            >
+              {deal.documentType}
+            </span>
           )}
         </div>
+
+        {/* Row 3: NOI + Cap Rate (if available) */}
+        {(deal.noi != null || deal.capRate != null) && (
+          <div className="flex items-center gap-2 mt-1.5 font-mono text-2xs text-muted-foreground/70">
+            {deal.noi != null && <span>NOI: {formatDollarCompact(deal.noi)}</span>}
+            {deal.capRate != null && <span>Cap: {deal.capRate.toFixed(2)}%</span>}
+          </div>
+        )}
       </div>
     </div>
   );
 };
 
 // ============================================================
-// MAIN KANBAN BOARD COMPONENT
+// Static card for drag overlay
 // ============================================================
 
-export const KanbanBoard = ({ properties, onStageChange, onNotesUpdate, mounted }: KanbanBoardProps) => {
-  const navigate = useNavigate();
+const StaticCard: React.FC<{ deal: DashboardDeal }> = ({ deal }) => (
+  <div className="rounded-xl p-3 border border-primary bg-muted shadow-lg scale-105 w-[180px]">
+    <p className="font-semibold text-sm text-foreground truncate">{deal.name || 'Untitled'}</p>
+    <p className="font-mono text-2xs text-muted-foreground truncate">
+      {deal.submarket || '\u2014'} &middot; {deal.units > 0 ? `${deal.units} units` : ''}
+    </p>
+    <span className="font-mono text-xs font-bold text-foreground mt-1 block">
+      {deal.dealValue ? formatDollarCompact(deal.dealValue) : '\u2014'}
+    </span>
+  </div>
+);
+
+// ============================================================
+// Main KanbanBoard
+// ============================================================
+
+export const KanbanBoard: React.FC<KanbanBoardProps> = ({
+  deals,
+  stages,
+  stageMap,
+  onStageChange,
+  onCardClick,
+  selectedDealId,
+  mounted,
+}) => {
   const [activeId, setActiveId] = useState<number | null>(null);
 
   const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8, // 8px movement required before drag starts
-      },
-    })
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
   );
 
-  // Group properties by stage
-  const propertiesByStage = useMemo(() => {
-    const grouped: Record<string, PropertyListItem[]> = {};
-    PIPELINE_STAGES.forEach(stage => {
-      grouped[stage.id] = properties.filter(p => (p.pipeline_stage || 'screening') === stage.id);
+  // Group deals by stage
+  const dealsByStage = useMemo(() => {
+    const grouped: Record<string, DashboardDeal[]> = {};
+    stages.forEach((s) => {
+      grouped[s.id] = [];
+    });
+    deals.forEach((d) => {
+      const stageId = stageMap[d.id] || stages[0]?.id || 'screening';
+      if (grouped[stageId]) {
+        grouped[stageId].push(d);
+      } else if (stages.length > 0) {
+        grouped[stages[0].id].push(d);
+      }
     });
     return grouped;
-  }, [properties]);
+  }, [deals, stages, stageMap]);
 
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(event.active.id as number);
   };
 
-  const handleDragEnd = async (event: DragEndEvent) => {
+  const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
-
     if (!over) {
       setActiveId(null);
       return;
     }
 
-    const propertyId = active.id as number;
-    const newStageId = over.id as string;
+    const dealId = active.id as number;
+    const targetStageId = over.id as string;
+    const currentStageId = stageMap[dealId] || stages[0]?.id || 'screening';
 
-    // Find the property that was dragged
-    const property = properties.find(p => p.id === propertyId);
-    if (!property) {
-      setActiveId(null);
-      return;
-    }
-
-    const currentStage = property.pipeline_stage || 'screening';
-
-    if (newStageId !== currentStage) {
-      const newStage = PIPELINE_STAGES.find(s => s.id === newStageId);
-      if (newStage) {
-        try {
-          await onStageChange(propertyId, newStageId);
-          toast.success(`${property.deal_name} moved to ${newStage.label}`);
-        } catch (error) {
-          toast.error('Failed to update stage');
-          console.error('Failed to update stage:', error);
-        }
-      }
+    if (targetStageId !== currentStageId && stages.some((s) => s.id === targetStageId)) {
+      onStageChange(dealId, targetStageId);
     }
 
     setActiveId(null);
   };
 
-  const handleCardClick = (id: number) => {
-    navigate(`/library/${id}`);
-  };
-
-  const activeProperty = activeId ? properties.find(p => p.id === activeId) : null;
+  const activeDeal = activeId != null ? deals.find((d) => d.id === activeId) : null;
 
   return (
     <DndContext
@@ -317,63 +245,53 @@ export const KanbanBoard = ({ properties, onStageChange, onNotesUpdate, mounted 
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div className="flex gap-4 overflow-x-auto pb-4" style={{ minHeight: 400 }}>
-        {PIPELINE_STAGES.map((stage, stageIndex) => {
-          const stageProperties = propertiesByStage[stage.id] || [];
-          const stageNOI = stageProperties.reduce((sum, p) => sum + (p.t12_noi || p.y1_noi || 0), 0);
+      <div className="flex gap-3 overflow-x-auto pb-3" style={{ minHeight: 320 }}>
+        {stages.map((stage, idx) => {
+          const stageDeals = dealsByStage[stage.id] || [];
+          const stageVolume = stageDeals.reduce((s, d) => s + (d.dealValue ?? 0), 0);
 
           return (
             <SortableContext
               key={stage.id}
               id={stage.id}
-              items={stageProperties.map(p => p.id)}
+              items={stageDeals.map((d) => d.id)}
               strategy={verticalListSortingStrategy}
             >
               <div
                 className={cn(
-                  'flex-shrink-0 w-72 border border-border rounded-2xl bg-card overflow-hidden transition-all duration-500',
+                  'flex-shrink-0 rounded-2xl bg-card/50 border border-border/60 overflow-hidden transition-all duration-500',
                   mounted ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-5',
                 )}
-                style={{ transitionDelay: `${300 + stageIndex * 100}ms` }}
+                style={{ flex: '0 0 195px', transitionDelay: `${200 + idx * 80}ms` }}
               >
-                {/* Stage Header */}
-                <div
-                  className="px-4 py-3 flex items-center justify-between border-b-2"
-                  style={{ borderBottomColor: stage.color }}
-                >
-                  <div className="flex items-center gap-2">
-                    <div
-                      className="w-3 h-3 rounded-full"
-                      style={{ backgroundColor: stage.color }}
-                    />
-                    <span className="font-semibold text-sm text-foreground">
-                      {stage.label}
-                    </span>
-                    <span className="text-xs px-1.5 py-0.5 rounded-full font-mono bg-muted text-muted-foreground">
-                      {stageProperties.length}
+                {/* Column Header */}
+                <div className="px-3 py-2.5 border-b-2" style={{ borderBottomColor: stage.color }}>
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: stage.color }} />
+                    <span className="text-xs font-semibold text-foreground truncate">{stage.label}</span>
+                    <span className="text-2xs px-1.5 py-0.5 rounded-full font-mono bg-muted text-muted-foreground ml-auto">
+                      {stageDeals.length}
                     </span>
                   </div>
-                  <span className="text-xs font-mono text-muted-foreground">
-                    {formatPrice(stageNOI)}
-                  </span>
+                  <p className="font-mono text-2xs text-muted-foreground/60">
+                    {stageVolume > 0 ? formatDollarCompact(stageVolume) : '\u2014'}
+                  </p>
                 </div>
 
-                {/* Stage Cards */}
-                <div className="p-3 space-y-3 min-h-[300px]">
-                  {stageProperties.length > 0 ? (
-                    stageProperties.map((property) => (
+                {/* Cards */}
+                <div className="p-2 space-y-2 max-h-[420px] overflow-y-auto">
+                  {stageDeals.length > 0 ? (
+                    stageDeals.map((deal) => (
                       <DraggableCard
-                        key={property.id}
-                        property={property}
-                        onNotesUpdate={onNotesUpdate}
-                        onClick={handleCardClick}
+                        key={deal.id}
+                        deal={deal}
+                        isSelected={selectedDealId === deal.id}
+                        onClick={() => onCardClick(deal.id)}
                       />
                     ))
                   ) : (
-                    <div className="h-32 rounded-xl border-2 border-dashed border-border flex items-center justify-center">
-                      <span className="text-xs text-muted-foreground">
-                        Drag deals here
-                      </span>
+                    <div className="h-24 rounded-xl border-2 border-dashed border-border/40 flex items-center justify-center">
+                      <span className="text-2xs text-muted-foreground/50">Drop deals here</span>
                     </div>
                   )}
                 </div>
@@ -383,38 +301,8 @@ export const KanbanBoard = ({ properties, onStageChange, onNotesUpdate, mounted 
         })}
       </div>
 
-      {/* Drag Overlay */}
       <DragOverlay>
-        {activeProperty ? (
-          <div className="rounded-xl p-3 border border-border bg-muted shadow-lg scale-105">
-            <div className="flex items-start justify-between mb-2">
-              <div className="min-w-0 flex-1">
-                <p className="font-semibold text-sm text-foreground truncate">
-                  {activeProperty.deal_name}
-                </p>
-                <p className="text-xs text-muted-foreground truncate">
-                  {activeProperty.submarket || activeProperty.property_address || '—'}
-                </p>
-              </div>
-              {activeProperty.document_type && (
-                <span className="text-[10px] font-mono font-bold px-2 py-1 rounded-lg bg-primary/10 text-primary shrink-0 ml-2">
-                  {activeProperty.document_type}
-                </span>
-              )}
-            </div>
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-muted-foreground">
-                {activeProperty.total_units && activeProperty.total_units > 0 ? `${activeProperty.total_units} units` : '—'}
-              </span>
-              <span className={cn(
-                "font-mono font-semibold",
-                (activeProperty.t12_noi || activeProperty.y1_noi) ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"
-              )}>
-                {activeProperty.t12_noi ? formatPrice(activeProperty.t12_noi) : activeProperty.y1_noi ? formatPrice(activeProperty.y1_noi) : 'No Pricing'}
-              </span>
-            </div>
-          </div>
-        ) : null}
+        {activeDeal ? <StaticCard deal={activeDeal} /> : null}
       </DragOverlay>
     </DndContext>
   );
