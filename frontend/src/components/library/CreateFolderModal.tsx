@@ -30,8 +30,6 @@ export const CreateFolderModal = ({ isOpen, onClose, onSuccess }: CreateFolderMo
   const isValid = folderName.trim().length > 0 && folderName.length <= 255;
 
   const handleCreate = async () => {
-    console.log('🔵 Creating folder:', { folderName, propertyType });
-
     if (!isValid) {
       setError('Folder name is required (max 255 characters)');
       return;
@@ -41,12 +39,10 @@ export const CreateFolderModal = ({ isOpen, onClose, onSuccess }: CreateFolderMo
     setError(null);
 
     try {
-      const newFolder = await dealFolderService.createFolder({
+      await dealFolderService.createFolder({
         folder_name: folderName.trim(),
         property_type: propertyType || undefined,
       });
-
-      console.log('✅ Folder created successfully:', newFolder);
 
       // Reset form
       setFolderName('');
@@ -56,7 +52,6 @@ export const CreateFolderModal = ({ isOpen, onClose, onSuccess }: CreateFolderMo
       onSuccess();
       onClose();
     } catch (err: any) {
-      console.error('❌ Create folder failed:', err);
       const errorMessage = err.response?.data?.detail || 'Failed to create folder';
       setError(errorMessage);
     } finally {

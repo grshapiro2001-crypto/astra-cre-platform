@@ -25,6 +25,8 @@ import {
   CheckCircle,
   AlertTriangle,
   XCircle,
+  LayoutGrid,
+  List,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -40,6 +42,7 @@ import type { PropertyListItem, ScreeningSummaryItem, BOVPricingTier } from '@/t
 import { DashboardMap } from '@/components/dashboard/DashboardMap';
 import { DealCard } from '@/components/dashboard/DealCard';
 import type { DashboardDeal } from '@/components/dashboard/DealCard';
+import { KanbanBoard } from '@/components/dashboard/KanbanBoard';
 
 // ============================================================
 // TYPES
@@ -147,6 +150,7 @@ export const Dashboard = () => {
   const [aiQuery, setAiQuery] = useState('');
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [isTyping, setIsTyping] = useState(false);
+  const [dashboardView, setDashboardView] = useState<'cards' | 'kanban'>('cards');
 
   // --- Data Fetching ---
   const fetchData = useCallback(async () => {
@@ -314,6 +318,34 @@ export const Dashboard = () => {
     } finally {
       setIsTyping(false);
     }
+  }, []);
+
+  // --- Kanban handlers ---
+  const handleStageChange = useCallback(async (propertyId: number, newStage: string) => {
+    const prev = properties.find((p) => p.id === propertyId);
+    const oldStage = prev?.pipeline_stage || 'screening';
+
+    // Optimistic update
+    setProperties((props) =>
+      props.map((p) => (p.id === propertyId ? { ...p, pipeline_stage: newStage } : p)),
+    );
+
+    try {
+      await propertyService.updateStage(propertyId, newStage);
+    } catch {
+      // Revert on failure
+      setProperties((props) =>
+        props.map((p) => (p.id === propertyId ? { ...p, pipeline_stage: oldStage } : p)),
+      );
+      throw new Error('Failed to update stage');
+    }
+  }, [properties]);
+
+  const handleNotesUpdate = useCallback(async (propertyId: number, notes: string) => {
+    await propertyService.updateNotes(propertyId, notes);
+    setProperties((props) =>
+      props.map((p) => (p.id === propertyId ? { ...p, pipeline_notes: notes } : p)),
+    );
   }, []);
 
   // ============================================================
@@ -527,7 +559,57 @@ export const Dashboard = () => {
               </div>
             )}
 
+            {/* ============== VIEW TOGGLE ============== */}
+            <div className="flex items-center gap-2">
+              <div className="flex items-center rounded-xl p-1 bg-muted">
+                <button
+                  onClick={() => setDashboardView('cards')}
+                  className={cn(
+                    'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
+                    dashboardView === 'cards'
+                      ? 'bg-accent text-primary'
+                      : 'text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  <List className="w-4 h-4" />
+                  Cards
+                </button>
+                <button
+                  onClick={() => setDashboardView('kanban')}
+                  className={cn(
+                    'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
+                    dashboardView === 'kanban'
+                      ? 'bg-accent text-primary'
+                      : 'text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  <LayoutGrid className="w-4 h-4" />
+                  Pipeline
+                </button>
+              </div>
+            </div>
+
+            {/* ============== KANBAN VIEW ============== */}
+            {dashboardView === 'kanban' && (
+              <section
+                className={cn(
+                  'transition-all duration-500 delay-300',
+                  mounted
+                    ? 'opacity-100 translate-y-0'
+                    : 'opacity-0 translate-y-5',
+                )}
+              >
+                <KanbanBoard
+                  properties={properties}
+                  onStageChange={handleStageChange}
+                  onNotesUpdate={handleNotesUpdate}
+                  mounted={mounted}
+                />
+              </section>
+            )}
+
             {/* ============== MAIN CONTENT — Deal Cards + Map ============== */}
+            {dashboardView === 'cards' && (
             <section
               className={cn(
                 'transition-all duration-500 delay-300',
@@ -587,6 +669,7 @@ export const Dashboard = () => {
                 </div>
               </div>
             </section>
+            )}
           </div>
 
           {/* ============== AI SUMMARY PANEL ============== */}

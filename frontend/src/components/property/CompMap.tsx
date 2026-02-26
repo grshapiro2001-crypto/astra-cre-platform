@@ -113,7 +113,7 @@ export const CompMap: React.FC<CompMapProps> = ({
 
   const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: apiKey || '',
-    version: '3.55',
+    version: 'weekly',
     libraries: LIBRARIES,
   });
 

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Response
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.user import User
-from app.schemas.user import UserCreate, UserLogin, UserResponse, Token
+from app.schemas.user import UserCreate, UserLogin, UserResponse, UserUpdate, Token
 from app.services.auth_service import verify_password, get_password_hash, create_access_token
 from app.api.deps import get_current_user
 from app.config import settings
@@ -75,6 +75,30 @@ def login(response: Response, user_credentials: UserLogin, db: Session = Depends
 @router.get("/me", response_model=UserResponse)
 def get_me(current_user: User = Depends(get_current_user)):
     """Get current user information."""
+    return current_user
+
+
+@router.patch("/me", response_model=UserResponse)
+def update_me(
+    update_data: UserUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Update current user's profile (full_name and/or email)."""
+    if update_data.email is not None and update_data.email != current_user.email:
+        existing = db.query(User).filter(User.email == update_data.email).first()
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email already in use"
+            )
+        current_user.email = update_data.email
+
+    if update_data.full_name is not None:
+        current_user.full_name = update_data.full_name
+
+    db.commit()
+    db.refresh(current_user)
     return current_user
 
 

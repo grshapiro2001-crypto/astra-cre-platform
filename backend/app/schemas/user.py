@@ -26,6 +26,11 @@ class UserResponse(BaseModel):
         from_attributes = True
 
 
+class UserUpdate(BaseModel):
+    full_name: Optional[str] = None
+    email: Optional[EmailStr] = None
+
+
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"

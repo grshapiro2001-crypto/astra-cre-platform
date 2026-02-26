@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { propertyService } from '@/services/propertyService';
+import { api } from '@/services/api';
 import { scoringService } from '@/services/scoringService';
 import { fmtPercent, fmtCapRate, normalizePercent } from '@/utils/formatUtils';
 import type { DealScoreResult } from '@/services/scoringService';
@@ -313,6 +314,9 @@ export const PropertyDetail = () => {
   const [showAIPanel, setShowAIPanel] = useState(false);
   const [newNote, setNewNote] = useState('');
   const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [followUpQuestion, setFollowUpQuestion] = useState('');
+  const [followUpLoading, setFollowUpLoading] = useState(false);
+  const [followUpResponses, setFollowUpResponses] = useState<Array<{ question: string; answer: string }>>([]);
   const [propertyPhotoUrl, setPropertyPhotoUrl] = useState<string | null>(null);
   const [photoLoadFailed, setPhotoLoadFailed] = useState(false);
 
@@ -342,6 +346,7 @@ export const PropertyDetail = () => {
   // --- Google Maps API ---
   const { isLoaded: mapsLoaded } = useLoadScript({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '',
+    version: 'weekly',
     libraries: ['places'],
   });
 
@@ -522,12 +527,26 @@ export const PropertyDetail = () => {
   const availablePeriods = useMemo((): FinancialPeriodKey[] => {
     if (!property) return [];
     const out: FinancialPeriodKey[] = [];
-    // Check both nested financials objects AND flat NOI fields
-    if (property.t3_financials || property.t3_noi != null) out.push('t3');
+    // Preferred order: T12 > T3 > Y1
     if (property.t12_financials || property.t12_noi != null) out.push('t12');
+    if (property.t3_financials || property.t3_noi != null) out.push('t3');
     if (property.y1_financials || property.y1_noi != null) out.push('y1');
     return out;
   }, [property]);
+
+  // Track if we're showing a fallback period (T12 was requested but unavailable)
+  const isFallbackPeriod = useMemo(() => {
+    if (!property || availablePeriods.length === 0) return false;
+    // If T12 is not available but other periods are, and the current period isn't T12
+    const t12Available = availablePeriods.includes('t12');
+    return !t12Available && availablePeriods.length > 0;
+  }, [property, availablePeriods]);
+
+  const fallbackPeriodLabel = useMemo(() => {
+    if (!isFallbackPeriod) return '';
+    const labels: Record<string, string> = { t3: 'T3', t12: 'T12', y1: 'Y1 Pro Forma' };
+    return labels[financialPeriod] || financialPeriod.toUpperCase();
+  }, [isFallbackPeriod, financialPeriod]);
 
   // Switch to first available period when the current one has no data
   useEffect(() => {
@@ -1707,6 +1726,12 @@ export const PropertyDetail = () => {
               </div>
             </div>
 
+            {isFallbackPeriod && (
+              <div className="mb-3 px-4 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 text-sm">
+                T12 data unavailable — showing {fallbackPeriodLabel} instead
+              </div>
+            )}
+
             <div className="border border-border rounded-2xl bg-card p-6">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Revenue column */}
@@ -1827,7 +1852,7 @@ export const PropertyDetail = () => {
                         </p>
                       </div>
                       <div className="text-right">
-                        <p className="font-mono text-3xl font-bold text-emerald-600 dark:text-emerald-400">
+                        <p className="font-mono text-3xl font-bold text-primary">
                           {financialView === 'perUnit'
                             ? fmtPerUnit(currentFinancials.noi, totalUnits)
                             : fmtCurrency(currentFinancials.noi)}
@@ -2812,20 +2837,74 @@ export const PropertyDetail = () => {
                 <div className="relative">
                   <input
                     type="text"
+                    value={followUpQuestion}
+                    onChange={(e) => setFollowUpQuestion(e.target.value)}
+                    onKeyDown={async (e) => {
+                      if (e.key === 'Enter' && followUpQuestion.trim() && !followUpLoading && property) {
+                        e.preventDefault();
+                        const question = followUpQuestion.trim();
+                        setFollowUpLoading(true);
+                        try {
+                          const response = await api.post('/chat', {
+                            message: `Regarding the property "${property.deal_name}" at ${property.property_address || 'unknown address'}: ${question}`,
+                          });
+                          setFollowUpResponses((prev) => [...prev, { question, answer: response.data.response }]);
+                          setFollowUpQuestion('');
+                        } catch (err: unknown) {
+                          const detail = err != null && typeof err === 'object' && 'response' in err
+                            ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
+                            : null;
+                          toast.error(detail || 'Failed to get AI response');
+                        } finally {
+                          setFollowUpLoading(false);
+                        }
+                      }
+                    }}
+                    disabled={followUpLoading}
                     placeholder="E.g., What's the rent growth assumption in the Y1 proforma?"
-                    className="w-full px-4 py-3 pr-12 rounded-xl text-sm bg-muted border border-border text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-ring"
+                    className="w-full px-4 py-3 pr-12 rounded-xl text-sm bg-muted border border-border text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
                   />
                   <button
-                    onClick={() => {
-                      toast.info('Coming soon', {
-                        description: 'AI follow-up questions will be available in a future update.'
-                      });
+                    onClick={async () => {
+                      if (!followUpQuestion.trim() || followUpLoading || !property) return;
+                      const question = followUpQuestion.trim();
+                      setFollowUpLoading(true);
+                      try {
+                        const response = await api.post('/chat', {
+                          message: `Regarding the property "${property.deal_name}" at ${property.property_address || 'unknown address'}: ${question}`,
+                        });
+                        setFollowUpResponses((prev) => [...prev, { question, answer: response.data.response }]);
+                        setFollowUpQuestion('');
+                      } catch (err: unknown) {
+                        const detail = err != null && typeof err === 'object' && 'response' in err
+                          ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
+                          : null;
+                        toast.error(detail || 'Failed to get AI response');
+                      } finally {
+                        setFollowUpLoading(false);
+                      }
                     }}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                    disabled={followUpLoading || !followUpQuestion.trim()}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <ArrowRight className="w-4 h-4" />
+                    {followUpLoading ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <ArrowRight className="w-4 h-4" />
+                    )}
                   </button>
                 </div>
+                {/* Follow-up responses */}
+                {followUpResponses.length > 0 && (
+                  <div className="mt-4 space-y-3">
+                    {followUpResponses.map((item, idx) => (
+                      <div key={idx} className="p-3 rounded-xl bg-muted/50 border border-border/40">
+                        <p className="text-xs font-semibold text-primary mb-1">Q: {item.question}</p>
+                        <p className="text-sm text-foreground whitespace-pre-wrap">{item.answer}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>

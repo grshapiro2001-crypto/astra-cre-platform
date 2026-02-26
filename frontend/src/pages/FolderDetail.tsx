@@ -53,7 +53,6 @@ export const FolderDetail = () => {
 
   // Handle folder deletion success
   const handleFolderDeleted = () => {
-    console.log('✅ Folder deleted, navigating to library');
     navigate('/library');
   };
 

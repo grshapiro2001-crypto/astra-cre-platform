@@ -120,7 +120,7 @@ export const DashboardMap: React.FC<DashboardMapProps> = ({
 
   const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: apiKey || '',
-    version: '3.55',
+    version: 'weekly',
     libraries: LIBRARIES,
   });
 
