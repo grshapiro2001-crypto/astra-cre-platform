@@ -12,12 +12,14 @@ import { useState, useMemo } from 'react';
 import {
   DndContext,
   DragEndEvent,
+  DragOverEvent,
   DragOverlay,
   DragStartEvent,
   useSensor,
   useSensors,
   PointerSensor,
   closestCorners,
+  useDroppable,
 } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -179,6 +181,19 @@ const StaticCard: React.FC<{ deal: DashboardDeal }> = ({ deal }) => (
 );
 
 // ============================================================
+// Droppable column body — makes empty columns accept drops
+// ============================================================
+
+const DropZone: React.FC<{ stageId: string; children: React.ReactNode }> = ({ stageId, children }) => {
+  const { setNodeRef } = useDroppable({ id: stageId });
+  return (
+    <div ref={setNodeRef} className="p-2 space-y-2 max-h-[420px] overflow-y-auto">
+      {children}
+    </div>
+  );
+};
+
+// ============================================================
 // Main KanbanBoard
 // ============================================================
 
@@ -192,6 +207,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   mounted,
 }) => {
   const [activeId, setActiveId] = useState<number | null>(null);
+  const [overStageId, setOverStageId] = useState<string | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -218,7 +234,20 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     setActiveId(event.active.id as number);
   };
 
+  // Resolve the stage ID from an over target (may be a stage id string or a card id number)
+  const resolveStageId = (overId: string | number): string | undefined => {
+    if (stages.some((s) => s.id === overId)) return overId as string;
+    return stageMap[overId as number];
+  };
+
+  const handleDragOver = (event: DragOverEvent) => {
+    const { over } = event;
+    const stageId = over ? (resolveStageId(over.id) ?? null) : null;
+    setOverStageId((prev) => (prev === stageId ? prev : stageId));
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
+    setOverStageId(null);
     const { active, over } = event;
     if (!over) {
       setActiveId(null);
@@ -226,10 +255,10 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     }
 
     const dealId = active.id as number;
-    const targetStageId = over.id as string;
+    const targetStageId = resolveStageId(over.id);
     const currentStageId = stageMap[dealId] || stages[0]?.id || 'screening';
 
-    if (targetStageId !== currentStageId && stages.some((s) => s.id === targetStageId)) {
+    if (targetStageId && targetStageId !== currentStageId && stages.some((s) => s.id === targetStageId)) {
       onStageChange(dealId, targetStageId);
     }
 
@@ -243,6 +272,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
       sensors={sensors}
       collisionDetection={closestCorners}
       onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
     >
       <div className="flex gap-3 overflow-x-auto pb-3" style={{ minHeight: 320 }}>
@@ -259,7 +289,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
             >
               <div
                 className={cn(
-                  'flex-shrink-0 rounded-2xl bg-card/50 border border-border/60 overflow-hidden transition-all duration-500',
+                  'flex-shrink-0 rounded-2xl bg-card/50 border overflow-hidden transition-all duration-500',
+                  overStageId === stage.id ? 'border-primary/50' : 'border-border/60',
                   mounted ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-5',
                 )}
                 style={{ flex: '0 0 195px', transitionDelay: `${200 + idx * 80}ms` }}
@@ -278,8 +309,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                   </p>
                 </div>
 
-                {/* Cards */}
-                <div className="p-2 space-y-2 max-h-[420px] overflow-y-auto">
+                {/* Cards — DropZone makes the column accept drops even when empty */}
+                <DropZone stageId={stage.id}>
                   {stageDeals.length > 0 ? (
                     stageDeals.map((deal) => (
                       <DraggableCard
@@ -290,11 +321,16 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                       />
                     ))
                   ) : (
-                    <div className="h-24 rounded-xl border-2 border-dashed border-border/40 flex items-center justify-center">
+                    <div
+                      className={cn(
+                        'h-24 rounded-xl border-2 border-dashed flex items-center justify-center transition-colors duration-150',
+                        overStageId === stage.id ? 'border-primary/40 bg-primary/5' : 'border-border/40',
+                      )}
+                    >
                       <span className="text-2xs text-muted-foreground/50">Drop deals here</span>
                     </div>
                   )}
-                </div>
+                </DropZone>
               </div>
             </SortableContext>
           );

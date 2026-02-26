@@ -13,6 +13,8 @@ import { Plus } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAuthStore } from '@/store/authSlice';
 import { PageTransition } from '@/components/layout/PageTransition';
+
+const DEAL_STAGES_KEY = 'astra-deal-stages';
 import { DashboardSkeleton } from '@/components/ui/PageSkeleton';
 import { SlowLoadBanner } from '@/components/common/SlowLoadBanner';
 import { propertyService } from '@/services/propertyService';
@@ -152,9 +154,15 @@ export const Dashboard = () => {
       setProperties(props);
 
       const defaultStageId = PIPELINE_PRESETS.find((p) => p.id === activePresetId)?.stages[0]?.id || 'screening';
+      const savedStages: Record<number, string> = (() => {
+        try {
+          const raw = localStorage.getItem(DEAL_STAGES_KEY);
+          return raw ? JSON.parse(raw) : {};
+        } catch { return {}; }
+      })();
       const initialStageMap: Record<number, string> = {};
       props.forEach((p) => {
-        initialStageMap[p.id] = p.pipeline_stage || defaultStageId;
+        initialStageMap[p.id] = savedStages[p.id] || p.pipeline_stage || defaultStageId;
       });
       setStageMap(initialStageMap);
 
@@ -280,7 +288,11 @@ export const Dashboard = () => {
   }, []);
 
   const handleStageChange = useCallback((dealId: number, newStageId: string) => {
-    setStageMap((prev) => ({ ...prev, [dealId]: newStageId }));
+    setStageMap((prev) => {
+      const next = { ...prev, [dealId]: newStageId };
+      try { localStorage.setItem(DEAL_STAGES_KEY, JSON.stringify(next)); } catch { /* noop */ }
+      return next;
+    });
   }, []);
 
   const handlePresetChange = useCallback((presetId: string) => {
@@ -317,12 +329,10 @@ export const Dashboard = () => {
               >
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                   <div>
-                    <h1 className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
-                      {getGreeting()}, {firstName}
+                    <h1 className="font-display text-2xl sm:text-3xl font-bold tracking-tight">
+                      <span className="text-white">{getGreeting()}, </span>
+                      <span className="text-primary">{firstName}</span>
                     </h1>
-                    <p className="font-mono text-sm mt-1 text-muted-foreground">
-                      {deals.length} deals in pipeline &middot; {totalVolume > 0 ? formatDollarCompact(totalVolume) : '$0'} total volume
-                    </p>
                   </div>
 
                   <div className="flex items-center gap-3">
