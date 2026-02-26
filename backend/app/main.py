@@ -26,6 +26,7 @@ def run_migrations():
             ("non_revenue_units", "FLOAT"),
             ("latitude", "FLOAT"),
             ("longitude", "FLOAT"),
+            ("organization_id", "INTEGER"),
         ]
         for col_name, col_type in new_columns:
             if col_name not in existing_cols:
@@ -94,6 +95,16 @@ def run_migrations():
                             logger.warning(f"Migration unit_mix skip {col_name}: {e}")
         except Exception as e:
             logger.warning(f"Migration unit_mix error: {e}")
+
+        # Add organization_id to deal_folders if missing
+        try:
+            df_cols = {c['name'] for c in inspector.get_columns('deal_folders')}
+            if 'organization_id' not in df_cols:
+                conn.execute(text("ALTER TABLE deal_folders ADD COLUMN organization_id INTEGER"))
+                conn.commit()
+                logger.warning("Migration: added column deal_folders.organization_id")
+        except Exception as e:
+            logger.warning(f"Migration deal_folders org_id skip: {e}")
 
 try:
     run_migrations()
