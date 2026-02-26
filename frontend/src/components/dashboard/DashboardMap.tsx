@@ -354,9 +354,6 @@ export const DashboardMap: React.FC<DashboardMapProps> = ({
             mapTypeControl: false,
             streetViewControl: false,
             fullscreenControl: true,
-            renderingType: typeof google !== 'undefined' && google.maps?.RenderingType
-              ? google.maps.RenderingType.RASTER
-              : undefined,
           }}
           onLoad={onLoad}
           onUnmount={onUnmount}
