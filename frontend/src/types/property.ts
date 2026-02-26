@@ -311,6 +311,8 @@ export interface PropertyListItem {
   t12_noi?: number | null;
   y1_noi?: number | null;
   t3_noi?: number | null;
+  organization_id?: number | null;
+  uploaded_by_name?: string | null;
 }
 
 /** Investment criteria for deal screening */

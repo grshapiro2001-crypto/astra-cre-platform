@@ -52,6 +52,7 @@ interface PropertyWithFinancials extends PropertyListItem {
 type DealStatus = 'all' | 'active' | 'new' | 'review' | 'passed' | 'closed';
 type ViewMode = 'grid' | 'list';
 type SortOption = 'dateAdded' | 'name' | 'noi' | 'capRate' | 'dealScore';
+type OwnershipFilter = 'all' | 'personal' | 'shared';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -161,6 +162,9 @@ export const Library = () => {
   const initialScreening = searchParams.get('screening') ?? 'all';
   const [screeningFilter, setScreeningFilter] = useState<string>(initialScreening);
 
+  // ---- Ownership filter state (Personal vs Shared) ----
+  const [ownershipFilter, setOwnershipFilter] = useState<OwnershipFilter>('all');
+
   // ---- Scoring state ----
   const [scores, setScores] = useState<Record<number, DealScoreResult>>({});
   const [scoreModalPropertyId, setScoreModalPropertyId] = useState<number | null>(null);
@@ -232,6 +236,12 @@ export const Library = () => {
         if (screeningFilter !== 'all') {
           if (!p.screening_verdict || p.screening_verdict !== screeningFilter) return false;
         }
+        // Ownership filter (Personal vs Shared)
+        if (ownershipFilter === 'personal') {
+          if (p.organization_id != null) return false;
+        } else if (ownershipFilter === 'shared') {
+          if (p.organization_id == null) return false;
+        }
         // Search filter
         if (searchQuery) {
           const q = searchQuery.toLowerCase();
@@ -267,7 +277,7 @@ export const Library = () => {
             );
         }
       });
-  }, [properties, selectedFilter, screeningFilter, searchQuery, sortBy, getPropertyStatus, scores]);
+  }, [properties, selectedFilter, screeningFilter, ownershipFilter, searchQuery, sortBy, getPropertyStatus, scores]);
 
   // ---- Pipeline stats ----
   const pipelineStats = useMemo(
@@ -523,6 +533,28 @@ export const Library = () => {
                   </button>
                 ))}
               </div>
+
+              {/* Ownership filter (Personal / Shared) */}
+              <div className="flex items-center gap-0.5 rounded-lg bg-muted/50 p-1">
+                {([
+                  { id: 'all' as const, label: 'All Deals' },
+                  { id: 'personal' as const, label: 'Personal' },
+                  { id: 'shared' as const, label: 'Shared' },
+                ]).map((opt) => (
+                  <button
+                    key={opt.id}
+                    onClick={() => setOwnershipFilter(opt.id)}
+                    className={cn(
+                      'px-2.5 py-1.5 rounded-md text-xs font-medium transition-all duration-200 whitespace-nowrap',
+                      ownershipFilter === opt.id
+                        ? 'bg-background text-foreground shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground',
+                    )}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* Selection info */}
@@ -718,6 +750,11 @@ export const Library = () => {
                             {property.property_type}
                           </span>
                         )}
+                        {property.organization_id != null && (
+                          <span className="px-1.5 py-0.5 text-[10px] rounded bg-primary/10 text-primary font-medium">
+                            Shared
+                          </span>
+                        )}
                       </div>
 
                       {/* Key metrics */}
@@ -751,11 +788,17 @@ export const Library = () => {
 
                       {/* Footer */}
                       <div className="flex items-center justify-between mt-4 pt-4 border-t border-border">
-                        <p className="text-xs text-muted-foreground">
-                          Added {formatDate(property.upload_date)}
-                        </p>
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground min-w-0">
+                          {property.organization_id != null && property.uploaded_by_name ? (
+                            <span className="truncate">
+                              {property.uploaded_by_name} &middot; {formatDate(property.upload_date)}
+                            </span>
+                          ) : (
+                            <span>Added {formatDate(property.upload_date)}</span>
+                          )}
+                        </div>
                         {property.deal_folder_id && (
-                          <span className="text-xs text-muted-foreground flex items-center gap-1">
+                          <span className="text-xs text-muted-foreground flex items-center gap-1 shrink-0">
                             <Building2 className="w-3 h-3" />
                             Folder
                           </span>
@@ -890,20 +933,28 @@ export const Library = () => {
                       <Building2 className="w-4 h-4 text-primary" />
                     </div>
                     <div className="min-w-0">
-                      <p
-                        title={displayName}
-                        className={cn(
-                          'font-semibold text-sm truncate transition-colors duration-200',
-                          isHovered
-                            ? 'text-primary'
-                            : 'text-foreground',
+                      <div className="flex items-center gap-1.5">
+                        <p
+                          title={displayName}
+                          className={cn(
+                            'font-semibold text-sm truncate transition-colors duration-200',
+                            isHovered
+                              ? 'text-primary'
+                              : 'text-foreground',
+                          )}
+                        >
+                          {displayName}
+                        </p>
+                        {property.organization_id != null && (
+                          <span className="px-1.5 py-0.5 text-[10px] rounded bg-primary/10 text-primary font-medium shrink-0">
+                            Shared
+                          </span>
                         )}
-                      >
-                        {displayName}
-                      </p>
+                      </div>
                       <p className="text-[11px] text-muted-foreground truncate">
-                        {property.property_type ||
-                          property.document_type}
+                        {property.organization_id != null && property.uploaded_by_name
+                          ? `${property.uploaded_by_name} · ${property.property_type || property.document_type}`
+                          : property.property_type || property.document_type}
                       </p>
                     </div>
                   </div>

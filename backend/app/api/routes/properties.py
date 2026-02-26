@@ -163,6 +163,13 @@ def list_properties(
         org_id=org_id,
     )
 
+    # Build user_id -> full_name map for uploader attribution
+    user_ids = list(set(p.user_id for p in properties if p.user_id))
+    user_map = {}
+    if user_ids:
+        users = db.query(User.id, User.full_name).filter(User.id.in_(user_ids)).all()
+        user_map = {u.id: u.full_name for u in users}
+
     # Convert to response format
     property_list = [
         PropertyListItem(
@@ -186,6 +193,8 @@ def list_properties(
             pipeline_notes=p.pipeline_notes,
             latitude=p.latitude,
             longitude=p.longitude,
+            organization_id=p.organization_id,
+            uploaded_by_name=user_map.get(p.user_id) if p.user_id else None,
         )
         for p in properties
     ]

@@ -210,6 +210,8 @@ class PropertyListItem(BaseModel):
     pipeline_notes: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
+    organization_id: Optional[int] = None
+    uploaded_by_name: Optional[str] = None
 
     class Config:
         from_attributes = True
