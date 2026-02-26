@@ -1,19 +1,18 @@
 /**
  * DashboardMap — Portfolio-level Google Map showing all deals as pins
  *
- * Separate from CompMap (which shows comps for a single property).
  * Pin colour is based on deal score:
- *   75+  → Green (#10B981)
- *   65-74 → Yellow (#F59E0B)
- *   <65  → Red (#EF4444)
+ *   80+  → Green (#10B981)
+ *   60-79 → Yellow (#F59E0B)
+ *   <60  → Red (#EF4444)
  *   No score → Purple (#8B5CF6)
  *
- * Clicking a pin opens an InfoWindow and notifies the parent (so the
- * corresponding DealCard can highlight / scroll into view).
+ * Full-height map with selected deal info panel, legend overlay,
+ * and bidirectional sync with kanban cards.
  */
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { GoogleMap, Marker, InfoWindow, useLoadScript } from '@react-google-maps/api';
-import { MapPin } from 'lucide-react';
+import { MapPin, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import type { DashboardDeal } from '@/components/dashboard/DealCard';
 
@@ -63,7 +62,7 @@ const darkMapStyles: google.maps.MapTypeStyle[] = [
   { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{ color: '#9999aa' }] },
 ];
 
-const containerStyle = { width: '100%', height: '450px' };
+const containerStyle = { width: '100%', height: '100%' };
 
 const SCORE_COLORS = {
   high: '#10B981',
@@ -78,8 +77,8 @@ const SCORE_COLORS = {
 
 const getScoreColor = (score: number | null): string => {
   if (score == null) return SCORE_COLORS.none;
-  if (score >= 75) return SCORE_COLORS.high;
-  if (score >= 65) return SCORE_COLORS.medium;
+  if (score >= 80) return SCORE_COLORS.high;
+  if (score >= 60) return SCORE_COLORS.medium;
   return SCORE_COLORS.low;
 };
 
@@ -104,6 +103,39 @@ const formatDealValue = (value: number | null): string => {
   if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
   if (value >= 1_000) return `$${(value / 1_000).toFixed(0)}K`;
   return `$${value}`;
+};
+
+// ============================================================
+// Score Ring SVG
+// ============================================================
+
+const ScoreRing: React.FC<{ score: number; size?: number }> = ({ score, size = 30 }) => {
+  const radius = (size - 4) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const pct = Math.min(100, Math.max(0, score)) / 100;
+  const offset = circumference * (1 - pct);
+  const color = score >= 80 ? SCORE_COLORS.high : score >= 60 ? SCORE_COLORS.medium : SCORE_COLORS.low;
+
+  return (
+    <svg width={size} height={size} className="shrink-0">
+      <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="currentColor" strokeWidth={2} className="text-border" />
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        fill="none"
+        stroke={color}
+        strokeWidth={2.5}
+        strokeDasharray={circumference}
+        strokeDashoffset={offset}
+        strokeLinecap="round"
+        transform={`rotate(-90 ${size / 2} ${size / 2})`}
+      />
+      <text x={size / 2} y={size / 2} textAnchor="middle" dominantBaseline="central" fill={color} fontSize={size * 0.32} fontWeight="bold" fontFamily="JetBrains Mono, monospace">
+        {Math.round(score)}
+      </text>
+    </svg>
+  );
 };
 
 // ============================================================
@@ -164,7 +196,6 @@ export const DashboardMap: React.FC<DashboardMapProps> = ({
     const dealsWithAddress = deals.filter((d) => d.address);
     if (dealsWithAddress.length === 0) return;
 
-    // Separate deals with backend coords from those needing geocoding
     const coordMap = new Map<number, { lat: number; lng: number }>();
     const needsGeocoding: typeof dealsWithAddress = [];
 
@@ -181,7 +212,6 @@ export const DashboardMap: React.FC<DashboardMapProps> = ({
       return;
     }
 
-    // Geocode remaining deals client-side as fallback
     Promise.all(
       needsGeocoding.map(async (deal) => {
         const coords = await geocodeAddress(deal.address);
@@ -229,7 +259,6 @@ export const DashboardMap: React.FC<DashboardMapProps> = ({
 
   useEffect(() => {
     if (!map || selectedDealId == null) return;
-    // Only pan when selectedDealId actually changes (not on re-renders)
     if (prevSelectedRef.current === selectedDealId) return;
     prevSelectedRef.current = selectedDealId;
 
@@ -249,42 +278,57 @@ export const DashboardMap: React.FC<DashboardMapProps> = ({
     onPinClick(dealId);
   };
 
+  // Selected deal data for the info panel below the map
+  const selectedDeal = useMemo(
+    () => (selectedDealId != null ? deals.find((d) => d.id === selectedDealId) : null),
+    [selectedDealId, deals],
+  );
+
   // ----- Render states -----
+
+  const placeholderHeight = { minHeight: '400px', height: '100%' };
 
   if (!apiKey) {
     return (
-      <div
-        className="bg-card/50 border border-border/60 rounded-2xl p-8 flex flex-col items-center justify-center"
-        style={{ height: '450px' }}
-      >
-        <MapPin className="h-8 w-8 text-muted-foreground mb-3" />
-        <p className="text-muted-foreground">
-          Add a Google Maps API key to enable the portfolio map
-        </p>
+      <div className="bg-card/50 border border-border/60 rounded-2xl flex flex-col h-full">
+        <div className="px-4 py-3 border-b border-border/60 flex items-center justify-between">
+          <span className="font-mono text-2xs uppercase tracking-wider text-muted-foreground font-semibold">Portfolio Map</span>
+          <span className="font-mono text-2xs text-muted-foreground">0 locations</span>
+        </div>
+        <div className="flex-1 flex flex-col items-center justify-center p-8" style={placeholderHeight}>
+          <MapPin className="h-8 w-8 text-muted-foreground mb-3" />
+          <p className="text-muted-foreground text-sm">Add a Google Maps API key to enable the portfolio map</p>
+        </div>
       </div>
     );
   }
 
   if (loadError) {
     return (
-      <div
-        className="bg-card/50 border border-border/60 rounded-2xl p-8 flex flex-col items-center justify-center"
-        style={{ height: '450px' }}
-      >
-        <MapPin className="h-8 w-8 text-muted-foreground mb-3" />
-        <p className="text-muted-foreground">Unable to load Google Maps</p>
+      <div className="bg-card/50 border border-border/60 rounded-2xl flex flex-col h-full">
+        <div className="px-4 py-3 border-b border-border/60 flex items-center justify-between">
+          <span className="font-mono text-2xs uppercase tracking-wider text-muted-foreground font-semibold">Portfolio Map</span>
+          <span className="font-mono text-2xs text-muted-foreground">0 locations</span>
+        </div>
+        <div className="flex-1 flex flex-col items-center justify-center p-8" style={placeholderHeight}>
+          <MapPin className="h-8 w-8 text-muted-foreground mb-3" />
+          <p className="text-muted-foreground text-sm">Unable to load Google Maps</p>
+        </div>
       </div>
     );
   }
 
   if (!isLoaded) {
     return (
-      <div
-        className="bg-card/50 border border-border/60 rounded-2xl p-8 flex flex-col items-center justify-center"
-        style={{ height: '450px' }}
-      >
-        <MapPin className="h-8 w-8 text-muted-foreground mb-3 animate-pulse" />
-        <p className="text-muted-foreground">Loading map&hellip;</p>
+      <div className="bg-card/50 border border-border/60 rounded-2xl flex flex-col h-full">
+        <div className="px-4 py-3 border-b border-border/60 flex items-center justify-between">
+          <span className="font-mono text-2xs uppercase tracking-wider text-muted-foreground font-semibold">Portfolio Map</span>
+          <span className="font-mono text-2xs text-muted-foreground">Loading...</span>
+        </div>
+        <div className="flex-1 flex flex-col items-center justify-center p-8" style={placeholderHeight}>
+          <MapPin className="h-8 w-8 text-muted-foreground mb-3 animate-pulse" />
+          <p className="text-muted-foreground text-sm">Loading map&hellip;</p>
+        </div>
       </div>
     );
   }
@@ -292,8 +336,15 @@ export const DashboardMap: React.FC<DashboardMapProps> = ({
   const selectedPinData = infoWindowId != null ? pins.find((p) => p.id === infoWindowId) : null;
 
   return (
-    <div>
-      <div className="rounded-2xl overflow-hidden border border-border/60">
+    <div className="bg-card/50 border border-border/60 rounded-2xl flex flex-col h-full overflow-hidden">
+      {/* Header bar */}
+      <div className="px-4 py-3 border-b border-border/60 flex items-center justify-between shrink-0">
+        <span className="font-mono text-2xs uppercase tracking-wider text-muted-foreground font-semibold">Portfolio Map</span>
+        <span className="font-mono text-2xs text-muted-foreground">{pins.length} locations</span>
+      </div>
+
+      {/* Map */}
+      <div className="relative flex-1" style={{ minHeight: '300px' }}>
         <GoogleMap
           mapContainerStyle={containerStyle}
           options={{
@@ -303,6 +354,9 @@ export const DashboardMap: React.FC<DashboardMapProps> = ({
             mapTypeControl: false,
             streetViewControl: false,
             fullscreenControl: true,
+            renderingType: typeof google !== 'undefined' && google.maps?.RenderingType
+              ? google.maps.RenderingType.RASTER
+              : undefined,
           }}
           onLoad={onLoad}
           onUnmount={onUnmount}
@@ -348,32 +402,51 @@ export const DashboardMap: React.FC<DashboardMapProps> = ({
             </InfoWindow>
           )}
         </GoogleMap>
+
+        {/* Score legend overlay */}
+        <div className="absolute bottom-3 left-3 flex items-center gap-3 px-3 py-1.5 rounded-lg bg-black/60 backdrop-blur-sm text-xs text-white/80">
+          <div className="flex items-center gap-1.5">
+            <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: SCORE_COLORS.high }} />
+            <span>80+</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: SCORE_COLORS.medium }} />
+            <span>60-79</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: SCORE_COLORS.low }} />
+            <span>&lt;60</span>
+          </div>
+        </div>
       </div>
 
-      {/* Legend */}
-      <div className="flex items-center gap-6 mt-3 text-sm text-muted-foreground">
-        <div className="flex items-center gap-1.5">
-          <span
-            className="inline-block w-3 h-3 rounded-full"
-            style={{ backgroundColor: SCORE_COLORS.high }}
-          />
-          <span>75+</span>
+      {/* Selected deal info panel */}
+      {selectedDeal && (
+        <div className="shrink-0 border-t border-border/60 p-4">
+          <div className="flex items-start gap-3">
+            {selectedDeal.dealScore != null && (
+              <ScoreRing score={selectedDeal.dealScore} size={36} />
+            )}
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-sm text-foreground truncate">{selectedDeal.name}</p>
+              <p className="text-xs text-muted-foreground truncate">{selectedDeal.address || selectedDeal.submarket || '\u2014'}</p>
+              <div className="flex items-center gap-3 mt-1.5 text-xs font-mono text-muted-foreground">
+                {selectedDeal.units > 0 && <span>{selectedDeal.units} units</span>}
+                <span className="font-semibold text-foreground">{formatDealValue(selectedDeal.dealValue)}</span>
+                {selectedDeal.noi != null && <span>NOI: {formatDealValue(selectedDeal.noi)}</span>}
+                {selectedDeal.capRate != null && <span>Cap: {selectedDeal.capRate.toFixed(2)}%</span>}
+              </div>
+            </div>
+            <button
+              onClick={() => navigate(`/library/${selectedDeal.id}`)}
+              className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-primary text-primary-foreground hover:brightness-110 transition-all"
+            >
+              View Full Analysis
+              <ArrowRight className="w-3 h-3" />
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-1.5">
-          <span
-            className="inline-block w-3 h-3 rounded-full"
-            style={{ backgroundColor: SCORE_COLORS.medium }}
-          />
-          <span>65-74</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span
-            className="inline-block w-3 h-3 rounded-full"
-            style={{ backgroundColor: SCORE_COLORS.low }}
-          />
-          <span>&lt;65</span>
-        </div>
-      </div>
+      )}
     </div>
   );
 };

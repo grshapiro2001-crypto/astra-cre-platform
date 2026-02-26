@@ -25,6 +25,9 @@ export interface DashboardDeal {
   propertyType: string | null;
   latitude?: number | null;
   longitude?: number | null;
+  noi?: number | null;
+  capRate?: number | null;
+  stage?: string;
 }
 
 // ============================================================
