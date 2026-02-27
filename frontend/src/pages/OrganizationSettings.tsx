@@ -3,7 +3,7 @@ import { PageTransition } from '@/components/layout/PageTransition';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Building2, Users, Copy, RefreshCw, Shield, UserX, Trash2, Check, X } from 'lucide-react';
+import { Building2, Users, Copy, RefreshCw, Shield, UserX, Trash2, Check, X, AlertTriangle, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 import organizationService from '@/services/organizationService';
 import type { Organization, OrgMember } from '@/services/organizationService';
@@ -13,6 +13,7 @@ export const OrganizationSettings = () => {
   const [members, setMembers] = useState<OrgMember[]>([]);
   const [pending, setPending] = useState<OrgMember[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [hasOrg, setHasOrg] = useState<boolean | null>(null);
 
   // Create form
@@ -30,6 +31,8 @@ export const OrganizationSettings = () => {
   const [confirmRegen, setConfirmRegen] = useState(false);
 
   const fetchOrg = useCallback(async () => {
+    setLoading(true);
+    setError(null);
     try {
       const data = await organizationService.getMyOrg();
       setOrg(data);
@@ -41,8 +44,19 @@ export const OrganizationSettings = () => {
       ]);
       if (membersData.status === 'fulfilled') setMembers(membersData.value);
       if (pendingData.status === 'fulfilled') setPending(pendingData.value as OrgMember[]);
-    } catch {
-      setHasOrg(false);
+    } catch (err: any) {
+      const status = err?.response?.status;
+      if (status === 404 || status === 400) {
+        // User genuinely has no organization
+        setHasOrg(false);
+      } else {
+        // Server error (500), network error, or unexpected failure
+        setHasOrg(false);
+        setError(
+          err?.response?.data?.detail ||
+            'Unable to load organization data. The server may be temporarily unavailable.',
+        );
+      }
     } finally {
       setLoading(false);
     }
@@ -145,6 +159,27 @@ export const OrganizationSettings = () => {
           <div className="animate-pulse space-y-4">
             <div className="h-8 w-48 bg-muted rounded" />
             <div className="h-40 bg-muted rounded-2xl" />
+          </div>
+        </div>
+      </PageTransition>
+    );
+  }
+
+  if (error) {
+    return (
+      <PageTransition>
+        <div className="max-w-3xl mx-auto py-8">
+          <div className="bg-card/50 border border-destructive/30 rounded-2xl p-8 text-center space-y-4">
+            <div className="w-12 h-12 rounded-xl bg-destructive/10 flex items-center justify-center mx-auto">
+              <AlertTriangle className="w-6 h-6 text-destructive" />
+            </div>
+            <div className="space-y-1">
+              <h2 className="text-lg font-semibold text-foreground">Failed to load organization</h2>
+              <p className="text-sm text-muted-foreground">{error}</p>
+            </div>
+            <Button onClick={fetchOrg} variant="outline" size="sm">
+              <RotateCcw className="w-4 h-4 mr-1.5" /> Try Again
+            </Button>
           </div>
         </div>
       </PageTransition>
