@@ -964,8 +964,14 @@ async def extract_with_claude(
         )
 
     try:
-        # Initialize Anthropic client with a 120-second timeout to prevent infinite hangs
-        client = anthropic.Anthropic(
+        # Use AsyncAnthropic so the Claude API call is truly non-blocking.
+        # The sync Anthropic client blocks the entire uvicorn event loop for
+        # the full API call duration (often 30–90 s).  With a single-worker
+        # uvicorn process (Render default), this prevents keepalive signals
+        # from being sent, causing Render's proxy to drop the connection
+        # before the response arrives — producing "Unknown error" on the
+        # client.  AsyncAnthropic + await keeps the event loop free.
+        client = anthropic.AsyncAnthropic(
             api_key=settings.ANTHROPIC_API_KEY,
             base_url="https://api.anthropic.com",
             timeout=120.0,  # 2 minutes max for the entire request
@@ -1000,8 +1006,8 @@ async def extract_with_claude(
                 filename=filename
             )
 
-        # Call Claude API with specialized prompt
-        message = client.messages.create(
+        # Call Claude API with specialized prompt (async — non-blocking)
+        message = await client.messages.create(
             model="claude-sonnet-4-5-20250929",
             max_tokens=16384,
             messages=[{

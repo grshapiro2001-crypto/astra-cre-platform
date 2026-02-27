@@ -27,6 +27,12 @@ def run_migrations():
             ("latitude", "FLOAT"),
             ("longitude", "FLOAT"),
             ("organization_id", "INTEGER"),
+            # raw_pdf_text: cached pdfplumber output for reliable re-analysis
+            # after Render restarts (ephemeral filesystem loses uploaded PDFs).
+            ("raw_pdf_text", "TEXT"),
+            # extraction_data_json: full Claude response blob for debugging
+            # missing T12/T3 data without re-running extraction.
+            ("extraction_data_json", "TEXT"),
         ]
         for col_name, col_type in new_columns:
             if col_name not in existing_cols:

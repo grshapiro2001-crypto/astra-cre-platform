@@ -105,6 +105,13 @@ class Property(Base):
 
     # Metadata
     raw_pdf_path = Column(Text)  # Relative path like "uploads/user123/file.pdf"
+    # Cached plain-text content extracted from the PDF by pdfplumber.
+    # Stored so re-analysis can succeed even when the PDF file has been lost
+    # from Render's ephemeral disk (e.g. after a server restart).
+    raw_pdf_text = Column(Text, nullable=True)
+    # Full JSON blob returned by Claude on the most recent extraction.
+    # Useful for post-hoc debugging (e.g. diagnosing missing T12/T3 data).
+    extraction_data_json = Column(Text, nullable=True)
     analysis_date = Column(DateTime(timezone=True))
     last_viewed_date = Column(DateTime(timezone=True))
     analysis_count = Column(Integer, default=1)

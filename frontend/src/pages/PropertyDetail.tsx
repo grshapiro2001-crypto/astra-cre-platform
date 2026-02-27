@@ -449,10 +449,30 @@ export const PropertyDetail = () => {
       setProperty(updated);
       setShowReanalyzeDialog(false);
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { detail?: string } } };
-      alert(
-        `Re-analysis failed: ${e.response?.data?.detail || 'Unknown error'}`,
-      );
+      // Surface the most specific error message available.
+      // e.response.data.detail = FastAPI HTTPException message (most useful)
+      // e.response.status       = HTTP status code (helps diagnose 429, 404, 500)
+      // e.message               = network-level error (e.g. timeout, CORS)
+      const e = err as {
+        response?: { status?: number; data?: { detail?: string } };
+        message?: string;
+      };
+      const detail = e.response?.data?.detail;
+      const status = e.response?.status;
+      const networkMsg = e.message;
+
+      let errorMsg: string;
+      if (detail) {
+        errorMsg = detail;
+      } else if (status) {
+        errorMsg = `Server error (HTTP ${status}). Check Render logs for details.`;
+      } else if (networkMsg) {
+        errorMsg = `Network error: ${networkMsg}. The request may have timed out — check Render logs.`;
+      } else {
+        errorMsg = 'Unknown error. Check the browser console and Render logs.';
+      }
+
+      alert(`Re-analysis failed: ${errorMsg}`);
     } finally {
       setIsReanalyzing(false);
     }
