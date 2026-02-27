@@ -85,7 +85,7 @@ function App() {
               <Route path="/data-bank" element={<DataBankPage />} />
               <Route path="/compare" element={<ComparisonPage />} />
               <Route path="/settings" element={<Settings />} />
-              <Route path="/organization" element={<OrganizationSettings />} />
+              <Route path="/organization" element={<ErrorBoundary><OrganizationSettings /></ErrorBoundary>} />
             </Route>
           </Route>
 
