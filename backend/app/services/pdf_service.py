@@ -1,6 +1,7 @@
 """
 PDF processing service for extracting text from PDF documents
 """
+import gc
 from pathlib import Path
 from typing import Dict, Any
 import pdfplumber
@@ -50,30 +51,50 @@ async def process_pdf_upload(
 
 def extract_text_from_pdf(file_path: str) -> str:
     """
-    Extract all text content from a PDF file using pdfplumber.
+    Extract text from a PDF file using pdfplumber.
+
+    Stops collecting once 120,000 characters have been accumulated — both
+    callers already truncate to 100,000 chars before sending to Claude, so
+    processing beyond 120k wastes memory without improving extraction quality.
+    Early exit is especially important for image-heavy market-research PDFs
+    (CBRE, JLL, W&D) where pdfminer parses every page's content stream even
+    though only the first 20-30 pages contribute usable text.
+
+    Explicit gc.collect() after closing the PDF reclaims pdfminer's internal
+    parsed-object graph, which contains cyclic references that CPython's
+    reference counter cannot free on its own, causing resident-set bloat
+    between requests on Render's 512 MB free tier.
 
     Args:
         file_path: Path to the PDF file
 
     Returns:
-        Concatenated text from all pages
+        Concatenated text from pages (up to ~120,000 chars)
 
     Raises:
         Exception: If PDF cannot be opened or read
     """
+    _CHAR_LIMIT = 120_000  # slightly above the 100k Claude truncation point
     try:
-        text_content = ""
+        text_parts = []
+        total_chars = 0
 
         with pdfplumber.open(file_path) as pdf:
-            # Extract text from each page
             for page_num, page in enumerate(pdf.pages, start=1):
                 page_text = page.extract_text()
-
                 if page_text:
-                    text_content += f"\n--- Page {page_num} ---\n"
-                    text_content += page_text
+                    text_parts.append(f"\n--- Page {page_num} ---\n")
+                    text_parts.append(page_text)
+                    total_chars += len(page_text)
+                    # Stop early — more pages won't survive the 100k truncation
+                    if total_chars >= _CHAR_LIMIT:
+                        break
 
-        return text_content
+        # Force GC: pdfminer leaves cyclic-referenced objects that CPython's
+        # reference counter cannot free automatically.
+        gc.collect()
+
+        return "".join(text_parts)
 
     except Exception as e:
         raise Exception(f"Failed to extract text from PDF: {str(e)}")

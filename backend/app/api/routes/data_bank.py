@@ -271,6 +271,10 @@ def upload_data_bank_file(
     unique_filename = f"{uuid.uuid4()}_{Path(file.filename).name}"
     file_path = upload_dir / unique_filename
     file_path.write_bytes(contents)
+    # Free the in-memory bytes buffer immediately — the PDF is now on disk and
+    # the background extraction task reads from disk, not from this variable.
+    # Keeping it alive until function return wastes 10-50 MB on Render's 512 MB tier.
+    del contents
 
     # Create document record
     document = DataBankDocument(
