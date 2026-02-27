@@ -16,6 +16,11 @@ export interface DataBankDocument {
   extraction_data: string | null;
   record_count: number | null;
   created_at: string;
+  // Market research metadata
+  source_firm: string | null;
+  publication_date: string | null;
+  geographies_covered: string | null;
+  signal_count: number | null;
 }
 
 export interface DataBankUploadResponse {
@@ -25,6 +30,7 @@ export interface DataBankUploadResponse {
   record_count: number;
   warnings: string[];
   filename: string;
+  signal_count: number | null;
 }
 
 export interface SalesComp {
@@ -83,7 +89,7 @@ export interface SubmarketInventory {
 // ---------------------------------------------------------------------------
 
 export const dataBankService = {
-  /** Upload a spreadsheet file (.xlsx, .xlsm, .csv) to the Data Bank */
+  /** Upload a file (.xlsx, .xlsm, .csv, .pdf) to the Data Bank */
   async uploadDocument(file: File): Promise<DataBankUploadResponse> {
     const formData = new FormData();
     formData.append('file', file);

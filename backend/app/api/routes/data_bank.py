@@ -1,8 +1,8 @@
 """
-Data Bank routes — inventory, comps, pipeline queries, and Excel uploads
+Data Bank routes — inventory, comps, pipeline queries, and file uploads
 
 Endpoints for managing submarket inventory, querying sales comps, pipeline projects,
-and uploading/extracting data from Excel spreadsheets.
+and uploading/extracting data from Excel spreadsheets and market research PDFs.
 """
 import uuid
 import logging
@@ -15,6 +15,7 @@ from typing import List, Optional
 from app.database import get_db
 from app.models.user import User
 from app.models.data_bank import DataBankDocument, SubmarketInventory, SalesComp, PipelineProject
+from app.models.market_sentiment import MarketSentimentSignal
 from app.api.deps import get_current_user
 from app.schemas.scoring import SubmarketInventoryCreate, SubmarketInventoryResponse
 from app.schemas.data_bank import (
@@ -23,13 +24,14 @@ from app.schemas.data_bank import (
     DataBankDocumentListResponse,
 )
 from app.services.data_bank_extraction_service import process_data_bank_upload
+from app.services.market_research_extraction_service import process_market_research_pdf
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/data-bank", tags=["Data Bank"])
 
 # Allowed file extensions
-ALLOWED_EXTENSIONS = {".xlsx", ".xlsm", ".csv"}
+ALLOWED_EXTENSIONS = {".xlsx", ".xlsm", ".csv", ".pdf"}
 MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 MB
 
 
@@ -197,13 +199,11 @@ def upload_data_bank_file(
     db: Session = Depends(get_db),
 ):
     """
-    Upload an Excel file (.xlsx, .xlsm, .csv) to the Data Bank.
+    Upload a file to the Data Bank.
 
-    The file is saved to disk, then processed through the extraction pipeline:
-    1. Document type detection (sales_comps, pipeline_tracker, underwriting_model)
-    2. Structural parse (openpyxl)
-    3. Claude API column classification + value normalization
-    4. Records stored in DB (SalesComp or PipelineProject rows)
+    Supports Excel (.xlsx, .xlsm, .csv) and PDF (.pdf) files:
+    - Excel files: extraction pipeline for sales comps, pipeline trackers, underwriting models
+    - PDF files: market research extraction for transaction comps and sentiment signals
     """
     user_id = str(current_user.id)
 
@@ -248,14 +248,25 @@ def upload_data_bank_file(
     db.add(document)
     db.flush()  # Get the document ID
 
-    # Run extraction
+    # Run extraction — branch on file type
     try:
-        doc_type, record_count, warnings = process_data_bank_upload(
-            filepath=str(file_path),
-            user_id=user_id,
-            db=db,
-            document=document,
-        )
+        if ext == ".pdf":
+            # PDFs are market research in Data Bank context
+            # (OMs and BOVs go through the Library upload flow)
+            doc_type, record_count, warnings = process_market_research_pdf(
+                filepath=str(file_path),
+                user_id=user_id,
+                db=db,
+                document=document,
+            )
+        else:
+            # Excel/CSV extraction (sales_comps, pipeline_tracker, underwriting_model)
+            doc_type, record_count, warnings = process_data_bank_upload(
+                filepath=str(file_path),
+                user_id=user_id,
+                db=db,
+                document=document,
+            )
     except Exception as e:
         logger.exception(f"Upload processing failed for {file.filename}")
         document.extraction_status = "failed"
@@ -272,6 +283,7 @@ def upload_data_bank_file(
         record_count=record_count,
         warnings=warnings,
         filename=file.filename,
+        signal_count=document.signal_count,
     )
 
 
@@ -341,6 +353,7 @@ def delete_document(
     # Delete associated records
     db.query(SalesComp).filter(SalesComp.document_id == document_id).delete()
     db.query(PipelineProject).filter(PipelineProject.document_id == document_id).delete()
+    db.query(MarketSentimentSignal).filter(MarketSentimentSignal.document_id == document_id).delete()
 
     # Delete the file from disk
     file_path = Path(document.file_path)

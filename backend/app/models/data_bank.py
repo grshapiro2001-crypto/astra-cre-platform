@@ -14,11 +14,17 @@ class DataBankDocument(Base):
     user_id = Column(String(36), ForeignKey("users.id"), nullable=False)
     filename = Column(String(255), nullable=False)
     file_path = Column(Text, nullable=False)
-    document_type = Column(String(50), nullable=False)  # sales_comps, pipeline_tracker, underwriting_model
+    document_type = Column(String(50), nullable=False)  # sales_comps, pipeline_tracker, underwriting_model, market_research
     extraction_status = Column(String(50), default="pending", nullable=False)  # pending, processing, completed, failed
     extraction_data = Column(Text, nullable=True)  # JSON
     record_count = Column(Integer, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    # Market research metadata (populated for document_type="market_research")
+    source_firm = Column(String(255), nullable=True)
+    publication_date = Column(String(50), nullable=True)
+    geographies_covered = Column(Text, nullable=True)  # comma-separated list of metros/submarkets
+    signal_count = Column(Integer, default=0)
 
     def __repr__(self):
         return f"<DataBankDocument(id={self.id}, type={self.document_type}, status={self.extraction_status})>"

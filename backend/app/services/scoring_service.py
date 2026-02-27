@@ -308,7 +308,28 @@ def calculate_deal_score(
 
     # ===== LAYER 2: Market Intelligence =====
     market_score_val = property_data.get("market_sentiment_score")
+    market_rationale = property_data.get("market_sentiment_rationale", "")
     layer2_metrics = {}
+
+    # If no cached score, attempt to compute dynamically from Data Bank signals
+    if market_score_val is None and db is not None:
+        from app.services.market_sentiment_scoring_service import compute_market_sentiment_score
+        l2_metro = property_data.get("metro", "")
+        l2_submarket = property_data.get("submarket", "")
+        if l2_metro or l2_submarket:
+            try:
+                sentiment_result = compute_market_sentiment_score(
+                    property_metro=l2_metro,
+                    property_submarket=l2_submarket,
+                    user_id=user_id,
+                    organization_id=None,
+                    db=db,
+                )
+                if sentiment_result["score"] is not None:
+                    market_score_val = sentiment_result["score"]
+                    market_rationale = sentiment_result["rationale"] or ""
+            except Exception:
+                pass  # Fall through to no-data case
 
     if market_score_val is not None:
         # Convert -10 to +10 range to 0-100 scale
@@ -318,7 +339,7 @@ def calculate_deal_score(
             "raw_score": round(l2_normalized, 1),
             "weight": 100,
             "weighted_score": round(l2_normalized, 1),
-            "context": property_data.get("market_sentiment_rationale", ""),
+            "context": market_rationale,
         }
         layer2_score = l2_normalized
     else:
@@ -327,7 +348,7 @@ def calculate_deal_score(
             "raw_score": None,
             "weight": 100,
             "weighted_score": None,
-            "context": "No market intelligence data — Phase 4",
+            "context": "No market intelligence data — upload market research PDFs to the Data Bank",
         }
         layer2_score = None
         warnings.append("No market intelligence data available")
@@ -495,6 +516,7 @@ def _extract_property_data(prop: Property, db: Optional[Session] = None) -> dict
     data = {
         "property_type": prop.property_type,
         "submarket": prop.submarket,
+        "metro": prop.metro,
         "county": "",
         "year_built": prop.year_built,
         "total_units": prop.total_units,
