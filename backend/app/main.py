@@ -106,6 +106,23 @@ def run_migrations():
         except Exception as e:
             logger.warning(f"Migration deal_folders org_id skip: {e}")
 
+        # Add market research metadata columns to data_bank_documents if missing
+        try:
+            dbd_cols = {c['name'] for c in inspector.get_columns('data_bank_documents')}
+            dbd_new_columns = [
+                ("source_firm", "VARCHAR(255)"),
+                ("publication_date", "VARCHAR(50)"),
+                ("geographies_covered", "TEXT"),
+                ("signal_count", "INTEGER"),
+            ]
+            for col_name, col_type in dbd_new_columns:
+                if col_name not in dbd_cols:
+                    conn.execute(text(f"ALTER TABLE data_bank_documents ADD COLUMN {col_name} {col_type}"))
+                    conn.commit()
+                    logger.warning(f"Migration: added column data_bank_documents.{col_name}")
+        except Exception as e:
+            logger.warning(f"Migration data_bank_documents market research cols skip: {e}")
+
 try:
     run_migrations()
 except Exception as e:
