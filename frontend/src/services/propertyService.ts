@@ -134,10 +134,26 @@ export const propertyService = {
   },
 
   /**
-   * Re-analyze property (EXPLICIT LLM CALL - only when user explicitly requests)
+   * Kick off async re-analysis (EXPLICIT LLM CALL).
+   * Returns 202 immediately with { property_id, analysis_status: "processing" }.
+   * Poll getAnalysisStatus() until analysis_status is "completed" or "failed".
    */
-  async reanalyzeProperty(id: number): Promise<PropertyDetail> {
+  async reanalyzeProperty(id: number): Promise<{ property_id: number; analysis_status: string }> {
     const response = await api.post(`/properties/${id}/reanalyze`);
+    return response.data;
+  },
+
+  /**
+   * Poll analysis status (lightweight — no LLM call).
+   * Used after reanalyzeProperty() to detect when background extraction finishes.
+   */
+  async getAnalysisStatus(id: number): Promise<{
+    property_id: number;
+    analysis_status: string;
+    last_analyzed_at: string | null;
+    analysis_count: number;
+  }> {
+    const response = await api.get(`/properties/${id}/analysis-status`);
     return response.data;
   },
 
