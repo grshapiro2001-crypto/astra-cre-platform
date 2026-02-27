@@ -184,7 +184,9 @@ const DocumentsTab = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadingIsPdf, setUploadingIsPdf] = useState(false);
   const [uploadResult, setUploadResult] = useState<DataBankUploadResponse | null>(null);
+  const [pollingDocId, setPollingDocId] = useState<number | null>(null);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -206,6 +208,38 @@ const DocumentsTab = () => {
     loadDocuments();
   }, [loadDocuments]);
 
+  // Poll document status until extraction completes or fails (PDF background processing)
+  useEffect(() => {
+    if (!pollingDocId) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const status = await dataBankService.getDocumentStatus(pollingDocId);
+        if (status.extraction_status !== 'processing') {
+          clearInterval(interval);
+          setPollingDocId(null);
+          setUploadResult((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  extraction_status: status.extraction_status,
+                  record_count: status.record_count ?? 0,
+                  signal_count: status.signal_count,
+                  document_type: status.document_type,
+                }
+              : prev,
+          );
+          await loadDocuments();
+        }
+      } catch {
+        clearInterval(interval);
+        setPollingDocId(null);
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [pollingDocId, loadDocuments]);
+
   const handleUpload = async (file: File) => {
     const ext = file.name.split('.').pop()?.toLowerCase();
     if (!ext || !['xlsx', 'xlsm', 'csv', 'pdf'].includes(ext)) {
@@ -213,14 +247,22 @@ const DocumentsTab = () => {
       return;
     }
 
+    const isPdf = ext === 'pdf';
     setUploading(true);
+    setUploadingIsPdf(isPdf);
     setUploadResult(null);
     setError(null);
 
     try {
       const result = await dataBankService.uploadDocument(file);
       setUploadResult(result);
-      await loadDocuments();
+      if (result.extraction_status === 'processing') {
+        // PDF background task: start polling, don't reload documents yet
+        setPollingDocId(result.document_id);
+        await loadDocuments(); // show the "processing" row immediately
+      } else {
+        await loadDocuments();
+      }
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Upload failed. Please try again.');
     } finally {
@@ -270,7 +312,7 @@ const DocumentsTab = () => {
           isDragOver
             ? 'border-primary bg-primary/5 scale-[1.01]'
             : 'border-border hover:border-primary/50 bg-card',
-          uploading && 'pointer-events-none opacity-70',
+          (uploading || !!pollingDocId) && 'pointer-events-none opacity-70',
         )}
       >
         <input
@@ -289,20 +331,51 @@ const DocumentsTab = () => {
             <div>
               <p className="text-sm font-medium text-foreground">Processing upload...</p>
               <p className="text-xs text-muted-foreground mt-1">
-                Extracting records from spreadsheet
+                {uploadingIsPdf
+                  ? 'Uploading market research report'
+                  : 'Extracting records from spreadsheet'}
               </p>
             </div>
           </div>
         ) : uploadResult ? (
+          uploadResult.extraction_status === 'processing' ? (
+            <div className="flex flex-col items-center gap-3 py-4">
+              <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
+                <Loader2 className="w-6 h-6 text-primary animate-spin" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-foreground">Analyzing PDF...</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Extracting data from market research report — this may take a minute
+                </p>
+              </div>
+            </div>
+          ) : uploadResult.extraction_status === 'failed' ? (
+            <div className="flex flex-col items-center gap-3 py-4">
+              <div className="w-12 h-12 rounded-xl bg-red-500/10 flex items-center justify-center">
+                <XCircle className="w-6 h-6 text-red-500" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-foreground">Extraction failed</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Could not extract data from <span className="font-medium">{uploadResult.filename}</span>.
+                  Check that the PDF is a readable market research report.
+                </p>
+              </div>
+              <Button variant="outline" size="sm" onClick={() => setUploadResult(null)} className="mt-2">
+                Try Again
+              </Button>
+            </div>
+          ) : (
           <div className="flex flex-col items-center gap-3 py-4">
-            <div className="w-12 h-12 rounded-xl bg-green-500/10 flex items-center justify-center">
-              <CheckCircle2 className="w-6 h-6 text-green-500" />
+            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
+              <CheckCircle2 className="w-6 h-6 text-primary" />
             </div>
             <div>
               <p className="text-sm font-medium text-foreground">Upload complete!</p>
               <p className="text-xs text-muted-foreground mt-1">
                 {uploadResult.document_type === 'market_research' && uploadResult.signal_count
-                  ? `Extracted ${uploadResult.record_count - uploadResult.signal_count} comps, ${uploadResult.signal_count} market signals`
+                  ? `Extracted ${(uploadResult.record_count ?? 0) - (uploadResult.signal_count ?? 0)} comps, ${uploadResult.signal_count} market signals`
                   : `Extracted ${uploadResult.record_count} records`}{' '}
                 from <span className="font-medium">{uploadResult.filename}</span>
                 {' '}({docTypeLabel(uploadResult.document_type)})
@@ -324,6 +397,7 @@ const DocumentsTab = () => {
               Upload Another
             </Button>
           </div>
+          )
         ) : (
           <div className="flex flex-col items-center gap-3 py-4">
             <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">

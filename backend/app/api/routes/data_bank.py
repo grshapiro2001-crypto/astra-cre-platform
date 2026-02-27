@@ -8,11 +8,11 @@ import uuid
 import logging
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status, Query, UploadFile, File
 from sqlalchemy.orm import Session
 from typing import List, Optional
 
-from app.database import get_db
+from app.database import get_db, SessionLocal
 from app.models.user import User
 from app.models.data_bank import DataBankDocument, SubmarketInventory, SalesComp, PipelineProject
 from app.models.market_sentiment import MarketSentimentSignal
@@ -27,6 +27,38 @@ from app.services.data_bank_extraction_service import process_data_bank_upload
 from app.services.market_research_extraction_service import process_market_research_pdf
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Background task helper for PDF extraction
+# ---------------------------------------------------------------------------
+
+def _run_pdf_extraction_background(document_id: int, filepath: str, user_id: str) -> None:
+    """
+    Background task: opens its own DB session and runs PDF extraction.
+    Called after the HTTP response has already been sent (202).
+    """
+    db = SessionLocal()
+    try:
+        document = db.query(DataBankDocument).filter(DataBankDocument.id == document_id).first()
+        if not document:
+            logger.error("Background PDF task: document %d not found", document_id)
+            return
+        process_market_research_pdf(filepath=filepath, user_id=user_id, db=db, document=document)
+    except Exception:
+        logger.exception("Background PDF extraction crashed for document %d", document_id)
+        # process_market_research_pdf already handles its own errors; this catch
+        # is belt-and-suspenders in case something fails before even entering it.
+        try:
+            db.rollback()
+            doc = db.query(DataBankDocument).filter(DataBankDocument.id == document_id).first()
+            if doc and doc.extraction_status == "processing":
+                doc.extraction_status = "failed"
+                db.commit()
+        except Exception:
+            pass
+    finally:
+        db.close()
 
 router = APIRouter(prefix="/data-bank", tags=["Data Bank"])
 
@@ -195,6 +227,7 @@ def query_pipeline(
 @router.post("/upload", response_model=DataBankUploadResponse, status_code=status.HTTP_201_CREATED)
 def upload_data_bank_file(
     file: UploadFile = File(...),
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -202,8 +235,10 @@ def upload_data_bank_file(
     Upload a file to the Data Bank.
 
     Supports Excel (.xlsx, .xlsm, .csv) and PDF (.pdf) files:
-    - Excel files: extraction pipeline for sales comps, pipeline trackers, underwriting models
-    - PDF files: market research extraction for transaction comps and sentiment signals
+    - Excel files: extracted synchronously (fast — no Claude API call)
+    - PDF files: returns immediately with extraction_status="processing"; extraction
+      runs in a background task. Poll GET /data-bank/document/{id}/status until
+      extraction_status is "completed" or "failed".
     """
     user_id = str(current_user.id)
 
@@ -230,7 +265,7 @@ def upload_data_bank_file(
         raise HTTPException(status_code=400, detail="Uploaded file is empty")
 
     # Save file to disk
-    upload_dir = Path("backend/uploads/data_bank")
+    upload_dir = Path("uploads/data_bank")
     upload_dir.mkdir(parents=True, exist_ok=True)
 
     unique_filename = f"{uuid.uuid4()}_{Path(file.filename).name}"
@@ -248,25 +283,39 @@ def upload_data_bank_file(
     db.add(document)
     db.flush()  # Get the document ID
 
-    # Run extraction — branch on file type
+    if ext == ".pdf":
+        # PDFs are market research in Data Bank context.
+        # Extraction is offloaded to a background task so the HTTP response
+        # returns immediately — avoids timeouts on large reports.
+        document.document_type = "market_research"
+        db.commit()
+        db.refresh(document)
+
+        background_tasks.add_task(
+            _run_pdf_extraction_background,
+            document_id=document.id,
+            filepath=str(file_path),
+            user_id=user_id,
+        )
+
+        return DataBankUploadResponse(
+            document_id=document.id,
+            document_type="market_research",
+            extraction_status="processing",
+            record_count=0,
+            warnings=[],
+            filename=file.filename,
+            signal_count=None,
+        )
+
+    # Excel/CSV: extract synchronously (no Claude API call — fast)
     try:
-        if ext == ".pdf":
-            # PDFs are market research in Data Bank context
-            # (OMs and BOVs go through the Library upload flow)
-            doc_type, record_count, warnings = process_market_research_pdf(
-                filepath=str(file_path),
-                user_id=user_id,
-                db=db,
-                document=document,
-            )
-        else:
-            # Excel/CSV extraction (sales_comps, pipeline_tracker, underwriting_model)
-            doc_type, record_count, warnings = process_data_bank_upload(
-                filepath=str(file_path),
-                user_id=user_id,
-                db=db,
-                document=document,
-            )
+        doc_type, record_count, warnings = process_data_bank_upload(
+            filepath=str(file_path),
+            user_id=user_id,
+            db=db,
+            document=document,
+        )
     except Exception as e:
         logger.exception(f"Upload processing failed for {file.filename}")
         document.extraction_status = "failed"
@@ -287,7 +336,7 @@ def upload_data_bank_file(
     )
 
 
-# ==================== DOCUMENT LIST / DETAIL / DELETE ====================
+# ==================== DOCUMENT LIST / DETAIL / STATUS / DELETE ====================
 
 @router.get("/documents", response_model=DataBankDocumentListResponse)
 def list_documents(
@@ -305,6 +354,36 @@ def list_documents(
         documents=documents,
         total=len(documents),
     )
+
+
+@router.get("/document/{document_id}/status")
+def get_document_status(
+    document_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Lightweight polling endpoint for PDF extraction status.
+    Returns just the fields the frontend needs to know if processing is done.
+    """
+    document = (
+        db.query(DataBankDocument)
+        .filter(
+            DataBankDocument.id == document_id,
+            DataBankDocument.user_id == str(current_user.id),
+        )
+        .first()
+    )
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return {
+        "id": document.id,
+        "extraction_status": document.extraction_status,
+        "document_type": document.document_type,
+        "record_count": document.record_count,
+        "signal_count": document.signal_count,
+        "source_firm": document.source_firm,
+    }
 
 
 @router.get("/document/{document_id}", response_model=DataBankDocumentResponse)

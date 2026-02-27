@@ -117,6 +117,19 @@ export const dataBankService = {
     return response.data;
   },
 
+  /** Lightweight status poll for in-progress PDF extraction */
+  async getDocumentStatus(id: number): Promise<{
+    id: number;
+    extraction_status: string;
+    document_type: string;
+    record_count: number | null;
+    signal_count: number | null;
+    source_firm: string | null;
+  }> {
+    const response = await api.get(`/data-bank/document/${id}/status`);
+    return response.data;
+  },
+
   /** Delete a document and all associated extracted records */
   async deleteDocument(id: number): Promise<void> {
     await api.delete(`/data-bank/document/${id}`);
