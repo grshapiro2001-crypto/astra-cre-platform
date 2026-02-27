@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react';
-import { PageTransition } from '@/components/layout/PageTransition';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -154,42 +153,37 @@ export const OrganizationSettings = () => {
 
   if (loading) {
     return (
-      <PageTransition>
-        <div className="max-w-3xl mx-auto py-8">
-          <div className="animate-pulse space-y-4">
-            <div className="h-8 w-48 bg-muted rounded" />
-            <div className="h-40 bg-muted rounded-2xl" />
-          </div>
+      <div className="max-w-3xl mx-auto py-8">
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 w-48 bg-muted rounded" />
+          <div className="h-40 bg-muted rounded-2xl" />
         </div>
-      </PageTransition>
+      </div>
     );
   }
 
   if (error) {
     return (
-      <PageTransition>
-        <div className="max-w-3xl mx-auto py-8">
-          <div className="bg-card/50 border border-destructive/30 rounded-2xl p-8 text-center space-y-4">
-            <div className="w-12 h-12 rounded-xl bg-destructive/10 flex items-center justify-center mx-auto">
-              <AlertTriangle className="w-6 h-6 text-destructive" />
-            </div>
-            <div className="space-y-1">
-              <h2 className="text-lg font-semibold text-foreground">Failed to load organization</h2>
-              <p className="text-sm text-muted-foreground">{error}</p>
-            </div>
-            <Button onClick={fetchOrg} variant="outline" size="sm">
-              <RotateCcw className="w-4 h-4 mr-1.5" /> Try Again
-            </Button>
+      <div className="max-w-3xl mx-auto py-8">
+        <div className="bg-card/50 border border-destructive/30 rounded-2xl p-8 text-center space-y-4">
+          <div className="w-12 h-12 rounded-xl bg-destructive/10 flex items-center justify-center mx-auto">
+            <AlertTriangle className="w-6 h-6 text-destructive" />
           </div>
+          <div className="space-y-1">
+            <h2 className="text-lg font-semibold text-foreground">Failed to load organization</h2>
+            <p className="text-sm text-muted-foreground">{error}</p>
+          </div>
+          <Button onClick={fetchOrg} variant="outline" size="sm">
+            <RotateCcw className="w-4 h-4 mr-1.5" /> Try Again
+          </Button>
         </div>
-      </PageTransition>
+      </div>
     );
   }
 
   // ========== NO ORG — SHOW CREATE/JOIN ==========
   if (!hasOrg) {
     return (
-      <PageTransition>
         <div className="max-w-3xl mx-auto py-8 space-y-6">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Organization</h1>
@@ -265,7 +259,6 @@ export const OrganizationSettings = () => {
             </div>
           </div>
         </div>
-      </PageTransition>
     );
   }
 
@@ -273,7 +266,6 @@ export const OrganizationSettings = () => {
   const isOwner = org?.your_role === 'owner';
 
   return (
-    <PageTransition>
       <div className="max-w-3xl mx-auto py-8 space-y-6">
         {/* Organization Info */}
         <div className="bg-card/50 border border-border/60 rounded-2xl p-6">
@@ -460,6 +452,5 @@ export const OrganizationSettings = () => {
           )}
         </div>
       </div>
-    </PageTransition>
   );
 };

@@ -16,7 +16,6 @@ import { Button } from '@/components/ui/button';
 import organizationService from '@/services/organizationService';
 import type { Organization } from '@/services/organizationService';
 import { MigrateDealModal } from '@/components/organization/MigrateDealModal';
-import { PageTransition } from '@/components/layout/PageTransition';
 
 const DEAL_STAGES_KEY = 'astra-deal-stages';
 import { DashboardSkeleton } from '@/components/ui/PageSkeleton';
@@ -327,7 +326,6 @@ export const Dashboard = () => {
   // ============================================================
 
   return (
-    <PageTransition>
       <AnimatePresence mode="wait">
         {isLoading ? (
           <motion.div key="skeleton" initial={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
@@ -540,6 +538,5 @@ export const Dashboard = () => {
           </motion.div>
         )}
       </AnimatePresence>
-    </PageTransition>
   );
 };
