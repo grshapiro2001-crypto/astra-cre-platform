@@ -502,6 +502,10 @@ def parse_financial_period(json_str: Optional[str]) -> Optional[FinancialPeriodD
 
     try:
         data = json.loads(json_str)
-        return FinancialPeriodData(**data)
-    except Exception:
+        result = FinancialPeriodData(**data)
+        logger.info("Parsed financial period '%s': noi=%s, gsr=%s, total_opex=%s",
+                     result.period_label, result.noi, result.gsr, result.total_opex)
+        return result
+    except Exception as e:
+        logger.error("Failed to parse financial period JSON: %s — data: %s", e, json_str[:200] if json_str else "None")
         return None

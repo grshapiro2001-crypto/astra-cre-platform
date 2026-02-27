@@ -898,6 +898,11 @@ def build_property_detail_response(property_obj: Property, db: Session) -> Prope
         pipeline_stage=property_obj.pipeline_stage,
         pipeline_notes=property_obj.pipeline_notes,
         pipeline_updated_at=property_obj.pipeline_updated_at,
+        t12_noi=property_obj.t12_noi,
+        t3_noi=property_obj.t3_noi,
+        y1_noi=property_obj.y1_noi,
+        financial_data_source=property_obj.financial_data_source,
+        financial_data_updated_at=property_obj.financial_data_updated_at,
         documents=document_items,  # Phase 1: Excel Integration
         rr_total_units=property_obj.rr_total_units,
         rr_occupied_units=property_obj.rr_occupied_units,
@@ -1329,10 +1334,12 @@ async def upload_document_to_property(
                     "credit_loss": summary.get("bad_debt"),
                     "net_rental_income": summary.get("net_rental_income"),
                     "real_estate_taxes": summary.get("real_estate_taxes"),
-                    "insurance": summary.get("insurance"),
+                    "insurance_amount": summary.get("insurance"),
                     "management_fee_pct": property_obj.t12_management_fee_pct,
                 }
                 property_obj.t12_financials_json = json.dumps(t12_fin)
+                logger.info("T12 financials JSON built: noi=%s, gsr=%s, total_opex=%s",
+                            t12_fin.get("noi"), t12_fin.get("gsr"), t12_fin.get("total_opex"))
 
                 # Calculate T3 from monthly data (last 3 months annualized)
                 t3_calculated = False
@@ -1420,7 +1427,7 @@ async def upload_document_to_property(
                             "credit_loss": t3_bad_debt,
                             "net_rental_income": t3_nri or t3_rev_annual,
                             "real_estate_taxes": t3_line_items.get("real_estate_taxes"),
-                            "insurance": t3_line_items.get("insurance"),
+                            "insurance_amount": t3_line_items.get("insurance"),
                             "management_fee_pct": None,
                         }
                         property_obj.t3_financials_json = json.dumps(t3_fin)
