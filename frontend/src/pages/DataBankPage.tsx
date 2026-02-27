@@ -3,6 +3,7 @@ import {
   Database,
   Upload as UploadIcon,
   FileSpreadsheet,
+  FileText,
   Trash2,
   ChevronDown,
   ChevronUp,
@@ -91,6 +92,7 @@ const docTypeLabel = (type: string): string => {
     sales_comps: 'Sales Comps',
     pipeline_tracker: 'Pipeline',
     underwriting_model: 'Underwriting',
+    market_research: 'Market Research',
     unknown: 'Unknown',
   };
   return map[type] || type;
@@ -206,8 +208,8 @@ const DocumentsTab = () => {
 
   const handleUpload = async (file: File) => {
     const ext = file.name.split('.').pop()?.toLowerCase();
-    if (!ext || !['xlsx', 'xlsm', 'csv'].includes(ext)) {
-      setError('Unsupported file type. Please upload .xlsx, .xlsm, or .csv files.');
+    if (!ext || !['xlsx', 'xlsm', 'csv', 'pdf'].includes(ext)) {
+      setError('Unsupported file type. Please upload .xlsx, .xlsm, .csv, or .pdf files.');
       return;
     }
 
@@ -274,7 +276,7 @@ const DocumentsTab = () => {
         <input
           ref={fileInputRef}
           type="file"
-          accept=".xlsx,.xlsm,.csv"
+          accept=".xlsx,.xlsm,.csv,.pdf"
           onChange={handleFileSelect}
           className="hidden"
         />
@@ -299,8 +301,10 @@ const DocumentsTab = () => {
             <div>
               <p className="text-sm font-medium text-foreground">Upload complete!</p>
               <p className="text-xs text-muted-foreground mt-1">
-                Extracted {uploadResult.record_count} records from{' '}
-                <span className="font-medium">{uploadResult.filename}</span>
+                {uploadResult.document_type === 'market_research' && uploadResult.signal_count
+                  ? `Extracted ${uploadResult.record_count - uploadResult.signal_count} comps, ${uploadResult.signal_count} market signals`
+                  : `Extracted ${uploadResult.record_count} records`}{' '}
+                from <span className="font-medium">{uploadResult.filename}</span>
                 {' '}({docTypeLabel(uploadResult.document_type)})
               </p>
               {uploadResult.warnings.length > 0 && (
@@ -336,7 +340,7 @@ const DocumentsTab = () => {
                 </button>
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                Supports .xlsx, .xlsm, and .csv files (sales comps, pipeline trackers)
+                Supports .xlsx, .xlsm, .csv, and .pdf files (sales comps, pipeline trackers, market research reports)
               </p>
             </div>
           </div>
@@ -404,7 +408,11 @@ const DocumentsTab = () => {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <FileSpreadsheet className="w-4 h-4 text-primary shrink-0" />
+                        {doc.document_type === 'market_research' ? (
+                          <FileText className="w-4 h-4 text-violet-500 shrink-0" />
+                        ) : (
+                          <FileSpreadsheet className="w-4 h-4 text-primary shrink-0" />
+                        )}
                         <span className="font-medium text-foreground truncate max-w-[200px]">
                           {doc.filename}
                         </span>
@@ -416,7 +424,9 @@ const DocumentsTab = () => {
                       </span>
                     </TableCell>
                     <TableCell className="text-right font-mono text-sm">
-                      {doc.record_count != null ? fmtNumber(doc.record_count) : '—'}
+                      {doc.document_type === 'market_research' && doc.signal_count != null
+                        ? `${(doc.record_count ?? 0) - doc.signal_count} / ${doc.signal_count}`
+                        : doc.record_count != null ? fmtNumber(doc.record_count) : '—'}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {fmtDate(doc.created_at)}
@@ -450,6 +460,34 @@ const DocumentsTab = () => {
                             <span className="font-medium text-foreground">Records Extracted:</span>{' '}
                             <span className="font-mono">{doc.record_count ?? '—'}</span>
                           </p>
+                          {doc.document_type === 'market_research' && (
+                            <>
+                              {doc.source_firm && (
+                                <p className="text-muted-foreground">
+                                  <span className="font-medium text-foreground">Source Firm:</span>{' '}
+                                  {doc.source_firm}
+                                </p>
+                              )}
+                              {doc.signal_count != null && (
+                                <p className="text-muted-foreground">
+                                  <span className="font-medium text-foreground">Market Signals:</span>{' '}
+                                  <span className="font-mono">{doc.signal_count}</span>
+                                </p>
+                              )}
+                              {doc.geographies_covered && (
+                                <p className="text-muted-foreground">
+                                  <span className="font-medium text-foreground">Geographies:</span>{' '}
+                                  {doc.geographies_covered}
+                                </p>
+                              )}
+                              {doc.publication_date && (
+                                <p className="text-muted-foreground">
+                                  <span className="font-medium text-foreground">Publication Date:</span>{' '}
+                                  {doc.publication_date}
+                                </p>
+                              )}
+                            </>
+                          )}
                           <p className="text-muted-foreground">
                             <span className="font-medium text-foreground">Status:</span>{' '}
                             {doc.extraction_status}
