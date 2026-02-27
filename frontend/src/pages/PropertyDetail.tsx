@@ -442,38 +442,68 @@ export const PropertyDetail = () => {
   const handleReanalyze = async () => {
     if (!id) return;
     setIsReanalyzing(true);
+    setShowReanalyzeDialog(false);
     try {
-      const updated = await propertyService.reanalyzeProperty(
-        parseInt(id),
-      );
-      setProperty(updated);
-      setShowReanalyzeDialog(false);
+      // POST returns 202 immediately — extraction runs in a background task
+      await propertyService.reanalyzeProperty(parseInt(id));
+
+      // Update local state to show processing indicator
+      setProperty((prev) => prev ? { ...prev, analysis_status: 'processing' } : prev);
+
+      // Poll analysis-status until extraction completes or fails
+      const poll = async () => {
+        const MAX_POLLS = 60; // up to ~5 minutes (60 × 5 s)
+        let attempts = 0;
+        const interval = window.setInterval(async () => {
+          attempts++;
+          try {
+            const status = await propertyService.getAnalysisStatus(parseInt(id));
+            if (status.analysis_status === 'completed' || status.analysis_status === 'failed') {
+              window.clearInterval(interval);
+              setIsReanalyzing(false);
+              if (status.analysis_status === 'completed') {
+                // Fetch full property now that extraction is done
+                const updated = await propertyService.getProperty(parseInt(id));
+                setProperty(updated);
+              } else {
+                setProperty((prev) => prev ? { ...prev, analysis_status: 'failed' } : prev);
+                alert('Re-analysis failed. Check Render logs for details.');
+              }
+            }
+          } catch {
+            // Polling errors are transient — keep trying until MAX_POLLS
+          }
+          if (attempts >= MAX_POLLS) {
+            window.clearInterval(interval);
+            setIsReanalyzing(false);
+            setProperty((prev) => prev ? { ...prev, analysis_status: 'failed' } : prev);
+            alert('Re-analysis timed out. The extraction may still be running — refresh the page in a moment.');
+          }
+        }, 5000); // poll every 5 seconds
+      };
+      poll();
     } catch (err: unknown) {
       // Surface the most specific error message available.
-      // e.response.data.detail = FastAPI HTTPException message (most useful)
-      // e.response.status       = HTTP status code (helps diagnose 429, 404, 500)
-      // e.message               = network-level error (e.g. timeout, CORS)
       const e = err as {
         response?: { status?: number; data?: { detail?: string } };
         message?: string;
       };
       const detail = e.response?.data?.detail;
-      const status = e.response?.status;
+      const httpStatus = e.response?.status;
       const networkMsg = e.message;
 
       let errorMsg: string;
       if (detail) {
         errorMsg = detail;
-      } else if (status) {
-        errorMsg = `Server error (HTTP ${status}). Check Render logs for details.`;
+      } else if (httpStatus) {
+        errorMsg = `Server error (HTTP ${httpStatus}). Check Render logs for details.`;
       } else if (networkMsg) {
-        errorMsg = `Network error: ${networkMsg}. The request may have timed out — check Render logs.`;
+        errorMsg = `Network error: ${networkMsg}.`;
       } else {
         errorMsg = 'Unknown error. Check the browser console and Render logs.';
       }
 
       alert(`Re-analysis failed: ${errorMsg}`);
-    } finally {
       setIsReanalyzing(false);
     }
   };
@@ -928,11 +958,16 @@ export const PropertyDetail = () => {
               </button>
 
               <button
-                onClick={() => setShowReanalyzeDialog(true)}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors"
+                onClick={() => !isReanalyzing && setShowReanalyzeDialog(true)}
+                disabled={isReanalyzing}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 hover:bg-purple-500/20 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                <RefreshCw className="w-4 h-4" />
-                Re-analyze
+                {isReanalyzing ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-4 h-4" />
+                )}
+                {isReanalyzing ? 'Analyzing…' : 'Re-analyze'}
               </button>
 
               {/* More menu */}
@@ -2942,27 +2977,23 @@ export const PropertyDetail = () => {
           <DialogHeader>
             <DialogTitle>Re-analyze Property?</DialogTitle>
             <DialogDescription>
-              This will re-run the AI analysis on the original PDF file. This
-              action will use AI credits and may take a few moments.
+              This will re-run the AI analysis on the original PDF file. The
+              job runs in the background — the page will update automatically
+              when extraction is complete.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <button
               onClick={() => setShowReanalyzeDialog(false)}
-              disabled={isReanalyzing}
-              className="px-4 py-2 rounded-lg text-sm font-medium border border-border text-foreground hover:bg-accent transition-colors disabled:opacity-50"
+              className="px-4 py-2 rounded-lg text-sm font-medium border border-border text-foreground hover:bg-accent transition-colors"
             >
               Cancel
             </button>
             <button
               onClick={handleReanalyze}
-              disabled={isReanalyzing}
-              className="px-4 py-2 rounded-lg text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center gap-2"
+              className="px-4 py-2 rounded-lg text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors flex items-center gap-2"
             >
-              {isReanalyzing && (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              )}
-              {isReanalyzing ? 'Re-analyzing...' : 'Re-analyze'}
+              Re-analyze
             </button>
           </DialogFooter>
         </DialogContent>

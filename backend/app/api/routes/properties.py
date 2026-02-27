@@ -8,7 +8,7 @@ CRITICAL ARCHITECTURE:
 """
 import logging
 import traceback
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status, UploadFile, File
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
@@ -17,7 +17,7 @@ import os
 import re
 import shutil
 
-from app.database import get_db
+from app.database import get_db, SessionLocal
 from app.models.user import User
 from app.models.property import Property, AnalysisLog, PropertyDocument, RentRollUnit, T12Financial
 from app.api.deps import get_current_user
@@ -43,6 +43,123 @@ logger = logging.getLogger(__name__)
 
 # LLM service is ONLY imported in reanalyze endpoint
 # This prevents accidental LLM calls in read-only operations
+
+
+# ---------------------------------------------------------------------------
+# Background task helper for re-analysis
+# ---------------------------------------------------------------------------
+
+EXTRACTION_MODEL = "claude-sonnet-4-5-20250929"
+
+
+def _run_reanalyze_background(property_id: int, user_id: str) -> None:
+    """
+    Background task: opens its own DB session and runs Claude re-extraction.
+    Called after the HTTP 202 response has already been sent.
+    """
+    import asyncio
+    db = SessionLocal()
+    try:
+        property_obj = db.query(Property).filter(Property.id == property_id).first()
+        if not property_obj:
+            logger.error("Background reanalyze: property %d not found", property_id)
+            return
+
+        from app.services.pdf_service import process_pdf_upload
+
+        pdf_file_path = property_obj.raw_pdf_path
+        use_cached_text = False
+
+        if not pdf_file_path or not os.path.exists(pdf_file_path):
+            cached_text = getattr(property_obj, 'raw_pdf_text', None)
+            if cached_text:
+                logger.info(
+                    "bg reanalyze property_id=%d: disk PDF missing, using cached text (%d chars)",
+                    property_id, len(cached_text)
+                )
+                use_cached_text = True
+            else:
+                logger.error(
+                    "bg reanalyze property_id=%d: no PDF on disk and no cached text — cannot extract",
+                    property_id
+                )
+                property_obj.analysis_status = "failed"
+                db.commit()
+                return
+
+        # Run the async extraction inside a new event loop
+        if use_cached_text:
+            from app.services.claude_extraction_service import extract_with_claude
+            extraction_result = asyncio.run(
+                extract_with_claude(
+                    pdf_text=property_obj.raw_pdf_text,
+                    filename=property_obj.uploaded_filename or "unknown.pdf",
+                )
+            )
+        else:
+            extraction_result = asyncio.run(
+                process_pdf_upload(
+                    file_path=pdf_file_path,
+                    filename=property_obj.uploaded_filename or "unknown.pdf",
+                )
+            )
+
+        # Log extracted periods for diagnostics
+        periods = extraction_result.get('financials_by_period', {})
+        logger.warning(
+            "bg reanalyze property_id=%d doc_type=%s: periods=%s t12_noi=%s",
+            property_id,
+            extraction_result.get('document_type'),
+            list(periods.keys()),
+            periods.get('t12', {}).get('noi') if periods.get('t12') else None,
+        )
+
+        if hasattr(property_obj, 'extraction_data_json'):
+            property_obj.extraction_data_json = json.dumps(extraction_result)
+
+        update_property_from_extraction(property_obj, extraction_result, db=db)
+        property_obj.analysis_count = (property_obj.analysis_count or 0) + 1
+        property_obj.last_analyzed_at = datetime.now(timezone.utc)
+        property_obj.analysis_status = "completed"
+        property_obj.analysis_model = EXTRACTION_MODEL
+
+        log = AnalysisLog(
+            property_id=property_obj.id,
+            user_id=user_id,
+            action="reanalyze",
+            model=EXTRACTION_MODEL,
+            status="success",
+        )
+        db.add(log)
+        db.commit()
+        logger.info("bg reanalyze property_id=%d: completed successfully", property_id)
+
+    except Exception as exc:
+        error_detail = str(exc) or repr(exc)
+        logger.error(
+            "bg reanalyze property_id=%d FAILED: %s\n%s",
+            property_id, error_detail, traceback.format_exc()
+        )
+        try:
+            db.rollback()
+            prop = db.query(Property).filter(Property.id == property_id).first()
+            if prop:
+                prop.analysis_status = "failed"
+                log = AnalysisLog(
+                    property_id=prop.id,
+                    user_id=user_id,
+                    action="reanalyze",
+                    model=EXTRACTION_MODEL,
+                    status="failed",
+                    error_message=error_detail[:2000],
+                )
+                db.add(log)
+                db.commit()
+        except Exception:
+            pass
+    finally:
+        db.close()
+
 
 router = APIRouter(prefix="/properties", tags=["Properties"])
 
@@ -510,176 +627,111 @@ def delete_property(
     return None
 
 
-# ==================== RE-ANALYZE PROPERTY (USES LLM) ====================
+# ==================== RE-ANALYZE PROPERTY (USES LLM — ASYNC) ====================
 
-@router.post("/{property_id}/reanalyze", response_model=PropertyDetail)
-async def reanalyze_property(
+@router.post("/{property_id}/reanalyze", status_code=status.HTTP_202_ACCEPTED)
+def reanalyze_property(
     property_id: int,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
-    Re-analyze property PDF using LLM (EXPLICIT LLM CALL)
+    Kick off an async re-analysis of the property PDF.
 
-    This is the ONLY endpoint (besides initial upload) that calls the LLM.
+    Returns 202 immediately with analysis_status="processing".
+    The actual Claude extraction runs in a BackgroundTask — the same pattern
+    used by the Data Bank PDF upload endpoint to avoid Render's HTTP timeout.
 
-    This endpoint:
-    - Loads PDF from disk
-    - Calls Claude API to re-extract data
-    - Updates property with new data
-    - Increments analysis_count
-    - Logs the re-analysis
+    Poll GET /properties/{id}/analysis-status until analysis_status is
+    "completed" or "failed", then fetch the full property with GET /properties/{id}.
     """
-    # Import LLM service HERE (not at top) to make it explicit
-    from app.services.pdf_service import process_pdf_upload
-    from app.config import settings
-
     # Get property
     property_obj = property_service.get_property(
         db,
         property_id,
         str(current_user.id),
-        update_view_date=False
+        update_view_date=False,
     )
 
     if not property_obj:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Property not found"
+            detail="Property not found",
         )
 
-    # Throttle check (prevent too frequent re-analysis).
-    # Use UTC-aware comparison to avoid TypeError when last_analyzed_at is
-    # timezone-aware (PostgreSQL TIMESTAMPTZ) and datetime.now() is naive.
+    # Throttle check — prevent too frequent re-analysis.
     if property_obj.last_analyzed_at:
         try:
             last_analyzed = property_obj.last_analyzed_at
-            # Normalise to UTC-aware if it already carries tzinfo, else treat
-            # as UTC so we can subtract safely.
             if last_analyzed.tzinfo is None:
                 last_analyzed = last_analyzed.replace(tzinfo=timezone.utc)
             now_utc = datetime.now(timezone.utc)
-            time_since_last = now_utc - last_analyzed
-            if time_since_last.total_seconds() < 300:  # 5 minutes
+            if (now_utc - last_analyzed).total_seconds() < 300:  # 5 min
                 raise HTTPException(
                     status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                    detail="Property was recently analyzed. Please wait 5 minutes before re-analyzing."
+                    detail="Property was recently analyzed. Please wait 5 minutes before re-analyzing.",
                 )
         except HTTPException:
             raise
         except Exception as throttle_err:
-            # Don't let a datetime comparison bug block re-analysis entirely.
             logger.warning("Throttle check failed (non-blocking): %s", throttle_err)
 
-    EXTRACTION_MODEL = "claude-sonnet-4-5-20250929"
-
-    # Determine PDF source: prefer disk file, fall back to cached text in DB
+    # Preflight: verify that a PDF source exists before accepting the job.
     pdf_file_path = property_obj.raw_pdf_path
-    use_cached_text = False
+    has_pdf = pdf_file_path and os.path.exists(pdf_file_path)
+    has_cached_text = bool(getattr(property_obj, 'raw_pdf_text', None))
 
-    if not pdf_file_path or not os.path.exists(pdf_file_path):
-        # Disk file is missing (common after Render restarts — ephemeral FS).
-        # Fall back to raw_pdf_text stored in the database, if available.
-        cached_text = getattr(property_obj, 'raw_pdf_text', None)
-        if cached_text:
-            logger.info(
-                "reanalyze property_id=%d: disk PDF missing at %r, "
-                "falling back to cached raw_pdf_text (%d chars)",
-                property_id, pdf_file_path, len(cached_text)
-            )
-            use_cached_text = True
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=(
-                    "PDF file not found on server (the file may have been lost "
-                    "after a server restart). Please re-upload the document to "
-                    "re-analyze it."
-                )
-            )
-
-    # Call LLM to re-analyze (THIS IS THE ONLY LLM CALL IN LIBRARY FEATURE)
-    try:
-        if use_cached_text:
-            # Use stored PDF text directly — skip pdfplumber
-            from app.services.claude_extraction_service import extract_with_claude
-            extraction_result = await extract_with_claude(
-                pdf_text=property_obj.raw_pdf_text,
-                filename=property_obj.uploaded_filename or "unknown.pdf"
-            )
-        else:
-            extraction_result = await process_pdf_upload(
-                file_path=pdf_file_path,
-                filename=property_obj.uploaded_filename or "unknown.pdf"
-            )
-
-        # Log a summary of what was extracted (helps diagnose missing T12/T3)
-        periods = extraction_result.get('financials_by_period', {})
-        logger.warning(
-            "reanalyze property_id=%d doc_type=%s: extracted periods=%s "
-            "t12_noi=%s t3_noi=%s y1_noi=%s",
-            property_id,
-            extraction_result.get('document_type'),
-            list(periods.keys()),
-            periods.get('t12', {}).get('noi') if periods.get('t12') else None,
-            periods.get('t3', {}).get('noi') if periods.get('t3') else None,
-            periods.get('y1', {}).get('noi') if periods.get('y1') else None,
-        )
-
-        # Store full extraction JSON for debugging (e.g. diagnosing missing T12)
-        import json as _json
-        if hasattr(property_obj, 'extraction_data_json'):
-            property_obj.extraction_data_json = _json.dumps(extraction_result)
-
-        # Update property with new data
-        update_property_from_extraction(property_obj, extraction_result, db=db)
-        property_obj.analysis_count += 1
-        property_obj.last_analyzed_at = datetime.now(timezone.utc)
-        property_obj.analysis_status = "success"
-        property_obj.analysis_model = EXTRACTION_MODEL  # Store actual model name
-
-        # Log the re-analysis
-        log = AnalysisLog(
-            property_id=property_obj.id,
-            user_id=str(current_user.id),
-            action="reanalyze",
-            model=EXTRACTION_MODEL,
-            status="success"
-        )
-        db.add(log)
-        db.commit()
-        db.refresh(property_obj)
-
-        return build_property_detail_response(property_obj, db)
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        error_detail = str(e) or repr(e)  # repr() handles exceptions with empty str()
-        logger.error(
-            "reanalyze property_id=%d FAILED: %s\n%s",
-            property_id, error_detail, traceback.format_exc()
-        )
-        # Log failure
-        try:
-            log = AnalysisLog(
-                property_id=property_obj.id,
-                user_id=str(current_user.id),
-                action="reanalyze",
-                model=EXTRACTION_MODEL,
-                status="failed",
-                error_message=error_detail[:2000]  # Truncate to fit column
-            )
-            db.add(log)
-            property_obj.analysis_status = "failed"
-            db.commit()
-        except Exception as log_err:
-            logger.error("Failed to write reanalyze failure log: %s", log_err)
-
+    if not has_pdf and not has_cached_text:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Re-analysis failed: {error_detail}"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=(
+                "PDF file not found on server (the file may have been lost "
+                "after a server restart). Please re-upload the document to "
+                "re-analyze it."
+            ),
         )
+
+    # Mark as processing and return 202 immediately
+    property_obj.analysis_status = "processing"
+    db.commit()
+
+    background_tasks.add_task(
+        _run_reanalyze_background,
+        property_id=property_id,
+        user_id=str(current_user.id),
+    )
+
+    return {"property_id": property_id, "analysis_status": "processing"}
+
+
+# ==================== RE-ANALYZE STATUS (POLLING) ====================
+
+@router.get("/{property_id}/analysis-status")
+def get_analysis_status(
+    property_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Lightweight polling endpoint for re-analysis status.
+    Returns just the fields the frontend needs to determine if processing is done.
+    Poll until analysis_status is "completed" or "failed".
+    """
+    property_obj = property_service.get_property(
+        db,
+        property_id,
+        str(current_user.id),
+        update_view_date=False,
+    )
+    if not property_obj:
+        raise HTTPException(status_code=404, detail="Property not found")
+    return {
+        "property_id": property_obj.id,
+        "analysis_status": property_obj.analysis_status,
+        "last_analyzed_at": property_obj.last_analyzed_at.isoformat() if property_obj.last_analyzed_at else None,
+        "analysis_count": property_obj.analysis_count,
+    }
 
 
 # ==================== EXPORT SUMMARY PDF (NO LLM) ====================

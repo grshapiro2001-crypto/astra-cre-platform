@@ -257,6 +257,7 @@ export interface PropertyDetail {
   upload_date?: string;
   last_analyzed_at?: string;
   analysis_count?: number;
+  analysis_status?: string | null;
   raw_pdf_path?: string;
   user_id?: string;
   screening_verdict?: string | null;
