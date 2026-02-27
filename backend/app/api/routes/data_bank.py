@@ -226,8 +226,8 @@ def query_pipeline(
 
 @router.post("/upload", response_model=DataBankUploadResponse, status_code=status.HTTP_201_CREATED)
 def upload_data_bank_file(
-    file: UploadFile = File(...),
     background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
