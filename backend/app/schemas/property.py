@@ -283,6 +283,15 @@ class PropertyDetail(BaseModel):
     pipeline_notes: Optional[str] = None
     pipeline_updated_at: Optional[datetime] = None
 
+    # Flat NOI fields (fallback for sorting/filtering and frontend compat)
+    t12_noi: Optional[float] = None
+    t3_noi: Optional[float] = None
+    y1_noi: Optional[float] = None
+
+    # Financial data source tracking
+    financial_data_source: Optional[str] = None
+    financial_data_updated_at: Optional[datetime] = None
+
     # Documents (Phase 1: Excel Integration)
     documents: List["PropertyDocumentResponse"] = []
 

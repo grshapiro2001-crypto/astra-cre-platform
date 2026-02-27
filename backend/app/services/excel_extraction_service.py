@@ -636,6 +636,11 @@ def _find_t12_month_headers(ws: Worksheet, max_scan: int = 20) -> Tuple[int, Dic
     """
     Find the row with month headers (Jan, Feb, ...).
     Returns (row_number, {month_name: col_index}, fiscal_year)
+
+    Handles month headers as:
+    - Text strings: "Jan", "January", "Jan-25", "Jan 2025"
+    - Date values: datetime(2025, 1, 1) (common in Yardi/RealPage exports)
+    - Numeric month references: "1/2025", "01/25"
     """
     month_names = ["january", "february", "march", "april", "may", "june",
                    "july", "august", "september", "october", "november", "december"]
@@ -651,18 +656,40 @@ def _find_t12_month_headers(ws: Worksheet, max_scan: int = 20) -> Tuple[int, Dic
             if cell.value is None:
                 continue
 
-            cell_str = str(cell.value).lower().strip()
+            matched = False
 
-            # Check for month names or abbreviations
-            for i, month_name in enumerate(month_names):
-                if month_name in cell_str or month_abbr[i] in cell_str:
-                    month_cols[month_abbr[i].capitalize()] = col_idx
-                    break
+            # Handle datetime objects (Excel date values for month headers)
+            if isinstance(cell.value, datetime):
+                month_idx = cell.value.month - 1  # 0-indexed
+                month_cols[month_abbr[month_idx].capitalize()] = col_idx
+                # Track fiscal year from the date values
+                if fiscal_year is None or cell.value.year > fiscal_year:
+                    fiscal_year = cell.value.year
+                matched = True
+
+            if not matched:
+                cell_str = str(cell.value).lower().strip()
+
+                # Check for month names or abbreviations
+                for i, month_name in enumerate(month_names):
+                    if month_name in cell_str or month_abbr[i] in cell_str:
+                        month_cols[month_abbr[i].capitalize()] = col_idx
+                        # Try to extract year from the same cell (e.g., "Jan-25", "Jan 2025")
+                        year_match = re.search(r'(20\d{2})', cell_str)
+                        if year_match:
+                            fiscal_year = int(year_match.group(1))
+                        elif re.search(r'[\-/](\d{2})$', cell_str):
+                            # Handle 2-digit year like "Jan-25"
+                            yr2 = re.search(r'[\-/](\d{2})$', cell_str)
+                            if yr2:
+                                yr = int(yr2.group(1))
+                                fiscal_year = 2000 + yr if yr < 100 else yr
+                        break
 
         # If we found at least 6 months, this is probably the header row
         if len(month_cols) >= 6:
-            # Try to find fiscal year in the row above
-            if row_idx > 1:
+            # Try to find fiscal year from the row above (if not already found from dates)
+            if fiscal_year is None and row_idx > 1:
                 prev_row = ws[row_idx - 1]
                 for cell in prev_row:
                     if cell.value and isinstance(cell.value, (int, float)):
@@ -677,8 +704,11 @@ def _find_t12_month_headers(ws: Worksheet, max_scan: int = 20) -> Tuple[int, Dic
                             fiscal_year = int(match.group(1))
                             break
 
+            logger.info("T12 month headers found at row %d with %d months, fiscal_year=%s",
+                        row_idx, len(month_cols), fiscal_year)
             return row_idx, month_cols, fiscal_year
 
+    logger.warning("T12 month headers NOT found after scanning %d rows", max_scan)
     return 0, {}, None
 
 
@@ -755,30 +785,59 @@ def _extract_t12_summary(line_items: Dict[str, Dict[str, Any]], total_col: Optio
     summary = {}
 
     # Define mappings from line item names to summary fields
+    # Keywords are checked in order — more specific first to reduce false positives
     mappings = {
-        "gross_potential_rent": ["gross potential rent", "gpr", "gross rent"],
-        "loss_to_lease": ["loss to lease", "gain loss to lease", "ltl"],
+        "gross_potential_rent": [
+            "gross potential rent", "gross potential revenue", "gpr",
+            "gross rent", "gross rental income", "gross scheduled rent",
+            "residential income", "apartment income", "rental income",
+        ],
+        "loss_to_lease": [
+            "loss to lease", "gain loss to lease", "gain/loss to lease",
+            "gain / loss to lease", "ltl", "gain(loss) to lease",
+        ],
         "concessions": ["concession", "concessions"],
-        "vacancy_loss": ["vacancy", "vacancy loss"],
-        "bad_debt": ["bad debt", "credit loss"],
-        "non_revenue_units": ["non revenue units", "non-revenue units", "non revenue"],
-        "net_rental_income": ["net rental income", "nri"],
-        "other_income": ["other income"],
-        "total_revenue": ["total revenue", "gross revenue", "effective gross income"],
-        "payroll": ["payroll"],
-        "utilities": ["utilities"],
-        "repairs_maintenance": ["repairs & maintenance", "repairs and maintenance", "r&m", "repair"],
-        "turnover": ["turnover", "make ready"],
-        "contract_services": ["contract services", "contracts"],
-        "marketing": ["marketing", "advertising"],
-        "administrative": ["administrative", "general & administrative", "g&a"],
-        "management_fee": ["management fee"],
+        "vacancy_loss": ["vacancy", "vacancy loss", "physical vacancy"],
+        "bad_debt": ["bad debt", "credit loss", "bad debt write-off"],
+        "non_revenue_units": [
+            "non revenue units", "non-revenue units", "non revenue",
+            "non-rev units", "model/employee",
+        ],
+        "net_rental_income": ["net rental income", "nri", "net rent income"],
+        "other_income": ["other income", "ancillary income", "miscellaneous income"],
+        "total_revenue": [
+            "total revenue", "total income", "gross revenue",
+            "effective gross income", "effective gross revenue",
+            "total operating revenue",
+        ],
+        "payroll": ["payroll", "personnel", "salary", "salaries & wages"],
+        "utilities": ["utilities", "utility"],
+        "repairs_maintenance": [
+            "repairs & maintenance", "repairs and maintenance",
+            "r&m", "repair", "maintenance",
+        ],
+        "turnover": ["turnover", "make ready", "turn cost"],
+        "contract_services": ["contract services", "contracts", "contracted services"],
+        "marketing": ["marketing", "advertising", "leasing cost"],
+        "administrative": [
+            "administrative", "general & administrative", "g&a",
+            "admin", "office expense",
+        ],
+        "management_fee": ["management fee", "mgmt fee", "property management"],
         "controllable_expenses": ["controllable"],
-        "real_estate_taxes": ["real estate taxes", "property taxes", "taxes"],
+        "real_estate_taxes": [
+            "real estate taxes", "property taxes", "taxes",
+            "real estate tax", "property tax",
+        ],
         "insurance": ["insurance"],
         "non_controllable_expenses": ["non controllable", "non-controllable"],
-        "total_operating_expenses": ["operating expenses", "total opex", "total expenses"],
-        "net_operating_income": ["net operating income", "noi"]
+        "total_operating_expenses": [
+            "total operating expenses", "total expenses",
+            "operating expenses", "total opex", "total expense",
+        ],
+        "net_operating_income": [
+            "net operating income", "noi", "net income",
+        ],
     }
 
     # Match line items to summary fields
@@ -796,6 +855,27 @@ def _extract_t12_summary(line_items: Dict[str, Dict[str, Any]], total_col: Optio
                     summary[field] = values["Total"]
                     break
 
+    # Fallback: if NOI is missing, calculate from total_revenue - total_operating_expenses
+    if summary.get("net_operating_income") is None:
+        rev = summary.get("total_revenue")
+        exp = summary.get("total_operating_expenses")
+        if rev is not None and exp is not None:
+            summary["net_operating_income"] = rev - abs(exp)
+            logger.info("T12 NOI computed as fallback: revenue(%s) - expenses(%s) = %s",
+                        rev, exp, summary["net_operating_income"])
+
+    # Fallback: if total_revenue is missing but GPR and other components exist
+    if summary.get("total_revenue") is None and summary.get("gross_potential_rent") is not None:
+        gpr = summary["gross_potential_rent"]
+        deductions = sum(abs(summary.get(k, 0) or 0) for k in [
+            "loss_to_lease", "vacancy_loss", "concessions", "bad_debt"
+        ])
+        other = summary.get("other_income", 0) or 0
+        summary["total_revenue"] = gpr - deductions + other
+        logger.info("T12 total_revenue computed as fallback: GPR(%s) - deductions(%s) + other(%s) = %s",
+                     gpr, deductions, other, summary["total_revenue"])
+
+    logger.info("T12 summary extraction: %s", {k: v for k, v in summary.items() if v is not None})
     return summary
 
 
@@ -807,23 +887,36 @@ def _extract_t12_monthly(line_items: Dict[str, Dict[str, Any]], month_cols: Dict
         "expenses": {}
     }
 
+    noi_keywords = ["net operating income", "noi", "net income"]
+    revenue_keywords = [
+        "total revenue", "total income", "gross revenue",
+        "effective gross income", "effective gross revenue",
+        "total operating revenue",
+    ]
+    expense_keywords = [
+        "total operating expenses", "total expenses",
+        "operating expenses", "total opex", "total expense",
+    ]
+
     # Find NOI, Revenue, and Expenses line items
     for item_name, values in line_items.items():
         item_lower = item_name.lower()
 
-        if "net operating income" in item_lower or item_lower == "noi":
+        if not monthly["noi"] and any(kw in item_lower for kw in noi_keywords):
             for month in month_cols.keys():
                 if month in values:
                     monthly["noi"][month] = values[month]
 
-        if "total revenue" in item_lower or "gross revenue" in item_lower or "effective gross income" in item_lower:
+        if not monthly["revenue"] and any(kw in item_lower for kw in revenue_keywords):
             for month in month_cols.keys():
                 if month in values:
                     monthly["revenue"][month] = values[month]
 
-        if "operating expenses" in item_lower or "total opex" in item_lower:
+        if not monthly["expenses"] and any(kw in item_lower for kw in expense_keywords):
             for month in month_cols.keys():
                 if month in values:
                     monthly["expenses"][month] = values[month]
 
+    logger.info("T12 monthly extraction: noi=%d months, revenue=%d months, expenses=%d months",
+                len(monthly["noi"]), len(monthly["revenue"]), len(monthly["expenses"]))
     return monthly
