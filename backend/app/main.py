@@ -33,6 +33,10 @@ def run_migrations():
             # extraction_data_json: full Claude response blob for debugging
             # missing T12/T3 data without re-running extraction.
             ("extraction_data_json", "TEXT"),
+            # Pipeline management columns
+            ("pipeline_stage", "VARCHAR(50) DEFAULT 'screening'"),
+            ("pipeline_notes", "TEXT"),
+            ("pipeline_updated_at", "TIMESTAMP"),
         ]
         for col_name, col_type in new_columns:
             if col_name not in existing_cols:
@@ -111,6 +115,16 @@ def run_migrations():
                 logger.warning("Migration: added column deal_folders.organization_id")
         except Exception as e:
             logger.warning(f"Migration deal_folders org_id skip: {e}")
+
+        # Add pipeline_template to organizations if missing
+        try:
+            org_cols = {c['name'] for c in inspector.get_columns('organizations')}
+            if 'pipeline_template' not in org_cols:
+                conn.execute(text("ALTER TABLE organizations ADD COLUMN pipeline_template VARCHAR(50) DEFAULT 'acquisitions'"))
+                conn.commit()
+                logger.warning("Migration: added column organizations.pipeline_template")
+        except Exception as e:
+            logger.warning(f"Migration organizations pipeline_template skip: {e}")
 
         # Add market research metadata columns to data_bank_documents if missing
         try:

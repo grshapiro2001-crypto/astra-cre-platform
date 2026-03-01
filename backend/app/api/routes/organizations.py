@@ -20,6 +20,8 @@ from app.schemas.organization import (
     JoinRequest,
     ApproveMemberRequest,
     MigrateDealRequest,
+    PipelineTemplateRequest,
+    PipelineTemplateResponse,
 )
 from app.api.deps import get_current_user
 
@@ -52,6 +54,7 @@ def _build_org_response(org: Organization, role: OrgRole, db: Session) -> Organi
         id=org.id,
         name=org.name,
         invite_code=org.invite_code,
+        pipeline_template=org.pipeline_template or "acquisitions",
         created_at=org.created_at,
         member_count=member_count,
         your_role=role,
@@ -388,3 +391,80 @@ def regenerate_invite_code(
     db.refresh(org)
 
     return _build_org_response(org, OrgRole.owner, db)
+
+
+# ==================== PIPELINE TEMPLATE ====================
+
+VALID_PIPELINE_TEMPLATES = ["broker", "acquisitions", "dispositions"]
+
+# First stage for each template — used when re-mapping properties on template switch
+TEMPLATE_FIRST_STAGE = {
+    "acquisitions": "screening",
+    "dispositions": "prep",
+    "broker": "lead",
+}
+
+# All stage IDs belonging to each template
+TEMPLATE_STAGES = {
+    "acquisitions": {"screening", "under_review", "loi", "under_contract", "closed"},
+    "dispositions": {"prep", "listed", "offers", "under_contract", "sold"},
+    "broker": {"lead", "pitch", "listing", "marketing", "offers", "closed"},
+}
+
+
+@router.get("/pipeline-template", response_model=PipelineTemplateResponse)
+def get_pipeline_template(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Get the org's active pipeline template."""
+    membership = _get_user_approved_membership(db, str(current_user.id))
+    if not membership:
+        # Not in an org — return default
+        return PipelineTemplateResponse(template="acquisitions")
+
+    org = db.query(Organization).filter(Organization.id == membership.organization_id).first()
+    return PipelineTemplateResponse(template=org.pipeline_template or "acquisitions")
+
+
+@router.patch("/pipeline-template", response_model=PipelineTemplateResponse)
+def update_pipeline_template(
+    data: PipelineTemplateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Update the org's pipeline template. Re-maps properties whose stage is invalid for the new template."""
+    if data.template not in VALID_PIPELINE_TEMPLATES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid template. Must be one of: {', '.join(VALID_PIPELINE_TEMPLATES)}",
+        )
+
+    membership = _get_user_approved_membership(db, str(current_user.id))
+    if not membership:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Not in an organization.")
+
+    org = db.query(Organization).filter(Organization.id == membership.organization_id).first()
+    if not org:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found.")
+
+    old_template = org.pipeline_template or "acquisitions"
+    new_template = data.template
+
+    org.pipeline_template = new_template
+    db.flush()
+
+    # Re-map org properties whose current stage doesn't exist in the new template
+    if old_template != new_template:
+        new_valid_stages = TEMPLATE_STAGES.get(new_template, set())
+        first_stage = TEMPLATE_FIRST_STAGE.get(new_template, "screening")
+
+        org_properties = db.query(Property).filter(
+            Property.organization_id == membership.organization_id,
+        ).all()
+        for prop in org_properties:
+            if prop.pipeline_stage not in new_valid_stages:
+                prop.pipeline_stage = first_stage
+
+    db.commit()
+    return PipelineTemplateResponse(template=new_template)

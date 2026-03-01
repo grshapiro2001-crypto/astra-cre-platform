@@ -480,25 +480,34 @@ def update_property_stage(
     This endpoint:
     - Updates pipeline_stage column
     - Updates pipeline_updated_at timestamp
-    - Validates stage is one of the valid values
+    - Validates stage is one of the valid values across all pipeline presets
     - Does NOT call LLM
-
-    Valid stages: screening, under_review, loi, under_contract, closed, passed
     """
-    # Validate stage
-    valid_stages = ["screening", "under_review", "loi", "under_contract", "closed", "passed"]
+    # Valid stages from ALL pipeline presets (Acquisitions, Dispositions, Broker)
+    valid_stages = [
+        # Acquisitions
+        "screening", "under_review", "loi", "under_contract", "closed",
+        # Dispositions
+        "prep", "listed", "offers", "sold",
+        # Broker
+        "lead", "pitch", "listing", "marketing",
+        # Legacy
+        "passed",
+    ]
     if stage not in valid_stages:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid stage. Must be one of: {', '.join(valid_stages)}"
         )
 
-    # Get property
+    # Get property (org-scoped so any org member can update)
+    org_id = _get_user_org_id(db, str(current_user.id))
     property_obj = property_service.get_property(
         db,
         property_id,
         str(current_user.id),
-        update_view_date=False
+        update_view_date=False,
+        org_id=org_id,
     )
 
     if not property_obj:
@@ -509,7 +518,7 @@ def update_property_stage(
 
     # Update stage
     property_obj.pipeline_stage = stage
-    property_obj.pipeline_updated_at = datetime.now()
+    property_obj.pipeline_updated_at = datetime.now(timezone.utc)
 
     db.commit()
     db.refresh(property_obj)

@@ -26,6 +26,7 @@ class Organization(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False)
     invite_code = Column(String(255), unique=True, nullable=False, default=lambda: secrets.token_urlsafe(8))
+    pipeline_template = Column(String(50), nullable=False, server_default="acquisitions")  # "broker", "acquisitions", "dispositions"
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     members = relationship("OrganizationMember", back_populates="organization", cascade="all, delete-orphan")

@@ -134,9 +134,7 @@ export const Dashboard = () => {
   const [scoresMap, setScoresMap] = useState<Record<number, number | null>>({});
 
   // --- Pipeline State ---
-  const [activePresetId, setActivePresetId] = useState<string>(() => {
-    try { return localStorage.getItem(STORAGE_KEY) || 'acquisitions'; } catch { return 'acquisitions'; }
-  });
+  const [activePresetId, setActivePresetId] = useState<string>('acquisitions');
   const [stageMap, setStageMap] = useState<Record<number, string>>({});
 
   // --- Org State ---
@@ -159,11 +157,32 @@ export const Dashboard = () => {
     setIsLoading(true);
     setError(null);
     try {
+      // Load org pipeline template (if user is in an org)
+      let resolvedPresetId = activePresetId;
+      try {
+        const templateResult = await organizationService.getPipelineTemplate();
+        if (templateResult.template && PIPELINE_PRESETS.some((p) => p.id === templateResult.template)) {
+          resolvedPresetId = templateResult.template;
+          setActivePresetId(resolvedPresetId);
+          try { localStorage.setItem(STORAGE_KEY, resolvedPresetId); } catch { /* noop */ }
+        }
+      } catch {
+        // Not in an org or endpoint unavailable — fall back to localStorage
+        try {
+          const stored = localStorage.getItem(STORAGE_KEY);
+          if (stored && PIPELINE_PRESETS.some((p) => p.id === stored)) {
+            resolvedPresetId = stored;
+            setActivePresetId(resolvedPresetId);
+          }
+        } catch { /* noop */ }
+      }
+
       const propertiesResult = await propertyService.listProperties({});
       const props = propertiesResult.properties as PropertyWithFinancials[];
       setProperties(props);
 
-      const defaultStageId = PIPELINE_PRESETS.find((p) => p.id === activePresetId)?.stages[0]?.id || 'screening';
+      // Build stageMap from API pipeline_stage (source of truth), falling back to localStorage then default
+      const defaultStageId = PIPELINE_PRESETS.find((p) => p.id === resolvedPresetId)?.stages[0]?.id || 'screening';
       const savedStages: Record<number, string> = (() => {
         try {
           const raw = localStorage.getItem(DEAL_STAGES_KEY);
@@ -172,9 +191,11 @@ export const Dashboard = () => {
       })();
       const initialStageMap: Record<number, string> = {};
       props.forEach((p) => {
-        initialStageMap[p.id] = savedStages[p.id] || p.pipeline_stage || defaultStageId;
+        // API pipeline_stage is the source of truth; localStorage is fallback for non-org users
+        initialStageMap[p.id] = p.pipeline_stage || savedStages[p.id] || defaultStageId;
       });
       setStageMap(initialStageMap);
+      try { localStorage.setItem(DEAL_STAGES_KEY, JSON.stringify(initialStageMap)); } catch { /* noop */ }
 
       criteriaService.getScreeningSummary().then(setScreeningSummary).catch(() => {});
 
@@ -217,7 +238,8 @@ export const Dashboard = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [activePresetId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -309,16 +331,51 @@ export const Dashboard = () => {
   }, []);
 
   const handleStageChange = useCallback((dealId: number, newStageId: string) => {
+    // Optimistic UI update
     setStageMap((prev) => {
       const next = { ...prev, [dealId]: newStageId };
       try { localStorage.setItem(DEAL_STAGES_KEY, JSON.stringify(next)); } catch { /* noop */ }
       return next;
     });
-  }, []);
+
+    // Persist to backend
+    propertyService.updateStage(dealId, newStageId).catch((err) => {
+      console.error('Failed to persist stage change:', err);
+      // Revert on error
+      setStageMap((prev) => {
+        const reverted = { ...prev };
+        const prop = properties.find((p) => p.id === dealId);
+        if (prop) {
+          reverted[dealId] = prop.pipeline_stage || activePreset.stages[0]?.id || 'screening';
+        }
+        try { localStorage.setItem(DEAL_STAGES_KEY, JSON.stringify(reverted)); } catch { /* noop */ }
+        return reverted;
+      });
+    });
+  }, [properties, activePreset]);
 
   const handlePresetChange = useCallback((presetId: string) => {
     setActivePresetId(presetId);
     try { localStorage.setItem(STORAGE_KEY, presetId); } catch { /* noop */ }
+
+    // Persist template choice to org (if in one)
+    organizationService.updatePipelineTemplate(presetId).then(() => {
+      // Re-fetch properties to get re-mapped stages from backend
+      propertyService.listProperties({}).then((result) => {
+        const props = result.properties as PropertyWithFinancials[];
+        setProperties(props);
+        const preset = PIPELINE_PRESETS.find((p) => p.id === presetId);
+        const defaultStageId = preset?.stages[0]?.id || 'screening';
+        const newMap: Record<number, string> = {};
+        props.forEach((p) => {
+          newMap[p.id] = p.pipeline_stage || defaultStageId;
+        });
+        setStageMap(newMap);
+        try { localStorage.setItem(DEAL_STAGES_KEY, JSON.stringify(newMap)); } catch { /* noop */ }
+      }).catch(() => {});
+    }).catch(() => {
+      // Not in an org or error — still works locally via localStorage
+    });
   }, []);
 
   // ============================================================

@@ -25,6 +25,7 @@ class OrganizationResponse(BaseModel):
     id: int
     name: str
     invite_code: str
+    pipeline_template: str = "acquisitions"
     created_at: datetime
     member_count: int
     your_role: OrgRole
@@ -54,3 +55,11 @@ class ApproveMemberRequest(BaseModel):
 
 class MigrateDealRequest(BaseModel):
     property_ids: List[int]  # IDs of personal deals to move to org
+
+
+class PipelineTemplateRequest(BaseModel):
+    template: str  # "broker", "acquisitions", "dispositions"
+
+
+class PipelineTemplateResponse(BaseModel):
+    template: str
