@@ -2,17 +2,156 @@
 Excel Extraction Service — Rent Rolls and T-12 Operating Statements
 
 This service parses Rent Roll and T-12 Excel files using openpyxl and extracts structured data.
-It does NOT use Claude API for extraction — the data is already structured in tabular form.
-Uses direct parsing with intelligent header detection.
+Uses a hybrid approach: fuzzy keyword matching (Tier 1) with Claude AI fallback (Tier 2).
+Uses direct parsing with intelligent header detection and fuzzy matching via rapidfuzz.
 """
+import json
 import logging
 import re
 from datetime import datetime
 from typing import Dict, Any, List, Optional, Tuple
 import openpyxl
 from openpyxl.worksheet.worksheet import Worksheet
+from rapidfuzz import fuzz, process
+
+from app.services.t12_taxonomy import T12_TAXONOMY, TAXONOMY_TO_SUMMARY_FIELD
 
 logger = logging.getLogger(__name__)
+
+
+# ==================== FUZZY MATCHING ENGINE ====================
+
+def match_line_item(raw_label: str, taxonomy: dict, threshold: int = 70) -> Optional[str]:
+    """
+    Match a raw Excel line item label to a canonical taxonomy key.
+    Returns the taxonomy key (e.g. 'gsr', 'noi') or None.
+
+    Uses a 3-tier matching strategy:
+    1. Exact abbreviation match
+    2. Regex pattern match
+    3. Fuzzy string match against all keywords
+    """
+    cleaned = raw_label.strip().lower()
+    cleaned = re.sub(r'^[\d\-\.]+\s*', '', cleaned)  # Strip leading GL codes
+    cleaned = re.sub(r'\s+', ' ', cleaned)
+
+    if not cleaned or len(cleaned) < 2:
+        return None
+
+    # Skip lines that are clearly section headers or separators
+    skip_patterns = [
+        r'^[\-=_]+$',  # separator lines
+        r'^page\s+\d+',
+        r'^total\s*$',  # bare "Total" without context
+    ]
+    for sp in skip_patterns:
+        if re.match(sp, cleaned):
+            return None
+
+    # 1. Exact abbreviation match
+    for key, entry in taxonomy.items():
+        if cleaned in [a.lower() for a in entry["abbreviations"]]:
+            return key
+
+    # 2. Regex pattern match
+    for key, entry in taxonomy.items():
+        for pattern in entry["patterns"]:
+            if re.search(pattern, cleaned, re.IGNORECASE):
+                return key
+
+    # 3. Fuzzy string match against all keywords
+    all_keywords = []
+    for key, entry in taxonomy.items():
+        for kw in entry["keywords"]:
+            all_keywords.append((kw, key))
+
+    keyword_strings = [kw for kw, _ in all_keywords]
+    match = process.extractOne(cleaned, keyword_strings, scorer=fuzz.token_sort_ratio)
+    if match and match[1] >= threshold:
+        matched_keyword = match[0]
+        for kw, key in all_keywords:
+            if kw == matched_keyword:
+                return key
+
+    return None
+
+
+def detect_t12_layout(worksheet) -> dict:
+    """
+    Scan the worksheet to detect:
+    - Which row has month headers
+    - Which column has line item labels
+    - Which column has the annual total
+    - Whether there are GL code columns
+    """
+    layout = {
+        "header_row": None,
+        "label_col": None,
+        "total_col": None,
+        "month_cols": [],
+        "has_gl_codes": False,
+        "data_start_row": None,
+    }
+
+    month_names = [
+        "jan", "feb", "mar", "apr", "may", "jun",
+        "jul", "aug", "sep", "oct", "nov", "dec",
+        "january", "february", "march", "april", "may", "june",
+        "july", "august", "september", "october", "november", "december",
+    ]
+    total_keywords = [
+        "total", "annual", "year", "ytd", "t-12", "t12",
+        "trailing", "12 month", "12-month", "twelve month",
+        "annualized", "combined",
+    ]
+
+    # Scan first 20 rows to find month headers
+    for row_idx, row in enumerate(worksheet.iter_rows(max_row=20, values_only=False)):
+        month_count = 0
+        month_cols_found = []
+        for cell in row:
+            val = str(cell.value).strip().lower() if cell.value else ""
+            # Check for month names or date objects
+            if any(m in val for m in month_names):
+                month_count += 1
+                month_cols_found.append(cell.column - 1)
+            elif hasattr(cell.value, 'month'):  # datetime object
+                month_count += 1
+                month_cols_found.append(cell.column - 1)
+
+        if month_count >= 6:
+            layout["header_row"] = row_idx
+            layout["month_cols"] = month_cols_found
+            layout["data_start_row"] = row_idx + 1
+
+            # Find total column in same row
+            for cell in row:
+                val = str(cell.value).strip().lower() if cell.value else ""
+                if any(tk in val for tk in total_keywords):
+                    layout["total_col"] = cell.column - 1
+            break
+
+    # Detect label column: find the column with the most text strings
+    # in rows after the header
+    if layout["data_start_row"] is not None:
+        col_text_counts = {}
+        for row in worksheet.iter_rows(
+            min_row=layout["data_start_row"] + 1,
+            max_row=min(layout["data_start_row"] + 40, worksheet.max_row),
+            values_only=False
+        ):
+            for cell in row:
+                if cell.value and isinstance(cell.value, str) and len(cell.value.strip()) > 2:
+                    col_idx = cell.column - 1
+                    if col_idx not in layout["month_cols"] and col_idx != layout.get("total_col"):
+                        col_text_counts[col_idx] = col_text_counts.get(col_idx, 0) + 1
+
+        if col_text_counts:
+            layout["label_col"] = max(col_text_counts, key=col_text_counts.get)
+            if layout["label_col"] > 0:
+                layout["has_gl_codes"] = True
+
+    return layout
 
 
 # ==================== DOCUMENT CLASSIFICATION ====================
@@ -591,11 +730,19 @@ def extract_t12(filepath: str) -> Dict[str, Any]:
         # Step 2: Find "Total Year" column
         total_col = _find_total_year_column(ws, month_row)
 
+        # Step 2b: Detect layout — find the label column adaptively
+        layout = detect_t12_layout(ws)
+        label_col = layout.get("label_col")
+        if label_col is not None:
+            logger.info("T12 layout detection: label_col=%d, has_gl_codes=%s",
+                        label_col, layout.get("has_gl_codes"))
+
         # Step 3: Extract property name
         property_name = _extract_property_name_from_sheet(ws)
 
-        # Step 4: Parse all line items
-        line_items = _parse_t12_line_items(ws, month_row, month_cols, total_col)
+        # Step 4: Parse all line items (using detected label column)
+        line_items = _parse_t12_line_items(ws, month_row, month_cols, total_col,
+                                           label_col=label_col)
 
         # Step 5: Extract summary values
         summary = _extract_t12_summary(line_items, total_col)
@@ -734,18 +881,24 @@ def _find_total_year_column(ws: Worksheet, month_row: int) -> Optional[int]:
 
 
 def _parse_t12_line_items(ws: Worksheet, month_row: int, month_cols: Dict[str, int],
-                          total_col: Optional[int]) -> Dict[str, Dict[str, Any]]:
+                          total_col: Optional[int],
+                          label_col: Optional[int] = None) -> Dict[str, Dict[str, Any]]:
     """
     Parse all line items from T-12 with monthly values.
     Returns: {"Line Item Name": {"Jan": 123, "Feb": 456, ..., "Total": 7890}}
+
+    label_col: 0-indexed column for line item labels (auto-detected or column A fallback)
     """
     line_items = {}
+    label_col_idx = label_col if label_col is not None else 0
 
     for row_idx in range(month_row + 1, ws.max_row + 1):
         row = ws[row_idx]
 
-        # Get line item name (column A)
-        item_name_cell = row[0]
+        # Get line item name from detected label column
+        if label_col_idx >= len(row):
+            continue
+        item_name_cell = row[label_col_idx]
         if item_name_cell.value is None:
             continue
 
@@ -781,79 +934,40 @@ def _parse_t12_line_items(ws: Worksheet, month_row: int, month_cols: Dict[str, i
 
 
 def _extract_t12_summary(line_items: Dict[str, Dict[str, Any]], total_col: Optional[int]) -> Dict[str, Any]:
-    """Extract key summary values from line items"""
+    """
+    Extract key summary values from line items using fuzzy matching.
+
+    Uses the T12 taxonomy and match_line_item() for robust matching
+    against real-world line item label variations.
+    """
     summary = {}
 
-    # Define mappings from line item names to summary fields
-    # Keywords are checked in order — more specific first to reduce false positives
-    mappings = {
-        "gross_potential_rent": [
-            "gross potential rent", "gross potential revenue", "gpr",
-            "gross rent", "gross rental income", "gross scheduled rent",
-            "residential income", "apartment income", "rental income",
-        ],
-        "loss_to_lease": [
-            "loss to lease", "gain loss to lease", "gain/loss to lease",
-            "gain / loss to lease", "ltl", "gain(loss) to lease",
-        ],
-        "concessions": ["concession", "concessions"],
-        "vacancy_loss": ["vacancy", "vacancy loss", "physical vacancy"],
-        "bad_debt": ["bad debt", "credit loss", "bad debt write-off"],
-        "non_revenue_units": [
-            "non revenue units", "non-revenue units", "non revenue",
-            "non-rev units", "model/employee",
-        ],
-        "net_rental_income": ["net rental income", "nri", "net rent income"],
-        "other_income": ["other income", "ancillary income", "miscellaneous income"],
-        "total_revenue": [
-            "total revenue", "total income", "gross revenue",
-            "effective gross income", "effective gross revenue",
-            "total operating revenue",
-        ],
-        "payroll": ["payroll", "personnel", "salary", "salaries & wages"],
-        "utilities": ["utilities", "utility"],
-        "repairs_maintenance": [
-            "repairs & maintenance", "repairs and maintenance",
-            "r&m", "repair", "maintenance",
-        ],
-        "turnover": ["turnover", "make ready", "turn cost"],
-        "contract_services": ["contract services", "contracts", "contracted services"],
-        "marketing": ["marketing", "advertising", "leasing cost"],
-        "administrative": [
-            "administrative", "general & administrative", "g&a",
-            "admin", "office expense",
-        ],
-        "management_fee": ["management fee", "mgmt fee", "property management"],
-        "controllable_expenses": ["controllable"],
-        "real_estate_taxes": [
-            "real estate taxes", "property taxes", "taxes",
-            "real estate tax", "property tax",
-        ],
-        "insurance": ["insurance"],
-        "non_controllable_expenses": ["non controllable", "non-controllable"],
-        "total_operating_expenses": [
-            "total operating expenses", "total expenses",
-            "operating expenses", "total opex", "total expense",
-        ],
-        "net_operating_income": [
-            "net operating income", "noi", "net income",
-        ],
-    }
+    # Skip words — lines containing these are likely false positives
+    skip_words = ["excl ", "excluding", "net potential", "after "]
 
-    # Match line items to summary fields
-    for field, keywords in mappings.items():
-        for item_name, values in line_items.items():
-            item_lower = item_name.lower()
-            # Check if any keyword matches
-            if any(kw in item_lower for kw in keywords):
-                # Skip false positives: lines containing "excl" or "net potential" that happen to match
-                skip_words = ["excl ", "excluding", "net potential", "after "]
-                if any(sw in item_lower for sw in skip_words):
-                    continue
-                # Prefer exact or close matches
-                if values.get("Total") is not None:
-                    summary[field] = values["Total"]
-                    break
+    # Match each line item using fuzzy matching
+    for item_name, values in line_items.items():
+        item_lower = item_name.lower()
+
+        # Skip false positives
+        if any(sw in item_lower for sw in skip_words):
+            continue
+
+        # Use fuzzy matching to find the canonical taxonomy key
+        taxonomy_key = match_line_item(item_name, T12_TAXONOMY)
+        if taxonomy_key is None:
+            continue
+
+        # Map taxonomy key to summary field name
+        summary_field = TAXONOMY_TO_SUMMARY_FIELD.get(taxonomy_key)
+        if summary_field is None:
+            continue
+
+        # Only set if not already set (first match wins — more specific items
+        # appear earlier in spreadsheets)
+        if summary_field not in summary and values.get("Total") is not None:
+            summary[summary_field] = values["Total"]
+            logger.debug("Fuzzy matched '%s' → %s = %s", item_name, summary_field, values["Total"])
 
     # Fallback: if NOI is missing, calculate from total_revenue - total_operating_expenses
     if summary.get("net_operating_income") is None:
@@ -875,48 +989,138 @@ def _extract_t12_summary(line_items: Dict[str, Dict[str, Any]], total_col: Optio
         logger.info("T12 total_revenue computed as fallback: GPR(%s) - deductions(%s) + other(%s) = %s",
                      gpr, deductions, other, summary["total_revenue"])
 
-    logger.info("T12 summary extraction: %s", {k: v for k, v in summary.items() if v is not None})
+    logger.info("T12 summary extraction (fuzzy): %s", {k: v for k, v in summary.items() if v is not None})
     return summary
 
 
 def _extract_t12_monthly(line_items: Dict[str, Dict[str, Any]], month_cols: Dict[str, int]) -> Dict[str, Dict[str, float]]:
-    """Extract monthly data for NOI, Revenue, and Expenses"""
+    """Extract monthly data for NOI, Revenue, and Expenses using fuzzy matching"""
     monthly = {
         "noi": {},
         "revenue": {},
         "expenses": {}
     }
 
-    noi_keywords = ["net operating income", "noi", "net income"]
-    revenue_keywords = [
-        "total revenue", "total income", "gross revenue",
-        "effective gross income", "effective gross revenue",
-        "total operating revenue",
-    ]
-    expense_keywords = [
-        "total operating expenses", "total expenses",
-        "operating expenses", "total opex", "total expense",
-    ]
+    # Map taxonomy keys to monthly dict keys
+    monthly_targets = {
+        "noi": "noi",
+        "egi": "revenue",
+        "total_opex": "expenses",
+    }
 
-    # Find NOI, Revenue, and Expenses line items
+    # Find NOI, Revenue, and Expenses line items via fuzzy matching
     for item_name, values in line_items.items():
-        item_lower = item_name.lower()
+        taxonomy_key = match_line_item(item_name, T12_TAXONOMY)
+        if taxonomy_key not in monthly_targets:
+            continue
 
-        if not monthly["noi"] and any(kw in item_lower for kw in noi_keywords):
-            for month in month_cols.keys():
-                if month in values:
-                    monthly["noi"][month] = values[month]
+        target = monthly_targets[taxonomy_key]
+        if monthly[target]:
+            continue  # Already found this one
 
-        if not monthly["revenue"] and any(kw in item_lower for kw in revenue_keywords):
-            for month in month_cols.keys():
-                if month in values:
-                    monthly["revenue"][month] = values[month]
-
-        if not monthly["expenses"] and any(kw in item_lower for kw in expense_keywords):
-            for month in month_cols.keys():
-                if month in values:
-                    monthly["expenses"][month] = values[month]
+        for month in month_cols.keys():
+            if month in values:
+                monthly[target][month] = values[month]
 
     logger.info("T12 monthly extraction: noi=%d months, revenue=%d months, expenses=%d months",
                 len(monthly["noi"]), len(monthly["revenue"]), len(monthly["expenses"]))
     return monthly
+
+
+# ==================== TIER 2: CLAUDE AI FALLBACK ====================
+
+def _worksheet_to_text(filepath: str) -> str:
+    """Convert all sheets to a text representation for Claude."""
+    wb = openpyxl.load_workbook(filepath, data_only=True)
+    output = []
+    for sheet_name in wb.sheetnames:
+        ws = wb[sheet_name]
+        output.append(f"\n=== Sheet: {sheet_name} ===\n")
+        for row in ws.iter_rows(values_only=True):
+            cells = [str(c) if c is not None else "" for c in row]
+            if any(c.strip() for c in cells):
+                output.append("\t".join(cells))
+    wb.close()
+    return "\n".join(output[:500])  # Cap at 500 lines to manage token cost
+
+
+async def extract_t12_with_ai_fallback(filepath: str) -> dict:
+    """
+    Try fuzzy matching first, fall back to Claude if it fails.
+    Tier 1: Fuzzy keyword matching (fast, no API cost)
+    Tier 2: Claude AI extraction (handles truly unusual formats)
+    """
+    # Tier 1: Fuzzy matching
+    result = extract_t12(filepath)
+
+    # Check if extraction actually produced data
+    summary = result.get("summary", {})
+    key_fields = ['gross_potential_rent', 'net_operating_income',
+                  'total_operating_expenses', 'total_revenue']
+    populated = sum(1 for f in key_fields if summary.get(f) not in [None, 0, 0.0])
+
+    if populated >= 2:
+        logger.info("T12 fuzzy extraction succeeded: %d/4 key fields populated", populated)
+        return result
+
+    logger.warning("T12 fuzzy extraction weak (%d/4 fields). Falling back to Claude AI.", populated)
+
+    # Tier 2: Send to Claude
+    try:
+        import anthropic
+
+        sheet_text = _worksheet_to_text(filepath)
+
+        client = anthropic.Anthropic()
+        response = client.messages.create(
+            model="claude-sonnet-4-5-20250929",
+            max_tokens=4096,
+            system="You are a CRE financial data extraction expert. Extract T12 trailing 12-month financial data from this spreadsheet content. Return ONLY valid JSON.",
+            messages=[{
+                "role": "user",
+                "content": f"""Extract the T12 (trailing 12 months) financial summary from this spreadsheet data.
+
+Return JSON with these fields (use null if not found, use annual/total figures not monthly):
+{{
+  "gross_potential_rent": <gross scheduled/potential rent, annual>,
+  "vacancy_loss": <vacancy loss, annual, as positive number>,
+  "concessions": <concessions, annual>,
+  "bad_debt": <bad debt/credit loss, annual>,
+  "other_income": <other/ancillary income, annual>,
+  "total_revenue": <effective gross income, annual>,
+  "total_operating_expenses": <total operating expenses, annual>,
+  "net_operating_income": <net operating income, annual>,
+  "real_estate_taxes": <real estate taxes, annual>,
+  "insurance": <insurance, annual>,
+  "management_fee": <management fee, annual>,
+  "repairs_maintenance": <repairs & maintenance, annual>,
+  "utilities": <utilities, annual>,
+  "payroll": <payroll/salaries, annual>,
+  "fiscal_year": <the year of the T12 period, e.g. 2025>,
+  "period_end_month": <last month of the trailing period, e.g. "December">
+}}
+
+Spreadsheet content:
+{sheet_text}"""
+            }],
+        )
+
+        # Parse Claude's JSON response
+        ai_text = response.content[0].text
+        # Strip markdown code fences if present
+        ai_text = re.sub(r'^```(?:json)?\s*', '', ai_text.strip())
+        ai_text = re.sub(r'\s*```$', '', ai_text.strip())
+
+        ai_result = json.loads(ai_text)
+        logger.info("Claude AI T12 extraction succeeded: NOI=%s", ai_result.get('net_operating_income'))
+
+        # Merge AI results into the standard result structure
+        result["summary"] = ai_result
+        if ai_result.get("fiscal_year"):
+            result["fiscal_year"] = ai_result["fiscal_year"]
+
+        return result
+
+    except Exception as e:
+        logger.error("Claude AI T12 extraction failed: %s", e)
+        return result  # Return the weak Tier 1 result as last resort

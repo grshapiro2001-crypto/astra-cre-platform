@@ -580,7 +580,7 @@ export const PropertyDetail = () => {
     // Preferred order: T12 > T3 > Y1
     if (property.t12_financials?.noi != null || property.t12_noi != null) out.push('t12');
     if (property.t3_financials?.noi != null || property.t3_noi != null) out.push('t3');
-    if (property.y1_financials || property.y1_noi != null) out.push('y1');
+    if (property.y1_financials?.noi != null || property.y1_noi != null) out.push('y1');
     return out;
   }, [property]);
 

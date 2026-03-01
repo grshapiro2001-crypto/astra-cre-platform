@@ -117,6 +117,18 @@ def _run_reanalyze_background(property_id: int, user_id: str) -> None:
         if hasattr(property_obj, 'extraction_data_json'):
             property_obj.extraction_data_json = json.dumps(extraction_result)
 
+        # Bug fix: if T12 data came from an Excel upload, don't let OM re-analysis
+        # overwrite those more precise numbers with (potentially empty) OM-extracted T12.
+        if getattr(property_obj, 'financial_data_source', None) == 't12_excel':
+            periods = extraction_result.get('financials_by_period', {})
+            if 't12' in periods:
+                logger.info(
+                    "bg reanalyze property_id=%d: preserving Excel-sourced T12 data, "
+                    "skipping OM T12 overwrite",
+                    property_id,
+                )
+                del periods['t12']
+
         update_property_from_extraction(property_obj, extraction_result, db=db)
         property_obj.analysis_count = (property_obj.analysis_count or 0) + 1
         property_obj.last_analyzed_at = datetime.now(timezone.utc)
