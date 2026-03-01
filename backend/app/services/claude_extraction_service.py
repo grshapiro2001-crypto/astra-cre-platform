@@ -127,7 +127,7 @@ SALES COMP EXTRACTION:
 OM_EXTRACTION_PROMPT = """You are extracting data from a Commercial Real Estate Offering Memorandum (OM).
 
 OMs are MARKETING documents created by a seller's broker to attract buyers. Key characteristics:
-- They typically contain ONLY Year 1 Proforma financials (not T12 or T3 in-document — those are in the data room)
+- They often contain BOTH Year 1 Proforma AND historical financials (T12/T3) side-by-side or in separate sections
 - They include investment highlights and a "sell" narrative
 - They have detailed unit mix tables with floorplan-level rents
 - They include rent comparable analysis (often by bedroom type)
@@ -135,14 +135,27 @@ OMs are MARKETING documents created by a seller's broker to attract buyers. Key 
 - They do NOT typically include explicit pricing — the buyer sets their price
 - They include market overview, demographics, and location highlights
 
+⚠️ CRITICAL — EXTRACT ALL FINANCIAL PERIODS (DO NOT STOP AFTER FIRST):
+Many OMs contain MULTIPLE sets of financials — you MUST extract ALL of them:
+- Historical/Trailing period (T12, T-12, TTM, Trailing 12 Months, T3, T-3)
+- Proforma/Forward-looking (Y1, Year 1, Pro Forma, Stabilized, Budget)
+
+SEARCH STRATEGY:
+- DO NOT stop after finding the first financial table
+- Scan the ENTIRE document for all financial periods
+- Look in multiple sections: Executive Summary, Financial Analysis, Operating Statement, Investment Summary
+- Common structure: Historical data comes first, then Proforma/Y1 appears later in document
+- Pattern A: Side-by-side columns in same table (T12 | Y1) — Extract BOTH columns
+- Pattern B: Separate tables/sections (first table = T12, later section = Proforma) — Extract from BOTH
+- Pattern C: Multiple periods in one table (T12 | T3 | Y1) — Extract ALL three
+
 EXTRACTION PRIORITIES FOR OMs:
 1. Property basics (name, address, metro, submarket, units, year built, SF)
-2. Y1 Proforma financials (this is the MAIN financial data — extract every line item)
+2. ALL financial periods — Y1 Proforma AND T12/T3 historical (extract every line item for each)
 3. Unit mix (CRITICAL — every floorplan with units, SF, in-place rent, proforma rent)
 4. Rent comps (extract the "All Unit" summary table AND per-bedroom tables if present)
 5. Sales comps (if present in "Investment Sales" or "Sales Comparison" section)
 6. Renovation assumptions (if this is a value-add OM — cost/unit, ROI, premiums)
-7. T12/T3 financials — ONLY if they appear in-document. Do NOT fabricate. Most OMs put these in the data room.
 
 FINANCIAL EXTRACTION FOR Y1 PROFORMA:
 Extract the FULL income waterfall:
@@ -200,6 +213,15 @@ AVERAGE RENTS:
 
 {shared_instructions}
 
+VERIFICATION - CRITICAL STEP:
+- ⚠️ VERIFY YOU EXTRACTED ALL PERIODS:
+  * Did you find a historical period (T12/T3/T1)? YES/NO
+  * Did you find a proforma period (Y1/Pro Forma)? YES/NO
+  * If you only found ONE period, scan the document again more thoroughly — most OMs have BOTH
+- For EACH period found, verify numeric values are populated (not null) — read the actual numbers from the document
+- Omit a period key entirely if that period truly does not exist in the document
+- Do NOT return a period with all null numeric values — either extract the real values or omit the period
+
 Return JSON format:
 {{
   "document_type": "OM",
@@ -256,8 +278,64 @@ Return JSON format:
       "insurance_amount": number or null,
       "credit_loss": number or null
     }},
-    "t12": {{...same structure as y1 - ONLY if found in document...}},
-    "t3": {{...same structure as y1 - ONLY if found in document...}}
+    "t12": {{
+      "period_label": "exact label from doc",
+      "gsr": number or null,
+      "vacancy": number or null,
+      "concessions": number or null,
+      "bad_debt": number or null,
+      "non_revenue_units": number or null,
+      "loss_to_lease": number or null,
+      "net_rental_income": number or null,
+      "utility_reimbursements": number or null,
+      "parking_storage_income": number or null,
+      "other_income": number or null,
+      "total_opex": number or null,
+      "opex_components": {{
+        "controllable_expenses": number or null,
+        "management_fee": number or null,
+        "insurance": number or null,
+        "property_taxes": number or null
+      }},
+      "noi": number or null,
+      "replacement_reserves": number or null,
+      "net_cash_flow": number or null,
+      "vacancy_rate_pct": number or null,
+      "expense_ratio_pct": number or null,
+      "management_fee_pct": number or null,
+      "real_estate_taxes": number or null,
+      "insurance_amount": number or null,
+      "credit_loss": number or null
+    }},
+    "t3": {{
+      "period_label": "exact label from doc",
+      "gsr": number or null,
+      "vacancy": number or null,
+      "concessions": number or null,
+      "bad_debt": number or null,
+      "non_revenue_units": number or null,
+      "loss_to_lease": number or null,
+      "net_rental_income": number or null,
+      "utility_reimbursements": number or null,
+      "parking_storage_income": number or null,
+      "other_income": number or null,
+      "total_opex": number or null,
+      "opex_components": {{
+        "controllable_expenses": number or null,
+        "management_fee": number or null,
+        "insurance": number or null,
+        "property_taxes": number or null
+      }},
+      "noi": number or null,
+      "replacement_reserves": number or null,
+      "net_cash_flow": number or null,
+      "vacancy_rate_pct": number or null,
+      "expense_ratio_pct": number or null,
+      "management_fee_pct": number or null,
+      "real_estate_taxes": number or null,
+      "insurance_amount": number or null,
+      "credit_loss": number or null
+    }}
   }},
   "unit_mix": [
     {{

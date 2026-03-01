@@ -952,43 +952,65 @@ def update_property_from_extraction(property_obj: Property, extraction_result: d
     if "financials_by_period" in extraction_result:
         periods = extraction_result["financials_by_period"]
 
+        # Helper: check if a period dict has any real numeric data (not just period_label)
+        def _has_numeric_data(period_dict: dict) -> bool:
+            return any(
+                isinstance(v, (int, float))
+                for k, v in period_dict.items()
+                if k not in ("period_label", "opex_components")
+            )
+
         if periods.get("t12"):
-            property_obj.t12_financials_json = json.dumps(periods["t12"])
-            property_obj.t12_noi = periods["t12"].get("noi")
-            # Granular T12 fields
-            property_obj.t12_loss_to_lease = periods["t12"].get("loss_to_lease")
-            property_obj.t12_vacancy_rate_pct = periods["t12"].get("vacancy_rate_pct")
-            property_obj.t12_concessions = periods["t12"].get("concessions")
-            property_obj.t12_credit_loss = periods["t12"].get("credit_loss")
-            property_obj.t12_net_rental_income = periods["t12"].get("net_rental_income")
-            property_obj.t12_utility_reimbursements = periods["t12"].get("utility_reimbursements")
-            property_obj.t12_parking_storage_income = periods["t12"].get("parking_storage_income")
-            property_obj.t12_other_income = periods["t12"].get("other_income")
-            property_obj.t12_management_fee_pct = periods["t12"].get("management_fee_pct")
-            property_obj.t12_real_estate_taxes = periods["t12"].get("real_estate_taxes")
-            property_obj.t12_insurance = periods["t12"].get("insurance_amount")
-            property_obj.t12_replacement_reserves = periods["t12"].get("replacement_reserves")
-            property_obj.t12_net_cash_flow = periods["t12"].get("net_cash_flow")
-            property_obj.t12_expense_ratio_pct = periods["t12"].get("expense_ratio_pct")
+            t12 = periods["t12"]
+            if not _has_numeric_data(t12):
+                logger.warning(
+                    "Discarding empty-shell T12 for property %s — all numeric fields are null",
+                    property_obj.id,
+                )
+            else:
+                property_obj.t12_financials_json = json.dumps(t12)
+                property_obj.t12_noi = t12.get("noi")
+                # Granular T12 fields
+                property_obj.t12_loss_to_lease = t12.get("loss_to_lease")
+                property_obj.t12_vacancy_rate_pct = t12.get("vacancy_rate_pct")
+                property_obj.t12_concessions = t12.get("concessions")
+                property_obj.t12_credit_loss = t12.get("credit_loss")
+                property_obj.t12_net_rental_income = t12.get("net_rental_income")
+                property_obj.t12_utility_reimbursements = t12.get("utility_reimbursements")
+                property_obj.t12_parking_storage_income = t12.get("parking_storage_income")
+                property_obj.t12_other_income = t12.get("other_income")
+                property_obj.t12_management_fee_pct = t12.get("management_fee_pct")
+                property_obj.t12_real_estate_taxes = t12.get("real_estate_taxes")
+                property_obj.t12_insurance = t12.get("insurance_amount")
+                property_obj.t12_replacement_reserves = t12.get("replacement_reserves")
+                property_obj.t12_net_cash_flow = t12.get("net_cash_flow")
+                property_obj.t12_expense_ratio_pct = t12.get("expense_ratio_pct")
 
         if periods.get("t3"):
-            property_obj.t3_financials_json = json.dumps(periods["t3"])
-            property_obj.t3_noi = periods["t3"].get("noi")
-            # Granular T3 fields
-            property_obj.t3_loss_to_lease = periods["t3"].get("loss_to_lease")
-            property_obj.t3_vacancy_rate_pct = periods["t3"].get("vacancy_rate_pct")
-            property_obj.t3_concessions = periods["t3"].get("concessions")
-            property_obj.t3_credit_loss = periods["t3"].get("credit_loss")
-            property_obj.t3_net_rental_income = periods["t3"].get("net_rental_income")
-            property_obj.t3_utility_reimbursements = periods["t3"].get("utility_reimbursements")
-            property_obj.t3_parking_storage_income = periods["t3"].get("parking_storage_income")
-            property_obj.t3_other_income = periods["t3"].get("other_income")
-            property_obj.t3_management_fee_pct = periods["t3"].get("management_fee_pct")
-            property_obj.t3_real_estate_taxes = periods["t3"].get("real_estate_taxes")
-            property_obj.t3_insurance = periods["t3"].get("insurance_amount")
-            property_obj.t3_replacement_reserves = periods["t3"].get("replacement_reserves")
-            property_obj.t3_net_cash_flow = periods["t3"].get("net_cash_flow")
-            property_obj.t3_expense_ratio_pct = periods["t3"].get("expense_ratio_pct")
+            t3 = periods["t3"]
+            if not _has_numeric_data(t3):
+                logger.warning(
+                    "Discarding empty-shell T3 for property %s — all numeric fields are null",
+                    property_obj.id,
+                )
+            else:
+                property_obj.t3_financials_json = json.dumps(t3)
+                property_obj.t3_noi = t3.get("noi")
+                # Granular T3 fields
+                property_obj.t3_loss_to_lease = t3.get("loss_to_lease")
+                property_obj.t3_vacancy_rate_pct = t3.get("vacancy_rate_pct")
+                property_obj.t3_concessions = t3.get("concessions")
+                property_obj.t3_credit_loss = t3.get("credit_loss")
+                property_obj.t3_net_rental_income = t3.get("net_rental_income")
+                property_obj.t3_utility_reimbursements = t3.get("utility_reimbursements")
+                property_obj.t3_parking_storage_income = t3.get("parking_storage_income")
+                property_obj.t3_other_income = t3.get("other_income")
+                property_obj.t3_management_fee_pct = t3.get("management_fee_pct")
+                property_obj.t3_real_estate_taxes = t3.get("real_estate_taxes")
+                property_obj.t3_insurance = t3.get("insurance_amount")
+                property_obj.t3_replacement_reserves = t3.get("replacement_reserves")
+                property_obj.t3_net_cash_flow = t3.get("net_cash_flow")
+                property_obj.t3_expense_ratio_pct = t3.get("expense_ratio_pct")
 
         if periods.get("y1"):
             property_obj.y1_financials_json = json.dumps(periods["y1"])
