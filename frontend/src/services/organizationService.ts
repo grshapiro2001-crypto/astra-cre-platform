@@ -4,6 +4,7 @@ export interface Organization {
   id: number;
   name: string;
   invite_code: string;
+  pipeline_template: string;
   created_at: string;
   member_count: number;
   your_role: 'owner' | 'member';
@@ -44,6 +45,12 @@ const organizationService = {
 
   regenerateCode: () =>
     api.post<Organization>('/organizations/regenerate-code').then((r) => r.data),
+
+  getPipelineTemplate: () =>
+    api.get<{ template: string }>('/organizations/pipeline-template').then((r) => r.data),
+
+  updatePipelineTemplate: (template: string) =>
+    api.patch<{ template: string }>('/organizations/pipeline-template', { template }).then((r) => r.data),
 };
 
 export default organizationService;
