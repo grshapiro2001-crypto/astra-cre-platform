@@ -1320,7 +1320,7 @@ async def upload_document_to_property(
 
                 # Build t12_financials_json from Excel extraction
                 t12_fin = {
-                    "period_label": "T-12 FY" + str(extraction.get("fiscal_year", "")),
+                    "period_label": ("T-12 FY" + str(extraction["fiscal_year"])) if extraction.get("fiscal_year") is not None else "T-12",
                     "gsr": summary.get("gross_potential_rent"),
                     "vacancy": abs(summary.get("vacancy_loss", 0)) if summary.get("vacancy_loss") else None,
                     "concessions": summary.get("concessions"),
@@ -1434,10 +1434,11 @@ async def upload_document_to_property(
                         property_obj.t3_expense_ratio_pct = t3_opex_ratio
                         t3_calculated = True
 
+                fy_label = ("T-12 FY" + str(extraction["fiscal_year"])) if extraction.get("fiscal_year") is not None else "T-12"
                 if t3_calculated:
-                    extraction_summary = "T-12 FY" + str(extraction.get("fiscal_year", "")) + ". NOI: $" + "{:,.0f}".format(summary.get("net_operating_income", 0)) + ". T3 NOI: $" + "{:,.0f}".format(t3_noi_annual)
+                    extraction_summary = fy_label + ". NOI: $" + "{:,.0f}".format(summary.get("net_operating_income", 0)) + ". T3 NOI: $" + "{:,.0f}".format(t3_noi_annual)
                 else:
-                    extraction_summary = "T-12 FY" + str(extraction.get("fiscal_year", "")) + ". NOI: $" + "{:,.0f}".format(summary.get("net_operating_income", 0))
+                    extraction_summary = fy_label + ". NOI: $" + "{:,.0f}".format(summary.get("net_operating_income", 0))
 
             else:
                 # Unknown Excel document type
