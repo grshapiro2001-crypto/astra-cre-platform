@@ -237,7 +237,7 @@ export interface StackingLayout {
   buildings: StackingBuilding[];
   amenities: StackingAmenity[];
   total_units: number;
-  source: 'manual' | 'scraped';
+  source: 'manual' | 'scraped' | 'satellite';
   source_url?: string;
   source_image_url?: string;
   confirmed_at: string;

@@ -1,6 +1,6 @@
 """
 Stacking layout endpoints — save/retrieve 3D building layout and rent roll units.
-Phase 1: Manual layout entry only (no scraper).
+Phase 1: Manual layout entry. Phase 2: Satellite auto-generation.
 """
 import json
 import logging
@@ -14,6 +14,7 @@ from app.models.property import Property, RentRollUnit
 from app.models.user import User
 from app.api.deps import get_current_user
 from app.services import property_service
+from app.services.stacking_extraction_service import extract_stacking_layout
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +72,55 @@ def save_stacking_layout(
         property_id=property_obj.id,
         stacking_layout_json=property_obj.stacking_layout_json,
     )
+
+
+@router.post("/properties/{property_id}/extract-stacking")
+async def extract_stacking_from_satellite(
+    property_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Extract building layout from satellite imagery via Claude Vision.
+
+    Returns layout JSON for the user to review and confirm — does NOT save it.
+    The user must call PATCH /stacking-layout to persist after reviewing.
+    """
+    property_obj = property_service.get_property(
+        db, property_id, current_user.id, update_view_date=False,
+        org_id=getattr(current_user, 'organization_id', None),
+    )
+    if not property_obj:
+        raise HTTPException(status_code=404, detail="Property not found")
+
+    address = property_obj.property_address
+    if not address or not address.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="This property has no address on file. Enter an address or use manual entry.",
+        )
+
+    try:
+        layout = await extract_stacking_layout(address.strip())
+    except ValueError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    except Exception as e:
+        logger.error("Satellite extraction failed for property %d: %s", property_id, e)
+        raise HTTPException(
+            status_code=502,
+            detail=f"Could not analyze satellite imagery: {e}",
+        )
+
+    return {
+        "property_id": property_id,
+        "source": "satellite",
+        "confidence": layout.get("confidence", "low"),
+        "confidence_reason": layout.get("confidence_reason", ""),
+        "layout": {
+            "buildings": layout.get("buildings", []),
+            "amenities": layout.get("amenities", []),
+            "total_units": layout.get("total_units", 0),
+        },
+    }
 
 
 @router.get("/properties/{property_id}/rent-roll-units")
