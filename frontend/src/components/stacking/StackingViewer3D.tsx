@@ -6,7 +6,7 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import type { StackingLayout, StackingBuilding, RentRollUnit } from '@/types/property';
+import type { StackingLayout, StackingBuilding, RentRollUnit, StackingFilterType } from '@/types/property';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 const UNIT_WIDTH = 4;
@@ -59,14 +59,6 @@ const MATERIALS = {
     roughness: 0.8,
     transparent: true,
     opacity: 0.6,
-  }),
-  // Roof cap: slightly lighter than slab
-  roof: new THREE.MeshStandardMaterial({
-    color: 0x252540,
-    metalness: 0.2,
-    roughness: 0.7,
-    transparent: true,
-    opacity: 0.5,
   }),
   // Pool: translucent cyan water
   pool: new THREE.MeshPhysicalMaterial({
@@ -126,6 +118,7 @@ interface StackingViewer3DProps {
   layout: StackingLayout;
   rentRollUnits: RentRollUnit[];
   onUnitClick: (data: UnitMeshData) => void;
+  activeFilter?: StackingFilterType;
 }
 
 // ─── Matching logic ──────────────────────────────────────────────────────────
@@ -205,6 +198,144 @@ function addUnitEdges(mesh: THREE.Mesh, geom: THREE.BufferGeometry) {
   mesh.receiveShadow = true;
 }
 
+// ─── Filter color helpers ───────────────────────────────────────────────────
+
+function lerpColor(c1: number, c2: number, t: number): THREE.Color {
+  const color1 = new THREE.Color(c1);
+  const color2 = new THREE.Color(c2);
+  return color1.lerp(color2, Math.max(0, Math.min(1, t)));
+}
+
+function statusToColor(status: 'occupied' | 'vacant' | 'unknown'): THREE.Color {
+  switch (status) {
+    case 'occupied': return new THREE.Color(0x7C3AED);
+    case 'vacant': return new THREE.Color(0xF43F5E);
+    case 'unknown': return new THREE.Color(0x3F3F5A);
+  }
+}
+
+function getFloorPlanColor(unitType: string | null | undefined): THREE.Color {
+  if (!unitType) return new THREE.Color(0x6B7280);
+  const t = unitType.toLowerCase();
+  if (t.includes('studio') || t.includes('stu')) return new THREE.Color(0xF59E0B);
+  if (t.includes('3') && (t.includes('br') || t.includes('bed'))) return new THREE.Color(0x10B981);
+  if (t.includes('2') && (t.includes('br') || t.includes('bed'))) return new THREE.Color(0x8B5CF6);
+  if (t.includes('1') && (t.includes('br') || t.includes('bed'))) return new THREE.Color(0x3B82F6);
+  return new THREE.Color(0x6B7280);
+}
+
+function getExpirationColor(leaseEnd: string | null | undefined): THREE.Color {
+  if (!leaseEnd) return new THREE.Color(0x6B7280);
+  const now = new Date();
+  const end = new Date(leaseEnd);
+  const diffMs = end.getTime() - now.getTime();
+  const diffDays = diffMs / (1000 * 60 * 60 * 24);
+  if (diffDays <= 30) return new THREE.Color(0xEF4444);   // expired or urgent
+  if (diffDays <= 90) return new THREE.Color(0xF97316);   // soon
+  if (diffDays <= 180) return new THREE.Color(0xEAB308);  // approaching
+  if (diffDays <= 365) return new THREE.Color(0x22C55E);  // stable
+  return new THREE.Color(0x3B82F6);                        // long-term
+}
+
+function getLTLColor(marketRent: number | null | undefined, inPlaceRent: number | null | undefined): THREE.Color {
+  if (marketRent == null || inPlaceRent == null || marketRent <= 0) return new THREE.Color(0x6B7280);
+  const ltl = (marketRent - inPlaceRent) / marketRent;
+  if (ltl <= 0) return new THREE.Color(0x3B82F6);      // at or above market
+  if (ltl <= 0.05) return new THREE.Color(0x22C55E);    // 1-5%
+  if (ltl <= 0.10) return new THREE.Color(0xEAB308);    // 5-10%
+  if (ltl <= 0.20) return new THREE.Color(0xF97316);    // 10-20%
+  return new THREE.Color(0xEF4444);                      // 20%+
+}
+
+function getRentGradientColor(
+  value: number | null | undefined,
+  min: number,
+  max: number,
+  colorMin: number,
+  colorMax: number,
+): THREE.Color {
+  if (value == null) return new THREE.Color(0x6B7280);
+  const range = max - min;
+  const t = range > 0 ? (value - min) / range : 0.5;
+  return lerpColor(colorMin, colorMax, t);
+}
+
+interface RentStats {
+  minMarketRent: number;
+  maxMarketRent: number;
+  minContractRent: number;
+  maxContractRent: number;
+  maxFloor: number;
+}
+
+function computeRentStats(rentRollUnits: RentRollUnit[], layout: StackingLayout): RentStats {
+  let minMarket = Infinity, maxMarket = -Infinity;
+  let minContract = Infinity, maxContract = -Infinity;
+  for (const u of rentRollUnits) {
+    if (u.market_rent != null) {
+      minMarket = Math.min(minMarket, u.market_rent);
+      maxMarket = Math.max(maxMarket, u.market_rent);
+    }
+    if (u.in_place_rent != null) {
+      minContract = Math.min(minContract, u.in_place_rent);
+      maxContract = Math.max(maxContract, u.in_place_rent);
+    }
+  }
+  const maxFloor = layout.buildings.reduce((m, b) => Math.max(m, b.num_floors), 1);
+  return {
+    minMarketRent: minMarket === Infinity ? 0 : minMarket,
+    maxMarketRent: maxMarket === -Infinity ? 0 : maxMarket,
+    minContractRent: minContract === Infinity ? 0 : minContract,
+    maxContractRent: maxContract === -Infinity ? 0 : maxContract,
+    maxFloor,
+  };
+}
+
+function applyFilterToScene(
+  scene: THREE.Scene,
+  filterType: StackingFilterType,
+  stats: RentStats,
+) {
+  scene.traverse((obj) => {
+    if (!(obj instanceof THREE.Mesh) || !obj.name.startsWith('unit_')) return;
+    const ud = obj.userData as UnitMeshData;
+    const mat = obj.material as THREE.MeshPhysicalMaterial;
+
+    let color: THREE.Color;
+    switch (filterType) {
+      case 'occupancy':
+        color = statusToColor(ud.status);
+        break;
+      case 'floor_level':
+        color = lerpColor(0x1E3A5F, 0x38BDF8, (ud.floor - 1) / Math.max(stats.maxFloor - 1, 1));
+        break;
+      case 'floor_plan':
+        color = getFloorPlanColor(ud.rentRollUnit?.unit_type);
+        break;
+      case 'expirations':
+        color = getExpirationColor(ud.rentRollUnit?.lease_end);
+        break;
+      case 'loss_to_lease':
+        color = getLTLColor(ud.rentRollUnit?.market_rent, ud.rentRollUnit?.in_place_rent);
+        break;
+      case 'market_rents':
+        color = getRentGradientColor(ud.rentRollUnit?.market_rent, stats.minMarketRent, stats.maxMarketRent, 0x1E3A5F, 0xF59E0B);
+        break;
+      case 'contract_rents':
+        color = getRentGradientColor(ud.rentRollUnit?.in_place_rent, stats.minContractRent, stats.maxContractRent, 0x1E3A5F, 0x8B5CF6);
+        break;
+      default:
+        color = statusToColor(ud.status);
+    }
+
+    mat.color.copy(color);
+    mat.emissive.copy(color).multiplyScalar(0.15);
+    mat.needsUpdate = true;
+  });
+}
+
+// ─── Geometry builders ──────────────────────────────────────────────────────
+
 function buildLinearBuilding(
   building: StackingBuilding,
   unitMap: Map<string, RentRollUnit>,
@@ -250,13 +381,6 @@ function buildLinearBuilding(
     }
   }
 
-  // Roof cap
-  const roofY = building.num_floors * (UNIT_HEIGHT + FLOOR_SLAB_HEIGHT);
-  const roofGeom = new THREE.BoxGeometry(totalWidth + 0.3, 0.15, UNIT_DEPTH + 0.3);
-  const roof = new THREE.Mesh(roofGeom, MATERIALS.roof.clone());
-  roof.position.set(0, roofY + 0.075, 0);
-  roof.castShadow = true;
-  group.add(roof);
 }
 
 function buildLShapeBuilding(
@@ -331,17 +455,6 @@ function buildLShapeBuilding(
     unitCounter = floor * building.units_per_floor;
   }
 
-  // Roof caps
-  const roofY = building.num_floors * (UNIT_HEIGHT + FLOOR_SLAB_HEIGHT);
-  const roof1 = new THREE.Mesh(new THREE.BoxGeometry(wing1Width + 0.3, 0.15, UNIT_DEPTH + 0.3), MATERIALS.roof.clone());
-  roof1.position.set(wing1Width / 2, roofY + 0.075, 0);
-  roof1.castShadow = true;
-  group.add(roof1);
-
-  const roof2 = new THREE.Mesh(new THREE.BoxGeometry(UNIT_DEPTH + 0.3, 0.15, wing2Depth + 0.3), MATERIALS.roof.clone());
-  roof2.position.set(0, roofY + 0.075, -(wing2Depth / 2 + UNIT_DEPTH / 2 + UNIT_GAP));
-  roof2.castShadow = true;
-  group.add(roof2);
 }
 
 function buildUShapeBuilding(
@@ -429,24 +542,6 @@ function buildUShapeBuilding(
     group.add(slab3);
   }
 
-  // Roof caps (3 wings)
-  const roofY = building.num_floors * (UNIT_HEIGHT + FLOOR_SLAB_HEIGHT);
-  const bottomZ = -(wings[0] - 1) * (UNIT_WIDTH + UNIT_GAP) - UNIT_WIDTH / 2 - UNIT_GAP;
-
-  const roofLeft = new THREE.Mesh(new THREE.BoxGeometry(UNIT_DEPTH + 0.3, 0.15, wingWidth(wings[0]) + 0.3), MATERIALS.roof.clone());
-  roofLeft.position.set(-(maxWingWidth / 2 + UNIT_DEPTH / 2 + UNIT_GAP), roofY + 0.075, -(wings[0] - 1) * (UNIT_WIDTH + UNIT_GAP) / 2);
-  roofLeft.castShadow = true;
-  group.add(roofLeft);
-
-  const roofBottom = new THREE.Mesh(new THREE.BoxGeometry(maxWingWidth + 0.3, 0.15, UNIT_DEPTH + 0.3), MATERIALS.roof.clone());
-  roofBottom.position.set(0, roofY + 0.075, bottomZ);
-  roofBottom.castShadow = true;
-  group.add(roofBottom);
-
-  const roofRight = new THREE.Mesh(new THREE.BoxGeometry(UNIT_DEPTH + 0.3, 0.15, wingWidth(wings[2]) + 0.3), MATERIALS.roof.clone());
-  roofRight.position.set(maxWingWidth / 2 + UNIT_DEPTH / 2 + UNIT_GAP, roofY + 0.075, -(wings[2] - 1) * (UNIT_WIDTH + UNIT_GAP) / 2);
-  roofRight.castShadow = true;
-  group.add(roofRight);
 }
 
 function buildTowerBuilding(
@@ -493,13 +588,6 @@ function buildTowerBuilding(
     }
   }
 
-  // Roof cap
-  const roofY = building.num_floors * (UNIT_HEIGHT + FLOOR_SLAB_HEIGHT);
-  const roofGeom = new THREE.BoxGeometry(gridWidth + 0.3, 0.15, gridDepth + 0.3);
-  const roof = new THREE.Mesh(roofGeom, MATERIALS.roof.clone());
-  roof.position.set(0, roofY + 0.075, 0);
-  roof.castShadow = true;
-  group.add(roof);
 }
 
 function buildCourtyardBuilding(
@@ -522,12 +610,13 @@ function buildCourtyardBuilding(
   // Apply rectangular aspect ratio when all 4 wings have equal unit counts
   if (numWings >= 4 && wingCounts.every((c) => c === wingCounts[0])) {
     const totalPerFloor = building.units_per_floor;
-    const longSide = Math.ceil(totalPerFloor * 0.35);
-    const shortSide = Math.ceil(totalPerFloor * 0.15);
-    wingCounts[0] = longSide;  // north
-    wingCounts[1] = shortSide; // east
-    wingCounts[2] = longSide;  // south
-    wingCounts[3] = shortSide; // west
+    const longSide = Math.round(totalPerFloor * 0.35);
+    const shortSide = Math.round(totalPerFloor * 0.15);
+    wingCounts[0] = longSide;   // north
+    wingCounts[1] = shortSide;  // east
+    wingCounts[2] = longSide;   // south
+    // Last wing absorbs rounding remainder to preserve exact total
+    wingCounts[3] = totalPerFloor - longSide - shortSide - longSide;
   }
 
   // Calculate horizontal wing width (north/south wings along X)
@@ -646,34 +735,6 @@ function buildCourtyardBuilding(
     }
   }
 
-  // Roof caps (one per wing)
-  const roofY = building.num_floors * (UNIT_HEIGHT + FLOOR_SLAB_HEIGHT);
-
-  const nRoof = new THREE.Mesh(new THREE.BoxGeometry(northWidth + 0.3, 0.15, UNIT_DEPTH + 0.3), MATERIALS.roof.clone());
-  nRoof.position.set(0, roofY + 0.075, 0);
-  nRoof.castShadow = true;
-  group.add(nRoof);
-
-  if (numWings >= 2) {
-    const eRoof = new THREE.Mesh(new THREE.BoxGeometry(UNIT_DEPTH + 0.3, 0.15, vertDepth(wingCounts[1]) + 0.3), MATERIALS.roof.clone());
-    eRoof.position.set(eastX, roofY + 0.075, -(courtyardDepth / 2 + (UNIT_WIDTH + UNIT_GAP) / 2));
-    eRoof.castShadow = true;
-    group.add(eRoof);
-  }
-
-  if (numWings >= 3) {
-    const sRoof = new THREE.Mesh(new THREE.BoxGeometry(southWidth + 0.3, 0.15, UNIT_DEPTH + 0.3), MATERIALS.roof.clone());
-    sRoof.position.set(0, roofY + 0.075, southZ);
-    sRoof.castShadow = true;
-    group.add(sRoof);
-  }
-
-  if (numWings >= 4) {
-    const wRoof = new THREE.Mesh(new THREE.BoxGeometry(UNIT_DEPTH + 0.3, 0.15, vertDepth(wingCounts[3]) + 0.3), MATERIALS.roof.clone());
-    wRoof.position.set(westX, roofY + 0.075, -(courtyardDepth / 2 + (UNIT_WIDTH + UNIT_GAP) / 2));
-    wRoof.castShadow = true;
-    group.add(wRoof);
-  }
 }
 
 function buildBuildingGroup(
@@ -756,7 +817,7 @@ function addAmenityPads(layout: StackingLayout, scene: THREE.Scene, sceneCenter:
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export function StackingViewer3D({ layout, rentRollUnits, onUnitClick }: StackingViewer3DProps) {
+export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFilter = 'occupancy' }: StackingViewer3DProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
@@ -1024,11 +1085,18 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick }: Stackin
     };
   }, [layout, rentRollUnits, handleMouseMove, handleClick]);
 
+  // ── Filter recoloring (no scene rebuild — material color swaps only) ──
+  useEffect(() => {
+    if (!sceneRef.current) return;
+    const stats = computeRentStats(rentRollUnits, layout);
+    applyFilterToScene(sceneRef.current, activeFilter, stats);
+  }, [activeFilter, rentRollUnits, layout]);
+
   return (
     <div className="relative">
       <div
         ref={containerRef}
-        className="w-full rounded-2xl overflow-hidden border border-border/60"
+        className="w-full rounded-l-2xl overflow-hidden border border-border/60"
         style={{ height: 480 }}
       />
       {!isReady && (
@@ -1036,18 +1104,9 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick }: Stackin
           <p className="text-muted-foreground text-sm">Loading 3D viewer...</p>
         </div>
       )}
-      {/* Legend */}
-      <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground">
-        <span className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#8B5CF6' }} /> Occupied
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#F43F5E' }} /> Vacant
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#6B7280' }} /> No Data
-        </span>
-        <span className="text-muted-foreground/60 ml-auto">Click a unit for details · Drag to rotate</span>
+      {/* Help text overlay */}
+      <div className="absolute bottom-2 left-3 text-[10px] text-muted-foreground/50 pointer-events-none">
+        Click a unit for details · Drag to rotate
       </div>
     </div>
   );
