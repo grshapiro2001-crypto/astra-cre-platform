@@ -16,14 +16,102 @@ const UNIT_GAP = 0.2;
 const FLOOR_SLAB_HEIGHT = 0.1;
 const BUILDING_GAP = 20;
 
-// Purple primary: hsl(267, 84%, 60%) → roughly #8B5CF6
-const COLOR_OCCUPIED = new THREE.Color(0x8B5CF6);
-const COLOR_VACANT = new THREE.Color(0xF43F5E);
-const COLOR_UNKNOWN = new THREE.Color(0x6B7280);
-const COLOR_SLAB = new THREE.Color(0x374151);
-const COLOR_AMENITY = new THREE.Color(0x6366F1);
-const COLOR_GROUND = new THREE.Color(0x1a1a2e);
-const COLOR_HOVER_EMISSIVE = new THREE.Color(0xA78BFA);
+// ─── Material palette — investor-grade dark theme ────────────────────────────
+const MATERIALS = {
+  // Occupied unit: rich purple glass effect
+  occupied: new THREE.MeshPhysicalMaterial({
+    color: 0x7C3AED,
+    metalness: 0.1,
+    roughness: 0.4,
+    transparent: true,
+    opacity: 0.88,
+    emissive: 0x4C1D95,
+    emissiveIntensity: 0.15,
+    clearcoat: 0.3,
+    clearcoatRoughness: 0.2,
+  }),
+  // Vacant unit: warm rose/coral with slight glow
+  vacant: new THREE.MeshPhysicalMaterial({
+    color: 0xF43F5E,
+    metalness: 0.1,
+    roughness: 0.5,
+    transparent: true,
+    opacity: 0.88,
+    emissive: 0xBE123C,
+    emissiveIntensity: 0.2,
+    clearcoat: 0.2,
+    clearcoatRoughness: 0.3,
+  }),
+  // No data: neutral dark with subtle sheen
+  noData: new THREE.MeshPhysicalMaterial({
+    color: 0x3F3F5A,
+    metalness: 0.15,
+    roughness: 0.6,
+    transparent: true,
+    opacity: 0.75,
+    emissive: 0x1E1E3A,
+    emissiveIntensity: 0.05,
+  }),
+  // Floor slab: dark concrete look
+  slab: new THREE.MeshStandardMaterial({
+    color: 0x1A1A2E,
+    metalness: 0.3,
+    roughness: 0.8,
+    transparent: true,
+    opacity: 0.6,
+  }),
+  // Roof cap: slightly lighter than slab
+  roof: new THREE.MeshStandardMaterial({
+    color: 0x252540,
+    metalness: 0.2,
+    roughness: 0.7,
+    transparent: true,
+    opacity: 0.5,
+  }),
+  // Pool: translucent cyan water
+  pool: new THREE.MeshPhysicalMaterial({
+    color: 0x22D3EE,
+    metalness: 0.0,
+    roughness: 0.1,
+    transparent: true,
+    opacity: 0.7,
+    emissive: 0x0891B2,
+    emissiveIntensity: 0.3,
+    clearcoat: 1.0,
+    clearcoatRoughness: 0.05,
+  }),
+  // Parking: matte dark gray
+  parking: new THREE.MeshStandardMaterial({
+    color: 0x374151,
+    metalness: 0.0,
+    roughness: 0.9,
+    transparent: true,
+    opacity: 0.5,
+  }),
+  // Amenity default: warm accent
+  amenity: new THREE.MeshStandardMaterial({
+    color: 0xD97706,
+    metalness: 0.1,
+    roughness: 0.6,
+    transparent: true,
+    opacity: 0.5,
+  }),
+  // Ground plane
+  ground: new THREE.MeshStandardMaterial({
+    color: 0x0D0D1A,
+    metalness: 0.0,
+    roughness: 1.0,
+    transparent: true,
+    opacity: 0.8,
+  }),
+};
+
+// Edge line material for unit borders
+const EDGE_LINE_MATERIAL = new THREE.LineBasicMaterial({
+  color: 0x1E1B4B,
+  transparent: true,
+  opacity: 0.4,
+});
 
 export interface UnitMeshData {
   building_id: string;
@@ -100,12 +188,21 @@ function getUnitStatus(rentRollUnit?: RentRollUnit): 'occupied' | 'vacant' | 'un
   return 'unknown';
 }
 
-function getColorForStatus(status: 'occupied' | 'vacant' | 'unknown'): THREE.Color {
+function getMaterialForStatus(status: 'occupied' | 'vacant' | 'unknown'): THREE.MeshPhysicalMaterial {
   switch (status) {
-    case 'occupied': return COLOR_OCCUPIED;
-    case 'vacant': return COLOR_VACANT;
-    case 'unknown': return COLOR_UNKNOWN;
+    case 'occupied': return MATERIALS.occupied.clone();
+    case 'vacant': return MATERIALS.vacant.clone();
+    case 'unknown': return MATERIALS.noData.clone();
   }
+}
+
+/** Attach edge wireframe + shadow flags to a unit mesh */
+function addUnitEdges(mesh: THREE.Mesh, geom: THREE.BufferGeometry) {
+  const edges = new THREE.EdgesGeometry(geom);
+  const wireframe = new THREE.LineSegments(edges, EDGE_LINE_MATERIAL.clone());
+  mesh.add(wireframe);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
 }
 
 function buildLinearBuilding(
@@ -121,8 +218,7 @@ function buildLinearBuilding(
 
     // Floor slab
     const slabGeom = new THREE.BoxGeometry(totalWidth + 0.3, FLOOR_SLAB_HEIGHT, UNIT_DEPTH + 0.3);
-    const slabMat = new THREE.MeshStandardMaterial({ color: COLOR_SLAB });
-    const slab = new THREE.Mesh(slabGeom, slabMat);
+    const slab = new THREE.Mesh(slabGeom, MATERIALS.slab.clone());
     slab.position.set(0, floorY - FLOOR_SLAB_HEIGHT / 2, 0);
     group.add(slab);
 
@@ -131,10 +227,9 @@ function buildLinearBuilding(
       const key = `${building.id}_${floor}_${pos}`;
       const rr = unitMap.get(key);
       const status = getUnitStatus(rr);
-      const color = getColorForStatus(status);
 
       const geom = new THREE.BoxGeometry(UNIT_WIDTH, UNIT_HEIGHT, UNIT_DEPTH);
-      const mat = new THREE.MeshStandardMaterial({ color, transparent: true, opacity: 0.88 });
+      const mat = getMaterialForStatus(status);
       const mesh = new THREE.Mesh(geom, mat);
 
       const x = (pos - 1) * (UNIT_WIDTH + UNIT_GAP) - totalWidth / 2 + UNIT_WIDTH / 2;
@@ -150,16 +245,17 @@ function buildLinearBuilding(
         rentRollUnit: rr,
       } satisfies UnitMeshData;
 
+      addUnitEdges(mesh, geom);
       group.add(mesh);
     }
   }
 
-  // Roof slab
+  // Roof cap
   const roofY = building.num_floors * (UNIT_HEIGHT + FLOOR_SLAB_HEIGHT);
-  const roofGeom = new THREE.BoxGeometry(totalWidth + 0.3, FLOOR_SLAB_HEIGHT, UNIT_DEPTH + 0.3);
-  const roofMat = new THREE.MeshStandardMaterial({ color: COLOR_SLAB });
-  const roof = new THREE.Mesh(roofGeom, roofMat);
-  roof.position.set(0, roofY - FLOOR_SLAB_HEIGHT / 2, 0);
+  const roofGeom = new THREE.BoxGeometry(totalWidth + 0.3, 0.15, UNIT_DEPTH + 0.3);
+  const roof = new THREE.Mesh(roofGeom, MATERIALS.roof.clone());
+  roof.position.set(0, roofY + 0.075, 0);
+  roof.castShadow = true;
   group.add(roof);
 }
 
@@ -183,13 +279,13 @@ function buildLShapeBuilding(
 
     // Slab for wing 1
     const slab1Geom = new THREE.BoxGeometry(wing1Width + 0.3, FLOOR_SLAB_HEIGHT, UNIT_DEPTH + 0.3);
-    const slab1 = new THREE.Mesh(slab1Geom, new THREE.MeshStandardMaterial({ color: COLOR_SLAB }));
+    const slab1 = new THREE.Mesh(slab1Geom, MATERIALS.slab.clone());
     slab1.position.set(wing1Width / 2, floorY - FLOOR_SLAB_HEIGHT / 2, 0);
     group.add(slab1);
 
     // Slab for wing 2
     const slab2Geom = new THREE.BoxGeometry(UNIT_DEPTH + 0.3, FLOOR_SLAB_HEIGHT, wing2Depth + 0.3);
-    const slab2 = new THREE.Mesh(slab2Geom, new THREE.MeshStandardMaterial({ color: COLOR_SLAB }));
+    const slab2 = new THREE.Mesh(slab2Geom, MATERIALS.slab.clone());
     slab2.position.set(0, floorY - FLOOR_SLAB_HEIGHT / 2, -(wing2Depth / 2 + UNIT_DEPTH / 2 + UNIT_GAP));
     group.add(slab2);
 
@@ -202,12 +298,13 @@ function buildLShapeBuilding(
       const status = getUnitStatus(rr);
 
       const geom = new THREE.BoxGeometry(UNIT_WIDTH, UNIT_HEIGHT, UNIT_DEPTH);
-      const mat = new THREE.MeshStandardMaterial({ color: getColorForStatus(status), transparent: true, opacity: 0.88 });
+      const mat = getMaterialForStatus(status);
       const mesh = new THREE.Mesh(geom, mat);
 
       mesh.position.set(i * (UNIT_WIDTH + UNIT_GAP), floorY + UNIT_HEIGHT / 2, 0);
       mesh.name = `unit_${building.id}_${floor}_${pos}`;
       mesh.userData = { building_id: building.id, building_label: building.label, floor, position: pos, status, rentRollUnit: rr } satisfies UnitMeshData;
+      addUnitEdges(mesh, geom);
       group.add(mesh);
     }
 
@@ -220,18 +317,31 @@ function buildLShapeBuilding(
       const status = getUnitStatus(rr);
 
       const geom = new THREE.BoxGeometry(UNIT_DEPTH, UNIT_HEIGHT, UNIT_WIDTH);
-      const mat = new THREE.MeshStandardMaterial({ color: getColorForStatus(status), transparent: true, opacity: 0.88 });
+      const mat = getMaterialForStatus(status);
       const mesh = new THREE.Mesh(geom, mat);
 
       const z = -(i + 1) * (UNIT_WIDTH + UNIT_GAP);
       mesh.position.set(0, floorY + UNIT_HEIGHT / 2, z);
       mesh.name = `unit_${building.id}_${floor}_${pos}`;
       mesh.userData = { building_id: building.id, building_label: building.label, floor, position: pos, status, rentRollUnit: rr } satisfies UnitMeshData;
+      addUnitEdges(mesh, geom);
       group.add(mesh);
     }
 
     unitCounter = floor * building.units_per_floor;
   }
+
+  // Roof caps
+  const roofY = building.num_floors * (UNIT_HEIGHT + FLOOR_SLAB_HEIGHT);
+  const roof1 = new THREE.Mesh(new THREE.BoxGeometry(wing1Width + 0.3, 0.15, UNIT_DEPTH + 0.3), MATERIALS.roof.clone());
+  roof1.position.set(wing1Width / 2, roofY + 0.075, 0);
+  roof1.castShadow = true;
+  group.add(roof1);
+
+  const roof2 = new THREE.Mesh(new THREE.BoxGeometry(UNIT_DEPTH + 0.3, 0.15, wing2Depth + 0.3), MATERIALS.roof.clone());
+  roof2.position.set(0, roofY + 0.075, -(wing2Depth / 2 + UNIT_DEPTH / 2 + UNIT_GAP));
+  roof2.castShadow = true;
+  group.add(roof2);
 }
 
 function buildUShapeBuilding(
@@ -261,11 +371,12 @@ function buildUShapeBuilding(
       const rr = unitMap.get(key);
       const status = getUnitStatus(rr);
       const geom = new THREE.BoxGeometry(UNIT_DEPTH, UNIT_HEIGHT, UNIT_WIDTH);
-      const mat = new THREE.MeshStandardMaterial({ color: getColorForStatus(status), transparent: true, opacity: 0.88 });
+      const mat = getMaterialForStatus(status);
       const mesh = new THREE.Mesh(geom, mat);
       mesh.position.set(-(maxWingWidth / 2 + UNIT_DEPTH / 2 + UNIT_GAP), floorY + UNIT_HEIGHT / 2, -i * (UNIT_WIDTH + UNIT_GAP));
       mesh.name = `unit_${building.id}_${floor}_${posCounter}`;
       mesh.userData = { building_id: building.id, building_label: building.label, floor, position: posCounter, status, rentRollUnit: rr } satisfies UnitMeshData;
+      addUnitEdges(mesh, geom);
       group.add(mesh);
       posCounter++;
     }
@@ -277,12 +388,13 @@ function buildUShapeBuilding(
       const rr = unitMap.get(key);
       const status = getUnitStatus(rr);
       const geom = new THREE.BoxGeometry(UNIT_WIDTH, UNIT_HEIGHT, UNIT_DEPTH);
-      const mat = new THREE.MeshStandardMaterial({ color: getColorForStatus(status), transparent: true, opacity: 0.88 });
+      const mat = getMaterialForStatus(status);
       const mesh = new THREE.Mesh(geom, mat);
       const x = i * (UNIT_WIDTH + UNIT_GAP) - maxWingWidth / 2 + UNIT_WIDTH / 2;
       mesh.position.set(x, floorY + UNIT_HEIGHT / 2, bottomZ);
       mesh.name = `unit_${building.id}_${floor}_${posCounter}`;
       mesh.userData = { building_id: building.id, building_label: building.label, floor, position: posCounter, status, rentRollUnit: rr } satisfies UnitMeshData;
+      addUnitEdges(mesh, geom);
       group.add(mesh);
       posCounter++;
     }
@@ -293,30 +405,48 @@ function buildUShapeBuilding(
       const rr = unitMap.get(key);
       const status = getUnitStatus(rr);
       const geom = new THREE.BoxGeometry(UNIT_DEPTH, UNIT_HEIGHT, UNIT_WIDTH);
-      const mat = new THREE.MeshStandardMaterial({ color: getColorForStatus(status), transparent: true, opacity: 0.88 });
+      const mat = getMaterialForStatus(status);
       const mesh = new THREE.Mesh(geom, mat);
       mesh.position.set(maxWingWidth / 2 + UNIT_DEPTH / 2 + UNIT_GAP, floorY + UNIT_HEIGHT / 2, -(wings[0] - 1 - i) * (UNIT_WIDTH + UNIT_GAP));
       mesh.name = `unit_${building.id}_${floor}_${posCounter}`;
       mesh.userData = { building_id: building.id, building_label: building.label, floor, position: posCounter, status, rentRollUnit: rr } satisfies UnitMeshData;
+      addUnitEdges(mesh, geom);
       group.add(mesh);
       posCounter++;
     }
 
-    // Floor slabs (simplified — one for each wing)
-    const slabMat = new THREE.MeshStandardMaterial({ color: COLOR_SLAB });
-
-    const slab1 = new THREE.Mesh(new THREE.BoxGeometry(UNIT_DEPTH + 0.3, FLOOR_SLAB_HEIGHT, wingWidth(wings[0]) + 0.3), slabMat.clone());
+    // Floor slabs (one for each wing)
+    const slab1 = new THREE.Mesh(new THREE.BoxGeometry(UNIT_DEPTH + 0.3, FLOOR_SLAB_HEIGHT, wingWidth(wings[0]) + 0.3), MATERIALS.slab.clone());
     slab1.position.set(-(maxWingWidth / 2 + UNIT_DEPTH / 2 + UNIT_GAP), floorY - FLOOR_SLAB_HEIGHT / 2, -(wings[0] - 1) * (UNIT_WIDTH + UNIT_GAP) / 2);
     group.add(slab1);
 
-    const slab2 = new THREE.Mesh(new THREE.BoxGeometry(maxWingWidth + 0.3, FLOOR_SLAB_HEIGHT, UNIT_DEPTH + 0.3), slabMat.clone());
+    const slab2 = new THREE.Mesh(new THREE.BoxGeometry(maxWingWidth + 0.3, FLOOR_SLAB_HEIGHT, UNIT_DEPTH + 0.3), MATERIALS.slab.clone());
     slab2.position.set(0, floorY - FLOOR_SLAB_HEIGHT / 2, bottomZ);
     group.add(slab2);
 
-    const slab3 = new THREE.Mesh(new THREE.BoxGeometry(UNIT_DEPTH + 0.3, FLOOR_SLAB_HEIGHT, wingWidth(wings[2]) + 0.3), slabMat.clone());
+    const slab3 = new THREE.Mesh(new THREE.BoxGeometry(UNIT_DEPTH + 0.3, FLOOR_SLAB_HEIGHT, wingWidth(wings[2]) + 0.3), MATERIALS.slab.clone());
     slab3.position.set(maxWingWidth / 2 + UNIT_DEPTH / 2 + UNIT_GAP, floorY - FLOOR_SLAB_HEIGHT / 2, -(wings[2] - 1) * (UNIT_WIDTH + UNIT_GAP) / 2);
     group.add(slab3);
   }
+
+  // Roof caps (3 wings)
+  const roofY = building.num_floors * (UNIT_HEIGHT + FLOOR_SLAB_HEIGHT);
+  const bottomZ = -(wings[0] - 1) * (UNIT_WIDTH + UNIT_GAP) - UNIT_WIDTH / 2 - UNIT_GAP;
+
+  const roofLeft = new THREE.Mesh(new THREE.BoxGeometry(UNIT_DEPTH + 0.3, 0.15, wingWidth(wings[0]) + 0.3), MATERIALS.roof.clone());
+  roofLeft.position.set(-(maxWingWidth / 2 + UNIT_DEPTH / 2 + UNIT_GAP), roofY + 0.075, -(wings[0] - 1) * (UNIT_WIDTH + UNIT_GAP) / 2);
+  roofLeft.castShadow = true;
+  group.add(roofLeft);
+
+  const roofBottom = new THREE.Mesh(new THREE.BoxGeometry(maxWingWidth + 0.3, 0.15, UNIT_DEPTH + 0.3), MATERIALS.roof.clone());
+  roofBottom.position.set(0, roofY + 0.075, bottomZ);
+  roofBottom.castShadow = true;
+  group.add(roofBottom);
+
+  const roofRight = new THREE.Mesh(new THREE.BoxGeometry(UNIT_DEPTH + 0.3, 0.15, wingWidth(wings[2]) + 0.3), MATERIALS.roof.clone());
+  roofRight.position.set(maxWingWidth / 2 + UNIT_DEPTH / 2 + UNIT_GAP, roofY + 0.075, -(wings[2] - 1) * (UNIT_WIDTH + UNIT_GAP) / 2);
+  roofRight.castShadow = true;
+  group.add(roofRight);
 }
 
 function buildTowerBuilding(
@@ -335,7 +465,7 @@ function buildTowerBuilding(
 
     // Slab
     const slabGeom = new THREE.BoxGeometry(gridWidth + 0.3, FLOOR_SLAB_HEIGHT, gridDepth + 0.3);
-    const slab = new THREE.Mesh(slabGeom, new THREE.MeshStandardMaterial({ color: COLOR_SLAB }));
+    const slab = new THREE.Mesh(slabGeom, MATERIALS.slab.clone());
     slab.position.set(0, floorY - FLOOR_SLAB_HEIGHT / 2, 0);
     group.add(slab);
 
@@ -348,7 +478,7 @@ function buildTowerBuilding(
         const status = getUnitStatus(rr);
 
         const geom = new THREE.BoxGeometry(UNIT_WIDTH, UNIT_HEIGHT, UNIT_DEPTH);
-        const mat = new THREE.MeshStandardMaterial({ color: getColorForStatus(status), transparent: true, opacity: 0.88 });
+        const mat = getMaterialForStatus(status);
         const mesh = new THREE.Mesh(geom, mat);
 
         const x = c * (UNIT_WIDTH + UNIT_GAP) - gridWidth / 2 + UNIT_WIDTH / 2;
@@ -356,17 +486,19 @@ function buildTowerBuilding(
         mesh.position.set(x, floorY + UNIT_HEIGHT / 2, z);
         mesh.name = `unit_${building.id}_${floor}_${posCounter}`;
         mesh.userData = { building_id: building.id, building_label: building.label, floor, position: posCounter, status, rentRollUnit: rr } satisfies UnitMeshData;
+        addUnitEdges(mesh, geom);
         group.add(mesh);
         posCounter++;
       }
     }
   }
 
-  // Roof
+  // Roof cap
   const roofY = building.num_floors * (UNIT_HEIGHT + FLOOR_SLAB_HEIGHT);
-  const roofGeom = new THREE.BoxGeometry(gridWidth + 0.3, FLOOR_SLAB_HEIGHT, gridDepth + 0.3);
-  const roof = new THREE.Mesh(roofGeom, new THREE.MeshStandardMaterial({ color: COLOR_SLAB }));
-  roof.position.set(0, roofY - FLOOR_SLAB_HEIGHT / 2, 0);
+  const roofGeom = new THREE.BoxGeometry(gridWidth + 0.3, 0.15, gridDepth + 0.3);
+  const roof = new THREE.Mesh(roofGeom, MATERIALS.roof.clone());
+  roof.position.set(0, roofY + 0.075, 0);
+  roof.castShadow = true;
   group.add(roof);
 }
 
@@ -386,6 +518,17 @@ function buildCourtyardBuilding(
       })();
 
   const numWings = wingCounts.length;
+
+  // Apply rectangular aspect ratio when all 4 wings have equal unit counts
+  if (numWings >= 4 && wingCounts.every((c) => c === wingCounts[0])) {
+    const totalPerFloor = building.units_per_floor;
+    const longSide = Math.ceil(totalPerFloor * 0.35);
+    const shortSide = Math.ceil(totalPerFloor * 0.15);
+    wingCounts[0] = longSide;  // north
+    wingCounts[1] = shortSide; // east
+    wingCounts[2] = longSide;  // south
+    wingCounts[3] = shortSide; // west
+  }
 
   // Calculate horizontal wing width (north/south wings along X)
   const horizWidth = (units: number) => units * (UNIT_WIDTH + UNIT_GAP) - UNIT_GAP;
@@ -411,7 +554,6 @@ function buildCourtyardBuilding(
   for (let floor = 1; floor <= building.num_floors; floor++) {
     const floorY = (floor - 1) * (UNIT_HEIGHT + FLOOR_SLAB_HEIGHT);
     let posCounter = 1;
-    const slabMat = new THREE.MeshStandardMaterial({ color: COLOR_SLAB });
 
     // ── North wing (along X, Z = 0) ──
     for (let i = 0; i < wingCounts[0]; i++) {
@@ -419,17 +561,18 @@ function buildCourtyardBuilding(
       const rr = unitMap.get(key);
       const status = getUnitStatus(rr);
       const geom = new THREE.BoxGeometry(UNIT_WIDTH, UNIT_HEIGHT, UNIT_DEPTH);
-      const mat = new THREE.MeshStandardMaterial({ color: getColorForStatus(status), transparent: true, opacity: 0.88 });
+      const mat = getMaterialForStatus(status);
       const mesh = new THREE.Mesh(geom, mat);
       const x = i * (UNIT_WIDTH + UNIT_GAP) - courtyardWidth / 2 + UNIT_WIDTH / 2;
       mesh.position.set(x, floorY + UNIT_HEIGHT / 2, 0);
       mesh.name = `unit_${building.id}_${floor}_${posCounter}`;
       mesh.userData = { building_id: building.id, building_label: building.label, floor, position: posCounter, status, rentRollUnit: rr } satisfies UnitMeshData;
+      addUnitEdges(mesh, geom);
       group.add(mesh);
       posCounter++;
     }
     // North slab
-    const nSlab = new THREE.Mesh(new THREE.BoxGeometry(northWidth + 0.3, FLOOR_SLAB_HEIGHT, UNIT_DEPTH + 0.3), slabMat.clone());
+    const nSlab = new THREE.Mesh(new THREE.BoxGeometry(northWidth + 0.3, FLOOR_SLAB_HEIGHT, UNIT_DEPTH + 0.3), MATERIALS.slab.clone());
     nSlab.position.set(0, floorY - FLOOR_SLAB_HEIGHT / 2, 0);
     group.add(nSlab);
 
@@ -440,17 +583,18 @@ function buildCourtyardBuilding(
         const rr = unitMap.get(key);
         const status = getUnitStatus(rr);
         const geom = new THREE.BoxGeometry(UNIT_DEPTH, UNIT_HEIGHT, UNIT_WIDTH);
-        const mat = new THREE.MeshStandardMaterial({ color: getColorForStatus(status), transparent: true, opacity: 0.88 });
+        const mat = getMaterialForStatus(status);
         const mesh = new THREE.Mesh(geom, mat);
         const z = -(i + 1) * (UNIT_WIDTH + UNIT_GAP);
         mesh.position.set(eastX, floorY + UNIT_HEIGHT / 2, z);
         mesh.name = `unit_${building.id}_${floor}_${posCounter}`;
         mesh.userData = { building_id: building.id, building_label: building.label, floor, position: posCounter, status, rentRollUnit: rr } satisfies UnitMeshData;
+        addUnitEdges(mesh, geom);
         group.add(mesh);
         posCounter++;
       }
       // East slab
-      const eSlab = new THREE.Mesh(new THREE.BoxGeometry(UNIT_DEPTH + 0.3, FLOOR_SLAB_HEIGHT, vertDepth(wingCounts[1]) + 0.3), slabMat.clone());
+      const eSlab = new THREE.Mesh(new THREE.BoxGeometry(UNIT_DEPTH + 0.3, FLOOR_SLAB_HEIGHT, vertDepth(wingCounts[1]) + 0.3), MATERIALS.slab.clone());
       eSlab.position.set(eastX, floorY - FLOOR_SLAB_HEIGHT / 2, -(courtyardDepth / 2 + (UNIT_WIDTH + UNIT_GAP) / 2));
       group.add(eSlab);
     }
@@ -462,17 +606,18 @@ function buildCourtyardBuilding(
         const rr = unitMap.get(key);
         const status = getUnitStatus(rr);
         const geom = new THREE.BoxGeometry(UNIT_WIDTH, UNIT_HEIGHT, UNIT_DEPTH);
-        const mat = new THREE.MeshStandardMaterial({ color: getColorForStatus(status), transparent: true, opacity: 0.88 });
+        const mat = getMaterialForStatus(status);
         const mesh = new THREE.Mesh(geom, mat);
         const x = i * (UNIT_WIDTH + UNIT_GAP) - courtyardWidth / 2 + UNIT_WIDTH / 2;
         mesh.position.set(x, floorY + UNIT_HEIGHT / 2, southZ);
         mesh.name = `unit_${building.id}_${floor}_${posCounter}`;
         mesh.userData = { building_id: building.id, building_label: building.label, floor, position: posCounter, status, rentRollUnit: rr } satisfies UnitMeshData;
+        addUnitEdges(mesh, geom);
         group.add(mesh);
         posCounter++;
       }
       // South slab
-      const sSlab = new THREE.Mesh(new THREE.BoxGeometry(southWidth + 0.3, FLOOR_SLAB_HEIGHT, UNIT_DEPTH + 0.3), slabMat.clone());
+      const sSlab = new THREE.Mesh(new THREE.BoxGeometry(southWidth + 0.3, FLOOR_SLAB_HEIGHT, UNIT_DEPTH + 0.3), MATERIALS.slab.clone());
       sSlab.position.set(0, floorY - FLOOR_SLAB_HEIGHT / 2, southZ);
       group.add(sSlab);
     }
@@ -484,20 +629,50 @@ function buildCourtyardBuilding(
         const rr = unitMap.get(key);
         const status = getUnitStatus(rr);
         const geom = new THREE.BoxGeometry(UNIT_DEPTH, UNIT_HEIGHT, UNIT_WIDTH);
-        const mat = new THREE.MeshStandardMaterial({ color: getColorForStatus(status), transparent: true, opacity: 0.88 });
+        const mat = getMaterialForStatus(status);
         const mesh = new THREE.Mesh(geom, mat);
         const z = -(i + 1) * (UNIT_WIDTH + UNIT_GAP);
         mesh.position.set(westX, floorY + UNIT_HEIGHT / 2, z);
         mesh.name = `unit_${building.id}_${floor}_${posCounter}`;
         mesh.userData = { building_id: building.id, building_label: building.label, floor, position: posCounter, status, rentRollUnit: rr } satisfies UnitMeshData;
+        addUnitEdges(mesh, geom);
         group.add(mesh);
         posCounter++;
       }
       // West slab
-      const wSlab = new THREE.Mesh(new THREE.BoxGeometry(UNIT_DEPTH + 0.3, FLOOR_SLAB_HEIGHT, vertDepth(wingCounts[3]) + 0.3), slabMat.clone());
+      const wSlab = new THREE.Mesh(new THREE.BoxGeometry(UNIT_DEPTH + 0.3, FLOOR_SLAB_HEIGHT, vertDepth(wingCounts[3]) + 0.3), MATERIALS.slab.clone());
       wSlab.position.set(westX, floorY - FLOOR_SLAB_HEIGHT / 2, -(courtyardDepth / 2 + (UNIT_WIDTH + UNIT_GAP) / 2));
       group.add(wSlab);
     }
+  }
+
+  // Roof caps (one per wing)
+  const roofY = building.num_floors * (UNIT_HEIGHT + FLOOR_SLAB_HEIGHT);
+
+  const nRoof = new THREE.Mesh(new THREE.BoxGeometry(northWidth + 0.3, 0.15, UNIT_DEPTH + 0.3), MATERIALS.roof.clone());
+  nRoof.position.set(0, roofY + 0.075, 0);
+  nRoof.castShadow = true;
+  group.add(nRoof);
+
+  if (numWings >= 2) {
+    const eRoof = new THREE.Mesh(new THREE.BoxGeometry(UNIT_DEPTH + 0.3, 0.15, vertDepth(wingCounts[1]) + 0.3), MATERIALS.roof.clone());
+    eRoof.position.set(eastX, roofY + 0.075, -(courtyardDepth / 2 + (UNIT_WIDTH + UNIT_GAP) / 2));
+    eRoof.castShadow = true;
+    group.add(eRoof);
+  }
+
+  if (numWings >= 3) {
+    const sRoof = new THREE.Mesh(new THREE.BoxGeometry(southWidth + 0.3, 0.15, UNIT_DEPTH + 0.3), MATERIALS.roof.clone());
+    sRoof.position.set(0, roofY + 0.075, southZ);
+    sRoof.castShadow = true;
+    group.add(sRoof);
+  }
+
+  if (numWings >= 4) {
+    const wRoof = new THREE.Mesh(new THREE.BoxGeometry(UNIT_DEPTH + 0.3, 0.15, vertDepth(wingCounts[3]) + 0.3), MATERIALS.roof.clone());
+    wRoof.position.set(westX, roofY + 0.075, -(courtyardDepth / 2 + (UNIT_WIDTH + UNIT_GAP) / 2));
+    wRoof.castShadow = true;
+    group.add(wRoof);
   }
 }
 
@@ -564,8 +739,7 @@ function addAmenityPads(layout: StackingLayout, scene: THREE.Scene, sceneCenter:
     const d = isParking ? 6 : isPool ? amenitySize : 3;
 
     const geom = new THREE.BoxGeometry(w, 0.15, d);
-    const color = isPool ? new THREE.Color(0x38BDF8) : COLOR_AMENITY;
-    const mat = new THREE.MeshStandardMaterial({ color, transparent: true, opacity: 0.6 });
+    const mat = isPool ? MATERIALS.pool.clone() : isParking ? MATERIALS.parking.clone() : MATERIALS.amenity.clone();
     const mesh = new THREE.Mesh(geom, mat);
     mesh.position.set(amenityX, 0.08, amenityZ);
     mesh.name = `amenity_${amenity.type}`;
@@ -613,7 +787,8 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick }: Stackin
 
     // ── Scene ──
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0f0f1a);
+    scene.background = new THREE.Color(0x080814);
+    scene.fog = new THREE.FogExp2(0x080814, 0.003);
     sceneRef.current = scene;
 
     // ── Camera ──
@@ -621,9 +796,19 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick }: Stackin
     cameraRef.current = camera;
 
     // ── Renderer ──
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      alpha: false,
+      powerPreference: 'high-performance',
+    });
     renderer.setSize(container.clientWidth, container.clientHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.1;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.setClearColor(0x080814, 1);
     container.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
@@ -635,14 +820,28 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick }: Stackin
     controlsRef.current = controls;
 
     // ── Lighting ──
-    const ambient = new THREE.AmbientLight(0xffffff, 0.5);
+    const ambient = new THREE.AmbientLight(0x8B8BBA, 0.4);
     scene.add(ambient);
-    const directional = new THREE.DirectionalLight(0xffffff, 0.8);
-    directional.position.set(10, 15, 10);
-    scene.add(directional);
-    const fillLight = new THREE.DirectionalLight(0xffffff, 0.3);
-    fillLight.position.set(-10, 8, -10);
+
+    const keyLight = new THREE.DirectionalLight(0xFFF5E6, 0.8);
+    keyLight.position.set(50, 80, 30);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.width = 2048;
+    keyLight.shadow.mapSize.height = 2048;
+    keyLight.shadow.camera.far = 300;
+    keyLight.shadow.camera.left = -100;
+    keyLight.shadow.camera.right = 100;
+    keyLight.shadow.camera.top = 100;
+    keyLight.shadow.camera.bottom = -100;
+    scene.add(keyLight);
+
+    const fillLight = new THREE.DirectionalLight(0xC4B5FD, 0.3);
+    fillLight.position.set(-40, 40, -20);
     scene.add(fillLight);
+
+    const rimLight = new THREE.DirectionalLight(0xA78BFA, 0.2);
+    rimLight.position.set(0, 20, -60);
+    scene.add(rimLight);
 
     // ── Build geometry (grid layout) ──
     const unitMap = matchUnitsToRentRoll(layout, rentRollUnits);
@@ -719,10 +918,10 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick }: Stackin
     const gridHelper = new THREE.GridHelper(groundSize, Math.max(10, Math.floor(groundSize / 2)), 0x2a2a4a, 0x1a1a3a);
     scene.add(gridHelper);
     const groundGeom = new THREE.PlaneGeometry(groundSize, groundSize);
-    const groundMat = new THREE.MeshStandardMaterial({ color: COLOR_GROUND, transparent: true, opacity: 0.5 });
-    const ground = new THREE.Mesh(groundGeom, groundMat);
+    const ground = new THREE.Mesh(groundGeom, MATERIALS.ground.clone());
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = -0.01;
+    ground.receiveShadow = true;
     scene.add(ground);
 
     // ── Camera position ──
@@ -731,9 +930,15 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick }: Stackin
     finalSceneBox.getCenter(sceneCenter);
     const finalSceneSize = new THREE.Vector3();
     finalSceneBox.getSize(finalSceneSize);
-    const maxDim = Math.max(finalSceneSize.x, finalSceneSize.y, finalSceneSize.z);
+    const maxDim = Math.max(finalSceneSize.x, finalSceneSize.z);
+    const cameraDistance = maxDim * 1.5;
 
-    camera.position.set(sceneCenter.x + maxDim * 0.6, sceneCenter.y + maxDim * 0.8, sceneCenter.z + maxDim * 1.2);
+    camera.position.set(
+      sceneCenter.x + cameraDistance * 0.6,
+      cameraDistance * 0.7,
+      sceneCenter.z + cameraDistance * 0.6,
+    );
+    camera.lookAt(sceneCenter);
     controls.target.copy(sceneCenter);
     controls.update();
 
@@ -755,18 +960,19 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick }: Stackin
 
         // Reset previous hover
         if (hoveredRef.current) {
-          const mat = hoveredRef.current.material as THREE.MeshStandardMaterial;
-          mat.emissive.set(0x000000);
-          mat.emissiveIntensity = 0;
+          const mat = hoveredRef.current.material as THREE.MeshPhysicalMaterial;
+          const status = (hoveredRef.current.userData as UnitMeshData).status;
+          mat.emissiveIntensity = status === 'vacant' ? 0.2 : status === 'occupied' ? 0.15 : 0.05;
+          mat.opacity = status === 'unknown' ? 0.75 : 0.88;
           hoveredRef.current = null;
         }
 
         if (intersects.length > 0) {
           const hit = intersects[0].object as THREE.Mesh;
           if (hit.name.startsWith('unit_')) {
-            const mat = hit.material as THREE.MeshStandardMaterial;
-            mat.emissive.copy(COLOR_HOVER_EMISSIVE);
-            mat.emissiveIntensity = 0.4;
+            const mat = hit.material as THREE.MeshPhysicalMaterial;
+            mat.emissiveIntensity = 0.6;
+            mat.opacity = 1.0;
             hoveredRef.current = hit;
             container.style.cursor = 'pointer';
           }
@@ -803,7 +1009,7 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick }: Stackin
       controls.dispose();
       renderer.dispose();
       scene.traverse((obj) => {
-        if (obj instanceof THREE.Mesh) {
+        if (obj instanceof THREE.Mesh || obj instanceof THREE.LineSegments) {
           obj.geometry.dispose();
           if (Array.isArray(obj.material)) {
             obj.material.forEach((m) => m.dispose());
