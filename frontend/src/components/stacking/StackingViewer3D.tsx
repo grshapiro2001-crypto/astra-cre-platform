@@ -168,8 +168,8 @@ function buildLShapeBuilding(
   unitMap: Map<string, RentRollUnit>,
   group: THREE.Group,
 ) {
-  const halfUnits = Math.ceil(building.units_per_floor / 2);
-  const otherHalf = building.units_per_floor - halfUnits;
+  const halfUnits = building.wings?.[0]?.units_per_floor ?? Math.ceil(building.units_per_floor / 2);
+  const otherHalf = building.wings?.[1]?.units_per_floor ?? (building.units_per_floor - halfUnits);
 
   // Wing 1: along X axis
   const wing1Width = halfUnits * (UNIT_WIDTH + UNIT_GAP) - UNIT_GAP;
@@ -239,10 +239,14 @@ function buildUShapeBuilding(
   unitMap: Map<string, RentRollUnit>,
   group: THREE.Group,
 ) {
-  // Split units across 3 wings
-  const wingUnits = Math.floor(building.units_per_floor / 3);
-  const remainder = building.units_per_floor - wingUnits * 3;
-  const wings = [wingUnits + (remainder > 0 ? 1 : 0), wingUnits + (remainder > 1 ? 1 : 0), wingUnits];
+  // Split units across 3 wings — use wing data if available
+  const wings = building.wings && building.wings.length >= 3
+    ? [building.wings[0].units_per_floor, building.wings[1].units_per_floor, building.wings[2].units_per_floor]
+    : (() => {
+        const wingUnits = Math.floor(building.units_per_floor / 3);
+        const remainder = building.units_per_floor - wingUnits * 3;
+        return [wingUnits + (remainder > 0 ? 1 : 0), wingUnits + (remainder > 1 ? 1 : 0), wingUnits];
+      })();
 
   const wingWidth = (w: number) => w * (UNIT_WIDTH + UNIT_GAP) - UNIT_GAP;
   const maxWingWidth = wingWidth(Math.max(...wings));
@@ -366,6 +370,137 @@ function buildTowerBuilding(
   group.add(roof);
 }
 
+function buildCourtyardBuilding(
+  building: StackingBuilding,
+  unitMap: Map<string, RentRollUnit>,
+  group: THREE.Group,
+) {
+  // Distribute units across 4 wings (N, E, S, W) — use wing data if available
+  const wingCounts: number[] = building.wings && building.wings.length >= 3
+    ? building.wings.map((w) => w.units_per_floor)
+    : (() => {
+        const numWings = 4;
+        const base = Math.floor(building.units_per_floor / numWings);
+        const remainder = building.units_per_floor - base * numWings;
+        return Array.from({ length: numWings }, (_, i) => base + (i < remainder ? 1 : 0));
+      })();
+
+  const numWings = wingCounts.length;
+
+  // Calculate horizontal wing width (north/south wings along X)
+  const horizWidth = (units: number) => units * (UNIT_WIDTH + UNIT_GAP) - UNIT_GAP;
+  // Calculate vertical wing depth (east/west wings along Z)
+  const vertDepth = (units: number) => units * (UNIT_WIDTH + UNIT_GAP) - UNIT_GAP;
+
+  // Courtyard dimensions — based on max horizontal/vertical wing sizes
+  const northWidth = horizWidth(wingCounts[0]);
+  const eastDepth = numWings >= 2 ? vertDepth(wingCounts[1]) : 0;
+  const southWidth = numWings >= 3 ? horizWidth(wingCounts[2]) : 0;
+  const westDepth = numWings >= 4 ? vertDepth(wingCounts[3]) : eastDepth;
+
+  const courtyardWidth = Math.max(northWidth, southWidth);
+  const courtyardDepth = Math.max(eastDepth, westDepth);
+
+  // Offsets: east/west wings sit outside the horizontal wings
+  const eastX = courtyardWidth / 2 + UNIT_DEPTH / 2 + UNIT_GAP;
+  const westX = -(courtyardWidth / 2 + UNIT_DEPTH / 2 + UNIT_GAP);
+
+  // South wing sits below the courtyard
+  const southZ = -(courtyardDepth + UNIT_DEPTH + UNIT_GAP * 2);
+
+  for (let floor = 1; floor <= building.num_floors; floor++) {
+    const floorY = (floor - 1) * (UNIT_HEIGHT + FLOOR_SLAB_HEIGHT);
+    let posCounter = 1;
+    const slabMat = new THREE.MeshStandardMaterial({ color: COLOR_SLAB });
+
+    // ── North wing (along X, Z = 0) ──
+    for (let i = 0; i < wingCounts[0]; i++) {
+      const key = `${building.id}_${floor}_${posCounter}`;
+      const rr = unitMap.get(key);
+      const status = getUnitStatus(rr);
+      const geom = new THREE.BoxGeometry(UNIT_WIDTH, UNIT_HEIGHT, UNIT_DEPTH);
+      const mat = new THREE.MeshStandardMaterial({ color: getColorForStatus(status), transparent: true, opacity: 0.88 });
+      const mesh = new THREE.Mesh(geom, mat);
+      const x = i * (UNIT_WIDTH + UNIT_GAP) - courtyardWidth / 2 + UNIT_WIDTH / 2;
+      mesh.position.set(x, floorY + UNIT_HEIGHT / 2, 0);
+      mesh.name = `unit_${building.id}_${floor}_${posCounter}`;
+      mesh.userData = { building_id: building.id, building_label: building.label, floor, position: posCounter, status, rentRollUnit: rr } satisfies UnitMeshData;
+      group.add(mesh);
+      posCounter++;
+    }
+    // North slab
+    const nSlab = new THREE.Mesh(new THREE.BoxGeometry(northWidth + 0.3, FLOOR_SLAB_HEIGHT, UNIT_DEPTH + 0.3), slabMat.clone());
+    nSlab.position.set(0, floorY - FLOOR_SLAB_HEIGHT / 2, 0);
+    group.add(nSlab);
+
+    // ── East wing (along -Z, X = eastX) ──
+    if (numWings >= 2) {
+      for (let i = 0; i < wingCounts[1]; i++) {
+        const key = `${building.id}_${floor}_${posCounter}`;
+        const rr = unitMap.get(key);
+        const status = getUnitStatus(rr);
+        const geom = new THREE.BoxGeometry(UNIT_DEPTH, UNIT_HEIGHT, UNIT_WIDTH);
+        const mat = new THREE.MeshStandardMaterial({ color: getColorForStatus(status), transparent: true, opacity: 0.88 });
+        const mesh = new THREE.Mesh(geom, mat);
+        const z = -(i + 1) * (UNIT_WIDTH + UNIT_GAP);
+        mesh.position.set(eastX, floorY + UNIT_HEIGHT / 2, z);
+        mesh.name = `unit_${building.id}_${floor}_${posCounter}`;
+        mesh.userData = { building_id: building.id, building_label: building.label, floor, position: posCounter, status, rentRollUnit: rr } satisfies UnitMeshData;
+        group.add(mesh);
+        posCounter++;
+      }
+      // East slab
+      const eSlab = new THREE.Mesh(new THREE.BoxGeometry(UNIT_DEPTH + 0.3, FLOOR_SLAB_HEIGHT, vertDepth(wingCounts[1]) + 0.3), slabMat.clone());
+      eSlab.position.set(eastX, floorY - FLOOR_SLAB_HEIGHT / 2, -(courtyardDepth / 2 + (UNIT_WIDTH + UNIT_GAP) / 2));
+      group.add(eSlab);
+    }
+
+    // ── South wing (along X, Z = southZ) ──
+    if (numWings >= 3) {
+      for (let i = 0; i < wingCounts[2]; i++) {
+        const key = `${building.id}_${floor}_${posCounter}`;
+        const rr = unitMap.get(key);
+        const status = getUnitStatus(rr);
+        const geom = new THREE.BoxGeometry(UNIT_WIDTH, UNIT_HEIGHT, UNIT_DEPTH);
+        const mat = new THREE.MeshStandardMaterial({ color: getColorForStatus(status), transparent: true, opacity: 0.88 });
+        const mesh = new THREE.Mesh(geom, mat);
+        const x = i * (UNIT_WIDTH + UNIT_GAP) - courtyardWidth / 2 + UNIT_WIDTH / 2;
+        mesh.position.set(x, floorY + UNIT_HEIGHT / 2, southZ);
+        mesh.name = `unit_${building.id}_${floor}_${posCounter}`;
+        mesh.userData = { building_id: building.id, building_label: building.label, floor, position: posCounter, status, rentRollUnit: rr } satisfies UnitMeshData;
+        group.add(mesh);
+        posCounter++;
+      }
+      // South slab
+      const sSlab = new THREE.Mesh(new THREE.BoxGeometry(southWidth + 0.3, FLOOR_SLAB_HEIGHT, UNIT_DEPTH + 0.3), slabMat.clone());
+      sSlab.position.set(0, floorY - FLOOR_SLAB_HEIGHT / 2, southZ);
+      group.add(sSlab);
+    }
+
+    // ── West wing (along -Z, X = westX) ──
+    if (numWings >= 4) {
+      for (let i = 0; i < wingCounts[3]; i++) {
+        const key = `${building.id}_${floor}_${posCounter}`;
+        const rr = unitMap.get(key);
+        const status = getUnitStatus(rr);
+        const geom = new THREE.BoxGeometry(UNIT_DEPTH, UNIT_HEIGHT, UNIT_WIDTH);
+        const mat = new THREE.MeshStandardMaterial({ color: getColorForStatus(status), transparent: true, opacity: 0.88 });
+        const mesh = new THREE.Mesh(geom, mat);
+        const z = -(i + 1) * (UNIT_WIDTH + UNIT_GAP);
+        mesh.position.set(westX, floorY + UNIT_HEIGHT / 2, z);
+        mesh.name = `unit_${building.id}_${floor}_${posCounter}`;
+        mesh.userData = { building_id: building.id, building_label: building.label, floor, position: posCounter, status, rentRollUnit: rr } satisfies UnitMeshData;
+        group.add(mesh);
+        posCounter++;
+      }
+      // West slab
+      const wSlab = new THREE.Mesh(new THREE.BoxGeometry(UNIT_DEPTH + 0.3, FLOOR_SLAB_HEIGHT, vertDepth(wingCounts[3]) + 0.3), slabMat.clone());
+      wSlab.position.set(westX, floorY - FLOOR_SLAB_HEIGHT / 2, -(courtyardDepth / 2 + (UNIT_WIDTH + UNIT_GAP) / 2));
+      group.add(wSlab);
+    }
+  }
+}
+
 function buildBuildingGroup(
   building: StackingBuilding,
   unitMap: Map<string, RentRollUnit>,
@@ -378,14 +513,16 @@ function buildBuildingGroup(
       buildLShapeBuilding(building, unitMap, group);
       break;
     case 'U':
-    case 'courtyard':
       buildUShapeBuilding(building, unitMap, group);
+      break;
+    case 'courtyard':
+    case 'wrap':
+      buildCourtyardBuilding(building, unitMap, group);
       break;
     case 'tower':
       buildTowerBuilding(building, unitMap, group);
       break;
     case 'linear':
-    case 'wrap':
     default:
       buildLinearBuilding(building, unitMap, group);
       break;
@@ -607,13 +744,11 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick }: Stackin
       // Raycasting for hover
       if (cameraRef.current && sceneRef.current) {
         raycasterRef.current.setFromCamera(mouseRef.current, cameraRef.current);
-        const unitMeshes = sceneRef.current.children.flatMap((child) => {
-          if (child instanceof THREE.Group) {
-            return child.children.filter(
-              (c): c is THREE.Mesh => c instanceof THREE.Mesh && c.name.startsWith('unit_'),
-            );
+        const unitMeshes: THREE.Mesh[] = [];
+        sceneRef.current.traverse((obj) => {
+          if (obj instanceof THREE.Mesh && obj.name.startsWith('unit_')) {
+            unitMeshes.push(obj);
           }
-          return child instanceof THREE.Mesh && child.name.startsWith('unit_') ? [child] : [];
         });
 
         const intersects = raycasterRef.current.intersectObjects(unitMeshes);
