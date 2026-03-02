@@ -1,11 +1,12 @@
 /**
  * StackingSection — Container component for the 3D Stacking Model feature.
- * Manages state transitions: empty → editing → viewing.
+ * Manages state transitions: choosing → extracting → extracted → editing → viewing.
+ * Phase 2 adds satellite auto-generation flow alongside manual entry.
  */
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Building2, Pencil, RotateCcw } from 'lucide-react';
+import { Building2, Pencil, RotateCcw, Globe, Loader2, AlertCircle } from 'lucide-react';
 import { LayoutEditor } from './LayoutEditor';
 import { StackingViewer3D } from './StackingViewer3D';
 import { UnitDetailModal } from './UnitDetailModal';
@@ -13,19 +14,35 @@ import { stackingService } from '@/services/stackingService';
 import type { PropertyDetail, StackingLayout, RentRollUnit } from '@/types/property';
 import type { UnitMeshData } from './StackingViewer3D';
 
-type SectionMode = 'empty' | 'editing' | 'viewing';
+type SectionMode = 'choosing' | 'extracting' | 'extracted' | 'editing' | 'viewing';
 
 interface StackingSectionProps {
   property: PropertyDetail;
 }
 
+interface ConfidenceInfo {
+  level: 'high' | 'medium' | 'low';
+  reason: string;
+}
+
+const CONFIDENCE_STYLES: Record<ConfidenceInfo['level'], string> = {
+  high: 'bg-primary/10 text-primary',
+  medium: 'bg-amber-500/10 text-amber-400',
+  low: 'bg-rose-500/10 text-rose-400',
+};
+
 export function StackingSection({ property }: StackingSectionProps) {
-  const [mode, setMode] = useState<SectionMode>('empty');
+  const [mode, setMode] = useState<SectionMode>('choosing');
   const [layout, setLayout] = useState<StackingLayout | null>(null);
   const [rentRollUnits, setRentRollUnits] = useState<RentRollUnit[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [selectedUnit, setSelectedUnit] = useState<UnitMeshData | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+
+  // Phase 2: Satellite extraction state
+  const [extractedLayout, setExtractedLayout] = useState<StackingLayout | null>(null);
+  const [extractionError, setExtractionError] = useState<string | null>(null);
+  const [confidence, setConfidence] = useState<ConfidenceInfo | null>(null);
 
   // Parse existing layout from property
   useEffect(() => {
@@ -35,10 +52,10 @@ export function StackingSection({ property }: StackingSectionProps) {
         setLayout(parsed);
         setMode('viewing');
       } catch {
-        setMode('empty');
+        setMode('choosing');
       }
     } else {
-      setMode('empty');
+      setMode('choosing');
     }
   }, [property.stacking_layout_json]);
 
@@ -53,11 +70,43 @@ export function StackingSection({ property }: StackingSectionProps) {
     return () => { cancelled = true; };
   }, [property.id]);
 
+  const handleExtractFromSatellite = useCallback(async () => {
+    setMode('extracting');
+    setExtractionError(null);
+
+    try {
+      const result = await stackingService.extractFromSatellite(property.id);
+
+      const extracted: StackingLayout = {
+        buildings: result.layout.buildings,
+        amenities: result.layout.amenities,
+        total_units: result.layout.total_units,
+        source: 'satellite',
+        confirmed_at: new Date().toISOString(),
+      };
+
+      setExtractedLayout(extracted);
+      setConfidence({
+        level: result.confidence,
+        reason: result.confidence_reason,
+      });
+      setMode('extracted');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      // Try to extract detail from Axios error response
+      const axiosDetail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setExtractionError(axiosDetail || message);
+      setMode('choosing');
+    }
+  }, [property.id]);
+
   const handleGenerate = useCallback(async (newLayout: StackingLayout) => {
     setIsSaving(true);
     try {
       await stackingService.saveLayout(property.id, newLayout);
       setLayout(newLayout);
+      setExtractedLayout(null);
+      setConfidence(null);
       setMode('viewing');
     } catch (err) {
       console.error('Failed to save stacking layout:', err);
@@ -79,7 +128,9 @@ export function StackingSection({ property }: StackingSectionProps) {
       };
       await stackingService.saveLayout(property.id, emptyLayout);
       setLayout(null);
-      setMode('empty');
+      setExtractedLayout(null);
+      setConfidence(null);
+      setMode('choosing');
     } catch (err) {
       console.error('Failed to reset stacking layout:', err);
     } finally {
@@ -97,6 +148,8 @@ export function StackingSection({ property }: StackingSectionProps) {
   const totalModelUnits = layout?.total_units ?? 0;
   const matched = Math.min(matchedCount, totalModelUnits);
   const unlinked = totalModelUnits - matched;
+
+  const hasAddress = Boolean(property.property_address?.trim());
 
   return (
     <div>
@@ -117,6 +170,17 @@ export function StackingSection({ property }: StackingSectionProps) {
         </div>
         {mode === 'viewing' && (
           <div className="flex items-center gap-2">
+            {hasAddress && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExtractFromSatellite}
+                className="gap-1.5"
+              >
+                <Globe className="w-3.5 h-3.5" />
+                Re-generate from Satellite
+              </Button>
+            )}
             <Button
               variant="outline"
               size="sm"
@@ -140,22 +204,96 @@ export function StackingSection({ property }: StackingSectionProps) {
         )}
       </div>
 
-      {mode === 'empty' && (
+      {/* Choosing — initial choice screen (no existing layout) */}
+      {mode === 'choosing' && (
         <div className="bg-card/30 border-border/40 border-dashed rounded-2xl p-8 text-center border">
           <Building2 className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
-          <p className="text-muted-foreground text-sm mb-4">
+          <p className="text-muted-foreground text-sm mb-6">
             Define your building layout to generate an interactive 3D model
           </p>
-          <Button
-            onClick={() => setMode('editing')}
-            className="gap-2"
-          >
-            <Building2 className="w-4 h-4" />
-            Create Layout
-          </Button>
+
+          {/* Extraction error message */}
+          {extractionError && (
+            <div className="mb-6 mx-auto max-w-md bg-rose-500/10 border border-rose-500/20 rounded-xl p-4 text-left">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-rose-400 mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-sm text-rose-400 font-medium">Satellite extraction failed</p>
+                  <p className="text-xs text-rose-400/80 mt-1">{extractionError}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+            <Button
+              onClick={handleExtractFromSatellite}
+              disabled={!hasAddress}
+              className="gap-2"
+            >
+              <Globe className="w-4 h-4" />
+              Auto-Generate from Satellite
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setMode('editing')}
+              className="gap-2"
+            >
+              <Pencil className="w-4 h-4" />
+              Manual Entry
+            </Button>
+          </div>
+
+          {!hasAddress && (
+            <p className="text-xs text-muted-foreground/60 mt-3">
+              Auto-generate requires a property address
+            </p>
+          )}
+
+          <p className="text-xs text-muted-foreground/60 mt-4 max-w-sm mx-auto">
+            Auto-generate uses satellite imagery to detect building layout. You can review and edit before confirming.
+          </p>
         </div>
       )}
 
+      {/* Extracting — loading state */}
+      {mode === 'extracting' && (
+        <div className="bg-card/30 border-border/40 border-dashed rounded-2xl p-8 text-center border">
+          <Loader2 className="w-10 h-10 text-primary animate-spin mx-auto mb-3" />
+          <p className="text-foreground font-medium text-sm mb-1">
+            Analyzing satellite imagery...
+          </p>
+          <p className="text-muted-foreground text-xs">
+            This may take up to 30 seconds
+          </p>
+        </div>
+      )}
+
+      {/* Extracted — show confidence badge + pre-filled editor */}
+      {mode === 'extracted' && extractedLayout && (
+        <div className="bg-card/50 border border-border/60 rounded-2xl p-6">
+          {/* Confidence badge */}
+          {confidence && (
+            <div className={cn(
+              'inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium mb-4',
+              CONFIDENCE_STYLES[confidence.level],
+            )}>
+              <span className="capitalize">{confidence.level} confidence</span>
+              {confidence.reason && (
+                <span className="opacity-80">— {confidence.reason}</span>
+              )}
+            </div>
+          )}
+
+          <LayoutEditor
+            initialLayout={extractedLayout}
+            onGenerate={handleGenerate}
+            isSaving={isSaving}
+          />
+        </div>
+      )}
+
+      {/* Editing — manual entry (existing Phase 1 flow) */}
       {mode === 'editing' && (
         <div className="bg-card/50 border border-border/60 rounded-2xl p-6">
           <LayoutEditor
@@ -166,6 +304,7 @@ export function StackingSection({ property }: StackingSectionProps) {
         </div>
       )}
 
+      {/* Viewing — 3D model (existing Phase 1 flow) */}
       {mode === 'viewing' && layout && layout.buildings.length > 0 && (
         <StackingViewer3D
           layout={layout}
