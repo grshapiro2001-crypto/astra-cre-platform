@@ -99,8 +99,31 @@ async def extract_stacking_from_satellite(
             detail="This property has no address on file. Enter an address or use manual entry.",
         )
 
+    # Build property context for Claude Vision
+    property_context = {
+        "property_name": property_obj.deal_name,
+        "total_units": property_obj.rr_total_units or property_obj.total_units,
+        "total_sf": property_obj.total_residential_sf,
+        "avg_unit_sf": property_obj.rr_avg_sqft,
+        "year_built": property_obj.year_built,
+        "occupied_units": property_obj.rr_occupied_units,
+    }
+
+    # Optionally get unit type mix from rent roll
+    rent_roll_units = db.query(RentRollUnit).filter(
+        RentRollUnit.property_id == property_id
+    ).all()
+    if rent_roll_units:
+        type_counts: dict[str, int] = {}
+        for unit in rent_roll_units:
+            utype = unit.unit_type or "Unknown"
+            type_counts[utype] = type_counts.get(utype, 0) + 1
+        property_context["unit_mix"] = ", ".join(
+            f"{count}x {utype}" for utype, count in sorted(type_counts.items())
+        )
+
     try:
-        layout = await extract_stacking_layout(address.strip())
+        layout = await extract_stacking_layout(address.strip(), property_context=property_context)
     except ValueError as e:
         raise HTTPException(status_code=502, detail=str(e))
     except Exception as e:
