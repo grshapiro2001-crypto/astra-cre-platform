@@ -14,48 +14,101 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
-EXTRACTION_PROMPT = """You are analyzing a satellite/aerial image of a multifamily residential property for a commercial real estate investment platform.
+def build_extraction_prompt(property_context: dict) -> str:
+    """Build a context-aware extraction prompt using known property data."""
 
-Return ONLY a JSON object — no explanation, no markdown fences:
+    # Base context block
+    context_lines = []
+    if property_context.get("property_name"):
+        context_lines.append(f"Property Name: {property_context['property_name']}")
+    if property_context.get("total_units"):
+        context_lines.append(
+            f"KNOWN Total Units: {property_context['total_units']} "
+            "(from rent roll — this is ground truth, DO NOT guess a different number)"
+        )
+    if property_context.get("total_sf"):
+        context_lines.append(f"Total Square Footage: {property_context['total_sf']:,.0f} SF")
+    if property_context.get("avg_unit_sf"):
+        context_lines.append(f"Average Unit Size: {property_context['avg_unit_sf']:,.0f} SF")
+    if property_context.get("year_built"):
+        context_lines.append(f"Year Built: {property_context['year_built']}")
+    if property_context.get("occupied_units"):
+        context_lines.append(f"Occupied Units: {property_context['occupied_units']}")
+    if property_context.get("unit_mix"):
+        context_lines.append(f"Unit Type Mix: {property_context['unit_mix']}")
 
-{
+    context_block = "\n".join(context_lines) if context_lines else "No property data available — estimate from image only."
+
+    has_unit_count = bool(property_context.get("total_units"))
+
+    if has_unit_count:
+        distribution_instruction = f"""
+CRITICAL CONSTRAINT: The property has EXACTLY {property_context['total_units']} total units.
+Your buildings array MUST sum to exactly {property_context['total_units']} units.
+Count every distinct building structure visible in the satellite image.
+Distribute the {property_context['total_units']} units across the visible buildings proportionally
+based on each building's visible footprint size.
+If a building looks twice as long as another, it should have roughly twice the units."""
+    else:
+        distribution_instruction = """
+No unit count is available. Estimate based on building footprints and typical unit sizes
+(800-1000 sqft per unit for garden-style, 600-800 for mid-rise)."""
+
+    year_built = property_context.get("year_built", "unknown")
+
+    return f"""You are analyzing a satellite/aerial image of a multifamily residential property for a commercial real estate investment platform.
+
+KNOWN PROPERTY DATA:
+{context_block}
+
+{distribution_instruction}
+
+Analyze the satellite image and return ONLY a JSON object — no explanation, no markdown fences:
+
+{{
   "property_name": "string or Unknown",
   "buildings": [
-    {
+    {{
       "id": "A",
       "label": "Building A",
       "shape": "linear|L|U|courtyard|tower|wrap",
       "num_floors": 3,
       "units_per_floor": 8,
       "wings": [
-        {
-          "name": "north",
+        {{
+          "name": "main",
           "units_per_floor": 8,
           "num_floors": 3,
-          "relative_position": "north side of courtyard"
-        }
+          "relative_position": "description of position on the property"
+        }}
       ],
       "total_units_this_building": 24
-    }
+    }}
   ],
   "amenities": [
-    { "type": "pool|clubhouse|parking|gym|other",
-      "relative_position": "south of building A" }
+    {{ "type": "pool|clubhouse|parking|gym|other",
+      "relative_position": "south of building A" }}
   ],
-  "total_units": 96,
+  "total_units": {property_context.get('total_units', '"estimated_number"')},
   "confidence": "high|medium|low",
-  "confidence_reason": "why"
-}
+  "confidence_reason": "explanation"
+}}
 
-Rules:
-- units_per_floor = number of units on ONE floor of that wing
-- Infer floors from building shadow length, roof patterns, or typical construction (most garden-style = 3 floors, mid-rise = 4-5)
-- For linear buildings with no visible wings, use a single wing entry
-- Multiple buildings = separate entries in buildings array
-- Garden-style scattered buildings = one entry per building
-- If you cannot determine exact unit count, estimate based on building footprint and typical unit sizes (800-1000 sqft per unit)
-- Never hallucinate — estimate and note in confidence_reason
-- For L-shaped buildings, use 2 wings. For U-shaped, use 3 wings. For courtyard/wrap, use 4 wings."""
+RULES:
+- Count EVERY distinct building structure in the image. Garden-style complexes often have 6-12 separate buildings.
+- Each building = one entry in the buildings array. Do NOT merge multiple buildings into one.
+- For linear/rectangular buildings (most common in garden-style): shape = "linear"
+- units_per_floor = number of units on ONE floor of that wing/building
+- Infer floors from building shadow length, roof patterns, and typical construction:
+  - Garden-style apartments: usually 2-3 floors
+  - Mid-rise: 4-5 floors
+  - Year built {year_built} can help: pre-2000 garden-style = likely 2-3 floors
+- For L-shaped buildings use 2 wings, U-shaped use 3 wings, courtyard/wrap use 4 wings
+- Simple rectangular buildings should have 1 wing with name "main"
+- The sum of all total_units_this_building values MUST equal total_units
+- Look for pools (blue rectangles), parking lots (gray areas with lines), clubhouse/leasing office buildings
+- Never hallucinate — if uncertain, note in confidence_reason
+"""
 
 
 async def fetch_satellite_image(address: str) -> str:
@@ -82,7 +135,7 @@ async def fetch_satellite_image(address: str) -> str:
         return base64.b64encode(response.content).decode("utf-8")
 
 
-async def extract_layout_from_image(image_base64: str) -> dict:
+async def extract_layout_from_image(image_base64: str, property_context: dict | None = None) -> dict:
     """Send satellite image to Claude Vision for building layout extraction.
 
     Uses AsyncAnthropic so the Claude API call is truly non-blocking.
@@ -115,7 +168,7 @@ async def extract_layout_from_image(image_base64: str) -> dict:
                     },
                     {
                         "type": "text",
-                        "text": EXTRACTION_PROMPT,
+                        "text": build_extraction_prompt(property_context or {}),
                     },
                 ],
             }
@@ -134,13 +187,13 @@ async def extract_layout_from_image(image_base64: str) -> dict:
     return json.loads(response_text)
 
 
-async def extract_stacking_layout(address: str) -> dict:
+async def extract_stacking_layout(address: str, property_context: dict | None = None) -> dict:
     """Full pipeline: address → satellite image → Claude Vision → layout JSON."""
     # Step 1: Fetch satellite image
     image_base64 = await fetch_satellite_image(address)
 
-    # Step 2: Extract layout via Claude Vision
-    layout = await extract_layout_from_image(image_base64)
+    # Step 2: Extract layout via Claude Vision (with property context)
+    layout = await extract_layout_from_image(image_base64, property_context=property_context)
 
     # Step 3: Add metadata
     layout["source"] = "satellite"

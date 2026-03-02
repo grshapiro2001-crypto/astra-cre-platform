@@ -9,12 +9,12 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { StackingLayout, StackingBuilding, RentRollUnit } from '@/types/property';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
-const UNIT_WIDTH = 1.2;
-const UNIT_HEIGHT = 0.8;
-const UNIT_DEPTH = 0.8;
-const UNIT_GAP = 0.08;
-const FLOOR_SLAB_HEIGHT = 0.06;
-const BUILDING_GAP = 4;
+const UNIT_WIDTH = 4;
+const UNIT_HEIGHT = 1.5;
+const UNIT_DEPTH = 6;
+const UNIT_GAP = 0.2;
+const FLOOR_SLAB_HEIGHT = 0.1;
+const BUILDING_GAP = 20;
 
 // Purple primary: hsl(267, 84%, 60%) → roughly #8B5CF6
 const COLOR_OCCUPIED = new THREE.Color(0x8B5CF6);
@@ -411,23 +411,35 @@ function createBuildingLabel(text: string, position: THREE.Vector3): THREE.Sprit
   const mat = new THREE.SpriteMaterial({ map: texture, transparent: true });
   const sprite = new THREE.Sprite(mat);
   sprite.position.copy(position);
-  sprite.scale.set(3, 0.75, 1);
+  sprite.scale.set(5, 1.25, 1);
   return sprite;
 }
 
-function addAmenityPads(layout: StackingLayout, scene: THREE.Scene, offsetX: number) {
-  const amenitySize = 2;
-  layout.amenities.forEach((amenity, i) => {
-    const geom = new THREE.BoxGeometry(amenitySize, 0.1, amenitySize);
-    const mat = new THREE.MeshStandardMaterial({ color: COLOR_AMENITY, transparent: true, opacity: 0.6 });
+function addAmenityPads(layout: StackingLayout, scene: THREE.Scene, sceneCenter: THREE.Vector3) {
+  const amenitySize = 4;
+  let amenityX = sceneCenter.x - ((layout.amenities.length - 1) * (amenitySize + 3)) / 2;
+  const amenityZ = sceneCenter.z;
+
+  layout.amenities.forEach((amenity) => {
+    const isPool = amenity.type === 'pool';
+    const isParking = amenity.type === 'parking';
+    const w = isParking ? 8 : amenitySize;
+    const d = isParking ? 6 : isPool ? amenitySize : 3;
+
+    const geom = new THREE.BoxGeometry(w, 0.15, d);
+    const color = isPool ? new THREE.Color(0x38BDF8) : COLOR_AMENITY;
+    const mat = new THREE.MeshStandardMaterial({ color, transparent: true, opacity: 0.6 });
     const mesh = new THREE.Mesh(geom, mat);
-    mesh.position.set(offsetX + i * (amenitySize + 1), 0.05, -8);
+    mesh.position.set(amenityX, 0.08, amenityZ);
     mesh.name = `amenity_${amenity.type}`;
     scene.add(mesh);
 
-    // Label
-    const label = createBuildingLabel(amenity.type.charAt(0).toUpperCase() + amenity.type.slice(1), new THREE.Vector3(mesh.position.x, 0.8, mesh.position.z));
+    const label = createBuildingLabel(
+      amenity.type.charAt(0).toUpperCase() + amenity.type.slice(1),
+      new THREE.Vector3(mesh.position.x, 1.5, mesh.position.z),
+    );
     scene.add(label);
+    amenityX += w + 3;
   });
 }
 
@@ -468,7 +480,7 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick }: Stackin
     sceneRef.current = scene;
 
     // ── Camera ──
-    const camera = new THREE.PerspectiveCamera(50, container.clientWidth / container.clientHeight, 0.1, 200);
+    const camera = new THREE.PerspectiveCamera(50, container.clientWidth / container.clientHeight, 0.1, 2000);
     cameraRef.current = camera;
 
     // ── Renderer ──
@@ -495,54 +507,94 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick }: Stackin
     fillLight.position.set(-10, 8, -10);
     scene.add(fillLight);
 
-    // ── Ground grid ──
-    const gridHelper = new THREE.GridHelper(40, 40, 0x2a2a4a, 0x1a1a3a);
+    // ── Build geometry (grid layout) ──
+    const unitMap = matchUnitsToRentRoll(layout, rentRollUnits);
+    const cols = Math.max(1, Math.ceil(Math.sqrt(layout.buildings.length)));
+
+    // First pass: build all groups and measure their bounding boxes
+    const buildingGroups: { group: THREE.Group; building: StackingBuilding; width: number; depth: number }[] = [];
+    for (const building of layout.buildings) {
+      const group = buildBuildingGroup(building, unitMap);
+      const box = new THREE.Box3().setFromObject(group);
+      const size = new THREE.Vector3();
+      box.getSize(size);
+      buildingGroups.push({ group, building, width: size.x, depth: size.z });
+    }
+
+    // Calculate max width per column and max depth per row
+    const maxColWidths: number[] = [];
+    const maxRowDepths: number[] = [];
+    for (let i = 0; i < buildingGroups.length; i++) {
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      maxColWidths[col] = Math.max(maxColWidths[col] || 0, buildingGroups[i].width);
+      maxRowDepths[row] = Math.max(maxRowDepths[row] || 0, buildingGroups[i].depth);
+    }
+
+    // Calculate total extents for centering
+    const totalGridWidth = maxColWidths.reduce((s, w) => s + w, 0) + (maxColWidths.length - 1) * BUILDING_GAP;
+    const totalGridDepth = maxRowDepths.reduce((s, d) => s + d, 0) + (maxRowDepths.length - 1) * BUILDING_GAP;
+
+    // Second pass: position buildings in grid
+    for (let i = 0; i < buildingGroups.length; i++) {
+      const { group, building } = buildingGroups[i];
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+
+      // Sum preceding column widths + gaps
+      let x = 0;
+      for (let c = 0; c < col; c++) x += maxColWidths[c] + BUILDING_GAP;
+      x += maxColWidths[col] / 2 - totalGridWidth / 2;
+
+      let z = 0;
+      for (let r = 0; r < row; r++) z += maxRowDepths[r] + BUILDING_GAP;
+      z += maxRowDepths[row] / 2 - totalGridDepth / 2;
+
+      group.position.set(x, 0, z);
+      scene.add(group);
+
+      // Building label above
+      const center = new THREE.Vector3();
+      new THREE.Box3().setFromObject(group).getCenter(center);
+      const labelPos = new THREE.Vector3(center.x, building.num_floors * (UNIT_HEIGHT + FLOOR_SLAB_HEIGHT) + 1.5, center.z);
+      scene.add(createBuildingLabel(building.label, labelPos));
+    }
+
+    // ── Amenities ──
+    // Compute building cluster center for amenity placement
+    const buildingBox = new THREE.Box3();
+    for (const { group } of buildingGroups) {
+      buildingBox.expandByObject(group);
+    }
+    const clusterCenter = new THREE.Vector3();
+    buildingBox.getCenter(clusterCenter);
+
+    if (layout.amenities.length > 0) {
+      addAmenityPads(layout, scene, clusterCenter);
+    }
+
+    // ── Dynamic ground plane ──
+    const sceneBox = new THREE.Box3().setFromObject(scene);
+    const sceneSize = new THREE.Vector3();
+    sceneBox.getSize(sceneSize);
+    const groundSize = Math.max(sceneSize.x, sceneSize.z) + 40;
+
+    const gridHelper = new THREE.GridHelper(groundSize, Math.max(10, Math.floor(groundSize / 2)), 0x2a2a4a, 0x1a1a3a);
     scene.add(gridHelper);
-    const groundGeom = new THREE.PlaneGeometry(40, 40);
+    const groundGeom = new THREE.PlaneGeometry(groundSize, groundSize);
     const groundMat = new THREE.MeshStandardMaterial({ color: COLOR_GROUND, transparent: true, opacity: 0.5 });
     const ground = new THREE.Mesh(groundGeom, groundMat);
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = -0.01;
     scene.add(ground);
 
-    // ── Build geometry ──
-    const unitMap = matchUnitsToRentRoll(layout, rentRollUnits);
-    let offsetX = 0;
-
-    for (const building of layout.buildings) {
-      const group = buildBuildingGroup(building, unitMap);
-      // Calculate bounding box to position next building
-      const box = new THREE.Box3().setFromObject(group);
-      const size = new THREE.Vector3();
-      box.getSize(size);
-
-      if (offsetX > 0) {
-        group.position.x = offsetX + BUILDING_GAP;
-      }
-      scene.add(group);
-
-      // Building label above
-      const center = new THREE.Vector3();
-      new THREE.Box3().setFromObject(group).getCenter(center);
-      const labelPos = new THREE.Vector3(center.x, building.num_floors * (UNIT_HEIGHT + FLOOR_SLAB_HEIGHT) + 0.8, center.z);
-      scene.add(createBuildingLabel(building.label, labelPos));
-
-      const updatedBox = new THREE.Box3().setFromObject(group);
-      offsetX = updatedBox.max.x;
-    }
-
-    // ── Amenities ──
-    if (layout.amenities.length > 0) {
-      addAmenityPads(layout, scene, 0);
-    }
-
     // ── Camera position ──
-    const sceneBox = new THREE.Box3().setFromObject(scene);
+    const finalSceneBox = new THREE.Box3().setFromObject(scene);
     const sceneCenter = new THREE.Vector3();
-    sceneBox.getCenter(sceneCenter);
-    const sceneSize = new THREE.Vector3();
-    sceneBox.getSize(sceneSize);
-    const maxDim = Math.max(sceneSize.x, sceneSize.y, sceneSize.z);
+    finalSceneBox.getCenter(sceneCenter);
+    const finalSceneSize = new THREE.Vector3();
+    finalSceneBox.getSize(finalSceneSize);
+    const maxDim = Math.max(finalSceneSize.x, finalSceneSize.y, finalSceneSize.z);
 
     camera.position.set(sceneCenter.x + maxDim * 0.6, sceneCenter.y + maxDim * 0.8, sceneCenter.z + maxDim * 1.2);
     controls.target.copy(sceneCenter);
