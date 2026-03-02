@@ -209,6 +209,54 @@ export interface RentRollSummary {
   rr_as_of_date: string | null;
 }
 
+// ==================== 3D STACKING MODEL TYPES ====================
+
+export interface StackingWing {
+  name: string;
+  units_per_floor: number;
+  num_floors: number;
+  relative_position: string;
+}
+
+export interface StackingBuilding {
+  id: string;
+  label: string;
+  shape: 'linear' | 'L' | 'U' | 'courtyard' | 'tower' | 'wrap';
+  num_floors: number;
+  units_per_floor: number;
+  wings?: StackingWing[];
+  total_units_this_building: number;
+}
+
+export interface StackingAmenity {
+  type: string;
+  relative_position: string;
+}
+
+export interface StackingLayout {
+  buildings: StackingBuilding[];
+  amenities: StackingAmenity[];
+  total_units: number;
+  source: 'manual' | 'scraped';
+  source_url?: string;
+  source_image_url?: string;
+  confirmed_at: string;
+}
+
+export interface RentRollUnit {
+  id: number;
+  unit_number: string | null;
+  unit_type: string | null;
+  sqft: number | null;
+  status: string | null;
+  is_occupied: boolean | null;
+  market_rent: number | null;
+  in_place_rent: number | null;
+  lease_start: string | null;
+  lease_end: string | null;
+  charge_details: Record<string, number> | null;
+}
+
 /** Alias for backwards compatibility */
 export type FinancialPeriodData = FinancialPeriod;
 
@@ -287,6 +335,8 @@ export interface PropertyDetail {
   // Pipeline management
   pipeline_stage?: string;
   pipeline_notes?: string | null;
+  // 3D Stacking layout
+  stacking_layout_json?: string | null;
 }
 
 /** Property list item for library views */

@@ -53,6 +53,7 @@ import { PropertyDetailSkeleton } from '@/components/ui/PageSkeleton';
 import { SensitivityAnalysis } from '@/components/property/SensitivityAnalysis';
 import { CompMap } from '@/components/property/CompMap';
 import { StreetViewImage } from '@/components/property/StreetViewImage';
+import { StackingSection } from '@/components/stacking/StackingSection';
 import {
   Dialog,
   DialogContent,
@@ -1689,6 +1690,11 @@ export const PropertyDetail = () => {
             </div>
           </section>
         )}
+
+        {/* 3D STACKING MODEL */}
+        <section className="animate-fade-in" style={{ animationDelay: '175ms' }}>
+          <StackingSection property={property} />
+        </section>
 
         {/* --------------------------------------------------------------- */}
         {/* OPERATING FINANCIALS                                             */}

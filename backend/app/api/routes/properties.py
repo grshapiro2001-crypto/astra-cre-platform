@@ -934,6 +934,7 @@ def build_property_detail_response(property_obj: Property, db: Session) -> Prope
         rr_avg_sqft=property_obj.rr_avg_sqft,
         rr_loss_to_lease_pct=property_obj.rr_loss_to_lease_pct,
         rr_as_of_date=property_obj.rr_as_of_date,
+        stacking_layout_json=property_obj.stacking_layout_json,
     )
 
 
