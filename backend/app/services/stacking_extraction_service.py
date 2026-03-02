@@ -71,7 +71,7 @@ Analyze the satellite image and return ONLY a JSON object — no explanation, no
     {{
       "id": "A",
       "label": "Building A",
-      "shape": "linear|L|U|courtyard|tower|wrap",
+      "shape": "linear|L|U|courtyard|tower|wrap",  // linear=simple rectangle, L=two connected wings at 90°, U=three wings open on one side, courtyard=four wings enclosing a center area, wrap=three or more wings partially enclosing an area, tower=tall single footprint
       "num_floors": 3,
       "units_per_floor": 8,
       "wings": [
@@ -108,6 +108,21 @@ RULES:
 - The sum of all total_units_this_building values MUST equal total_units
 - Look for pools (blue rectangles), parking lots (gray areas with lines), clubhouse/leasing office buildings
 - Never hallucinate — if uncertain, note in confidence_reason
+
+CRITICAL — CONNECTED vs SEPARATE BUILDINGS:
+- If building structures SHARE WALLS or are PHYSICALLY CONNECTED (even at corners or via breezeways), they are ONE building with multiple wings — NOT separate buildings.
+- A large L-shaped, U-shaped, courtyard, or wrap-around structure is ONE building with 2-4 wings.
+- Only count buildings as SEPARATE if there is clear open space (grass, parking, walkways) between them with NO structural connection.
+- Mid-rise/urban properties (4+ floors, built after 2010) are almost always ONE connected building with wings around a courtyard or pool.
+- Garden-style suburban complexes (2-3 floors, spread across a large lot) are usually MULTIPLE separate buildings.
+- Year built and style matter: {property_context.get('year_built', 'unknown')} — newer urban properties tend to be single connected structures.
+
+WING POSITIONING — When a building has multiple wings, describe each wing's position:
+- For L-shape: "north" wing and "east" wing (or whichever directions apply)
+- For U-shape: "west" wing, "south" wing, "east" wing (open end faces a direction)
+- For courtyard/wrap: "north" wing, "east" wing, "south" wing, "west" wing
+- Use cardinal directions based on the satellite image orientation (top = north)
+- Include "relative_position" for EVERY wing — this drives the 3D rendering
 """
 
 
