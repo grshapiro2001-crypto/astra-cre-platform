@@ -306,6 +306,9 @@ class PropertyDetail(BaseModel):
     rr_loss_to_lease_pct: Optional[float] = None
     rr_as_of_date: Optional[datetime] = None
 
+    # 3D Stacking layout
+    stacking_layout_json: Optional[str] = None
+
     class Config:
         from_attributes = True
 

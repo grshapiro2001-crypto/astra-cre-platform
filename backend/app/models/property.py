@@ -158,6 +158,9 @@ class Property(Base):
     t12_total_expenses = Column(Numeric(20, 6), nullable=True)
     t12_gsr = Column(Numeric(20, 6), nullable=True)
 
+    # 3D Stacking layout (Phase 1: manual entry, Phase 2: scraper-based)
+    stacking_layout_json = Column(Text, nullable=True)
+
     # Relationships
     unit_mix = relationship("PropertyUnitMix", backref="property", cascade="all, delete-orphan")
     rent_comps = relationship("PropertyRentComp", backref="property", cascade="all, delete-orphan")
