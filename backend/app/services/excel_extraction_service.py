@@ -474,6 +474,17 @@ def _parse_rent_roll_units(ws: Worksheet, header_row: int, headers: Dict[int, st
 
         first_col_str = str(first_col).strip()
 
+        # Check if this is a "Charge Total" row (MUST come before generic "total" break)
+        if "charge total" in first_col_str.lower() or "total charges" in first_col_str.lower():
+            if current_unit is not None:
+                # Set the in_place_rent to the charge total
+                total = _get_numeric_value(row, col_map.get("in_place_rent", col_map.get("rent")))
+                if total:
+                    current_unit["in_place_rent"] = total
+                current_unit["charge_details"] = charge_details.copy()
+                charge_details = {}
+            continue
+
         # Check if this is a summary row (skip it)
         if any(kw in first_col_str.lower() for kw in ["total", "summary", "grand total", "property"]):
             break
@@ -484,20 +495,9 @@ def _parse_rent_roll_units(ws: Worksheet, header_row: int, headers: Dict[int, st
                                      "storage", "utility", "water", "sewer", "cable", "admin fee"]:
             # This is a charge detail row
             charge_name = first_col_str
-            charge_amount = _get_numeric_value(row, col_map.get("in_place_rent", col_map.get("rent", 0)))
+            charge_amount = _get_numeric_value(row, col_map.get("in_place_rent", col_map.get("rent")))
             if charge_amount:
                 charge_details[charge_name] = charge_amount
-            continue
-
-        # Check if this is a "Charge Total" row
-        if "charge total" in first_col_str.lower() or "total charges" in first_col_str.lower():
-            if current_unit is not None:
-                # Set the in_place_rent to the charge total
-                total = _get_numeric_value(row, col_map.get("in_place_rent", col_map.get("rent", 0)))
-                if total:
-                    current_unit["in_place_rent"] = total
-                current_unit["charge_details"] = charge_details.copy()
-                charge_details = {}
             continue
 
         # Otherwise, this is a new unit row
@@ -566,7 +566,12 @@ def _map_rent_roll_columns(headers: Dict[int, str]) -> Dict[str, int]:
         # Rents
         if "market" in header_lower and "rent" in header_lower:
             col_map["market_rent"] = col_idx
-        elif any(kw in header_lower for kw in ["in place", "in-place", "current rent", "actual rent", "charge", "rent"]):
+        elif any(kw in header_lower for kw in [
+            "in place", "in-place", "current rent", "actual rent",
+            "contract rent", "lease rent", "monthly rent",
+            "charge amount", "scheduled rent", "scheduled charges",
+            "charge", "rent",
+        ]):
             if "in_place_rent" not in col_map:
                 col_map["in_place_rent"] = col_idx
 

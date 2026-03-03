@@ -16,40 +16,40 @@ const UNIT_GAP = 0.2;
 const FLOOR_SLAB_HEIGHT = 0.1;
 const BUILDING_GAP = 20;
 
-// ─── Material palette — investor-grade dark theme ────────────────────────────
+// ─── Material palette — Lumen/Beans.AI inspired dark theme ───────────────────
 const MATERIALS = {
-  // Occupied unit: rich purple glass effect
+  // Occupied unit: unified blue-grey facade
   occupied: new THREE.MeshPhysicalMaterial({
-    color: 0x7C3AED,
-    metalness: 0.1,
-    roughness: 0.4,
-    transparent: true,
-    opacity: 0.88,
-    emissive: 0x4C1D95,
-    emissiveIntensity: 0.15,
-    clearcoat: 0.3,
-    clearcoatRoughness: 0.2,
-  }),
-  // Vacant unit: warm rose/coral with slight glow
-  vacant: new THREE.MeshPhysicalMaterial({
-    color: 0xF43F5E,
-    metalness: 0.1,
+    color: 0x2d3561,
+    metalness: 0.2,
     roughness: 0.5,
     transparent: true,
-    opacity: 0.88,
-    emissive: 0xBE123C,
-    emissiveIntensity: 0.2,
+    opacity: 0.9,
+    emissive: 0x1a1a3e,
+    emissiveIntensity: 0.1,
     clearcoat: 0.2,
     clearcoatRoughness: 0.3,
   }),
-  // No data: neutral dark with subtle sheen
+  // Vacant unit: same facade base (status shown via stripe)
+  vacant: new THREE.MeshPhysicalMaterial({
+    color: 0x2d3561,
+    metalness: 0.2,
+    roughness: 0.5,
+    transparent: true,
+    opacity: 0.9,
+    emissive: 0x1a1a3e,
+    emissiveIntensity: 0.1,
+    clearcoat: 0.2,
+    clearcoatRoughness: 0.3,
+  }),
+  // No data: darker facade
   noData: new THREE.MeshPhysicalMaterial({
-    color: 0x3F3F5A,
+    color: 0x1a1a3e,
     metalness: 0.15,
     roughness: 0.6,
     transparent: true,
-    opacity: 0.75,
-    emissive: 0x1E1E3A,
+    opacity: 0.85,
+    emissive: 0x0f0f2a,
     emissiveIntensity: 0.05,
   }),
   // Floor slab: dark concrete look
@@ -62,13 +62,13 @@ const MATERIALS = {
   }),
   // Pool: translucent cyan water
   pool: new THREE.MeshPhysicalMaterial({
-    color: 0x22D3EE,
+    color: 0x00d4ff,
     metalness: 0.0,
     roughness: 0.1,
     transparent: true,
-    opacity: 0.7,
-    emissive: 0x0891B2,
-    emissiveIntensity: 0.3,
+    opacity: 0.6,
+    emissive: 0x006688,
+    emissiveIntensity: 0.2,
     clearcoat: 1.0,
     clearcoatRoughness: 0.05,
   }),
@@ -94,7 +94,17 @@ const MATERIALS = {
     metalness: 0.0,
     roughness: 1.0,
     transparent: true,
-    opacity: 0.8,
+    opacity: 0.3,
+  }),
+  // Window band: glass between floors
+  windowBand: new THREE.MeshPhysicalMaterial({
+    color: 0x88aacc,
+    metalness: 0.3,
+    roughness: 0.1,
+    transparent: true,
+    opacity: 0.7,
+    emissive: 0x446688,
+    emissiveIntensity: 0.1,
   }),
 };
 
@@ -199,9 +209,62 @@ function addUnitEdges(mesh: THREE.Mesh, geom: THREE.BufferGeometry) {
   mesh.receiveShadow = true;
 }
 
+/** Add a thin colored status stripe on the exterior front face of a unit */
+function addStatusStripe(mesh: THREE.Mesh, status: 'occupied' | 'vacant' | 'unknown', wingDirection: WingDirection = 'south') {
+  mesh.geometry.computeBoundingBox();
+  const sz = new THREE.Vector3();
+  mesh.geometry.boundingBox!.getSize(sz);
+
+  const stripeColor = statusToColor(status);
+  const stripeMat = new THREE.MeshBasicMaterial({
+    color: stripeColor,
+    transparent: true,
+    opacity: 0.85,
+    side: THREE.DoubleSide,
+  });
+
+  // Stripe: full face width × 15% of face height, at bottom of exterior face
+  const faceWidth = (wingDirection === 'east' || wingDirection === 'west') ? sz.z : sz.x;
+  const stripeGeom = new THREE.PlaneGeometry(faceWidth * 0.95, sz.y * 0.15);
+  const stripe = new THREE.Mesh(stripeGeom, stripeMat);
+
+  const offset = 0.01;
+  switch (wingDirection) {
+    case 'south':
+      stripe.position.set(0, -sz.y * 0.35, sz.z / 2 + offset);
+      break;
+    case 'north':
+      stripe.position.set(0, -sz.y * 0.35, -(sz.z / 2 + offset));
+      stripe.rotation.y = Math.PI;
+      break;
+    case 'east':
+      stripe.position.set(sz.x / 2 + offset, -sz.y * 0.35, 0);
+      stripe.rotation.y = Math.PI / 2;
+      break;
+    case 'west':
+      stripe.position.set(-(sz.x / 2 + offset), -sz.y * 0.35, 0);
+      stripe.rotation.y = -Math.PI / 2;
+      break;
+  }
+  stripe.name = `stripe_${mesh.name}`;
+  mesh.add(stripe);
+}
+
+/** Add a glass window band strip between floors */
+function addWindowBand(group: THREE.Group, width: number, depth: number, floorY: number, x: number = 0, z: number = 0) {
+  const bandHeight = UNIT_HEIGHT * 0.12;
+  const geom = new THREE.BoxGeometry(width + 0.1, bandHeight, depth + 0.1);
+  const mesh = new THREE.Mesh(geom, MATERIALS.windowBand.clone());
+  mesh.position.set(x, floorY - FLOOR_SLAB_HEIGHT / 2 - bandHeight / 2 - 0.01, z);
+  mesh.name = 'window_band';
+  group.add(mesh);
+}
+
 // ─── Unit number label textures ─────────────────────────────────────────────
 
-function createUnitNumberTexture(unitNumber: string): THREE.CanvasTexture {
+type WingDirection = 'south' | 'north' | 'east' | 'west';
+
+function createUnitNumberTexture(unitNumber: string, fontSize: number = 28): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
   canvas.width = 128;
   canvas.height = 64;
@@ -210,7 +273,7 @@ function createUnitNumberTexture(unitNumber: string): THREE.CanvasTexture {
   ctx.clearRect(0, 0, 128, 64);
 
   ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-  ctx.font = 'bold 28px monospace';
+  ctx.font = `bold ${Math.round(fontSize)}px monospace`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
 
@@ -227,29 +290,72 @@ function createUnitNumberTexture(unitNumber: string): THREE.CanvasTexture {
   return texture;
 }
 
-function addUnitLabel(mesh: THREE.Mesh, rr: RentRollUnit | undefined) {
+function addUnitLabel(
+  mesh: THREE.Mesh,
+  rr: RentRollUnit | undefined,
+  wingDirection: WingDirection = 'south',
+  totalUnits: number = 100,
+) {
   const unitNumber = rr?.unit_number;
   if (!unitNumber) return;
 
   // Read actual geometry dimensions (handles rotated boxes like UNIT_DEPTH x H x UNIT_WIDTH)
-  const geomBox = new THREE.Box3();
   mesh.geometry.computeBoundingBox();
-  geomBox.copy(mesh.geometry.boundingBox!);
   const sz = new THREE.Vector3();
-  geomBox.getSize(sz);
+  mesh.geometry.boundingBox!.getSize(sz);
 
-  const labelTexture = createUnitNumberTexture(unitNumber);
-  const labelMat = new THREE.MeshBasicMaterial({
-    map: labelTexture,
-    transparent: true,
-    depthTest: true,
-    side: THREE.FrontSide,
-  });
-  const labelGeom = new THREE.PlaneGeometry(sz.x * 0.85, sz.y * 0.7);
-  const labelMesh = new THREE.Mesh(labelGeom, labelMat);
-  labelMesh.position.set(0, 0, sz.z / 2 + 0.01);
-  labelMesh.name = `label_${mesh.name}`;
-  mesh.add(labelMesh);
+  // Scale font size inversely with total unit count for legibility
+  const fontSize = Math.max(18, Math.min(48, 2400 / totalUnits));
+  const labelTexture = createUnitNumberTexture(unitNumber, fontSize);
+
+  // Label width should span the "wide" face of the unit
+  const labelWidth = (wingDirection === 'east' || wingDirection === 'west') ? sz.z * 0.85 : sz.x * 0.85;
+  const labelHeight = sz.y * 0.7;
+
+  // Build configs for two label planes: exterior face + interior (opposite) face
+  const configs: Array<{ position: THREE.Vector3; rotation: THREE.Euler }> = [];
+  const offset = 0.01;
+  switch (wingDirection) {
+    case 'south':
+      configs.push(
+        { position: new THREE.Vector3(0, 0, sz.z / 2 + offset), rotation: new THREE.Euler(0, 0, 0) },
+        { position: new THREE.Vector3(0, 0, -(sz.z / 2 + offset)), rotation: new THREE.Euler(0, Math.PI, 0) },
+      );
+      break;
+    case 'north':
+      configs.push(
+        { position: new THREE.Vector3(0, 0, -(sz.z / 2 + offset)), rotation: new THREE.Euler(0, Math.PI, 0) },
+        { position: new THREE.Vector3(0, 0, sz.z / 2 + offset), rotation: new THREE.Euler(0, 0, 0) },
+      );
+      break;
+    case 'east':
+      configs.push(
+        { position: new THREE.Vector3(sz.x / 2 + offset, 0, 0), rotation: new THREE.Euler(0, Math.PI / 2, 0) },
+        { position: new THREE.Vector3(-(sz.x / 2 + offset), 0, 0), rotation: new THREE.Euler(0, -Math.PI / 2, 0) },
+      );
+      break;
+    case 'west':
+      configs.push(
+        { position: new THREE.Vector3(-(sz.x / 2 + offset), 0, 0), rotation: new THREE.Euler(0, -Math.PI / 2, 0) },
+        { position: new THREE.Vector3(sz.x / 2 + offset, 0, 0), rotation: new THREE.Euler(0, Math.PI / 2, 0) },
+      );
+      break;
+  }
+
+  for (const cfg of configs) {
+    const labelMat = new THREE.MeshBasicMaterial({
+      map: labelTexture,
+      transparent: true,
+      depthTest: true,
+      side: THREE.FrontSide,
+    });
+    const labelGeom = new THREE.PlaneGeometry(labelWidth, labelHeight);
+    const labelMesh = new THREE.Mesh(labelGeom, labelMat);
+    labelMesh.position.copy(cfg.position);
+    labelMesh.rotation.copy(cfg.rotation);
+    labelMesh.name = `label_${mesh.name}`;
+    mesh.add(labelMesh);
+  }
 }
 
 // ─── Filter color helpers ───────────────────────────────────────────────────
@@ -361,10 +467,9 @@ function applyFilterToScene(
   stats: RentStats,
   refDate: Date,
 ) {
-  scene.traverse((obj) => {
+  scene.traverse((obj: THREE.Object3D) => {
     if (!(obj instanceof THREE.Mesh) || !obj.name.startsWith('unit_')) return;
     const ud = obj.userData as UnitMeshData;
-    const mat = obj.material as THREE.MeshPhysicalMaterial;
 
     let color: THREE.Color;
     switch (filterType) {
@@ -393,9 +498,14 @@ function applyFilterToScene(
         color = statusToColor(ud.status);
     }
 
-    mat.color.copy(color);
-    mat.emissive.copy(color).multiplyScalar(0.15);
-    mat.needsUpdate = true;
+    // Update status stripe color (child mesh named stripe_unit_*)
+    obj.traverse((child: THREE.Object3D) => {
+      if (child instanceof THREE.Mesh && child.name.startsWith('stripe_')) {
+        const stripeMat = child.material as THREE.MeshBasicMaterial;
+        stripeMat.color.copy(color);
+        stripeMat.needsUpdate = true;
+      }
+    });
   });
 }
 
@@ -405,6 +515,7 @@ function buildLinearBuilding(
   building: StackingBuilding,
   unitMap: Map<string, RentRollUnit>,
   group: THREE.Group,
+  totalUnits: number = 100,
 ) {
   const unitsPerFloor = building.units_per_floor;
   const totalWidth = unitsPerFloor * (UNIT_WIDTH + UNIT_GAP) - UNIT_GAP;
@@ -417,6 +528,11 @@ function buildLinearBuilding(
     const slab = new THREE.Mesh(slabGeom, MATERIALS.slab.clone());
     slab.position.set(0, floorY - FLOOR_SLAB_HEIGHT / 2, 0);
     group.add(slab);
+
+    // Window band between floors (not on ground floor)
+    if (floor > 1) {
+      addWindowBand(group, totalWidth, UNIT_DEPTH, floorY, 0, 0);
+    }
 
     // Units
     for (let pos = 1; pos <= unitsPerFloor; pos++) {
@@ -442,7 +558,8 @@ function buildLinearBuilding(
       } satisfies UnitMeshData;
 
       addUnitEdges(mesh, geom);
-      addUnitLabel(mesh, rr);
+      addUnitLabel(mesh, rr, 'south', totalUnits);
+      addStatusStripe(mesh, status, 'south');
       group.add(mesh);
     }
   }
@@ -453,6 +570,7 @@ function buildLShapeBuilding(
   building: StackingBuilding,
   unitMap: Map<string, RentRollUnit>,
   group: THREE.Group,
+  totalUnits: number = 100,
 ) {
   const halfUnits = building.wings?.[0]?.units_per_floor ?? Math.ceil(building.units_per_floor / 2);
   const otherHalf = building.wings?.[1]?.units_per_floor ?? (building.units_per_floor - halfUnits);
@@ -479,6 +597,12 @@ function buildLShapeBuilding(
     slab2.position.set(0, floorY - FLOOR_SLAB_HEIGHT / 2, -(wing2Depth / 2 + UNIT_DEPTH / 2 + UNIT_GAP));
     group.add(slab2);
 
+    // Window bands between floors
+    if (floor > 1) {
+      addWindowBand(group, wing1Width, UNIT_DEPTH, floorY, wing1Width / 2, 0);
+      addWindowBand(group, UNIT_DEPTH, wing2Depth, floorY, 0, -(wing2Depth / 2 + UNIT_DEPTH / 2 + UNIT_GAP));
+    }
+
     // Wing 1 units (along X)
     for (let i = 0; i < halfUnits; i++) {
       unitCounter++;
@@ -495,7 +619,8 @@ function buildLShapeBuilding(
       mesh.name = `unit_${building.id}_${floor}_${pos}`;
       mesh.userData = { building_id: building.id, building_label: building.label, floor, position: pos, status, rentRollUnit: rr } satisfies UnitMeshData;
       addUnitEdges(mesh, geom);
-      addUnitLabel(mesh, rr);
+      addUnitLabel(mesh, rr, 'south', totalUnits);
+      addStatusStripe(mesh, status, 'south');
       group.add(mesh);
     }
 
@@ -516,7 +641,8 @@ function buildLShapeBuilding(
       mesh.name = `unit_${building.id}_${floor}_${pos}`;
       mesh.userData = { building_id: building.id, building_label: building.label, floor, position: pos, status, rentRollUnit: rr } satisfies UnitMeshData;
       addUnitEdges(mesh, geom);
-      addUnitLabel(mesh, rr);
+      addUnitLabel(mesh, rr, 'west', totalUnits);
+      addStatusStripe(mesh, status, 'west');
       group.add(mesh);
     }
 
@@ -529,6 +655,7 @@ function buildUShapeBuilding(
   building: StackingBuilding,
   unitMap: Map<string, RentRollUnit>,
   group: THREE.Group,
+  totalUnits: number = 100,
 ) {
   // Split units across 3 wings — use wing data if available
   const wings = building.wings && building.wings.length >= 3
@@ -558,7 +685,8 @@ function buildUShapeBuilding(
       mesh.name = `unit_${building.id}_${floor}_${posCounter}`;
       mesh.userData = { building_id: building.id, building_label: building.label, floor, position: posCounter, status, rentRollUnit: rr } satisfies UnitMeshData;
       addUnitEdges(mesh, geom);
-      addUnitLabel(mesh, rr);
+      addUnitLabel(mesh, rr, 'west', totalUnits);
+      addStatusStripe(mesh, status, 'west');
       group.add(mesh);
       posCounter++;
     }
@@ -577,7 +705,8 @@ function buildUShapeBuilding(
       mesh.name = `unit_${building.id}_${floor}_${posCounter}`;
       mesh.userData = { building_id: building.id, building_label: building.label, floor, position: posCounter, status, rentRollUnit: rr } satisfies UnitMeshData;
       addUnitEdges(mesh, geom);
-      addUnitLabel(mesh, rr);
+      addUnitLabel(mesh, rr, 'south', totalUnits);
+      addStatusStripe(mesh, status, 'south');
       group.add(mesh);
       posCounter++;
     }
@@ -594,7 +723,8 @@ function buildUShapeBuilding(
       mesh.name = `unit_${building.id}_${floor}_${posCounter}`;
       mesh.userData = { building_id: building.id, building_label: building.label, floor, position: posCounter, status, rentRollUnit: rr } satisfies UnitMeshData;
       addUnitEdges(mesh, geom);
-      addUnitLabel(mesh, rr);
+      addUnitLabel(mesh, rr, 'east', totalUnits);
+      addStatusStripe(mesh, status, 'east');
       group.add(mesh);
       posCounter++;
     }
@@ -611,6 +741,13 @@ function buildUShapeBuilding(
     const slab3 = new THREE.Mesh(new THREE.BoxGeometry(UNIT_DEPTH + 0.3, FLOOR_SLAB_HEIGHT, wingWidth(wings[2]) + 0.3), MATERIALS.slab.clone());
     slab3.position.set(maxWingWidth / 2 + UNIT_DEPTH / 2 + UNIT_GAP, floorY - FLOOR_SLAB_HEIGHT / 2, -(wings[2] - 1) * (UNIT_WIDTH + UNIT_GAP) / 2);
     group.add(slab3);
+
+    // Window bands between floors
+    if (floor > 1) {
+      addWindowBand(group, UNIT_DEPTH, wingWidth(wings[0]), floorY, -(maxWingWidth / 2 + UNIT_DEPTH / 2 + UNIT_GAP), -(wings[0] - 1) * (UNIT_WIDTH + UNIT_GAP) / 2);
+      addWindowBand(group, maxWingWidth, UNIT_DEPTH, floorY, 0, bottomZ);
+      addWindowBand(group, UNIT_DEPTH, wingWidth(wings[2]), floorY, maxWingWidth / 2 + UNIT_DEPTH / 2 + UNIT_GAP, -(wings[2] - 1) * (UNIT_WIDTH + UNIT_GAP) / 2);
+    }
   }
 
 }
@@ -619,6 +756,7 @@ function buildTowerBuilding(
   building: StackingBuilding,
   unitMap: Map<string, RentRollUnit>,
   group: THREE.Group,
+  totalUnits: number = 100,
 ) {
   // Tower: units arranged in a grid on each floor
   const cols = Math.ceil(Math.sqrt(building.units_per_floor));
@@ -634,6 +772,11 @@ function buildTowerBuilding(
     const slab = new THREE.Mesh(slabGeom, MATERIALS.slab.clone());
     slab.position.set(0, floorY - FLOOR_SLAB_HEIGHT / 2, 0);
     group.add(slab);
+
+    // Window band between floors
+    if (floor > 1) {
+      addWindowBand(group, gridWidth, gridDepth, floorY, 0, 0);
+    }
 
     let posCounter = 1;
     for (let r = 0; r < rows; r++) {
@@ -653,7 +796,8 @@ function buildTowerBuilding(
         mesh.name = `unit_${building.id}_${floor}_${posCounter}`;
         mesh.userData = { building_id: building.id, building_label: building.label, floor, position: posCounter, status, rentRollUnit: rr } satisfies UnitMeshData;
         addUnitEdges(mesh, geom);
-        addUnitLabel(mesh, rr);
+        addUnitLabel(mesh, rr, 'south', totalUnits);
+        addStatusStripe(mesh, status, 'south');
         group.add(mesh);
         posCounter++;
       }
@@ -666,6 +810,7 @@ function buildCourtyardBuilding(
   building: StackingBuilding,
   unitMap: Map<string, RentRollUnit>,
   group: THREE.Group,
+  totalUnits: number = 100,
 ) {
   // Distribute units across 4 wings (N, E, S, W) — use wing data if available
   const wingCounts: number[] = building.wings && building.wings.length >= 3
@@ -729,7 +874,8 @@ function buildCourtyardBuilding(
       mesh.name = `unit_${building.id}_${floor}_${posCounter}`;
       mesh.userData = { building_id: building.id, building_label: building.label, floor, position: posCounter, status, rentRollUnit: rr } satisfies UnitMeshData;
       addUnitEdges(mesh, geom);
-      addUnitLabel(mesh, rr);
+      addUnitLabel(mesh, rr, 'south', totalUnits);
+      addStatusStripe(mesh, status, 'south');
       group.add(mesh);
       posCounter++;
     }
@@ -752,7 +898,8 @@ function buildCourtyardBuilding(
         mesh.name = `unit_${building.id}_${floor}_${posCounter}`;
         mesh.userData = { building_id: building.id, building_label: building.label, floor, position: posCounter, status, rentRollUnit: rr } satisfies UnitMeshData;
         addUnitEdges(mesh, geom);
-        addUnitLabel(mesh, rr);
+        addUnitLabel(mesh, rr, 'east', totalUnits);
+        addStatusStripe(mesh, status, 'east');
         group.add(mesh);
         posCounter++;
       }
@@ -776,7 +923,8 @@ function buildCourtyardBuilding(
         mesh.name = `unit_${building.id}_${floor}_${posCounter}`;
         mesh.userData = { building_id: building.id, building_label: building.label, floor, position: posCounter, status, rentRollUnit: rr } satisfies UnitMeshData;
         addUnitEdges(mesh, geom);
-        addUnitLabel(mesh, rr);
+        addUnitLabel(mesh, rr, 'north', totalUnits);
+        addStatusStripe(mesh, status, 'north');
         group.add(mesh);
         posCounter++;
       }
@@ -800,7 +948,8 @@ function buildCourtyardBuilding(
         mesh.name = `unit_${building.id}_${floor}_${posCounter}`;
         mesh.userData = { building_id: building.id, building_label: building.label, floor, position: posCounter, status, rentRollUnit: rr } satisfies UnitMeshData;
         addUnitEdges(mesh, geom);
-        addUnitLabel(mesh, rr);
+        addUnitLabel(mesh, rr, 'west', totalUnits);
+        addStatusStripe(mesh, status, 'west');
         group.add(mesh);
         posCounter++;
       }
@@ -809,6 +958,14 @@ function buildCourtyardBuilding(
       wSlab.position.set(westX, floorY - FLOOR_SLAB_HEIGHT / 2, -(courtyardDepth / 2 + (UNIT_WIDTH + UNIT_GAP) / 2));
       group.add(wSlab);
     }
+
+    // Window bands between floors (all wings)
+    if (floor > 1) {
+      addWindowBand(group, northWidth, UNIT_DEPTH, floorY, 0, 0);
+      if (numWings >= 2) addWindowBand(group, UNIT_DEPTH, vertDepth(wingCounts[1]), floorY, eastX, -(courtyardDepth / 2 + (UNIT_WIDTH + UNIT_GAP) / 2));
+      if (numWings >= 3) addWindowBand(group, southWidth, UNIT_DEPTH, floorY, 0, southZ);
+      if (numWings >= 4) addWindowBand(group, UNIT_DEPTH, vertDepth(wingCounts[3]), floorY, westX, -(courtyardDepth / 2 + (UNIT_WIDTH + UNIT_GAP) / 2));
+    }
   }
 
 }
@@ -816,27 +973,28 @@ function buildCourtyardBuilding(
 function buildBuildingGroup(
   building: StackingBuilding,
   unitMap: Map<string, RentRollUnit>,
+  totalUnits: number = 100,
 ): THREE.Group {
   const group = new THREE.Group();
   group.name = `building_${building.id}`;
 
   switch (building.shape) {
     case 'L':
-      buildLShapeBuilding(building, unitMap, group);
+      buildLShapeBuilding(building, unitMap, group, totalUnits);
       break;
     case 'U':
-      buildUShapeBuilding(building, unitMap, group);
+      buildUShapeBuilding(building, unitMap, group, totalUnits);
       break;
     case 'courtyard':
     case 'wrap':
-      buildCourtyardBuilding(building, unitMap, group);
+      buildCourtyardBuilding(building, unitMap, group, totalUnits);
       break;
     case 'tower':
-      buildTowerBuilding(building, unitMap, group);
+      buildTowerBuilding(building, unitMap, group, totalUnits);
       break;
     case 'linear':
     default:
-      buildLinearBuilding(building, unitMap, group);
+      buildLinearBuilding(building, unitMap, group, totalUnits);
       break;
   }
 
@@ -875,10 +1033,10 @@ function addAmenityPads(layout: StackingLayout, scene: THREE.Scene, sceneCenter:
     const w = isParking ? 8 : amenitySize;
     const d = isParking ? 6 : isPool ? amenitySize : 3;
 
-    const geom = new THREE.BoxGeometry(w, 0.15, d);
+    const geom = new THREE.BoxGeometry(w, isPool ? 0.05 : 0.15, d);
     const mat = isPool ? MATERIALS.pool.clone() : isParking ? MATERIALS.parking.clone() : MATERIALS.amenity.clone();
     const mesh = new THREE.Mesh(geom, mat);
-    mesh.position.set(amenityX, 0.08, amenityZ);
+    mesh.position.set(amenityX, isPool ? 0.03 : 0.08, amenityZ);
     mesh.name = `amenity_${amenity.type}`;
     scene.add(mesh);
 
@@ -931,8 +1089,8 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
     if (hoveredRef.current) {
       const mat = hoveredRef.current.material as THREE.MeshPhysicalMaterial;
       const status = (hoveredRef.current.userData as UnitMeshData).status;
-      mat.emissiveIntensity = status === 'vacant' ? 0.2 : status === 'occupied' ? 0.15 : 0.05;
-      mat.opacity = status === 'unknown' ? 0.75 : 0.88;
+      mat.emissiveIntensity = status === 'unknown' ? 0.05 : 0.1;
+      mat.opacity = status === 'unknown' ? 0.85 : 0.9;
       hoveredRef.current = null;
     }
 
@@ -976,8 +1134,8 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
 
     // ── Scene ──
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x080814);
-    scene.fog = new THREE.FogExp2(0x080814, 0.003);
+    scene.background = new THREE.Color(0x1a1a2e);
+    scene.fog = new THREE.FogExp2(0x1a1a2e, 0.003);
     sceneRef.current = scene;
 
     // ── Camera ──
@@ -997,7 +1155,7 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    renderer.setClearColor(0x080814, 1);
+    renderer.setClearColor(0x1a1a2e, 1);
     container.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
@@ -1005,7 +1163,8 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.08;
-    controls.maxPolarAngle = Math.PI / 2 - 0.05;
+    controls.minPolarAngle = 20 * Math.PI / 180;   // 20° — prevent top-down
+    controls.maxPolarAngle = 75 * Math.PI / 180;    // 75° — prevent under-building
     controlsRef.current = controls;
 
     // ── Lighting ──
@@ -1034,12 +1193,13 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
 
     // ── Build geometry (grid layout) ──
     const unitMap = matchUnitsToRentRoll(layout, rentRollUnits);
+    const totalUnits = layout.buildings.reduce((sum, b) => sum + b.units_per_floor * b.num_floors, 0);
     const cols = Math.max(1, Math.ceil(Math.sqrt(layout.buildings.length)));
 
     // First pass: build all groups and measure their bounding boxes
     const buildingGroups: { group: THREE.Group; building: StackingBuilding; width: number; depth: number }[] = [];
     for (const building of layout.buildings) {
-      const group = buildBuildingGroup(building, unitMap);
+      const group = buildBuildingGroup(building, unitMap, totalUnits);
       const box = new THREE.Box3().setFromObject(group);
       const size = new THREE.Vector3();
       box.getSize(size);
@@ -1116,14 +1276,16 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
     ground.receiveShadow = true;
     scene.add(ground);
 
-    // ── Camera position (based on pre-ground scene bounds) ──
+    // ── Camera position — isometric-style (55° elevation, 45° azimuth) ──
     const maxDim = Math.max(sceneSize.x, sceneSize.z);
     const cameraDistance = maxDim * 1.5;
+    const elevation = 55 * Math.PI / 180;
+    const azimuth = 45 * Math.PI / 180;
 
     camera.position.set(
-      sceneCenter.x + cameraDistance * 0.6,
-      cameraDistance * 0.7,
-      sceneCenter.z + cameraDistance * 0.6,
+      sceneCenter.x + cameraDistance * Math.cos(elevation) * Math.sin(azimuth),
+      sceneCenter.y + cameraDistance * Math.sin(elevation),
+      sceneCenter.z + cameraDistance * Math.cos(elevation) * Math.cos(azimuth),
     );
     camera.lookAt(sceneCenter);
     controls.target.copy(sceneCenter);
