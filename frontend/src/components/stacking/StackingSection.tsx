@@ -38,6 +38,7 @@ export function StackingSection({ property }: StackingSectionProps) {
 
   // Filter state
   const [activeFilter, setActiveFilter] = useState<StackingFilterType>('occupancy');
+  const [checkedFloorPlans, setCheckedFloorPlans] = useState<Set<string>>(new Set());
 
   // Phase 2: Satellite extraction state
   const [extractedLayout, setExtractedLayout] = useState<StackingLayout | null>(null);
@@ -138,6 +139,39 @@ export function StackingSection({ property }: StackingSectionProps) {
     }
   }, [property.id]);
 
+  // Floor plan filter: init all checked when rent roll loads
+  useEffect(() => {
+    if (rentRollUnits.length > 0) {
+      setCheckedFloorPlans(new Set(rentRollUnits.map((u) => u.unit_type || 'Unknown')));
+    }
+  }, [rentRollUnits]);
+
+  const floorPlanCounts = useMemo((): Map<string, number> => {
+    const counts = new Map<string, number>();
+    rentRollUnits.forEach((u) => {
+      const t = u.unit_type || 'Unknown';
+      counts.set(t, (counts.get(t) || 0) + 1);
+    });
+    return counts;
+  }, [rentRollUnits]);
+
+  const handleFloorPlanToggle = useCallback((type: string) => {
+    setCheckedFloorPlans((prev) => {
+      const next = new Set(prev);
+      if (next.has(type)) next.delete(type);
+      else next.add(type);
+      return next;
+    });
+  }, []);
+
+  const handleFloorPlanSelectAll = useCallback(() => {
+    setCheckedFloorPlans(new Set(floorPlanCounts.keys()));
+  }, [floorPlanCounts]);
+
+  const handleFloorPlanClearAll = useCallback(() => {
+    setCheckedFloorPlans(new Set());
+  }, []);
+
   // Match quality
   const matchedCount = rentRollUnits.length;
   const totalModelUnits = layout?.total_units ?? 0;
@@ -156,23 +190,6 @@ export function StackingSection({ property }: StackingSectionProps) {
       case 'floor_level': {
         const maxFloor = layout?.buildings.reduce((m, b) => Math.max(m, b.num_floors), 1) ?? 1;
         return { type: 'gradient', minColor: '#1E3A5F', maxColor: '#38BDF8', minLabel: 'Floor 1', maxLabel: `Floor ${maxFloor}` };
-      }
-      case 'floor_plan': {
-        const types = new Set(rentRollUnits.map((u) => u.unit_type).filter(Boolean));
-        const items: { color: string; label: string }[] = [];
-        const palette: Record<string, string> = {
-          studio: '#F59E0B', '1 br': '#3B82F6', '1br': '#3B82F6', '1 bed': '#3B82F6',
-          '2 br': '#8B5CF6', '2br': '#8B5CF6', '2 bed': '#8B5CF6',
-          '3 br': '#10B981', '3br': '#10B981', '3 bed': '#10B981',
-        };
-        types.forEach((t) => {
-          if (!t) return;
-          const lower = t.toLowerCase();
-          const matchKey = Object.keys(palette).find((k) => lower.includes(k));
-          items.push({ color: matchKey ? palette[matchKey] : '#6B7280', label: t });
-        });
-        if (items.length === 0) items.push({ color: '#6B7280', label: 'Unknown' });
-        return { type: 'categorical', items };
       }
       case 'expirations':
         return { type: 'categorical', items: [
@@ -381,6 +398,7 @@ export function StackingSection({ property }: StackingSectionProps) {
               rentRollUnits={rentRollUnits}
               activeFilter={activeFilter}
               asOfDate={property.rr_as_of_date}
+              checkedFloorPlans={checkedFloorPlans}
             />
           </div>
           <StackingFilterSidebar
@@ -388,6 +406,11 @@ export function StackingSection({ property }: StackingSectionProps) {
             onFilterChange={setActiveFilter}
             legend={legend}
             asOfDate={property.rr_as_of_date}
+            floorPlanCounts={floorPlanCounts}
+            checkedFloorPlans={checkedFloorPlans}
+            onFloorPlanToggle={handleFloorPlanToggle}
+            onFloorPlanSelectAll={handleFloorPlanSelectAll}
+            onFloorPlanClearAll={handleFloorPlanClearAll}
           />
         </div>
       )}

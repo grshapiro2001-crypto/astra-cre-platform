@@ -1,8 +1,10 @@
 /**
  * StackingFilterSidebar — Filter buttons + dynamic legend for 3D stacking viewer.
- * Allows users to switch between data visualization modes that recolor unit meshes.
+ * VISUALIZATION section: single-select radio buttons for color modes.
+ * FLOOR PLAN FILTER section: multi-select checklist that dims unchecked floor plans.
  */
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 import type { StackingFilterType, FilterLegend } from '@/types/property';
 
@@ -11,31 +13,48 @@ interface StackingFilterSidebarProps {
   onFilterChange: (filter: StackingFilterType) => void;
   legend: FilterLegend;
   asOfDate?: string | null;
+  floorPlanCounts: Map<string, number>;
+  checkedFloorPlans: Set<string>;
+  onFloorPlanToggle: (type: string) => void;
+  onFloorPlanSelectAll: () => void;
+  onFloorPlanClearAll: () => void;
 }
 
 const FILTER_OPTIONS: { id: StackingFilterType; label: string }[] = [
   { id: 'occupancy', label: 'Occupancy' },
   { id: 'floor_level', label: 'Floor Level' },
-  { id: 'floor_plan', label: 'Floor Plan' },
   { id: 'expirations', label: 'Expirations' },
   { id: 'loss_to_lease', label: 'Loss-to-Lease' },
   { id: 'market_rents', label: 'Market Rents' },
   { id: 'contract_rents', label: 'Contract Rents' },
 ];
 
-export function StackingFilterSidebar({ activeFilter, onFilterChange, legend, asOfDate }: StackingFilterSidebarProps) {
+export function StackingFilterSidebar({
+  activeFilter,
+  onFilterChange,
+  legend,
+  asOfDate,
+  floorPlanCounts,
+  checkedFloorPlans,
+  onFloorPlanToggle,
+  onFloorPlanSelectAll,
+  onFloorPlanClearAll,
+}: StackingFilterSidebarProps) {
+  const sortedFloorPlans = [...floorPlanCounts.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  const allChecked = floorPlanCounts.size > 0 && checkedFloorPlans.size === floorPlanCounts.size;
+
   return (
     <div className="w-64 shrink-0 bg-card/30 border-l border-border flex flex-col rounded-r-2xl overflow-hidden"
          style={{ height: 480 }}>
-      {/* Header */}
+      {/* Visualization header */}
       <div className="px-4 pt-4 pb-2">
         <h3 className="text-[10px] font-semibold tracking-widest text-muted-foreground/70 uppercase">
           Visualization
         </h3>
       </div>
 
-      {/* Filter buttons */}
-      <div className="flex-1 overflow-y-auto px-3 space-y-1">
+      {/* Visualization filter buttons */}
+      <div className="px-3 space-y-1">
         {FILTER_OPTIONS.map((opt) => (
           <Button
             key={opt.id}
@@ -57,8 +76,39 @@ export function StackingFilterSidebar({ activeFilter, onFilterChange, legend, as
         ))}
       </div>
 
+      {/* Floor Plan Filter */}
+      {sortedFloorPlans.length > 0 && (
+        <div className="border-t border-border/60 px-4 py-3 flex flex-col min-h-0" style={{ maxHeight: '55%' }}>
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-[10px] font-semibold tracking-widest text-muted-foreground/70 uppercase">
+              Floor Plan Filter
+            </h3>
+            <button
+              type="button"
+              className="text-[10px] text-primary hover:underline"
+              onClick={allChecked ? onFloorPlanClearAll : onFloorPlanSelectAll}
+            >
+              {allChecked ? 'Clear All' : 'Select All'}
+            </button>
+          </div>
+          <div className="overflow-y-auto space-y-1 flex-1 min-h-0">
+            {sortedFloorPlans.map(([type, count]) => (
+              <label key={type} className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer py-0.5">
+                <Checkbox
+                  checked={checkedFloorPlans.has(type)}
+                  onCheckedChange={() => onFloorPlanToggle(type)}
+                  className="h-3.5 w-3.5"
+                />
+                <span className="flex-1 truncate">{type}</span>
+                <span className="text-[10px] text-muted-foreground/50 shrink-0">{count} units</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Legend */}
-      <div className="border-t border-border/60 px-4 py-3">
+      <div className="border-t border-border/60 px-4 py-3 mt-auto">
         <h4 className="text-[10px] font-semibold tracking-widest text-muted-foreground/70 uppercase mb-2">
           Legend
         </h4>

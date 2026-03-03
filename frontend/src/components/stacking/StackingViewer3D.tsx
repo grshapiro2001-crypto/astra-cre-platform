@@ -130,6 +130,7 @@ interface StackingViewer3DProps {
   onUnitClick?: (data: UnitMeshData) => void;
   activeFilter?: StackingFilterType;
   asOfDate?: string | null;
+  checkedFloorPlans?: Set<string>;
 }
 
 // ─── Matching logic ──────────────────────────────────────────────────────────
@@ -374,16 +375,6 @@ function statusToColor(status: 'occupied' | 'vacant' | 'unknown'): THREE.Color {
   }
 }
 
-function getFloorPlanColor(unitType: string | null | undefined): THREE.Color {
-  if (!unitType) return new THREE.Color(0x6B7280);
-  const t = unitType.toLowerCase();
-  if (t.includes('studio') || t.includes('stu')) return new THREE.Color(0xF59E0B);
-  if (t.includes('3') && (t.includes('br') || t.includes('bed'))) return new THREE.Color(0x10B981);
-  if (t.includes('2') && (t.includes('br') || t.includes('bed'))) return new THREE.Color(0x8B5CF6);
-  if (t.includes('1') && (t.includes('br') || t.includes('bed'))) return new THREE.Color(0x3B82F6);
-  return new THREE.Color(0x6B7280);
-}
-
 function getExpirationColor(leaseEnd: string | null | undefined, refDate: Date): THREE.Color {
   if (!leaseEnd) return new THREE.Color(0x6B7280);
   const end = new Date(leaseEnd);
@@ -479,9 +470,6 @@ function applyFilterToScene(
       case 'floor_level':
         color = lerpColor(0x1E3A5F, 0x38BDF8, (ud.floor - 1) / Math.max(stats.maxFloor - 1, 1));
         break;
-      case 'floor_plan':
-        color = getFloorPlanColor(ud.rentRollUnit?.unit_type);
-        break;
       case 'expirations':
         color = getExpirationColor(ud.rentRollUnit?.lease_end, refDate);
         break;
@@ -506,6 +494,28 @@ function applyFilterToScene(
         stripeMat.needsUpdate = true;
       }
     });
+  });
+}
+
+interface MaterialSnapshot {
+  color: THREE.Color;
+  opacity: number;
+  emissive: THREE.Color;
+}
+
+function restoreFromSnapshot(
+  scene: THREE.Scene,
+  snapshot: Map<string, MaterialSnapshot>,
+) {
+  scene.traverse((obj) => {
+    if (!(obj instanceof THREE.Mesh)) return;
+    const snap = snapshot.get(obj.uuid);
+    if (!snap) return;
+    const mat = obj.material as THREE.MeshStandardMaterial;
+    mat.color.copy(snap.color);
+    mat.opacity = snap.opacity;
+    if ('emissive' in mat) (mat as THREE.MeshStandardMaterial).emissive.copy(snap.emissive);
+    mat.needsUpdate = true;
   });
 }
 
@@ -1051,7 +1061,7 @@ function addAmenityPads(layout: StackingLayout, scene: THREE.Scene, sceneCenter:
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFilter = 'occupancy', asOfDate }: StackingViewer3DProps) {
+export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFilter = 'occupancy', asOfDate, checkedFloorPlans }: StackingViewer3DProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
@@ -1061,6 +1071,7 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
   const mouseRef = useRef(new THREE.Vector2());
   const hoveredRef = useRef<THREE.Mesh | null>(null);
   const animationIdRef = useRef<number>(0);
+  const materialSnapshotRef = useRef<Map<string, MaterialSnapshot>>(new Map());
   const [isReady, setIsReady] = useState(false);
   const [hoveredUnit, setHoveredUnit] = useState<UnitMeshData | null>(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
@@ -1316,6 +1327,20 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
     };
     window.addEventListener('resize', handleResize);
 
+    // ── Material snapshot for safe filter restore ──
+    const snapshot = new Map<string, MaterialSnapshot>();
+    scene.traverse((obj) => {
+      if (obj instanceof THREE.Mesh && obj.material) {
+        const mat = obj.material as THREE.MeshStandardMaterial;
+        snapshot.set(obj.uuid, {
+          color: mat.color.clone(),
+          opacity: mat.opacity,
+          emissive: 'emissive' in mat ? mat.emissive.clone() : new THREE.Color(0),
+        });
+      }
+    });
+    materialSnapshotRef.current = snapshot;
+
     // ── Cleanup ──
     return () => {
       cancelAnimationFrame(animationIdRef.current);
@@ -1348,10 +1373,49 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
   // ── Filter recoloring (no scene rebuild — material color swaps only) ──
   useEffect(() => {
     if (!sceneRef.current) return;
+    // Restore all materials to base state before applying new filter colors
+    if (materialSnapshotRef.current.size > 0) {
+      restoreFromSnapshot(sceneRef.current, materialSnapshotRef.current);
+    }
     const stats = computeRentStats(rentRollUnits, layout);
     const refDate = asOfDate ? new Date(asOfDate) : new Date();
     applyFilterToScene(sceneRef.current, activeFilter, stats, refDate);
   }, [activeFilter, rentRollUnits, layout, asOfDate]);
+
+  // ── Floor plan opacity layer (dims unchecked floor plans to 15%) ──
+  useEffect(() => {
+    if (!sceneRef.current || !checkedFloorPlans) return;
+    const scene = sceneRef.current;
+
+    scene.traverse((obj: THREE.Object3D) => {
+      if (!(obj instanceof THREE.Mesh)) return;
+
+      // Handle unit meshes
+      if (obj.name.startsWith('unit_')) {
+        const ud = obj.userData as UnitMeshData;
+        const unitType = ud.rentRollUnit?.unit_type || null;
+        const isDimmed = unitType !== null && !checkedFloorPlans.has(unitType);
+        const snap = materialSnapshotRef.current.get(obj.uuid);
+        const mat = obj.material as THREE.MeshStandardMaterial;
+        mat.opacity = isDimmed ? 0.15 : (snap?.opacity ?? mat.opacity);
+        mat.needsUpdate = true;
+      }
+
+      // Handle label meshes — dim alongside their unit
+      if (obj.name.startsWith('label_')) {
+        const unitName = obj.name.replace('label_', '');
+        const parentUnit = scene.getObjectByName(unitName) as THREE.Mesh | undefined;
+        if (parentUnit) {
+          const ud = parentUnit.userData as UnitMeshData;
+          const unitType = ud.rentRollUnit?.unit_type || null;
+          const isDimmed = unitType !== null && !checkedFloorPlans.has(unitType);
+          const mat = obj.material as THREE.MeshBasicMaterial;
+          mat.opacity = isDimmed ? 0.15 : 1.0;
+          mat.needsUpdate = true;
+        }
+      }
+    });
+  }, [checkedFloorPlans]);
 
   const rr = hoveredUnit?.rentRollUnit;
 
