@@ -10,6 +10,7 @@ interface StackingFilterSidebarProps {
   activeFilter: StackingFilterType;
   onFilterChange: (filter: StackingFilterType) => void;
   legend: FilterLegend;
+  asOfDate?: string | null;
 }
 
 const FILTER_OPTIONS: { id: StackingFilterType; label: string }[] = [
@@ -22,7 +23,7 @@ const FILTER_OPTIONS: { id: StackingFilterType; label: string }[] = [
   { id: 'contract_rents', label: 'Contract Rents' },
 ];
 
-export function StackingFilterSidebar({ activeFilter, onFilterChange, legend }: StackingFilterSidebarProps) {
+export function StackingFilterSidebar({ activeFilter, onFilterChange, legend, asOfDate }: StackingFilterSidebarProps) {
   return (
     <div className="w-64 shrink-0 bg-card/30 border-l border-border flex flex-col rounded-r-2xl overflow-hidden"
          style={{ height: 480 }}>
@@ -61,6 +62,14 @@ export function StackingFilterSidebar({ activeFilter, onFilterChange, legend }: 
         <h4 className="text-[10px] font-semibold tracking-widest text-muted-foreground/70 uppercase mb-2">
           Legend
         </h4>
+
+        {activeFilter === 'expirations' && (
+          <p className="text-xs text-muted-foreground mb-2">
+            {asOfDate
+              ? `Relative to ${new Date(asOfDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+              : 'As of today'}
+          </p>
+        )}
 
         {legend.type === 'categorical' && (
           <div className="space-y-1.5">

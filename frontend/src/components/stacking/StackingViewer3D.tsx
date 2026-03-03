@@ -117,8 +117,9 @@ export interface UnitMeshData {
 interface StackingViewer3DProps {
   layout: StackingLayout;
   rentRollUnits: RentRollUnit[];
-  onUnitClick: (data: UnitMeshData) => void;
+  onUnitClick?: (data: UnitMeshData) => void;
   activeFilter?: StackingFilterType;
+  asOfDate?: string | null;
 }
 
 // ─── Matching logic ──────────────────────────────────────────────────────────
@@ -198,6 +199,59 @@ function addUnitEdges(mesh: THREE.Mesh, geom: THREE.BufferGeometry) {
   mesh.receiveShadow = true;
 }
 
+// ─── Unit number label textures ─────────────────────────────────────────────
+
+function createUnitNumberTexture(unitNumber: string): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 128;
+  canvas.height = 64;
+  const ctx = canvas.getContext('2d')!;
+
+  ctx.clearRect(0, 0, 128, 64);
+
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+  ctx.font = 'bold 28px monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
+  ctx.shadowBlur = 3;
+  ctx.shadowOffsetX = 1;
+  ctx.shadowOffsetY = 1;
+
+  ctx.fillText(unitNumber, 64, 32);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  return texture;
+}
+
+function addUnitLabel(mesh: THREE.Mesh, rr: RentRollUnit | undefined) {
+  const unitNumber = rr?.unit_number;
+  if (!unitNumber) return;
+
+  // Read actual geometry dimensions (handles rotated boxes like UNIT_DEPTH x H x UNIT_WIDTH)
+  const geomBox = new THREE.Box3();
+  mesh.geometry.computeBoundingBox();
+  geomBox.copy(mesh.geometry.boundingBox!);
+  const sz = new THREE.Vector3();
+  geomBox.getSize(sz);
+
+  const labelTexture = createUnitNumberTexture(unitNumber);
+  const labelMat = new THREE.MeshBasicMaterial({
+    map: labelTexture,
+    transparent: true,
+    depthTest: true,
+    side: THREE.FrontSide,
+  });
+  const labelGeom = new THREE.PlaneGeometry(sz.x * 0.85, sz.y * 0.7);
+  const labelMesh = new THREE.Mesh(labelGeom, labelMat);
+  labelMesh.position.set(0, 0, sz.z / 2 + 0.01);
+  labelMesh.name = `label_${mesh.name}`;
+  mesh.add(labelMesh);
+}
+
 // ─── Filter color helpers ───────────────────────────────────────────────────
 
 function lerpColor(c1: number, c2: number, t: number): THREE.Color {
@@ -224,11 +278,10 @@ function getFloorPlanColor(unitType: string | null | undefined): THREE.Color {
   return new THREE.Color(0x6B7280);
 }
 
-function getExpirationColor(leaseEnd: string | null | undefined): THREE.Color {
+function getExpirationColor(leaseEnd: string | null | undefined, refDate: Date): THREE.Color {
   if (!leaseEnd) return new THREE.Color(0x6B7280);
-  const now = new Date();
   const end = new Date(leaseEnd);
-  const diffMs = end.getTime() - now.getTime();
+  const diffMs = end.getTime() - refDate.getTime();
   const diffDays = diffMs / (1000 * 60 * 60 * 24);
   if (diffDays <= 30) return new THREE.Color(0xEF4444);   // expired or urgent
   if (diffDays <= 90) return new THREE.Color(0xF97316);   // soon
@@ -237,8 +290,19 @@ function getExpirationColor(leaseEnd: string | null | undefined): THREE.Color {
   return new THREE.Color(0x3B82F6);                        // long-term
 }
 
+function formatLTL(
+  marketRent: number | null | undefined,
+  inPlaceRent: number | null | undefined,
+): string {
+  if (!marketRent || marketRent <= 0) return '—';
+  if (inPlaceRent == null || inPlaceRent <= 0) return '—';
+  const ltl = ((marketRent - inPlaceRent) / marketRent) * 100;
+  if (ltl < 0) return '0.0%';
+  return `${ltl.toFixed(1)}%`;
+}
+
 function getLTLColor(marketRent: number | null | undefined, inPlaceRent: number | null | undefined): THREE.Color {
-  if (marketRent == null || inPlaceRent == null || marketRent <= 0) return new THREE.Color(0x6B7280);
+  if (marketRent == null || inPlaceRent == null || marketRent <= 0 || inPlaceRent <= 0) return new THREE.Color(0x6B7280);
   const ltl = (marketRent - inPlaceRent) / marketRent;
   if (ltl <= 0) return new THREE.Color(0x3B82F6);      // at or above market
   if (ltl <= 0.05) return new THREE.Color(0x22C55E);    // 1-5%
@@ -295,6 +359,7 @@ function applyFilterToScene(
   scene: THREE.Scene,
   filterType: StackingFilterType,
   stats: RentStats,
+  refDate: Date,
 ) {
   scene.traverse((obj) => {
     if (!(obj instanceof THREE.Mesh) || !obj.name.startsWith('unit_')) return;
@@ -313,7 +378,7 @@ function applyFilterToScene(
         color = getFloorPlanColor(ud.rentRollUnit?.unit_type);
         break;
       case 'expirations':
-        color = getExpirationColor(ud.rentRollUnit?.lease_end);
+        color = getExpirationColor(ud.rentRollUnit?.lease_end, refDate);
         break;
       case 'loss_to_lease':
         color = getLTLColor(ud.rentRollUnit?.market_rent, ud.rentRollUnit?.in_place_rent);
@@ -377,6 +442,7 @@ function buildLinearBuilding(
       } satisfies UnitMeshData;
 
       addUnitEdges(mesh, geom);
+      addUnitLabel(mesh, rr);
       group.add(mesh);
     }
   }
@@ -429,6 +495,7 @@ function buildLShapeBuilding(
       mesh.name = `unit_${building.id}_${floor}_${pos}`;
       mesh.userData = { building_id: building.id, building_label: building.label, floor, position: pos, status, rentRollUnit: rr } satisfies UnitMeshData;
       addUnitEdges(mesh, geom);
+      addUnitLabel(mesh, rr);
       group.add(mesh);
     }
 
@@ -449,6 +516,7 @@ function buildLShapeBuilding(
       mesh.name = `unit_${building.id}_${floor}_${pos}`;
       mesh.userData = { building_id: building.id, building_label: building.label, floor, position: pos, status, rentRollUnit: rr } satisfies UnitMeshData;
       addUnitEdges(mesh, geom);
+      addUnitLabel(mesh, rr);
       group.add(mesh);
     }
 
@@ -490,6 +558,7 @@ function buildUShapeBuilding(
       mesh.name = `unit_${building.id}_${floor}_${posCounter}`;
       mesh.userData = { building_id: building.id, building_label: building.label, floor, position: posCounter, status, rentRollUnit: rr } satisfies UnitMeshData;
       addUnitEdges(mesh, geom);
+      addUnitLabel(mesh, rr);
       group.add(mesh);
       posCounter++;
     }
@@ -508,6 +577,7 @@ function buildUShapeBuilding(
       mesh.name = `unit_${building.id}_${floor}_${posCounter}`;
       mesh.userData = { building_id: building.id, building_label: building.label, floor, position: posCounter, status, rentRollUnit: rr } satisfies UnitMeshData;
       addUnitEdges(mesh, geom);
+      addUnitLabel(mesh, rr);
       group.add(mesh);
       posCounter++;
     }
@@ -524,6 +594,7 @@ function buildUShapeBuilding(
       mesh.name = `unit_${building.id}_${floor}_${posCounter}`;
       mesh.userData = { building_id: building.id, building_label: building.label, floor, position: posCounter, status, rentRollUnit: rr } satisfies UnitMeshData;
       addUnitEdges(mesh, geom);
+      addUnitLabel(mesh, rr);
       group.add(mesh);
       posCounter++;
     }
@@ -582,6 +653,7 @@ function buildTowerBuilding(
         mesh.name = `unit_${building.id}_${floor}_${posCounter}`;
         mesh.userData = { building_id: building.id, building_label: building.label, floor, position: posCounter, status, rentRollUnit: rr } satisfies UnitMeshData;
         addUnitEdges(mesh, geom);
+        addUnitLabel(mesh, rr);
         group.add(mesh);
         posCounter++;
       }
@@ -657,6 +729,7 @@ function buildCourtyardBuilding(
       mesh.name = `unit_${building.id}_${floor}_${posCounter}`;
       mesh.userData = { building_id: building.id, building_label: building.label, floor, position: posCounter, status, rentRollUnit: rr } satisfies UnitMeshData;
       addUnitEdges(mesh, geom);
+      addUnitLabel(mesh, rr);
       group.add(mesh);
       posCounter++;
     }
@@ -679,6 +752,7 @@ function buildCourtyardBuilding(
         mesh.name = `unit_${building.id}_${floor}_${posCounter}`;
         mesh.userData = { building_id: building.id, building_label: building.label, floor, position: posCounter, status, rentRollUnit: rr } satisfies UnitMeshData;
         addUnitEdges(mesh, geom);
+        addUnitLabel(mesh, rr);
         group.add(mesh);
         posCounter++;
       }
@@ -702,6 +776,7 @@ function buildCourtyardBuilding(
         mesh.name = `unit_${building.id}_${floor}_${posCounter}`;
         mesh.userData = { building_id: building.id, building_label: building.label, floor, position: posCounter, status, rentRollUnit: rr } satisfies UnitMeshData;
         addUnitEdges(mesh, geom);
+        addUnitLabel(mesh, rr);
         group.add(mesh);
         posCounter++;
       }
@@ -725,6 +800,7 @@ function buildCourtyardBuilding(
         mesh.name = `unit_${building.id}_${floor}_${posCounter}`;
         mesh.userData = { building_id: building.id, building_label: building.label, floor, position: posCounter, status, rentRollUnit: rr } satisfies UnitMeshData;
         addUnitEdges(mesh, geom);
+        addUnitLabel(mesh, rr);
         group.add(mesh);
         posCounter++;
       }
@@ -817,7 +893,7 @@ function addAmenityPads(layout: StackingLayout, scene: THREE.Scene, sceneCenter:
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFilter = 'occupancy' }: StackingViewer3DProps) {
+export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFilter = 'occupancy', asOfDate }: StackingViewer3DProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
@@ -828,16 +904,68 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
   const hoveredRef = useRef<THREE.Mesh | null>(null);
   const animationIdRef = useRef<number>(0);
   const [isReady, setIsReady] = useState(false);
+  const [hoveredUnit, setHoveredUnit] = useState<UnitMeshData | null>(null);
+  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
 
   const handleMouseMove = useCallback((event: MouseEvent) => {
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
     mouseRef.current.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
     mouseRef.current.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+    // Tooltip position (relative to container)
+    setTooltipPos({ x: event.clientX - rect.left, y: event.clientY - rect.top });
+
+    // Raycasting for hover tooltip
+    if (!cameraRef.current || !sceneRef.current) return;
+    raycasterRef.current.setFromCamera(mouseRef.current, cameraRef.current);
+    const unitMeshes: THREE.Mesh[] = [];
+    sceneRef.current.traverse((obj) => {
+      if (obj instanceof THREE.Mesh && obj.name.startsWith('unit_') && !obj.name.startsWith('label_')) {
+        unitMeshes.push(obj);
+      }
+    });
+    const intersects = raycasterRef.current.intersectObjects(unitMeshes);
+
+    // Reset previous hover
+    if (hoveredRef.current) {
+      const mat = hoveredRef.current.material as THREE.MeshPhysicalMaterial;
+      const status = (hoveredRef.current.userData as UnitMeshData).status;
+      mat.emissiveIntensity = status === 'vacant' ? 0.2 : status === 'occupied' ? 0.15 : 0.05;
+      mat.opacity = status === 'unknown' ? 0.75 : 0.88;
+      hoveredRef.current = null;
+    }
+
+    if (intersects.length > 0) {
+      const hit = intersects[0].object as THREE.Mesh;
+      if (hit.name.startsWith('unit_')) {
+        const mat = hit.material as THREE.MeshPhysicalMaterial;
+        mat.emissiveIntensity = 0.6;
+        mat.opacity = 1.0;
+        hoveredRef.current = hit;
+        containerRef.current.style.cursor = 'pointer';
+        const ud = hit.userData as UnitMeshData;
+        setHoveredUnit(ud);
+      }
+    } else {
+      containerRef.current.style.cursor = 'grab';
+      setHoveredUnit(null);
+    }
+  }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    setHoveredUnit(null);
+    if (hoveredRef.current) {
+      const mat = hoveredRef.current.material as THREE.MeshPhysicalMaterial;
+      const status = (hoveredRef.current.userData as UnitMeshData).status;
+      mat.emissiveIntensity = status === 'vacant' ? 0.2 : status === 'occupied' ? 0.15 : 0.05;
+      mat.opacity = status === 'unknown' ? 0.75 : 0.88;
+      hoveredRef.current = null;
+    }
   }, []);
 
   const handleClick = useCallback(() => {
-    if (hoveredRef.current?.userData?.building_id) {
+    if (hoveredRef.current?.userData?.building_id && onUnitClick) {
       onUnitClick(hoveredRef.current.userData as UnitMeshData);
     }
   }, [onUnitClick]);
@@ -970,28 +1098,26 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
       addAmenityPads(layout, scene, clusterCenter);
     }
 
-    // ── Dynamic ground plane ──
+    // ── Dynamic ground plane (centered on building cluster) ──
     const sceneBox = new THREE.Box3().setFromObject(scene);
     const sceneSize = new THREE.Vector3();
     sceneBox.getSize(sceneSize);
+    const sceneCenter = new THREE.Vector3();
+    sceneBox.getCenter(sceneCenter);
     const groundSize = Math.max(sceneSize.x, sceneSize.z) + 40;
 
     const gridHelper = new THREE.GridHelper(groundSize, Math.max(10, Math.floor(groundSize / 2)), 0x2a2a4a, 0x1a1a3a);
+    gridHelper.position.set(sceneCenter.x, 0, sceneCenter.z);
     scene.add(gridHelper);
     const groundGeom = new THREE.PlaneGeometry(groundSize, groundSize);
     const ground = new THREE.Mesh(groundGeom, MATERIALS.ground.clone());
     ground.rotation.x = -Math.PI / 2;
-    ground.position.y = -0.01;
+    ground.position.set(sceneCenter.x, -0.05, sceneCenter.z);
     ground.receiveShadow = true;
     scene.add(ground);
 
-    // ── Camera position ──
-    const finalSceneBox = new THREE.Box3().setFromObject(scene);
-    const sceneCenter = new THREE.Vector3();
-    finalSceneBox.getCenter(sceneCenter);
-    const finalSceneSize = new THREE.Vector3();
-    finalSceneBox.getSize(finalSceneSize);
-    const maxDim = Math.max(finalSceneSize.x, finalSceneSize.z);
+    // ── Camera position (based on pre-ground scene bounds) ──
+    const maxDim = Math.max(sceneSize.x, sceneSize.z);
     const cameraDistance = maxDim * 1.5;
 
     camera.position.set(
@@ -1006,42 +1132,6 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
     // ── Animate ──
     const animate = () => {
       animationIdRef.current = requestAnimationFrame(animate);
-
-      // Raycasting for hover
-      if (cameraRef.current && sceneRef.current) {
-        raycasterRef.current.setFromCamera(mouseRef.current, cameraRef.current);
-        const unitMeshes: THREE.Mesh[] = [];
-        sceneRef.current.traverse((obj) => {
-          if (obj instanceof THREE.Mesh && obj.name.startsWith('unit_')) {
-            unitMeshes.push(obj);
-          }
-        });
-
-        const intersects = raycasterRef.current.intersectObjects(unitMeshes);
-
-        // Reset previous hover
-        if (hoveredRef.current) {
-          const mat = hoveredRef.current.material as THREE.MeshPhysicalMaterial;
-          const status = (hoveredRef.current.userData as UnitMeshData).status;
-          mat.emissiveIntensity = status === 'vacant' ? 0.2 : status === 'occupied' ? 0.15 : 0.05;
-          mat.opacity = status === 'unknown' ? 0.75 : 0.88;
-          hoveredRef.current = null;
-        }
-
-        if (intersects.length > 0) {
-          const hit = intersects[0].object as THREE.Mesh;
-          if (hit.name.startsWith('unit_')) {
-            const mat = hit.material as THREE.MeshPhysicalMaterial;
-            mat.emissiveIntensity = 0.6;
-            mat.opacity = 1.0;
-            hoveredRef.current = hit;
-            container.style.cursor = 'pointer';
-          }
-        } else {
-          container.style.cursor = 'grab';
-        }
-      }
-
       controls.update();
       renderer.render(scene, camera);
     };
@@ -1050,6 +1140,7 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
 
     // ── Event listeners ──
     container.addEventListener('mousemove', handleMouseMove);
+    container.addEventListener('mouseleave', handleMouseLeave);
     container.addEventListener('click', handleClick);
 
     // ── Resize ──
@@ -1065,6 +1156,7 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
     return () => {
       cancelAnimationFrame(animationIdRef.current);
       container.removeEventListener('mousemove', handleMouseMove);
+      container.removeEventListener('mouseleave', handleMouseLeave);
       container.removeEventListener('click', handleClick);
       window.removeEventListener('resize', handleResize);
       controls.dispose();
@@ -1073,8 +1165,12 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
         if (obj instanceof THREE.Mesh || obj instanceof THREE.LineSegments) {
           obj.geometry.dispose();
           if (Array.isArray(obj.material)) {
-            obj.material.forEach((m) => m.dispose());
+            obj.material.forEach((m) => {
+              if ('map' in m && m.map) m.map.dispose();
+              m.dispose();
+            });
           } else {
+            if ('map' in obj.material && obj.material.map) obj.material.map.dispose();
             obj.material.dispose();
           }
         }
@@ -1083,14 +1179,17 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
         container.removeChild(renderer.domElement);
       }
     };
-  }, [layout, rentRollUnits, handleMouseMove, handleClick]);
+  }, [layout, rentRollUnits, handleMouseMove, handleMouseLeave, handleClick]);
 
   // ── Filter recoloring (no scene rebuild — material color swaps only) ──
   useEffect(() => {
     if (!sceneRef.current) return;
     const stats = computeRentStats(rentRollUnits, layout);
-    applyFilterToScene(sceneRef.current, activeFilter, stats);
-  }, [activeFilter, rentRollUnits, layout]);
+    const refDate = asOfDate ? new Date(asOfDate) : new Date();
+    applyFilterToScene(sceneRef.current, activeFilter, stats, refDate);
+  }, [activeFilter, rentRollUnits, layout, asOfDate]);
+
+  const rr = hoveredUnit?.rentRollUnit;
 
   return (
     <div className="relative">
@@ -1104,9 +1203,86 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
           <p className="text-muted-foreground text-sm">Loading 3D viewer...</p>
         </div>
       )}
+
+      {/* Floating tooltip */}
+      {hoveredUnit && (
+        <div
+          className="absolute pointer-events-none z-10 bg-card/95 backdrop-blur-sm border border-border/60 rounded-xl shadow-2xl p-3 min-w-[220px] max-w-[280px] text-sm"
+          style={{
+            left: `${tooltipPos.x}px`,
+            top: `${tooltipPos.y}px`,
+            transform: 'translate(-50%, -110%)',
+          }}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between mb-2">
+            <span className="font-bold text-foreground">
+              Unit {rr?.unit_number || '—'}
+            </span>
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+              hoveredUnit.status === 'occupied'
+                ? 'bg-primary/20 text-primary'
+                : hoveredUnit.status === 'vacant'
+                  ? 'bg-rose-500/20 text-rose-400'
+                  : 'bg-muted text-muted-foreground'
+            }`}>
+              {hoveredUnit.status === 'occupied' ? 'Occupied' : hoveredUnit.status === 'vacant' ? 'Vacant' : 'Unknown'}
+            </span>
+          </div>
+
+          {/* Data grid */}
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+            <div>
+              <span className="text-muted-foreground">Floor</span>
+              <p className="font-mono font-semibold text-foreground">{hoveredUnit.floor}</p>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Type</span>
+              <p className="font-mono font-semibold text-foreground">{rr?.unit_type || '—'}</p>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Market Rent</span>
+              <p className="font-mono font-semibold text-foreground">
+                {rr?.market_rent ? `$${rr.market_rent.toLocaleString()}` : '—'}
+              </p>
+            </div>
+            <div>
+              <span className="text-muted-foreground">In-Place Rent</span>
+              <p className="font-mono font-semibold text-foreground">
+                {rr?.in_place_rent && rr.in_place_rent > 0 ? `$${rr.in_place_rent.toLocaleString()}` : '—'}
+              </p>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Loss-to-Lease</span>
+              <p className="font-mono font-semibold text-foreground">
+                {formatLTL(rr?.market_rent, rr?.in_place_rent)}
+              </p>
+            </div>
+            <div>
+              <span className="text-muted-foreground">SQFT</span>
+              <p className="font-mono font-semibold text-foreground">
+                {rr?.sqft ? rr.sqft.toLocaleString() : '—'}
+              </p>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Lease End</span>
+              <p className="font-mono font-semibold text-foreground">
+                {rr?.lease_end
+                  ? new Date(rr.lease_end).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })
+                  : '—'}
+              </p>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Status</span>
+              <p className="font-mono font-semibold text-foreground">{rr?.status || '—'}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Help text overlay */}
       <div className="absolute bottom-2 left-3 text-[10px] text-muted-foreground/50 pointer-events-none">
-        Click a unit for details · Drag to rotate
+        Hover a unit for details · Drag to rotate
       </div>
     </div>
   );

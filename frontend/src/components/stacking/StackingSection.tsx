@@ -9,11 +9,9 @@ import { cn } from '@/lib/utils';
 import { Building2, Pencil, RotateCcw, Globe, Loader2, AlertCircle } from 'lucide-react';
 import { LayoutEditor } from './LayoutEditor';
 import { StackingViewer3D } from './StackingViewer3D';
-import { UnitDetailModal } from './UnitDetailModal';
 import { StackingFilterSidebar } from './StackingFilterSidebar';
 import { stackingService } from '@/services/stackingService';
 import type { PropertyDetail, StackingLayout, RentRollUnit, StackingFilterType, FilterLegend } from '@/types/property';
-import type { UnitMeshData } from './StackingViewer3D';
 
 type SectionMode = 'choosing' | 'extracting' | 'extracted' | 'editing' | 'viewing';
 
@@ -37,8 +35,6 @@ export function StackingSection({ property }: StackingSectionProps) {
   const [layout, setLayout] = useState<StackingLayout | null>(null);
   const [rentRollUnits, setRentRollUnits] = useState<RentRollUnit[]>([]);
   const [isSaving, setIsSaving] = useState(false);
-  const [selectedUnit, setSelectedUnit] = useState<UnitMeshData | null>(null);
-  const [modalOpen, setModalOpen] = useState(false);
 
   // Filter state
   const [activeFilter, setActiveFilter] = useState<StackingFilterType>('occupancy');
@@ -141,11 +137,6 @@ export function StackingSection({ property }: StackingSectionProps) {
       setIsSaving(false);
     }
   }, [property.id]);
-
-  const handleUnitClick = useCallback((data: UnitMeshData) => {
-    setSelectedUnit(data);
-    setModalOpen(true);
-  }, []);
 
   // Match quality
   const matchedCount = rentRollUnits.length;
@@ -388,23 +379,19 @@ export function StackingSection({ property }: StackingSectionProps) {
             <StackingViewer3D
               layout={layout}
               rentRollUnits={rentRollUnits}
-              onUnitClick={handleUnitClick}
               activeFilter={activeFilter}
+              asOfDate={property.rr_as_of_date}
             />
           </div>
           <StackingFilterSidebar
             activeFilter={activeFilter}
             onFilterChange={setActiveFilter}
             legend={legend}
+            asOfDate={property.rr_as_of_date}
           />
         </div>
       )}
 
-      <UnitDetailModal
-        data={selectedUnit}
-        open={modalOpen}
-        onOpenChange={setModalOpen}
-      />
     </div>
   );
 }
