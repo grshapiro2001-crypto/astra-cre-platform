@@ -1245,6 +1245,13 @@ async def upload_document_to_property(
 
                 # Save unit-level data
                 for unit in extraction.get("units", []):
+                    # Defensive: ensure in_place_rent derived from charge_details
+                    cd = unit.get("charge_details") or {}
+                    ipr = unit.get("in_place_rent") or 0
+                    if cd and not ipr:
+                        base = excel_extraction_service.find_base_rent(cd)
+                        unit["in_place_rent"] = base if base > 0 else sum(cd.values())
+
                     rr_unit = RentRollUnit(
                         property_id=property_id,
                         document_id=doc.id,
@@ -1285,7 +1292,7 @@ async def upload_document_to_property(
 
                     # Also override these existing property fields (Excel > OM)
                     property_obj.total_units = summary.get("total_units")
-                    property_obj.average_in_place_rent = summary.get("avg_in_place_rent")
+                    property_obj.average_inplace_rent = summary.get("avg_in_place_rent")
                     property_obj.average_market_rent = summary.get("avg_market_rent")
                     property_obj.financial_data_source = "rent_roll_excel"
                     property_obj.financial_data_updated_at = datetime.utcnow()
@@ -1519,6 +1526,143 @@ async def upload_document_to_property(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Document processing failed: {str(e)}"
         )
+
+
+# ==================== BACKFILL RENT ROLL ====================
+
+@router.post("/{property_id}/backfill-rent")
+def backfill_rent(
+    property_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Re-parse the stored rent roll file and update all rent_roll_units rows
+    for this property.  Fixes stale data from before the parser rewrite
+    without requiring the user to re-upload the file.
+    """
+    # 1. Get property
+    property_obj = property_service.get_property(
+        db,
+        property_id,
+        str(current_user.id),
+        update_view_date=False,
+    )
+    if not property_obj:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Property not found",
+        )
+
+    # 2. Find the most recent rent_roll document
+    rent_roll_doc = (
+        db.query(PropertyDocument)
+        .filter(
+            PropertyDocument.property_id == property_id,
+            PropertyDocument.document_category == "rent_roll",
+        )
+        .order_by(PropertyDocument.uploaded_at.desc())
+        .first()
+    )
+    if not rent_roll_doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No rent roll document found for this property.",
+        )
+
+    # 3. Check file still exists on disk
+    file_path = rent_roll_doc.file_path
+    if not file_path or not os.path.exists(file_path):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=(
+                "Rent roll file not found on server (the file may have been "
+                "lost after a server restart). Please re-upload the rent roll "
+                "to backfill."
+            ),
+        )
+
+    # 4. Re-run extraction
+    extraction = excel_extraction_service.extract_rent_roll(file_path)
+    if extraction.get("error"):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Rent roll extraction failed: {extraction['error']}",
+        )
+
+    units = extraction.get("units", [])
+
+    # 5. Delete existing rent_roll_units for this property
+    deleted = (
+        db.query(RentRollUnit)
+        .filter(RentRollUnit.property_id == property_id)
+        .delete()
+    )
+    logger.info("Backfill: deleted %d stale rent_roll_units for property %d", deleted, property_id)
+
+    # 6. Create new RentRollUnit rows
+    for unit in units:
+        # Defensive: derive in_place_rent from charge_details
+        cd = unit.get("charge_details") or {}
+        ipr = unit.get("in_place_rent") or 0
+        if cd and not ipr:
+            base = excel_extraction_service.find_base_rent(cd)
+            ipr = base if base > 0 else sum(cd.values())
+            unit["in_place_rent"] = ipr
+
+        rr_unit = RentRollUnit(
+            property_id=property_id,
+            document_id=rent_roll_doc.id,
+            unit_number=unit.get("unit_number"),
+            unit_type=unit.get("unit_type"),
+            sqft=unit.get("sqft"),
+            status=unit.get("status"),
+            is_occupied=unit.get("is_occupied", True),
+            resident_name=unit.get("resident_name"),
+            move_in_date=unit.get("move_in_date"),
+            lease_start=unit.get("lease_start"),
+            lease_end=unit.get("lease_end"),
+            market_rent=unit.get("market_rent"),
+            in_place_rent=unit.get("in_place_rent"),
+            charge_details=unit.get("charge_details"),
+        )
+        db.add(rr_unit)
+
+    # 7. Update property summary fields
+    summary = extraction.get("summary", {})
+    if summary:
+        property_obj.rr_total_units = summary.get("total_units")
+        property_obj.rr_occupied_units = summary.get("occupied_units")
+        property_obj.rr_vacancy_count = summary.get("vacant_units")
+        property_obj.rr_physical_occupancy_pct = summary.get("physical_occupancy_pct")
+        property_obj.rr_avg_market_rent = summary.get("avg_market_rent")
+        property_obj.rr_avg_in_place_rent = summary.get("avg_in_place_rent")
+        property_obj.rr_avg_sqft = summary.get("avg_sqft")
+        property_obj.rr_loss_to_lease_pct = summary.get("loss_to_lease_pct")
+        property_obj.rr_as_of_date = rent_roll_doc.document_date
+
+        property_obj.total_units = summary.get("total_units")
+        property_obj.average_inplace_rent = summary.get("avg_in_place_rent")
+        property_obj.average_market_rent = summary.get("avg_market_rent")
+        property_obj.financial_data_source = "rent_roll_excel"
+        property_obj.financial_data_updated_at = datetime.utcnow()
+
+    # 8. Commit
+    db.commit()
+
+    units_with_rent = sum(1 for u in units if u.get("in_place_rent"))
+    logger.info(
+        "Backfill complete for property %d: %d units, %d with in_place_rent",
+        property_id, len(units), units_with_rent,
+    )
+
+    return {
+        "property_id": property_id,
+        "status": "completed",
+        "units_updated": len(units),
+        "units_with_in_place_rent": units_with_rent,
+        "avg_in_place_rent": summary.get("avg_in_place_rent"),
+    }
 
 
 # ==================== GEOCODING ENDPOINTS ====================
