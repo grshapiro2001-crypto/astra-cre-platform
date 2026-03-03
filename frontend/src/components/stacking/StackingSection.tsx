@@ -3,15 +3,16 @@
  * Manages state transitions: choosing → extracting → extracted → editing → viewing.
  * Phase 2 adds satellite auto-generation flow alongside manual entry.
  */
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Building2, Pencil, RotateCcw, Globe, Loader2, AlertCircle } from 'lucide-react';
 import { LayoutEditor } from './LayoutEditor';
 import { StackingViewer3D } from './StackingViewer3D';
 import { UnitDetailModal } from './UnitDetailModal';
+import { StackingFilterSidebar } from './StackingFilterSidebar';
 import { stackingService } from '@/services/stackingService';
-import type { PropertyDetail, StackingLayout, RentRollUnit } from '@/types/property';
+import type { PropertyDetail, StackingLayout, RentRollUnit, StackingFilterType, FilterLegend } from '@/types/property';
 import type { UnitMeshData } from './StackingViewer3D';
 
 type SectionMode = 'choosing' | 'extracting' | 'extracted' | 'editing' | 'viewing';
@@ -38,6 +39,9 @@ export function StackingSection({ property }: StackingSectionProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [selectedUnit, setSelectedUnit] = useState<UnitMeshData | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+
+  // Filter state
+  const [activeFilter, setActiveFilter] = useState<StackingFilterType>('occupancy');
 
   // Phase 2: Satellite extraction state
   const [extractedLayout, setExtractedLayout] = useState<StackingLayout | null>(null);
@@ -148,6 +152,79 @@ export function StackingSection({ property }: StackingSectionProps) {
   const totalModelUnits = layout?.total_units ?? 0;
   const matched = Math.min(matchedCount, totalModelUnits);
   const unlinked = totalModelUnits - matched;
+
+  // Compute filter legend based on active filter and rent roll data
+  const legend = useMemo((): FilterLegend => {
+    switch (activeFilter) {
+      case 'occupancy':
+        return { type: 'categorical', items: [
+          { color: '#7C3AED', label: 'Occupied' },
+          { color: '#F43F5E', label: 'Vacant' },
+          { color: '#3F3F5A', label: 'No Data' },
+        ] };
+      case 'floor_level': {
+        const maxFloor = layout?.buildings.reduce((m, b) => Math.max(m, b.num_floors), 1) ?? 1;
+        return { type: 'gradient', minColor: '#1E3A5F', maxColor: '#38BDF8', minLabel: 'Floor 1', maxLabel: `Floor ${maxFloor}` };
+      }
+      case 'floor_plan': {
+        const types = new Set(rentRollUnits.map((u) => u.unit_type).filter(Boolean));
+        const items: { color: string; label: string }[] = [];
+        const palette: Record<string, string> = {
+          studio: '#F59E0B', '1 br': '#3B82F6', '1br': '#3B82F6', '1 bed': '#3B82F6',
+          '2 br': '#8B5CF6', '2br': '#8B5CF6', '2 bed': '#8B5CF6',
+          '3 br': '#10B981', '3br': '#10B981', '3 bed': '#10B981',
+        };
+        types.forEach((t) => {
+          if (!t) return;
+          const lower = t.toLowerCase();
+          const matchKey = Object.keys(palette).find((k) => lower.includes(k));
+          items.push({ color: matchKey ? palette[matchKey] : '#6B7280', label: t });
+        });
+        if (items.length === 0) items.push({ color: '#6B7280', label: 'Unknown' });
+        return { type: 'categorical', items };
+      }
+      case 'expirations':
+        return { type: 'categorical', items: [
+          { color: '#EF4444', label: 'Expired / ≤30 days' },
+          { color: '#F97316', label: '31–90 days' },
+          { color: '#EAB308', label: '91–180 days' },
+          { color: '#22C55E', label: '181–365 days' },
+          { color: '#3B82F6', label: '365+ days' },
+          { color: '#6B7280', label: 'No data' },
+        ] };
+      case 'loss_to_lease':
+        return { type: 'categorical', items: [
+          { color: '#3B82F6', label: '≤0% (at/above market)' },
+          { color: '#22C55E', label: '1–5%' },
+          { color: '#EAB308', label: '5–10%' },
+          { color: '#F97316', label: '10–20%' },
+          { color: '#EF4444', label: '20%+' },
+          { color: '#6B7280', label: 'No data' },
+        ] };
+      case 'market_rents': {
+        let min = Infinity, max = -Infinity;
+        for (const u of rentRollUnits) {
+          if (u.market_rent != null) { min = Math.min(min, u.market_rent); max = Math.max(max, u.market_rent); }
+        }
+        if (min === Infinity) { min = 0; max = 0; }
+        return { type: 'gradient', minColor: '#1E3A5F', maxColor: '#F59E0B', minLabel: `$${min.toLocaleString()}`, maxLabel: `$${max.toLocaleString()}` };
+      }
+      case 'contract_rents': {
+        let min = Infinity, max = -Infinity;
+        for (const u of rentRollUnits) {
+          if (u.in_place_rent != null) { min = Math.min(min, u.in_place_rent); max = Math.max(max, u.in_place_rent); }
+        }
+        if (min === Infinity) { min = 0; max = 0; }
+        return { type: 'gradient', minColor: '#1E3A5F', maxColor: '#8B5CF6', minLabel: `$${min.toLocaleString()}`, maxLabel: `$${max.toLocaleString()}` };
+      }
+      default:
+        return { type: 'categorical', items: [
+          { color: '#7C3AED', label: 'Occupied' },
+          { color: '#F43F5E', label: 'Vacant' },
+          { color: '#3F3F5A', label: 'No Data' },
+        ] };
+    }
+  }, [activeFilter, rentRollUnits, layout]);
 
   const hasAddress = Boolean(property.property_address?.trim());
 
@@ -304,13 +381,23 @@ export function StackingSection({ property }: StackingSectionProps) {
         </div>
       )}
 
-      {/* Viewing — 3D model (existing Phase 1 flow) */}
+      {/* Viewing — 3D model + filter sidebar */}
       {mode === 'viewing' && layout && layout.buildings.length > 0 && (
-        <StackingViewer3D
-          layout={layout}
-          rentRollUnits={rentRollUnits}
-          onUnitClick={handleUnitClick}
-        />
+        <div className="flex gap-0">
+          <div className="flex-1 min-w-0">
+            <StackingViewer3D
+              layout={layout}
+              rentRollUnits={rentRollUnits}
+              onUnitClick={handleUnitClick}
+              activeFilter={activeFilter}
+            />
+          </div>
+          <StackingFilterSidebar
+            activeFilter={activeFilter}
+            onFilterChange={setActiveFilter}
+            legend={legend}
+          />
+        </div>
       )}
 
       <UnitDetailModal

@@ -257,6 +257,37 @@ export interface RentRollUnit {
   charge_details: Record<string, number> | null;
 }
 
+// ─── Stacking Filter Types ──────────────────────────────────────────────────
+
+export type StackingFilterType =
+  | 'occupancy'
+  | 'floor_level'
+  | 'floor_plan'
+  | 'expirations'
+  | 'loss_to_lease'
+  | 'market_rents'
+  | 'contract_rents';
+
+export interface LegendItem {
+  color: string;
+  label: string;
+}
+
+export interface GradientLegend {
+  type: 'gradient';
+  minColor: string;
+  maxColor: string;
+  minLabel: string;
+  maxLabel: string;
+}
+
+export interface CategoricalLegend {
+  type: 'categorical';
+  items: LegendItem[];
+}
+
+export type FilterLegend = GradientLegend | CategoricalLegend;
+
 /** Alias for backwards compatibility */
 export type FinancialPeriodData = FinancialPeriod;
 
