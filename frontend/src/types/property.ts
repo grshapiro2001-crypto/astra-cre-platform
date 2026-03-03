@@ -262,7 +262,6 @@ export interface RentRollUnit {
 export type StackingFilterType =
   | 'occupancy'
   | 'floor_level'
-  | 'floor_plan'
   | 'expirations'
   | 'loss_to_lease'
   | 'market_rents'
