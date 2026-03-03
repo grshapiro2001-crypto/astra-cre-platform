@@ -419,7 +419,7 @@ def _find_rent_roll_header(ws: Worksheet, max_scan: int = 15) -> Tuple[int, Dict
     Returns (row_number, {col_index: header_name})
     """
     keywords = ["unit", "sqft", "sq ft", "sf", "status", "rent", "resident", "tenant",
-                "lease", "move in", "market", "type", "bldg"]
+                "lease", "move in", "market", "type", "bldg", "scheduled", "charge"]
 
     best_row = 0
     best_headers = {}
@@ -448,76 +448,162 @@ def _find_rent_roll_header(ws: Worksheet, max_scan: int = 15) -> Tuple[int, Dict
     return best_row, best_headers
 
 
+# ─── Base rent identification ─────────────────────────────────────────────────
+
+BASE_RENT_SYNONYMS = [
+    'rent', 'base rent', 'contract rent', 'lease rent', 'monthly rent',
+    'unit rent', 'apt rent', 'apartment rent', 'residential rent',
+    'scheduled rent', 'gross rent', 'net rent', 'basic rent',
+]
+
+EXCLUDE_PREFIXES = [
+    'amenity', 'pet', 'parking', 'storage', 'garage', 'concierge',
+    'trash', 'internet', 'cable', 'utility', 'month to month', 'valet',
+]
+
+
+def find_base_rent(charge_details: dict) -> float:
+    """
+    Identify the base rent amount from a charge_details dict.
+    Uses a 3-step approach: exact match → fuzzy match → single unambiguous code.
+    """
+    if not charge_details:
+        return 0.0
+
+    # Step 1: exact match on known synonyms
+    for code, amount in charge_details.items():
+        if code.lower().strip() in BASE_RENT_SYNONYMS:
+            return float(amount or 0)
+
+    # Step 2: fuzzy match via rapidfuzz
+    codes = list(charge_details.keys())
+    best_match = process.extractOne(
+        'rent', codes,
+        scorer=fuzz.token_sort_ratio,
+        score_cutoff=70,
+    )
+    if best_match:
+        matched_code = best_match[0]
+        if not any(matched_code.lower().startswith(ex) for ex in EXCLUDE_PREFIXES):
+            return float(charge_details[matched_code] or 0)
+
+    # Step 3: single unambiguous rent code
+    rent_codes = [
+        c for c in charge_details
+        if 'rent' in c.lower()
+        and not any(ex in c.lower() for ex in EXCLUDE_PREFIXES)
+    ]
+    if len(rent_codes) == 1:
+        return float(charge_details[rent_codes[0]] or 0)
+
+    return 0.0
+
+
+def _finalize_unit(unit: Dict[str, Any], charge_details: dict) -> None:
+    """Finalize a unit by setting charge_details and computing in_place_rent."""
+    if charge_details:
+        unit["charge_details"] = charge_details.copy()
+        base = find_base_rent(charge_details)
+        if base > 0:
+            unit["in_place_rent"] = base
+        elif unit.get("in_place_rent", 0) == 0:
+            unit["in_place_rent"] = sum(charge_details.values())
+    elif not unit.get("charge_details"):
+        unit["charge_details"] = {}
+
+
+# Hardcoded charge code names for sheets that put charge codes in col A
+_COL_A_CHARGE_CODES = {
+    "rent", "amenity rent", "internet", "parking", "parking fee",
+    "package concierge", "valet trash", "trash", "pet rent", "garage",
+    "storage", "utility", "water", "sewer", "cable", "admin fee",
+}
+
+
 def _parse_rent_roll_units(ws: Worksheet, header_row: int, headers: Dict[int, str]) -> List[Dict[str, Any]]:
     """
     Parse unit rows from rent roll.
 
-    Each unit has:
-    - A primary row with unit info
-    - Optional charge detail rows below it
-    - A "Charge Total" row (or the primary row itself has the total)
+    Each unit block consists of:
+    - A primary row with unit info (unit number in unit col)
+    - Optional charge detail sub-rows (blank unit col, charge code in charge_code col or col A)
+    - A "Charge Total" row aggregating all charges
     """
-    # Map headers to column indices
     col_map = _map_rent_roll_columns(headers)
 
-    units = []
-    current_unit = None
-    charge_details = {}
+    units: List[Dict[str, Any]] = []
+    current_unit: Optional[Dict[str, Any]] = None
+    charge_details: Dict[str, float] = {}
+
+    unit_col = col_map.get("unit")
+    charge_code_col = col_map.get("charge_code")
+    rent_col = col_map.get("in_place_rent")
 
     for row_idx in range(header_row + 1, ws.max_row + 1):
         row = ws[row_idx]
 
-        # Get first column value (usually unit number or charge name)
-        first_col = _get_cell_value(row, 1)
-        if first_col is None or str(first_col).strip() == "":
-            continue
+        unit_val = _get_cell_value(row, unit_col)
+        charge_code_val = _get_cell_value(row, charge_code_col) if charge_code_col else None
 
-        first_col_str = str(first_col).strip()
+        # Scan entire row text for Charge Total / summary markers
+        row_text = " ".join(str(c.value or "") for c in row).lower()
 
-        # Check if this is a "Charge Total" row (MUST come before generic "total" break)
-        if "charge total" in first_col_str.lower() or "total charges" in first_col_str.lower():
+        # ── Charge Total row ──
+        if "charge total" in row_text or "total charges" in row_text:
             if current_unit is not None:
-                # Set the in_place_rent to the charge total
-                total = _get_numeric_value(row, col_map.get("in_place_rent", col_map.get("rent")))
-                if total:
-                    current_unit["in_place_rent"] = total
+                total = _get_numeric_value(row, rent_col)
                 current_unit["charge_details"] = charge_details.copy()
+                # Prefer base rent from charge_details; fall back to charge total
+                base = find_base_rent(charge_details)
+                if base > 0:
+                    current_unit["in_place_rent"] = base
+                elif total:
+                    current_unit["in_place_rent"] = total
+                elif charge_details:
+                    current_unit["in_place_rent"] = sum(charge_details.values())
                 charge_details = {}
             continue
 
-        # Check if this is a summary row (skip it)
-        if any(kw in first_col_str.lower() for kw in ["total", "summary", "grand total", "property"]):
+        # ── Summary row → stop parsing ──
+        if unit_val and any(kw in unit_val.lower() for kw in ["total", "summary", "grand total", "property"]):
             break
 
-        # Check if this is a charge detail row
-        if first_col_str.lower() in ["rent", "amenity rent", "internet", "parking", "parking fee",
-                                     "package concierge", "valet trash", "trash", "pet rent", "garage",
-                                     "storage", "utility", "water", "sewer", "cable", "admin fee"]:
-            # This is a charge detail row
-            charge_name = first_col_str
-            charge_amount = _get_numeric_value(row, col_map.get("in_place_rent", col_map.get("rent")))
-            if charge_amount:
-                charge_details[charge_name] = charge_amount
+        # ── Charge detail sub-row: blank unit col, charge code populated ──
+        if not unit_val and charge_code_val:
+            amount = _get_numeric_value(row, rent_col)
+            if amount:
+                charge_details[charge_code_val] = amount
             continue
 
-        # Otherwise, this is a new unit row
-        # Save previous unit if exists
+        # ── Charge detail via col A (fallback for sheets without charge_code column) ──
+        if unit_val and unit_val.lower().strip() in _COL_A_CHARGE_CODES:
+            amount = _get_numeric_value(row, rent_col)
+            if amount:
+                charge_details[unit_val] = amount
+            continue
+
+        # ── Skip fully blank rows ──
+        if not unit_val:
+            continue
+
+        # ── New unit header row ──
+        # Finalize previous unit
         if current_unit is not None:
-            # If we have charge details but no explicit total, sum them
-            if charge_details and current_unit.get("in_place_rent") == 0:
-                current_unit["in_place_rent"] = sum(charge_details.values())
-            current_unit["charge_details"] = charge_details.copy()
+            _finalize_unit(current_unit, charge_details)
             units.append(current_unit)
             charge_details = {}
 
-        # Parse new unit
         current_unit = _parse_unit_row(row, col_map)
 
-    # Don't forget the last unit
+        # Unit header row may also carry a charge code (e.g. "Amenity Rent" in col L)
+        if charge_code_val:
+            amount = _get_numeric_value(row, rent_col)
+            if amount:
+                charge_details[charge_code_val] = amount
+
+    # Finalize last unit
     if current_unit is not None:
-        if charge_details and current_unit.get("in_place_rent") == 0:
-            current_unit["in_place_rent"] = sum(charge_details.values())
-        current_unit["charge_details"] = charge_details.copy()
+        _finalize_unit(current_unit, charge_details)
         units.append(current_unit)
 
     return units
@@ -575,6 +661,11 @@ def _map_rent_roll_columns(headers: Dict[int, str]) -> Dict[str, int]:
             if "in_place_rent" not in col_map:
                 col_map["in_place_rent"] = col_idx
 
+        # Charge code column (used for charge detail sub-rows)
+        if any(kw in header_lower for kw in ["charge code", "charge description", "description", "ledger"]):
+            if "charge_code" not in col_map:
+                col_map["charge_code"] = col_idx
+
     return col_map
 
 
@@ -591,7 +682,7 @@ def _parse_unit_row(row, col_map: Dict[str, int]) -> Dict[str, Any]:
         "lease_start": _get_date_value(row, col_map.get("lease_start")),
         "lease_end": _get_date_value(row, col_map.get("lease_end")),
         "market_rent": _get_numeric_value(row, col_map.get("market_rent")),
-        "in_place_rent": _get_numeric_value(row, col_map.get("in_place_rent")) or 0,
+        "in_place_rent": 0,  # Will be set from charge details or charge total
         "charge_details": {}
     }
 

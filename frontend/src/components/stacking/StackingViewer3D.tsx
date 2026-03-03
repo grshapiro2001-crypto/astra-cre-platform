@@ -1163,8 +1163,8 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.08;
-    controls.minPolarAngle = 20 * Math.PI / 180;   // 20° — prevent top-down
-    controls.maxPolarAngle = 75 * Math.PI / 180;    // 75° — prevent under-building
+    controls.minPolarAngle = THREE.MathUtils.degToRad(5);    // 5° — nearly top-down OK
+    controls.maxPolarAngle = THREE.MathUtils.degToRad(88);   // 88° — near ground level OK
     controlsRef.current = controls;
 
     // ── Lighting ──
@@ -1267,20 +1267,20 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
     const groundSize = Math.max(sceneSize.x, sceneSize.z) + 40;
 
     const gridHelper = new THREE.GridHelper(groundSize, Math.max(10, Math.floor(groundSize / 2)), 0x2a2a4a, 0x1a1a3a);
-    gridHelper.position.set(sceneCenter.x, 0, sceneCenter.z);
+    gridHelper.position.set(sceneCenter.x, -UNIT_HEIGHT * 0.5, sceneCenter.z);
     scene.add(gridHelper);
     const groundGeom = new THREE.PlaneGeometry(groundSize, groundSize);
     const ground = new THREE.Mesh(groundGeom, MATERIALS.ground.clone());
     ground.rotation.x = -Math.PI / 2;
-    ground.position.set(sceneCenter.x, -0.05, sceneCenter.z);
+    ground.position.set(sceneCenter.x, -UNIT_HEIGHT * 0.5, sceneCenter.z);
     ground.receiveShadow = true;
     scene.add(ground);
 
-    // ── Camera position — isometric-style (55° elevation, 45° azimuth) ──
+    // ── Camera position — 40° elevation, 45° azimuth for ground-floor visibility ──
     const maxDim = Math.max(sceneSize.x, sceneSize.z);
     const cameraDistance = maxDim * 1.5;
-    const elevation = 55 * Math.PI / 180;
-    const azimuth = 45 * Math.PI / 180;
+    const elevation = THREE.MathUtils.degToRad(40);
+    const azimuth = THREE.MathUtils.degToRad(45);
 
     camera.position.set(
       sceneCenter.x + cameraDistance * Math.cos(elevation) * Math.sin(azimuth),
@@ -1289,6 +1289,8 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
     );
     camera.lookAt(sceneCenter);
     controls.target.copy(sceneCenter);
+    controls.minDistance = UNIT_DEPTH * 2;
+    controls.maxDistance = cameraDistance * 3;
     controls.update();
 
     // ── Animate ──
