@@ -349,6 +349,15 @@ def extract_rent_roll(filepath: str) -> Dict[str, Any]:
         # Step 4: Parse units
         units = _parse_rent_roll_units(ws, header_row_num, headers)
 
+        # Step 4b: Safety net — ensure every unit has in_place_rent derived
+        # from charge_details. Guards against edge cases where _finalize_unit
+        # or the Charge Total handler didn't set the value.
+        for unit in units:
+            cd = unit.get("charge_details") or {}
+            if cd and not unit.get("in_place_rent"):
+                base = find_base_rent(cd)
+                unit["in_place_rent"] = base if base > 0 else sum(cd.values())
+
         # Step 5: Calculate summary
         summary = _calculate_rent_roll_summary(units)
 
