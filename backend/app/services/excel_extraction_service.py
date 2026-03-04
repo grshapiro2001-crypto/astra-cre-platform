@@ -632,60 +632,140 @@ def _parse_rent_roll_units(ws: Worksheet, header_row: int, headers: Dict[int, st
 
 
 def _map_rent_roll_columns(headers: Dict[int, str]) -> Dict[str, int]:
-    """Map standardized field names to column indices"""
+    """Map standardized field names to column indices.
+
+    Uses a two-pass approach: exact full-string matches first (high confidence),
+    then substring fallback for columns not yet mapped.  This prevents greedy
+    substring matches from stealing columns (e.g. "Charge Code" matching the
+    substring "charge" and being mis-mapped as the rent column).
+    """
     col_map = {}
 
+    # --- Exact-match keyword sets (header_lower must equal one of these) ---
+    EXACT_MARKET_RENT = {"market rent", "gross rent", "asking rent"}
+    EXACT_IN_PLACE_RENT = {
+        "scheduled charges", "scheduled charge", "charge amount",
+        "in place rent", "in-place rent", "current rent", "actual rent",
+        "contract rent", "lease rent", "monthly rent", "scheduled rent",
+    }
+    EXACT_CHARGE_CODE = {
+        "charge code", "charge codes", "charge description",
+        "transaction code",
+    }
+
+    # ---- Pass 1: exact full-string match (highest confidence) ----
     for col_idx, header in headers.items():
         header_lower = header.lower().strip()
 
         # Unit identification
-        if any(kw in header_lower for kw in ["bldg-unit", "unit", "unit #", "unit number", "apt", "apartment"]):
-            if "unit" not in col_map:  # Prefer first match
+        if header_lower in {"bldg-unit", "unit", "unit #", "unit number", "apt", "apartment"}:
+            if "unit" not in col_map:
                 col_map["unit"] = col_idx
 
         # Unit type
-        if "type" in header_lower and "property" not in header_lower:
+        if header_lower in {"unit type", "type", "floorplan"}:
             col_map["unit_type"] = col_idx
 
         # Square footage
-        if any(kw in header_lower for kw in ["sqft", "sq ft", "sf", "square"]):
+        if header_lower in {"sqft", "sq ft", "sf", "square feet", "square footage"}:
             col_map["sqft"] = col_idx
 
         # Status
-        if "status" in header_lower:
+        if header_lower in {"unit status", "status"}:
             col_map["status"] = col_idx
 
         # Resident
-        if any(kw in header_lower for kw in ["resident", "tenant", "name"]):
+        if header_lower in {"resident", "tenant", "tenant name", "resident name"}:
             if "resident" not in col_map:
                 col_map["resident"] = col_idx
 
         # Move in date
-        if "move in" in header_lower:
+        if header_lower in {"move-in", "move in", "move in date"}:
             col_map["move_in"] = col_idx
 
         # Lease dates
-        if "lease" in header_lower:
-            if "start" in header_lower or "from" in header_lower:
-                col_map["lease_start"] = col_idx
-            elif "end" in header_lower or "to" in header_lower or "expire" in header_lower:
-                col_map["lease_end"] = col_idx
+        if header_lower in {"lease start", "lease from", "lease begin"}:
+            col_map["lease_start"] = col_idx
+        elif header_lower in {"lease end", "lease to", "lease expiration", "lease expire"}:
+            col_map["lease_end"] = col_idx
 
-        # Rents
-        if "market" in header_lower and "rent" in header_lower:
+        # Market rent (exact)
+        if header_lower in EXACT_MARKET_RENT:
             col_map["market_rent"] = col_idx
-        elif any(kw in header_lower for kw in [
-            "in place", "in-place", "current rent", "actual rent",
-            "contract rent", "lease rent", "monthly rent",
-            "charge amount", "scheduled rent", "scheduled charges",
-            "charge", "rent",
-        ]):
+
+        # In-place / scheduled rent (exact)
+        if header_lower in EXACT_IN_PLACE_RENT:
             if "in_place_rent" not in col_map:
                 col_map["in_place_rent"] = col_idx
 
-        # Charge code column (used for charge detail sub-rows)
-        if any(kw in header_lower for kw in ["charge code", "charge description", "description", "ledger"]):
+        # Charge code (exact)
+        if header_lower in EXACT_CHARGE_CODE:
             if "charge_code" not in col_map:
+                col_map["charge_code"] = col_idx
+
+    # ---- Pass 2: substring fallback for columns not yet mapped ----
+    for col_idx, header in headers.items():
+        header_lower = header.lower().strip()
+
+        # Unit identification (substring fallback)
+        if "unit" not in col_map:
+            if any(kw in header_lower for kw in ["bldg-unit", "unit", "unit #", "unit number", "apt", "apartment"]):
+                col_map["unit"] = col_idx
+
+        # Unit type (substring fallback)
+        if "unit_type" not in col_map:
+            if "type" in header_lower and "property" not in header_lower:
+                col_map["unit_type"] = col_idx
+
+        # Square footage (substring fallback)
+        if "sqft" not in col_map:
+            if any(kw in header_lower for kw in ["sqft", "sq ft", "sf", "square"]):
+                col_map["sqft"] = col_idx
+
+        # Status (substring fallback)
+        if "status" not in col_map:
+            if "status" in header_lower:
+                col_map["status"] = col_idx
+
+        # Resident (substring fallback)
+        if "resident" not in col_map:
+            if any(kw in header_lower for kw in ["resident", "tenant", "name"]):
+                col_map["resident"] = col_idx
+
+        # Move in date (substring fallback)
+        if "move_in" not in col_map:
+            if "move in" in header_lower or "move-in" in header_lower:
+                col_map["move_in"] = col_idx
+
+        # Lease dates (substring fallback)
+        if "lease" in header_lower:
+            if "lease_start" not in col_map:
+                if "start" in header_lower or "from" in header_lower:
+                    col_map["lease_start"] = col_idx
+            if "lease_end" not in col_map:
+                if "end" in header_lower or "to" in header_lower or "expire" in header_lower:
+                    col_map["lease_end"] = col_idx
+
+        # Market rent (substring fallback)
+        if "market_rent" not in col_map:
+            if "market" in header_lower and "rent" in header_lower:
+                col_map["market_rent"] = col_idx
+
+        # In-place rent (substring fallback — no bare "charge" or "rent")
+        if "in_place_rent" not in col_map:
+            if any(kw in header_lower for kw in [
+                "in place", "in-place", "current rent", "actual rent",
+                "contract rent", "lease rent", "monthly rent",
+                "charge amount", "scheduled rent", "scheduled charges",
+                "rent amount",
+            ]):
+                col_map["in_place_rent"] = col_idx
+
+        # Charge code (substring fallback — no "ledger" or bare "description")
+        if "charge_code" not in col_map:
+            if any(kw in header_lower for kw in [
+                "charge code", "charge description", "transaction code",
+            ]):
                 col_map["charge_code"] = col_idx
 
     return col_map
