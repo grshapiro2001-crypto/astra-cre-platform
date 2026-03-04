@@ -591,8 +591,21 @@ def _parse_rent_roll_units(ws: Worksheet, header_row: int, headers: Dict[int, st
                 charge_details[unit_val] = amount
             continue
 
-        # ── Skip fully blank rows ──
+        # ── Skip rows without a unit value ──
         if not unit_val:
+            # Fallback: if charge_code_col is missing, scan for a text cell
+            # paired with an amount at rent_col — treat as charge sub-row.
+            if current_unit is not None and rent_col:
+                amount = _get_numeric_value(row, rent_col)
+                if amount:
+                    code_name = None
+                    for cell in row:
+                        v = cell.value
+                        if isinstance(v, str) and v.strip():
+                            code_name = v.strip()
+                            break
+                    if code_name:
+                        charge_details[code_name] = amount
             continue
 
         # ── New unit header row ──
