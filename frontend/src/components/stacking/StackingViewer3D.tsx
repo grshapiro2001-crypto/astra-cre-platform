@@ -15,6 +15,7 @@ const UNIT_DEPTH = 6;
 const UNIT_GAP = 0.2;
 const FLOOR_SLAB_HEIGHT = 0.1;
 const BUILDING_GAP = 20;
+const CORRIDOR_WIDTH = UNIT_DEPTH * 0.4; // hallway between the two unit rows (double-loaded)
 
 // ─── Material palette — Lumen/Beans.AI inspired dark theme ───────────────────
 const MATERIALS = {
@@ -122,6 +123,7 @@ export interface UnitMeshData {
   position: number;
   status: 'occupied' | 'vacant' | 'unknown';
   rentRollUnit?: RentRollUnit;
+  wingDirection?: 'south' | 'north' | 'east' | 'west';
 }
 
 interface StackingViewer3DProps {
@@ -134,6 +136,11 @@ interface StackingViewer3DProps {
 }
 
 // ─── Matching logic ──────────────────────────────────────────────────────────
+
+/** Natural sort: treats numeric segments numerically ("9" < "10", "1A-002" sorts correctly). */
+function naturalSort(a: string, b: string): number {
+  return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+}
 
 function matchUnitsToRentRoll(
   layout: StackingLayout,
@@ -152,29 +159,14 @@ function matchUnitsToRentRoll(
     }
   }
 
-  // Try floor-prefix matching (e.g., "101" → floor 1, unit 01)
-  const unitsWithFloorPrefix = rentRollUnits.filter((u) => {
-    if (!u.unit_number) return false;
-    const num = u.unit_number.replace(/[^0-9]/g, '');
-    return num.length >= 2;
-  });
+  // Always natural-sort by unit_number (handles "001"<"002", "9"<"10", "1A-002", etc.)
+  // then assign sequentially: floor 1 all positions, floor 2 all positions, …
+  const sorted = [...rentRollUnits].sort((a, b) =>
+    naturalSort(a.unit_number || '', b.unit_number || ''),
+  );
 
-  if (unitsWithFloorPrefix.length >= rentRollUnits.length * 0.5) {
-    // Enough units have parseable numbers — use floor-prefix matching
-    const sorted = [...rentRollUnits].sort((a, b) => {
-      const aNum = (a.unit_number || '').replace(/[^0-9]/g, '');
-      const bNum = (b.unit_number || '').replace(/[^0-9]/g, '');
-      return aNum.localeCompare(bNum, undefined, { numeric: true });
-    });
-
-    for (let i = 0; i < Math.min(sorted.length, modelKeys.length); i++) {
-      map.set(modelKeys[i], sorted[i]);
-    }
-  } else {
-    // Sequential matching
-    for (let i = 0; i < Math.min(rentRollUnits.length, modelKeys.length); i++) {
-      map.set(modelKeys[i], rentRollUnits[i]);
-    }
+  for (let i = 0; i < Math.min(sorted.length, modelKeys.length); i++) {
+    map.set(modelKeys[i], sorted[i]);
   }
 
   return map;
@@ -528,24 +520,31 @@ function buildLinearBuilding(
   totalUnits: number = 100,
 ) {
   const unitsPerFloor = building.units_per_floor;
-  const totalWidth = unitsPerFloor * (UNIT_WIDTH + UNIT_GAP) - UNIT_GAP;
+  // Double-loaded: split each floor into exterior Row A and interior Row B
+  const rowACount = Math.ceil(unitsPerFloor / 2);
+  const rowBCount = Math.floor(unitsPerFloor / 2);
+  const rowAWidth = rowACount * (UNIT_WIDTH + UNIT_GAP) - UNIT_GAP;
+  const rowBWidth = rowBCount > 0 ? rowBCount * (UNIT_WIDTH + UNIT_GAP) - UNIT_GAP : 0;
+  const totalWidth = rowAWidth; // slab sized to the larger (exterior) row
 
   for (let floor = 1; floor <= building.num_floors; floor++) {
     const floorY = (floor - 1) * (UNIT_HEIGHT + FLOOR_SLAB_HEIGHT);
+    const wingDepth = UNIT_DEPTH * 2 + CORRIDOR_WIDTH;
 
-    // Floor slab
-    const slabGeom = new THREE.BoxGeometry(totalWidth + 0.3, FLOOR_SLAB_HEIGHT, UNIT_DEPTH + 0.3);
+    // Floor slab spans full double-loaded depth, centered between the two rows
+    const slabGeom = new THREE.BoxGeometry(totalWidth + 0.3, FLOOR_SLAB_HEIGHT, wingDepth + 0.3);
     const slab = new THREE.Mesh(slabGeom, MATERIALS.slab.clone());
-    slab.position.set(0, floorY - FLOOR_SLAB_HEIGHT / 2, 0);
+    slab.position.set(0, floorY - FLOOR_SLAB_HEIGHT / 2, (UNIT_DEPTH + CORRIDOR_WIDTH) / 2);
     group.add(slab);
 
-    // Window band between floors (not on ground floor)
+    // Window band between floors
     if (floor > 1) {
-      addWindowBand(group, totalWidth, UNIT_DEPTH, floorY, 0, 0);
+      addWindowBand(group, totalWidth, wingDepth, floorY, 0, (UNIT_DEPTH + CORRIDOR_WIDTH) / 2);
     }
 
-    // Units
-    for (let pos = 1; pos <= unitsPerFloor; pos++) {
+    // Row A — exterior, z = 0 (same as current single-row behavior)
+    for (let i = 0; i < rowACount; i++) {
+      const pos = i + 1;
       const key = `${building.id}_${floor}_${pos}`;
       const rr = unitMap.get(key);
       const status = getUnitStatus(rr);
@@ -554,9 +553,8 @@ function buildLinearBuilding(
       const mat = getMaterialForStatus(status);
       const mesh = new THREE.Mesh(geom, mat);
 
-      const x = (pos - 1) * (UNIT_WIDTH + UNIT_GAP) - totalWidth / 2 + UNIT_WIDTH / 2;
+      const x = i * (UNIT_WIDTH + UNIT_GAP) - rowAWidth / 2 + UNIT_WIDTH / 2;
       mesh.position.set(x, floorY + UNIT_HEIGHT / 2, 0);
-
       mesh.name = `unit_${building.id}_${floor}_${pos}`;
       mesh.userData = {
         building_id: building.id,
@@ -565,10 +563,43 @@ function buildLinearBuilding(
         position: pos,
         status,
         rentRollUnit: rr,
+        wingDirection: 'south',
       } satisfies UnitMeshData;
 
       addUnitEdges(mesh, geom);
       addUnitLabel(mesh, rr, 'south', totalUnits);
+      addStatusStripe(mesh, status, 'south');
+      group.add(mesh);
+    }
+
+    // Row B — interior (corridor-facing), z = UNIT_DEPTH + CORRIDOR_WIDTH
+    for (let i = 0; i < rowBCount; i++) {
+      const pos = rowACount + i + 1;
+      const key = `${building.id}_${floor}_${pos}`;
+      const rr = unitMap.get(key);
+      const status = getUnitStatus(rr);
+
+      const geom = new THREE.BoxGeometry(UNIT_WIDTH, UNIT_HEIGHT, UNIT_DEPTH);
+      const mat = getMaterialForStatus(status);
+      const mesh = new THREE.Mesh(geom, mat);
+
+      const x = i * (UNIT_WIDTH + UNIT_GAP) - rowBWidth / 2 + UNIT_WIDTH / 2;
+      mesh.position.set(x, floorY + UNIT_HEIGHT / 2, UNIT_DEPTH + CORRIDOR_WIDTH);
+      mesh.name = `unit_${building.id}_${floor}_${pos}`;
+      mesh.userData = {
+        building_id: building.id,
+        building_label: building.label,
+        floor,
+        position: pos,
+        status,
+        rentRollUnit: rr,
+        wingDirection: 'north',
+      } satisfies UnitMeshData;
+
+      addUnitEdges(mesh, geom);
+      // Interior face (toward corridor) = -Z face = 'north' primary label
+      addUnitLabel(mesh, rr, 'north', totalUnits);
+      // Exterior face (outward) = +Z face = 'south' stripe
       addStatusStripe(mesh, status, 'south');
       group.add(mesh);
     }
@@ -585,78 +616,109 @@ function buildLShapeBuilding(
   const halfUnits = building.wings?.[0]?.units_per_floor ?? Math.ceil(building.units_per_floor / 2);
   const otherHalf = building.wings?.[1]?.units_per_floor ?? (building.units_per_floor - halfUnits);
 
-  // Wing 1: along X axis
-  const wing1Width = halfUnits * (UNIT_WIDTH + UNIT_GAP) - UNIT_GAP;
-  // Wing 2: along Z axis
-  const wing2Depth = otherHalf * (UNIT_WIDTH + UNIT_GAP) - UNIT_GAP;
+  // Wing 1 (along X): double-loaded in Z
+  const w1RowA = Math.ceil(halfUnits / 2);
+  const w1RowB = Math.floor(halfUnits / 2);
+  const wing1Width = w1RowA * (UNIT_WIDTH + UNIT_GAP) - UNIT_GAP;
 
-  let unitCounter = 0;
+  // Wing 2 (along -Z): double-loaded in X
+  const w2RowA = Math.ceil(otherHalf / 2);
+  const w2RowB = Math.floor(otherHalf / 2);
+  const wing2Depth = w2RowA * (UNIT_WIDTH + UNIT_GAP) - UNIT_GAP;
+
+  const wingDepth = UNIT_DEPTH * 2 + CORRIDOR_WIDTH;
 
   for (let floor = 1; floor <= building.num_floors; floor++) {
     const floorY = (floor - 1) * (UNIT_HEIGHT + FLOOR_SLAB_HEIGHT);
+    let floorPos = 0;
 
-    // Slab for wing 1
-    const slab1Geom = new THREE.BoxGeometry(wing1Width + 0.3, FLOOR_SLAB_HEIGHT, UNIT_DEPTH + 0.3);
+    // Slab for wing 1 (spans full double-loaded depth in Z)
+    const slab1Geom = new THREE.BoxGeometry(wing1Width + 0.3, FLOOR_SLAB_HEIGHT, wingDepth + 0.3);
     const slab1 = new THREE.Mesh(slab1Geom, MATERIALS.slab.clone());
-    slab1.position.set(wing1Width / 2, floorY - FLOOR_SLAB_HEIGHT / 2, 0);
+    slab1.position.set(wing1Width / 2, floorY - FLOOR_SLAB_HEIGHT / 2, (UNIT_DEPTH + CORRIDOR_WIDTH) / 2);
     group.add(slab1);
 
-    // Slab for wing 2
-    const slab2Geom = new THREE.BoxGeometry(UNIT_DEPTH + 0.3, FLOOR_SLAB_HEIGHT, wing2Depth + 0.3);
+    // Slab for wing 2 (spans full double-loaded depth in X, on the -X side)
+    const slab2Geom = new THREE.BoxGeometry(wingDepth + 0.3, FLOOR_SLAB_HEIGHT, wing2Depth + 0.3);
     const slab2 = new THREE.Mesh(slab2Geom, MATERIALS.slab.clone());
-    slab2.position.set(0, floorY - FLOOR_SLAB_HEIGHT / 2, -(wing2Depth / 2 + UNIT_DEPTH / 2 + UNIT_GAP));
+    slab2.position.set(-(UNIT_DEPTH + CORRIDOR_WIDTH) / 2, floorY - FLOOR_SLAB_HEIGHT / 2, -(wing2Depth / 2 + UNIT_DEPTH / 2 + UNIT_GAP));
     group.add(slab2);
 
     // Window bands between floors
     if (floor > 1) {
-      addWindowBand(group, wing1Width, UNIT_DEPTH, floorY, wing1Width / 2, 0);
-      addWindowBand(group, UNIT_DEPTH, wing2Depth, floorY, 0, -(wing2Depth / 2 + UNIT_DEPTH / 2 + UNIT_GAP));
+      addWindowBand(group, wing1Width, wingDepth, floorY, wing1Width / 2, (UNIT_DEPTH + CORRIDOR_WIDTH) / 2);
+      addWindowBand(group, wingDepth, wing2Depth, floorY, -(UNIT_DEPTH + CORRIDOR_WIDTH) / 2, -(wing2Depth / 2 + UNIT_DEPTH / 2 + UNIT_GAP));
     }
 
-    // Wing 1 units (along X)
-    for (let i = 0; i < halfUnits; i++) {
-      unitCounter++;
-      const pos = unitCounter - (floor - 1) * building.units_per_floor;
-      const key = `${building.id}_${floor}_${pos}`;
+    // Wing 1 Row A (along X, z = 0, exterior)
+    for (let i = 0; i < w1RowA; i++) {
+      floorPos++;
+      const key = `${building.id}_${floor}_${floorPos}`;
       const rr = unitMap.get(key);
       const status = getUnitStatus(rr);
-
       const geom = new THREE.BoxGeometry(UNIT_WIDTH, UNIT_HEIGHT, UNIT_DEPTH);
-      const mat = getMaterialForStatus(status);
-      const mesh = new THREE.Mesh(geom, mat);
-
+      const mesh = new THREE.Mesh(geom, getMaterialForStatus(status));
       mesh.position.set(i * (UNIT_WIDTH + UNIT_GAP), floorY + UNIT_HEIGHT / 2, 0);
-      mesh.name = `unit_${building.id}_${floor}_${pos}`;
-      mesh.userData = { building_id: building.id, building_label: building.label, floor, position: pos, status, rentRollUnit: rr } satisfies UnitMeshData;
+      mesh.name = `unit_${building.id}_${floor}_${floorPos}`;
+      mesh.userData = { building_id: building.id, building_label: building.label, floor, position: floorPos, status, rentRollUnit: rr, wingDirection: 'south' } satisfies UnitMeshData;
       addUnitEdges(mesh, geom);
       addUnitLabel(mesh, rr, 'south', totalUnits);
       addStatusStripe(mesh, status, 'south');
       group.add(mesh);
     }
 
-    // Wing 2 units (along -Z)
-    for (let i = 0; i < otherHalf; i++) {
-      unitCounter++;
-      const pos = unitCounter - (floor - 1) * building.units_per_floor;
-      const key = `${building.id}_${floor}_${pos}`;
+    // Wing 1 Row B (along X, z = UNIT_DEPTH + CORRIDOR_WIDTH, interior)
+    for (let i = 0; i < w1RowB; i++) {
+      floorPos++;
+      const key = `${building.id}_${floor}_${floorPos}`;
       const rr = unitMap.get(key);
       const status = getUnitStatus(rr);
+      const geom = new THREE.BoxGeometry(UNIT_WIDTH, UNIT_HEIGHT, UNIT_DEPTH);
+      const mesh = new THREE.Mesh(geom, getMaterialForStatus(status));
+      mesh.position.set(i * (UNIT_WIDTH + UNIT_GAP), floorY + UNIT_HEIGHT / 2, UNIT_DEPTH + CORRIDOR_WIDTH);
+      mesh.name = `unit_${building.id}_${floor}_${floorPos}`;
+      mesh.userData = { building_id: building.id, building_label: building.label, floor, position: floorPos, status, rentRollUnit: rr, wingDirection: 'north' } satisfies UnitMeshData;
+      addUnitEdges(mesh, geom);
+      addUnitLabel(mesh, rr, 'north', totalUnits);
+      addStatusStripe(mesh, status, 'south');
+      group.add(mesh);
+    }
 
+    // Wing 2 Row A (along -Z, x = 0, exterior)
+    for (let i = 0; i < w2RowA; i++) {
+      floorPos++;
+      const key = `${building.id}_${floor}_${floorPos}`;
+      const rr = unitMap.get(key);
+      const status = getUnitStatus(rr);
       const geom = new THREE.BoxGeometry(UNIT_DEPTH, UNIT_HEIGHT, UNIT_WIDTH);
-      const mat = getMaterialForStatus(status);
-      const mesh = new THREE.Mesh(geom, mat);
-
+      const mesh = new THREE.Mesh(geom, getMaterialForStatus(status));
       const z = -(i + 1) * (UNIT_WIDTH + UNIT_GAP);
       mesh.position.set(0, floorY + UNIT_HEIGHT / 2, z);
-      mesh.name = `unit_${building.id}_${floor}_${pos}`;
-      mesh.userData = { building_id: building.id, building_label: building.label, floor, position: pos, status, rentRollUnit: rr } satisfies UnitMeshData;
+      mesh.name = `unit_${building.id}_${floor}_${floorPos}`;
+      mesh.userData = { building_id: building.id, building_label: building.label, floor, position: floorPos, status, rentRollUnit: rr, wingDirection: 'west' } satisfies UnitMeshData;
       addUnitEdges(mesh, geom);
       addUnitLabel(mesh, rr, 'west', totalUnits);
       addStatusStripe(mesh, status, 'west');
       group.add(mesh);
     }
 
-    unitCounter = floor * building.units_per_floor;
+    // Wing 2 Row B (along -Z, x = -(UNIT_DEPTH + CORRIDOR_WIDTH), interior)
+    for (let i = 0; i < w2RowB; i++) {
+      floorPos++;
+      const key = `${building.id}_${floor}_${floorPos}`;
+      const rr = unitMap.get(key);
+      const status = getUnitStatus(rr);
+      const geom = new THREE.BoxGeometry(UNIT_DEPTH, UNIT_HEIGHT, UNIT_WIDTH);
+      const mesh = new THREE.Mesh(geom, getMaterialForStatus(status));
+      const z = -(i + 1) * (UNIT_WIDTH + UNIT_GAP);
+      mesh.position.set(-(UNIT_DEPTH + CORRIDOR_WIDTH), floorY + UNIT_HEIGHT / 2, z);
+      mesh.name = `unit_${building.id}_${floor}_${floorPos}`;
+      mesh.userData = { building_id: building.id, building_label: building.label, floor, position: floorPos, status, rentRollUnit: rr, wingDirection: 'east' } satisfies UnitMeshData;
+      addUnitEdges(mesh, geom);
+      addUnitLabel(mesh, rr, 'east', totalUnits);
+      addStatusStripe(mesh, status, 'west');
+      group.add(mesh);
+    }
   }
 
 }
@@ -678,22 +740,34 @@ function buildUShapeBuilding(
 
   const wingWidth = (w: number) => w * (UNIT_WIDTH + UNIT_GAP) - UNIT_GAP;
   const maxWingWidth = wingWidth(Math.max(...wings));
+  const wingDepth = UNIT_DEPTH * 2 + CORRIDOR_WIDTH;
+
+  // Double-loaded row splits per wing
+  const leftRowA = Math.ceil(wings[0] / 2);
+  const leftRowB = Math.floor(wings[0] / 2);
+  const bottomRowA = Math.ceil(wings[1] / 2);
+  const bottomRowB = Math.floor(wings[1] / 2);
+  const rightRowA = Math.ceil(wings[2] / 2);
+  const rightRowB = Math.floor(wings[2] / 2);
+
+  // Positions for left/right wing anchors (inner edge fixed, expand outward)
+  const leftX = -(maxWingWidth / 2 + UNIT_DEPTH / 2 + UNIT_GAP);    // Row A center X
+  const rightX = maxWingWidth / 2 + UNIT_DEPTH / 2 + UNIT_GAP;      // Row A center X
 
   for (let floor = 1; floor <= building.num_floors; floor++) {
     const floorY = (floor - 1) * (UNIT_HEIGHT + FLOOR_SLAB_HEIGHT);
     let posCounter = 1;
 
-    // Left wing (along -Z)
-    for (let i = 0; i < wings[0]; i++) {
+    // ── Left wing Row A (along -Z, x = leftX, exterior) ──
+    for (let i = 0; i < leftRowA; i++) {
       const key = `${building.id}_${floor}_${posCounter}`;
       const rr = unitMap.get(key);
       const status = getUnitStatus(rr);
       const geom = new THREE.BoxGeometry(UNIT_DEPTH, UNIT_HEIGHT, UNIT_WIDTH);
-      const mat = getMaterialForStatus(status);
-      const mesh = new THREE.Mesh(geom, mat);
-      mesh.position.set(-(maxWingWidth / 2 + UNIT_DEPTH / 2 + UNIT_GAP), floorY + UNIT_HEIGHT / 2, -i * (UNIT_WIDTH + UNIT_GAP));
+      const mesh = new THREE.Mesh(geom, getMaterialForStatus(status));
+      mesh.position.set(leftX, floorY + UNIT_HEIGHT / 2, -i * (UNIT_WIDTH + UNIT_GAP));
       mesh.name = `unit_${building.id}_${floor}_${posCounter}`;
-      mesh.userData = { building_id: building.id, building_label: building.label, floor, position: posCounter, status, rentRollUnit: rr } satisfies UnitMeshData;
+      mesh.userData = { building_id: building.id, building_label: building.label, floor, position: posCounter, status, rentRollUnit: rr, wingDirection: 'west' } satisfies UnitMeshData;
       addUnitEdges(mesh, geom);
       addUnitLabel(mesh, rr, 'west', totalUnits);
       addStatusStripe(mesh, status, 'west');
@@ -701,19 +775,35 @@ function buildUShapeBuilding(
       posCounter++;
     }
 
-    // Bottom wing (along X, connecting the two vertical wings)
+    // ── Left wing Row B (along -Z, x = leftX - (UNIT_DEPTH + CORRIDOR_WIDTH), interior) ──
+    for (let i = 0; i < leftRowB; i++) {
+      const key = `${building.id}_${floor}_${posCounter}`;
+      const rr = unitMap.get(key);
+      const status = getUnitStatus(rr);
+      const geom = new THREE.BoxGeometry(UNIT_DEPTH, UNIT_HEIGHT, UNIT_WIDTH);
+      const mesh = new THREE.Mesh(geom, getMaterialForStatus(status));
+      mesh.position.set(leftX - (UNIT_DEPTH + CORRIDOR_WIDTH), floorY + UNIT_HEIGHT / 2, -i * (UNIT_WIDTH + UNIT_GAP));
+      mesh.name = `unit_${building.id}_${floor}_${posCounter}`;
+      mesh.userData = { building_id: building.id, building_label: building.label, floor, position: posCounter, status, rentRollUnit: rr, wingDirection: 'east' } satisfies UnitMeshData;
+      addUnitEdges(mesh, geom);
+      addUnitLabel(mesh, rr, 'east', totalUnits);
+      addStatusStripe(mesh, status, 'west');
+      group.add(mesh);
+      posCounter++;
+    }
+
+    // ── Bottom wing Row A (along X, z = bottomZ, exterior) ──
     const bottomZ = -(wings[0] - 1) * (UNIT_WIDTH + UNIT_GAP) - UNIT_WIDTH / 2 - UNIT_GAP;
-    for (let i = 0; i < wings[1]; i++) {
+    for (let i = 0; i < bottomRowA; i++) {
       const key = `${building.id}_${floor}_${posCounter}`;
       const rr = unitMap.get(key);
       const status = getUnitStatus(rr);
       const geom = new THREE.BoxGeometry(UNIT_WIDTH, UNIT_HEIGHT, UNIT_DEPTH);
-      const mat = getMaterialForStatus(status);
-      const mesh = new THREE.Mesh(geom, mat);
+      const mesh = new THREE.Mesh(geom, getMaterialForStatus(status));
       const x = i * (UNIT_WIDTH + UNIT_GAP) - maxWingWidth / 2 + UNIT_WIDTH / 2;
       mesh.position.set(x, floorY + UNIT_HEIGHT / 2, bottomZ);
       mesh.name = `unit_${building.id}_${floor}_${posCounter}`;
-      mesh.userData = { building_id: building.id, building_label: building.label, floor, position: posCounter, status, rentRollUnit: rr } satisfies UnitMeshData;
+      mesh.userData = { building_id: building.id, building_label: building.label, floor, position: posCounter, status, rentRollUnit: rr, wingDirection: 'south' } satisfies UnitMeshData;
       addUnitEdges(mesh, geom);
       addUnitLabel(mesh, rr, 'south', totalUnits);
       addStatusStripe(mesh, status, 'south');
@@ -721,17 +811,35 @@ function buildUShapeBuilding(
       posCounter++;
     }
 
-    // Right wing (along +Z, going back up)
-    for (let i = 0; i < wings[2]; i++) {
+    // ── Bottom wing Row B (along X, z = bottomZ + UNIT_DEPTH + CORRIDOR_WIDTH, interior) ──
+    const bottomRowBWidth = bottomRowB > 0 ? bottomRowB * (UNIT_WIDTH + UNIT_GAP) - UNIT_GAP : 0;
+    for (let i = 0; i < bottomRowB; i++) {
+      const key = `${building.id}_${floor}_${posCounter}`;
+      const rr = unitMap.get(key);
+      const status = getUnitStatus(rr);
+      const geom = new THREE.BoxGeometry(UNIT_WIDTH, UNIT_HEIGHT, UNIT_DEPTH);
+      const mesh = new THREE.Mesh(geom, getMaterialForStatus(status));
+      const x = i * (UNIT_WIDTH + UNIT_GAP) - bottomRowBWidth / 2 + UNIT_WIDTH / 2;
+      mesh.position.set(x, floorY + UNIT_HEIGHT / 2, bottomZ + UNIT_DEPTH + CORRIDOR_WIDTH);
+      mesh.name = `unit_${building.id}_${floor}_${posCounter}`;
+      mesh.userData = { building_id: building.id, building_label: building.label, floor, position: posCounter, status, rentRollUnit: rr, wingDirection: 'north' } satisfies UnitMeshData;
+      addUnitEdges(mesh, geom);
+      addUnitLabel(mesh, rr, 'north', totalUnits);
+      addStatusStripe(mesh, status, 'south');
+      group.add(mesh);
+      posCounter++;
+    }
+
+    // ── Right wing Row A (along -Z from top, x = rightX, exterior) ──
+    for (let i = 0; i < rightRowA; i++) {
       const key = `${building.id}_${floor}_${posCounter}`;
       const rr = unitMap.get(key);
       const status = getUnitStatus(rr);
       const geom = new THREE.BoxGeometry(UNIT_DEPTH, UNIT_HEIGHT, UNIT_WIDTH);
-      const mat = getMaterialForStatus(status);
-      const mesh = new THREE.Mesh(geom, mat);
-      mesh.position.set(maxWingWidth / 2 + UNIT_DEPTH / 2 + UNIT_GAP, floorY + UNIT_HEIGHT / 2, -(wings[0] - 1 - i) * (UNIT_WIDTH + UNIT_GAP));
+      const mesh = new THREE.Mesh(geom, getMaterialForStatus(status));
+      mesh.position.set(rightX, floorY + UNIT_HEIGHT / 2, -(wings[0] - 1 - i) * (UNIT_WIDTH + UNIT_GAP));
       mesh.name = `unit_${building.id}_${floor}_${posCounter}`;
-      mesh.userData = { building_id: building.id, building_label: building.label, floor, position: posCounter, status, rentRollUnit: rr } satisfies UnitMeshData;
+      mesh.userData = { building_id: building.id, building_label: building.label, floor, position: posCounter, status, rentRollUnit: rr, wingDirection: 'east' } satisfies UnitMeshData;
       addUnitEdges(mesh, geom);
       addUnitLabel(mesh, rr, 'east', totalUnits);
       addStatusStripe(mesh, status, 'east');
@@ -739,24 +847,41 @@ function buildUShapeBuilding(
       posCounter++;
     }
 
-    // Floor slabs (one for each wing)
-    const slab1 = new THREE.Mesh(new THREE.BoxGeometry(UNIT_DEPTH + 0.3, FLOOR_SLAB_HEIGHT, wingWidth(wings[0]) + 0.3), MATERIALS.slab.clone());
-    slab1.position.set(-(maxWingWidth / 2 + UNIT_DEPTH / 2 + UNIT_GAP), floorY - FLOOR_SLAB_HEIGHT / 2, -(wings[0] - 1) * (UNIT_WIDTH + UNIT_GAP) / 2);
+    // ── Right wing Row B (along -Z from top, x = rightX + UNIT_DEPTH + CORRIDOR_WIDTH, interior) ──
+    for (let i = 0; i < rightRowB; i++) {
+      const key = `${building.id}_${floor}_${posCounter}`;
+      const rr = unitMap.get(key);
+      const status = getUnitStatus(rr);
+      const geom = new THREE.BoxGeometry(UNIT_DEPTH, UNIT_HEIGHT, UNIT_WIDTH);
+      const mesh = new THREE.Mesh(geom, getMaterialForStatus(status));
+      mesh.position.set(rightX + UNIT_DEPTH + CORRIDOR_WIDTH, floorY + UNIT_HEIGHT / 2, -(wings[0] - 1 - i) * (UNIT_WIDTH + UNIT_GAP));
+      mesh.name = `unit_${building.id}_${floor}_${posCounter}`;
+      mesh.userData = { building_id: building.id, building_label: building.label, floor, position: posCounter, status, rentRollUnit: rr, wingDirection: 'west' } satisfies UnitMeshData;
+      addUnitEdges(mesh, geom);
+      addUnitLabel(mesh, rr, 'west', totalUnits);
+      addStatusStripe(mesh, status, 'east');
+      group.add(mesh);
+      posCounter++;
+    }
+
+    // Floor slabs (double-loaded depth for each wing)
+    const slab1 = new THREE.Mesh(new THREE.BoxGeometry(wingDepth + 0.3, FLOOR_SLAB_HEIGHT, wingWidth(wings[0]) + 0.3), MATERIALS.slab.clone());
+    slab1.position.set(leftX - (UNIT_DEPTH + CORRIDOR_WIDTH) / 2, floorY - FLOOR_SLAB_HEIGHT / 2, -(wings[0] - 1) * (UNIT_WIDTH + UNIT_GAP) / 2);
     group.add(slab1);
 
-    const slab2 = new THREE.Mesh(new THREE.BoxGeometry(maxWingWidth + 0.3, FLOOR_SLAB_HEIGHT, UNIT_DEPTH + 0.3), MATERIALS.slab.clone());
-    slab2.position.set(0, floorY - FLOOR_SLAB_HEIGHT / 2, bottomZ);
+    const slab2 = new THREE.Mesh(new THREE.BoxGeometry(maxWingWidth + 0.3, FLOOR_SLAB_HEIGHT, wingDepth + 0.3), MATERIALS.slab.clone());
+    slab2.position.set(0, floorY - FLOOR_SLAB_HEIGHT / 2, bottomZ + (UNIT_DEPTH + CORRIDOR_WIDTH) / 2);
     group.add(slab2);
 
-    const slab3 = new THREE.Mesh(new THREE.BoxGeometry(UNIT_DEPTH + 0.3, FLOOR_SLAB_HEIGHT, wingWidth(wings[2]) + 0.3), MATERIALS.slab.clone());
-    slab3.position.set(maxWingWidth / 2 + UNIT_DEPTH / 2 + UNIT_GAP, floorY - FLOOR_SLAB_HEIGHT / 2, -(wings[2] - 1) * (UNIT_WIDTH + UNIT_GAP) / 2);
+    const slab3 = new THREE.Mesh(new THREE.BoxGeometry(wingDepth + 0.3, FLOOR_SLAB_HEIGHT, wingWidth(wings[2]) + 0.3), MATERIALS.slab.clone());
+    slab3.position.set(rightX + (UNIT_DEPTH + CORRIDOR_WIDTH) / 2, floorY - FLOOR_SLAB_HEIGHT / 2, -(wings[2] - 1) * (UNIT_WIDTH + UNIT_GAP) / 2);
     group.add(slab3);
 
     // Window bands between floors
     if (floor > 1) {
-      addWindowBand(group, UNIT_DEPTH, wingWidth(wings[0]), floorY, -(maxWingWidth / 2 + UNIT_DEPTH / 2 + UNIT_GAP), -(wings[0] - 1) * (UNIT_WIDTH + UNIT_GAP) / 2);
-      addWindowBand(group, maxWingWidth, UNIT_DEPTH, floorY, 0, bottomZ);
-      addWindowBand(group, UNIT_DEPTH, wingWidth(wings[2]), floorY, maxWingWidth / 2 + UNIT_DEPTH / 2 + UNIT_GAP, -(wings[2] - 1) * (UNIT_WIDTH + UNIT_GAP) / 2);
+      addWindowBand(group, wingDepth, wingWidth(wings[0]), floorY, leftX - (UNIT_DEPTH + CORRIDOR_WIDTH) / 2, -(wings[0] - 1) * (UNIT_WIDTH + UNIT_GAP) / 2);
+      addWindowBand(group, maxWingWidth, wingDepth, floorY, 0, bottomZ + (UNIT_DEPTH + CORRIDOR_WIDTH) / 2);
+      addWindowBand(group, wingDepth, wingWidth(wings[2]), floorY, rightX + (UNIT_DEPTH + CORRIDOR_WIDTH) / 2, -(wings[2] - 1) * (UNIT_WIDTH + UNIT_GAP) / 2);
     }
   }
 
@@ -804,7 +929,7 @@ function buildTowerBuilding(
         const z = r * (UNIT_DEPTH + UNIT_GAP) - gridDepth / 2 + UNIT_DEPTH / 2;
         mesh.position.set(x, floorY + UNIT_HEIGHT / 2, z);
         mesh.name = `unit_${building.id}_${floor}_${posCounter}`;
-        mesh.userData = { building_id: building.id, building_label: building.label, floor, position: posCounter, status, rentRollUnit: rr } satisfies UnitMeshData;
+        mesh.userData = { building_id: building.id, building_label: building.label, floor, position: posCounter, status, rentRollUnit: rr, wingDirection: 'south' } satisfies UnitMeshData;
         addUnitEdges(mesh, geom);
         addUnitLabel(mesh, rr, 'south', totalUnits);
         addStatusStripe(mesh, status, 'south');
@@ -842,16 +967,12 @@ function buildCourtyardBuilding(
     wingCounts[0] = longSide;   // north
     wingCounts[1] = shortSide;  // east
     wingCounts[2] = longSide;   // south
-    // Last wing absorbs rounding remainder to preserve exact total
     wingCounts[3] = totalPerFloor - longSide - shortSide - longSide;
   }
 
-  // Calculate horizontal wing width (north/south wings along X)
   const horizWidth = (units: number) => units * (UNIT_WIDTH + UNIT_GAP) - UNIT_GAP;
-  // Calculate vertical wing depth (east/west wings along Z)
   const vertDepth = (units: number) => units * (UNIT_WIDTH + UNIT_GAP) - UNIT_GAP;
 
-  // Courtyard dimensions — based on max horizontal/vertical wing sizes
   const northWidth = horizWidth(wingCounts[0]);
   const eastDepth = numWings >= 2 ? vertDepth(wingCounts[1]) : 0;
   const southWidth = numWings >= 3 ? horizWidth(wingCounts[2]) : 0;
@@ -860,121 +981,205 @@ function buildCourtyardBuilding(
   const courtyardWidth = Math.max(northWidth, southWidth);
   const courtyardDepth = Math.max(eastDepth, westDepth);
 
-  // Offsets: east/west wings sit outside the horizontal wings
+  // Inner courtyard edges (fixed — wings expand OUTWARD from here)
+  // North wing: inner edge at z = -UNIT_DEPTH/2 (Row A center stays at z=0)
+  // East wing: inner edge at x = eastX - UNIT_DEPTH/2 (Row A center stays at eastX)
   const eastX = courtyardWidth / 2 + UNIT_DEPTH / 2 + UNIT_GAP;
   const westX = -(courtyardWidth / 2 + UNIT_DEPTH / 2 + UNIT_GAP);
-
-  // South wing sits below the courtyard
   const southZ = -(courtyardDepth + UNIT_DEPTH + UNIT_GAP * 2);
+
+  const wingDepth = UNIT_DEPTH * 2 + CORRIDOR_WIDTH;
+
+  // Double-loaded row splits per wing
+  const nRowA = Math.ceil(wingCounts[0] / 2);
+  const nRowB = Math.floor(wingCounts[0] / 2);
+  const eRowA = numWings >= 2 ? Math.ceil(wingCounts[1] / 2) : 0;
+  const eRowB = numWings >= 2 ? Math.floor(wingCounts[1] / 2) : 0;
+  const sRowA = numWings >= 3 ? Math.ceil(wingCounts[2] / 2) : 0;
+  const sRowB = numWings >= 3 ? Math.floor(wingCounts[2] / 2) : 0;
+  const wRowA = numWings >= 4 ? Math.ceil(wingCounts[3] / 2) : 0;
+  const wRowB = numWings >= 4 ? Math.floor(wingCounts[3] / 2) : 0;
 
   for (let floor = 1; floor <= building.num_floors; floor++) {
     const floorY = (floor - 1) * (UNIT_HEIGHT + FLOOR_SLAB_HEIGHT);
     let posCounter = 1;
 
-    // ── North wing (along X, Z = 0) ──
-    for (let i = 0; i < wingCounts[0]; i++) {
+    // ── North wing Row A (along X, z = 0, inner courtyard row) ──
+    for (let i = 0; i < nRowA; i++) {
       const key = `${building.id}_${floor}_${posCounter}`;
       const rr = unitMap.get(key);
       const status = getUnitStatus(rr);
       const geom = new THREE.BoxGeometry(UNIT_WIDTH, UNIT_HEIGHT, UNIT_DEPTH);
-      const mat = getMaterialForStatus(status);
-      const mesh = new THREE.Mesh(geom, mat);
+      const mesh = new THREE.Mesh(geom, getMaterialForStatus(status));
       const x = i * (UNIT_WIDTH + UNIT_GAP) - courtyardWidth / 2 + UNIT_WIDTH / 2;
       mesh.position.set(x, floorY + UNIT_HEIGHT / 2, 0);
       mesh.name = `unit_${building.id}_${floor}_${posCounter}`;
-      mesh.userData = { building_id: building.id, building_label: building.label, floor, position: posCounter, status, rentRollUnit: rr } satisfies UnitMeshData;
+      mesh.userData = { building_id: building.id, building_label: building.label, floor, position: posCounter, status, rentRollUnit: rr, wingDirection: 'south' } satisfies UnitMeshData;
       addUnitEdges(mesh, geom);
       addUnitLabel(mesh, rr, 'south', totalUnits);
       addStatusStripe(mesh, status, 'south');
       group.add(mesh);
       posCounter++;
     }
-    // North slab
-    const nSlab = new THREE.Mesh(new THREE.BoxGeometry(northWidth + 0.3, FLOOR_SLAB_HEIGHT, UNIT_DEPTH + 0.3), MATERIALS.slab.clone());
-    nSlab.position.set(0, floorY - FLOOR_SLAB_HEIGHT / 2, 0);
+
+    // ── North wing Row B (along X, z = UNIT_DEPTH + CORRIDOR_WIDTH, outer row) ──
+    for (let i = 0; i < nRowB; i++) {
+      const key = `${building.id}_${floor}_${posCounter}`;
+      const rr = unitMap.get(key);
+      const status = getUnitStatus(rr);
+      const geom = new THREE.BoxGeometry(UNIT_WIDTH, UNIT_HEIGHT, UNIT_DEPTH);
+      const mesh = new THREE.Mesh(geom, getMaterialForStatus(status));
+      const x = i * (UNIT_WIDTH + UNIT_GAP) - courtyardWidth / 2 + UNIT_WIDTH / 2;
+      mesh.position.set(x, floorY + UNIT_HEIGHT / 2, UNIT_DEPTH + CORRIDOR_WIDTH);
+      mesh.name = `unit_${building.id}_${floor}_${posCounter}`;
+      mesh.userData = { building_id: building.id, building_label: building.label, floor, position: posCounter, status, rentRollUnit: rr, wingDirection: 'north' } satisfies UnitMeshData;
+      addUnitEdges(mesh, geom);
+      addUnitLabel(mesh, rr, 'north', totalUnits);
+      addStatusStripe(mesh, status, 'south');
+      group.add(mesh);
+      posCounter++;
+    }
+
+    // North slab (full double-loaded depth, center between the two rows)
+    const nSlab = new THREE.Mesh(new THREE.BoxGeometry(northWidth + 0.3, FLOOR_SLAB_HEIGHT, wingDepth + 0.3), MATERIALS.slab.clone());
+    nSlab.position.set(0, floorY - FLOOR_SLAB_HEIGHT / 2, (UNIT_DEPTH + CORRIDOR_WIDTH) / 2);
     group.add(nSlab);
 
-    // ── East wing (along -Z, X = eastX) ──
+    // ── East wing Row A (along -Z, x = eastX, inner courtyard row) ──
     if (numWings >= 2) {
-      for (let i = 0; i < wingCounts[1]; i++) {
+      for (let i = 0; i < eRowA; i++) {
         const key = `${building.id}_${floor}_${posCounter}`;
         const rr = unitMap.get(key);
         const status = getUnitStatus(rr);
         const geom = new THREE.BoxGeometry(UNIT_DEPTH, UNIT_HEIGHT, UNIT_WIDTH);
-        const mat = getMaterialForStatus(status);
-        const mesh = new THREE.Mesh(geom, mat);
+        const mesh = new THREE.Mesh(geom, getMaterialForStatus(status));
         const z = -(i + 1) * (UNIT_WIDTH + UNIT_GAP);
         mesh.position.set(eastX, floorY + UNIT_HEIGHT / 2, z);
         mesh.name = `unit_${building.id}_${floor}_${posCounter}`;
-        mesh.userData = { building_id: building.id, building_label: building.label, floor, position: posCounter, status, rentRollUnit: rr } satisfies UnitMeshData;
+        mesh.userData = { building_id: building.id, building_label: building.label, floor, position: posCounter, status, rentRollUnit: rr, wingDirection: 'east' } satisfies UnitMeshData;
         addUnitEdges(mesh, geom);
         addUnitLabel(mesh, rr, 'east', totalUnits);
         addStatusStripe(mesh, status, 'east');
         group.add(mesh);
         posCounter++;
       }
-      // East slab
-      const eSlab = new THREE.Mesh(new THREE.BoxGeometry(UNIT_DEPTH + 0.3, FLOOR_SLAB_HEIGHT, vertDepth(wingCounts[1]) + 0.3), MATERIALS.slab.clone());
-      eSlab.position.set(eastX, floorY - FLOOR_SLAB_HEIGHT / 2, -(courtyardDepth / 2 + (UNIT_WIDTH + UNIT_GAP) / 2));
+
+      // ── East wing Row B (along -Z, x = eastX + UNIT_DEPTH + CORRIDOR_WIDTH, outer row) ──
+      for (let i = 0; i < eRowB; i++) {
+        const key = `${building.id}_${floor}_${posCounter}`;
+        const rr = unitMap.get(key);
+        const status = getUnitStatus(rr);
+        const geom = new THREE.BoxGeometry(UNIT_DEPTH, UNIT_HEIGHT, UNIT_WIDTH);
+        const mesh = new THREE.Mesh(geom, getMaterialForStatus(status));
+        const z = -(i + 1) * (UNIT_WIDTH + UNIT_GAP);
+        mesh.position.set(eastX + UNIT_DEPTH + CORRIDOR_WIDTH, floorY + UNIT_HEIGHT / 2, z);
+        mesh.name = `unit_${building.id}_${floor}_${posCounter}`;
+        mesh.userData = { building_id: building.id, building_label: building.label, floor, position: posCounter, status, rentRollUnit: rr, wingDirection: 'west' } satisfies UnitMeshData;
+        addUnitEdges(mesh, geom);
+        addUnitLabel(mesh, rr, 'west', totalUnits);
+        addStatusStripe(mesh, status, 'east');
+        group.add(mesh);
+        posCounter++;
+      }
+
+      // East slab (full double-loaded width in X)
+      const eSlab = new THREE.Mesh(new THREE.BoxGeometry(wingDepth + 0.3, FLOOR_SLAB_HEIGHT, vertDepth(wingCounts[1]) + 0.3), MATERIALS.slab.clone());
+      eSlab.position.set(eastX + (UNIT_DEPTH + CORRIDOR_WIDTH) / 2, floorY - FLOOR_SLAB_HEIGHT / 2, -(courtyardDepth / 2 + (UNIT_WIDTH + UNIT_GAP) / 2));
       group.add(eSlab);
     }
 
-    // ── South wing (along X, Z = southZ) ──
+    // ── South wing Row A (along X, z = southZ, inner courtyard row) ──
     if (numWings >= 3) {
-      for (let i = 0; i < wingCounts[2]; i++) {
+      for (let i = 0; i < sRowA; i++) {
         const key = `${building.id}_${floor}_${posCounter}`;
         const rr = unitMap.get(key);
         const status = getUnitStatus(rr);
         const geom = new THREE.BoxGeometry(UNIT_WIDTH, UNIT_HEIGHT, UNIT_DEPTH);
-        const mat = getMaterialForStatus(status);
-        const mesh = new THREE.Mesh(geom, mat);
+        const mesh = new THREE.Mesh(geom, getMaterialForStatus(status));
         const x = i * (UNIT_WIDTH + UNIT_GAP) - courtyardWidth / 2 + UNIT_WIDTH / 2;
         mesh.position.set(x, floorY + UNIT_HEIGHT / 2, southZ);
         mesh.name = `unit_${building.id}_${floor}_${posCounter}`;
-        mesh.userData = { building_id: building.id, building_label: building.label, floor, position: posCounter, status, rentRollUnit: rr } satisfies UnitMeshData;
+        mesh.userData = { building_id: building.id, building_label: building.label, floor, position: posCounter, status, rentRollUnit: rr, wingDirection: 'north' } satisfies UnitMeshData;
         addUnitEdges(mesh, geom);
         addUnitLabel(mesh, rr, 'north', totalUnits);
         addStatusStripe(mesh, status, 'north');
         group.add(mesh);
         posCounter++;
       }
-      // South slab
-      const sSlab = new THREE.Mesh(new THREE.BoxGeometry(southWidth + 0.3, FLOOR_SLAB_HEIGHT, UNIT_DEPTH + 0.3), MATERIALS.slab.clone());
-      sSlab.position.set(0, floorY - FLOOR_SLAB_HEIGHT / 2, southZ);
+
+      // ── South wing Row B (along X, z = southZ - (UNIT_DEPTH + CORRIDOR_WIDTH), outer row) ──
+      for (let i = 0; i < sRowB; i++) {
+        const key = `${building.id}_${floor}_${posCounter}`;
+        const rr = unitMap.get(key);
+        const status = getUnitStatus(rr);
+        const geom = new THREE.BoxGeometry(UNIT_WIDTH, UNIT_HEIGHT, UNIT_DEPTH);
+        const mesh = new THREE.Mesh(geom, getMaterialForStatus(status));
+        const x = i * (UNIT_WIDTH + UNIT_GAP) - courtyardWidth / 2 + UNIT_WIDTH / 2;
+        mesh.position.set(x, floorY + UNIT_HEIGHT / 2, southZ - (UNIT_DEPTH + CORRIDOR_WIDTH));
+        mesh.name = `unit_${building.id}_${floor}_${posCounter}`;
+        mesh.userData = { building_id: building.id, building_label: building.label, floor, position: posCounter, status, rentRollUnit: rr, wingDirection: 'south' } satisfies UnitMeshData;
+        addUnitEdges(mesh, geom);
+        addUnitLabel(mesh, rr, 'south', totalUnits);
+        addStatusStripe(mesh, status, 'north');
+        group.add(mesh);
+        posCounter++;
+      }
+
+      // South slab (full double-loaded depth)
+      const sSlab = new THREE.Mesh(new THREE.BoxGeometry(southWidth + 0.3, FLOOR_SLAB_HEIGHT, wingDepth + 0.3), MATERIALS.slab.clone());
+      sSlab.position.set(0, floorY - FLOOR_SLAB_HEIGHT / 2, southZ - (UNIT_DEPTH + CORRIDOR_WIDTH) / 2);
       group.add(sSlab);
     }
 
-    // ── West wing (along -Z, X = westX) ──
+    // ── West wing Row A (along -Z, x = westX, inner courtyard row) ──
     if (numWings >= 4) {
-      for (let i = 0; i < wingCounts[3]; i++) {
+      for (let i = 0; i < wRowA; i++) {
         const key = `${building.id}_${floor}_${posCounter}`;
         const rr = unitMap.get(key);
         const status = getUnitStatus(rr);
         const geom = new THREE.BoxGeometry(UNIT_DEPTH, UNIT_HEIGHT, UNIT_WIDTH);
-        const mat = getMaterialForStatus(status);
-        const mesh = new THREE.Mesh(geom, mat);
+        const mesh = new THREE.Mesh(geom, getMaterialForStatus(status));
         const z = -(i + 1) * (UNIT_WIDTH + UNIT_GAP);
         mesh.position.set(westX, floorY + UNIT_HEIGHT / 2, z);
         mesh.name = `unit_${building.id}_${floor}_${posCounter}`;
-        mesh.userData = { building_id: building.id, building_label: building.label, floor, position: posCounter, status, rentRollUnit: rr } satisfies UnitMeshData;
+        mesh.userData = { building_id: building.id, building_label: building.label, floor, position: posCounter, status, rentRollUnit: rr, wingDirection: 'west' } satisfies UnitMeshData;
         addUnitEdges(mesh, geom);
         addUnitLabel(mesh, rr, 'west', totalUnits);
         addStatusStripe(mesh, status, 'west');
         group.add(mesh);
         posCounter++;
       }
-      // West slab
-      const wSlab = new THREE.Mesh(new THREE.BoxGeometry(UNIT_DEPTH + 0.3, FLOOR_SLAB_HEIGHT, vertDepth(wingCounts[3]) + 0.3), MATERIALS.slab.clone());
-      wSlab.position.set(westX, floorY - FLOOR_SLAB_HEIGHT / 2, -(courtyardDepth / 2 + (UNIT_WIDTH + UNIT_GAP) / 2));
+
+      // ── West wing Row B (along -Z, x = westX - (UNIT_DEPTH + CORRIDOR_WIDTH), outer row) ──
+      for (let i = 0; i < wRowB; i++) {
+        const key = `${building.id}_${floor}_${posCounter}`;
+        const rr = unitMap.get(key);
+        const status = getUnitStatus(rr);
+        const geom = new THREE.BoxGeometry(UNIT_DEPTH, UNIT_HEIGHT, UNIT_WIDTH);
+        const mesh = new THREE.Mesh(geom, getMaterialForStatus(status));
+        const z = -(i + 1) * (UNIT_WIDTH + UNIT_GAP);
+        mesh.position.set(westX - (UNIT_DEPTH + CORRIDOR_WIDTH), floorY + UNIT_HEIGHT / 2, z);
+        mesh.name = `unit_${building.id}_${floor}_${posCounter}`;
+        mesh.userData = { building_id: building.id, building_label: building.label, floor, position: posCounter, status, rentRollUnit: rr, wingDirection: 'east' } satisfies UnitMeshData;
+        addUnitEdges(mesh, geom);
+        addUnitLabel(mesh, rr, 'east', totalUnits);
+        addStatusStripe(mesh, status, 'west');
+        group.add(mesh);
+        posCounter++;
+      }
+
+      // West slab (full double-loaded width in X)
+      const wSlab = new THREE.Mesh(new THREE.BoxGeometry(wingDepth + 0.3, FLOOR_SLAB_HEIGHT, vertDepth(wingCounts[3]) + 0.3), MATERIALS.slab.clone());
+      wSlab.position.set(westX - (UNIT_DEPTH + CORRIDOR_WIDTH) / 2, floorY - FLOOR_SLAB_HEIGHT / 2, -(courtyardDepth / 2 + (UNIT_WIDTH + UNIT_GAP) / 2));
       group.add(wSlab);
     }
 
-    // Window bands between floors (all wings)
+    // Window bands between floors (all wings, spanning full double-loaded depth)
     if (floor > 1) {
-      addWindowBand(group, northWidth, UNIT_DEPTH, floorY, 0, 0);
-      if (numWings >= 2) addWindowBand(group, UNIT_DEPTH, vertDepth(wingCounts[1]), floorY, eastX, -(courtyardDepth / 2 + (UNIT_WIDTH + UNIT_GAP) / 2));
-      if (numWings >= 3) addWindowBand(group, southWidth, UNIT_DEPTH, floorY, 0, southZ);
-      if (numWings >= 4) addWindowBand(group, UNIT_DEPTH, vertDepth(wingCounts[3]), floorY, westX, -(courtyardDepth / 2 + (UNIT_WIDTH + UNIT_GAP) / 2));
+      addWindowBand(group, northWidth, wingDepth, floorY, 0, (UNIT_DEPTH + CORRIDOR_WIDTH) / 2);
+      if (numWings >= 2) addWindowBand(group, wingDepth, vertDepth(wingCounts[1]), floorY, eastX + (UNIT_DEPTH + CORRIDOR_WIDTH) / 2, -(courtyardDepth / 2 + (UNIT_WIDTH + UNIT_GAP) / 2));
+      if (numWings >= 3) addWindowBand(group, southWidth, wingDepth, floorY, 0, southZ - (UNIT_DEPTH + CORRIDOR_WIDTH) / 2);
+      if (numWings >= 4) addWindowBand(group, wingDepth, vertDepth(wingCounts[3]), floorY, westX - (UNIT_DEPTH + CORRIDOR_WIDTH) / 2, -(courtyardDepth / 2 + (UNIT_WIDTH + UNIT_GAP) / 2));
     }
   }
 
@@ -1254,6 +1459,62 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
       new THREE.Box3().setFromObject(group).getCenter(center);
       const labelPos = new THREE.Vector3(center.x, building.num_floors * (UNIT_HEIGHT + FLOOR_SLAB_HEIGHT) + 1.5, center.z);
       scene.add(createBuildingLabel(building.label, labelPos));
+    }
+
+    // ── Fix 1: Post-build label refresh using real unit_numbers from rent roll ──
+    // Collect all unit meshes in deterministic order: building order → floor asc → position asc
+    const allUnitMeshes: THREE.Mesh[] = [];
+    scene.traverse((obj: THREE.Object3D) => {
+      if (obj instanceof THREE.Mesh && obj.name.startsWith('unit_')) {
+        allUnitMeshes.push(obj);
+      }
+    });
+    const buildingOrder = new Map(layout.buildings.map((b, idx) => [b.id, idx]));
+    allUnitMeshes.sort((a, b) => {
+      const ua = a.userData as UnitMeshData;
+      const ub = b.userData as UnitMeshData;
+      const aBldgIdx = buildingOrder.get(ua.building_id) ?? 0;
+      const bBldgIdx = buildingOrder.get(ub.building_id) ?? 0;
+      if (aBldgIdx !== bBldgIdx) return aBldgIdx - bBldgIdx;
+      if (ua.floor !== ub.floor) return ua.floor - ub.floor;
+      return ua.position - ub.position;
+    });
+
+    // Natural-sort rent roll by unit_number, then assign 1:1 to meshes
+    const sortedRR = [...rentRollUnits].sort((a, b) =>
+      naturalSort(a.unit_number || '', b.unit_number || ''),
+    );
+    const uuidReg = new Map<string, RentRollUnit>();
+    for (let i = 0; i < Math.min(allUnitMeshes.length, sortedRR.length); i++) {
+      uuidReg.set(allUnitMeshes[i].uuid, sortedRR[i]);
+    }
+
+    // Log first 10 assignments for verification
+    console.log('[StackingViewer3D] First 10 unit label assignments:');
+    allUnitMeshes.slice(0, 10).forEach((m, i) => {
+      const rr = uuidReg.get(m.uuid);
+      console.log(`  [${i}] ${m.name} → unit_number=${rr?.unit_number ?? '(unmatched)'}`);
+    });
+
+    // Replace labels on every unit mesh with the matched real unit_number
+    for (const mesh of allUnitMeshes) {
+      const rr = uuidReg.get(mesh.uuid);
+      const ud = mesh.userData as UnitMeshData;
+      // Update userData so hover tooltip shows the correct unit_number
+      if (rr) ud.rentRollUnit = rr;
+      // Remove existing label children
+      const toRemove = mesh.children.filter((c: THREE.Object3D) => c.name.startsWith('label_'));
+      for (const c of toRemove) {
+        if (c instanceof THREE.Mesh) {
+          c.geometry.dispose();
+          (c.material as THREE.MeshBasicMaterial).dispose();
+        }
+        mesh.remove(c);
+      }
+      // Re-add label with real unit_number (or positional index as fallback)
+      const unitNumber = rr?.unit_number ?? String(ud.position).padStart(3, '0');
+      const labelRR = { unit_number: unitNumber } as RentRollUnit;
+      addUnitLabel(mesh, labelRR, ud.wingDirection ?? 'south', totalUnits);
     }
 
     // ── Amenities ──
