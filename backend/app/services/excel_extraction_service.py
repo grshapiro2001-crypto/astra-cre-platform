@@ -512,7 +512,14 @@ def _finalize_unit(unit: Dict[str, Any], charge_details: dict) -> None:
     """Finalize a unit by setting charge_details and computing in_place_rent."""
     if charge_details:
         unit["charge_details"] = charge_details.copy()
+        # DEBUG: unit 008
+        _u = str(unit.get("unit_number") or "")
+        if "008" in _u:
+            print(f"[DEBUG 008] _finalize_unit called for unit={_u}")
+            print(f"[DEBUG 008]   charge_details passed to find_base_rent: {charge_details}")
         base = find_base_rent(charge_details)
+        if "008" in _u:
+            print(f"[DEBUG 008]   find_base_rent returned: {base}")
         if base > 0:
             unit["in_place_rent"] = base
         elif unit.get("in_place_rent", 0) == 0:
@@ -548,6 +555,7 @@ def _parse_rent_roll_units(ws: Worksheet, header_row: int, headers: Dict[int, st
     charge_code_col = col_map.get("charge_code")
     rent_col = col_map.get("in_place_rent")
 
+    _debug_008 = False  # DEBUG: track rows while processing unit 008
     for row_idx in range(header_row + 1, ws.max_row + 1):
         row = ws[row_idx]
 
@@ -557,24 +565,44 @@ def _parse_rent_roll_units(ws: Worksheet, header_row: int, headers: Dict[int, st
         # Scan entire row text for Charge Total / summary markers
         row_text = " ".join(str(c.value or "") for c in row).lower()
 
+        # DEBUG: raw row for unit 008
+        _raw = tuple(c.value for c in row)
+        if _debug_008:
+            print(f"[DEBUG 008] row {row_idx}: raw={_raw}")
+
         # ── Charge Total row ──
         if "charge total" in row_text or "total charges" in row_text:
             if current_unit is not None:
                 total = _get_numeric_value(row, rent_col)
                 current_unit["charge_details"] = charge_details.copy()
+                # DEBUG: unit 008
+                _u = str(current_unit.get("unit_number") or "")
+                if "008" in _u:
+                    print(f"[DEBUG 008] Charge Total row hit for unit={_u}, row_idx={row_idx}")
+                    print(f"[DEBUG 008]   charge_details passed to find_base_rent: {charge_details}")
+                    print(f"[DEBUG 008]   total from rent_col: {total}")
                 # Prefer base rent from charge_details; fall back to charge total
                 base = find_base_rent(charge_details)
+                if "008" in _u:
+                    print(f"[DEBUG 008]   find_base_rent returned: {base}")
                 if base > 0:
                     current_unit["in_place_rent"] = base
                 elif total:
                     current_unit["in_place_rent"] = total
                 elif charge_details:
                     current_unit["in_place_rent"] = sum(charge_details.values())
+                if "008" in _u:
+                    print(f"[DEBUG 008]   final in_place_rent assigned: {current_unit.get('in_place_rent')}")
+                    _debug_008 = False  # done with unit 008 block
                 charge_details = {}
+            if _debug_008:
+                print(f"[DEBUG 008]   action: CHARGE TOTAL (no current_unit)")
             continue
 
         # ── Summary row → stop parsing ──
         if unit_val and any(kw in unit_val.lower() for kw in ["total", "summary", "grand total", "property"]):
+            if _debug_008:
+                print(f"[DEBUG 008] row {row_idx}: action: SUMMARY ROW — stop parsing")
             break
 
         # ── Charge detail sub-row: blank unit col, charge code populated ──
@@ -582,6 +610,8 @@ def _parse_rent_roll_units(ws: Worksheet, header_row: int, headers: Dict[int, st
             amount = _get_numeric_value(row, rent_col)
             if amount:
                 charge_details[charge_code_val] = amount
+            if _debug_008:
+                print(f"[DEBUG 008]   action: CHARGE CODE SUB-ROW code={charge_code_val} amount={amount}")
             continue
 
         # ── Charge detail via col A (fallback for sheets without charge_code column) ──
@@ -589,26 +619,43 @@ def _parse_rent_roll_units(ws: Worksheet, header_row: int, headers: Dict[int, st
             amount = _get_numeric_value(row, rent_col)
             if amount:
                 charge_details[unit_val] = amount
+            if _debug_008:
+                print(f"[DEBUG 008]   action: COL-A CHARGE CODE code={unit_val} amount={amount}")
             continue
 
         # ── Skip fully blank rows ──
         if not unit_val:
+            if _debug_008:
+                print(f"[DEBUG 008]   action: SKIPPED (blank row)")
             continue
 
         # ── New unit header row ──
         # Finalize previous unit
         if current_unit is not None:
+            if _debug_008:
+                print(f"[DEBUG 008]   action: NEW UNIT HEADER — finalizing unit 008 first")
             _finalize_unit(current_unit, charge_details)
             units.append(current_unit)
             charge_details = {}
+            _debug_008 = False  # leaving unit 008 block
 
         current_unit = _parse_unit_row(row, col_map)
+        # DEBUG: activate tracing when unit 008 starts
+        if "008" in str(current_unit.get("unit_number") or ""):
+            _debug_008 = True
+            print(f"[DEBUG 008] ===== UNIT 008 HEADER ROW row_idx={row_idx} =====")
+            print(f"[DEBUG 008]   parsed unit: {current_unit}")
+            print(f"[DEBUG 008]   raw row: {_raw}")
+        elif _debug_008:
+            print(f"[DEBUG 008]   action: UNIT HEADER (not 008, unit_val={unit_val})")
 
         # Unit header row may also carry a charge code (e.g. "Amenity Rent" in col L)
         if charge_code_val:
             amount = _get_numeric_value(row, rent_col)
             if amount:
                 charge_details[charge_code_val] = amount
+            if _debug_008:
+                print(f"[DEBUG 008]   unit header also has charge_code={charge_code_val} amount={amount}")
 
     # Finalize last unit
     if current_unit is not None:
