@@ -7,7 +7,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
-import { Building2, Pencil, RotateCcw, Globe, Loader2, AlertCircle, Layers, Map, Upload, X } from 'lucide-react';
+import { Building2, Pencil, RotateCcw, Globe, Loader2, AlertCircle, Layers, Map as MapIcon, Upload, X } from 'lucide-react';
 import { LayoutEditor } from './LayoutEditor';
 import { StackingViewer3D } from './StackingViewer3D';
 import type { UnitMeshData } from './StackingViewer3D';
@@ -411,7 +411,7 @@ export function StackingSection({ property }: StackingSectionProps) {
               onClick={() => { setShowFloorPlanUpload(true); setFloorPlanFiles([]); setFloorPlanError(null); }}
               className="gap-1.5"
             >
-              <Map className="w-3.5 h-3.5" />
+              <MapIcon className="w-3.5 h-3.5" />
               Map from Floor Plan
             </Button>
             <Button
@@ -481,7 +481,7 @@ export function StackingSection({ property }: StackingSectionProps) {
               onClick={() => { setShowFloorPlanUpload(true); setFloorPlanFiles([]); setFloorPlanError(null); }}
               className="gap-2"
             >
-              <Map className="w-4 h-4" />
+              <MapIcon className="w-4 h-4" />
               Map from Floor Plan
             </Button>
             <Button
