@@ -189,6 +189,46 @@ function naturalSort(a: string, b: string): number {
   return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
 }
 
+/**
+ * Infer the floor number from a unit number string using common multifamily patterns.
+ * Returns null if floor cannot be determined.
+ *
+ * Patterns handled:
+ *   "0301" or "301" → floor 3  (first significant digit(s) before last 2 digits = floor)
+ *   "A-301" or "1-205" → floor 3 or 2 (number after separator)
+ */
+function inferFloorFromUnitNumber(unitNumber: string, totalFloors: number): number | null {
+  const num = unitNumber || '';
+
+  // Strip building/wing prefix like "A-", "B1-", "Bldg2-"
+  const cleaned = num.replace(/^[A-Za-z0-9]*[-_]/, '');
+  const digits = cleaned.replace(/[^0-9]/g, '');
+
+  if (digits.length >= 3 && digits.length <= 4) {
+    const withoutLeadingZeros = digits.replace(/^0+/, '') || '0';
+    if (withoutLeadingZeros.length >= 3) {
+      const potentialFloor = parseInt(withoutLeadingZeros.slice(0, -2), 10);
+      if (potentialFloor >= 1 && potentialFloor <= totalFloors) {
+        return potentialFloor;
+      }
+    }
+  }
+
+  // Pattern 2: separator-based "1-205", "A-301"
+  const separatorMatch = num.match(/[A-Za-z0-9]+[-_](\d{3,4})/);
+  if (separatorMatch) {
+    const afterSep = separatorMatch[1].replace(/^0+/, '') || '0';
+    if (afterSep.length >= 3) {
+      const potentialFloor = parseInt(afterSep.slice(0, -2), 10);
+      if (potentialFloor >= 1 && potentialFloor <= totalFloors) {
+        return potentialFloor;
+      }
+    }
+  }
+
+  return null;
+}
+
 function matchUnitsToRentRoll(
   layout: StackingLayout,
   rentRollUnits: RentRollUnit[],
@@ -196,24 +236,74 @@ function matchUnitsToRentRoll(
   const map = new Map<string, RentRollUnit>();
   if (!rentRollUnits.length) return map;
 
-  // Build a flat list of model unit keys in order: building → floor → position
-  const modelKeys: string[] = [];
-  for (const bldg of layout.buildings) {
-    for (let floor = 1; floor <= bldg.num_floors; floor++) {
-      for (let pos = 1; pos <= bldg.units_per_floor; pos++) {
-        modelKeys.push(`${bldg.id}_${floor}_${pos}`);
+  // Deduplicate by id
+  const seenIds = new Set<number>();
+  const deduped = rentRollUnits.filter(u => {
+    if (seenIds.has(u.id)) return false;
+    seenIds.add(u.id);
+    return true;
+  });
+
+  const totalFloors = layout.buildings.reduce((m, b) => Math.max(m, b.num_floors), 1);
+
+  // Try to infer floor from unit number
+  const unitsWithFloor = deduped.map(u => ({
+    unit: u,
+    inferredFloor: inferFloorFromUnitNumber(u.unit_number || '', totalFloors),
+  }));
+
+  const inferredCount = unitsWithFloor.filter(u => u.inferredFloor !== null).length;
+  const useInferredFloors = inferredCount > deduped.length * 0.5;
+
+  if (useInferredFloors) {
+    // Floor-aware grouping
+    for (const bldg of layout.buildings) {
+      for (let floor = 1; floor <= bldg.num_floors; floor++) {
+        const floorUnits = unitsWithFloor
+          .filter(u => u.inferredFloor === floor)
+          .sort((a, b) => naturalSort(a.unit.unit_number || '', b.unit.unit_number || ''));
+
+        for (let pos = 0; pos < Math.min(floorUnits.length, bldg.units_per_floor); pos++) {
+          const key = `${bldg.id}_${floor}_${pos + 1}`;
+          map.set(key, floorUnits[pos].unit);
+        }
+      }
+
+      // Distribute unmatched units to floors with remaining slots
+      const unmatchedUnits = unitsWithFloor
+        .filter(u => u.inferredFloor === null || u.inferredFloor > bldg.num_floors)
+        .sort((a, b) => naturalSort(a.unit.unit_number || '', b.unit.unit_number || ''));
+
+      let unmatchedIdx = 0;
+      for (let floor = 1; floor <= bldg.num_floors && unmatchedIdx < unmatchedUnits.length; floor++) {
+        const assignedOnFloor = Array.from(map.keys()).filter(k => k.startsWith(`${bldg.id}_${floor}_`)).length;
+        for (let pos = assignedOnFloor + 1; pos <= bldg.units_per_floor && unmatchedIdx < unmatchedUnits.length; pos++) {
+          const key = `${bldg.id}_${floor}_${pos}`;
+          if (!map.has(key)) {
+            map.set(key, unmatchedUnits[unmatchedIdx].unit);
+            unmatchedIdx++;
+          }
+        }
       }
     }
-  }
+  } else {
+    // Fallback: sequential assignment (current behavior) with dedup
+    const modelKeys: string[] = [];
+    for (const bldg of layout.buildings) {
+      for (let floor = 1; floor <= bldg.num_floors; floor++) {
+        for (let pos = 1; pos <= bldg.units_per_floor; pos++) {
+          modelKeys.push(`${bldg.id}_${floor}_${pos}`);
+        }
+      }
+    }
 
-  // Always natural-sort by unit_number (handles "001"<"002", "9"<"10", "1A-002", etc.)
-  // then assign sequentially: floor 1 all positions, floor 2 all positions, …
-  const sorted = [...rentRollUnits].sort((a, b) =>
-    naturalSort(a.unit_number || '', b.unit_number || ''),
-  );
+    const sorted = [...deduped].sort((a, b) =>
+      naturalSort(a.unit_number || '', b.unit_number || ''),
+    );
 
-  for (let i = 0; i < Math.min(sorted.length, modelKeys.length); i++) {
-    map.set(modelKeys[i], sorted[i]);
+    for (let i = 0; i < Math.min(sorted.length, modelKeys.length); i++) {
+      map.set(modelKeys[i], sorted[i]);
+    }
   }
 
   return map;
@@ -1630,13 +1720,61 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
       return ua.position - ub.position;
     });
 
-    // Natural-sort rent roll by unit_number, then assign 1:1 to meshes
-    const sortedRR = [...rentRollUnits].sort((a, b) =>
-      naturalSort(a.unit_number || '', b.unit_number || ''),
-    );
+    // Deduplicate rent roll units by id
+    const seenRRIds = new Set<number>();
+    const dedupedRR = rentRollUnits.filter(u => {
+      if (seenRRIds.has(u.id)) return false;
+      seenRRIds.add(u.id);
+      return true;
+    });
+
+    const totalFloors2 = layout.buildings.reduce((m, b) => Math.max(m, b.num_floors), 1);
+
+    // Try floor-aware assignment using same inference as matchUnitsToRentRoll
+    const rrWithFloor = dedupedRR.map(u => ({
+      unit: u,
+      inferredFloor: inferFloorFromUnitNumber(u.unit_number || '', totalFloors2),
+    }));
+    const inferCount = rrWithFloor.filter(u => u.inferredFloor !== null).length;
+    const useFloorAware = inferCount > dedupedRR.length * 0.5;
+
     const uuidReg = new Map<string, RentRollUnit>();
-    for (let i = 0; i < Math.min(allUnitMeshes.length, sortedRR.length); i++) {
-      uuidReg.set(allUnitMeshes[i].uuid, sortedRR[i]);
+
+    if (useFloorAware) {
+      // Group meshes by floor
+      const meshesByFloor = new Map<number, THREE.Mesh[]>();
+      for (const m of allUnitMeshes) {
+        const floor = (m.userData as UnitMeshData).floor;
+        if (!meshesByFloor.has(floor)) meshesByFloor.set(floor, []);
+        meshesByFloor.get(floor)!.push(m);
+      }
+
+      // Assign units to meshes on their inferred floor
+      for (const [floor, meshes] of meshesByFloor) {
+        const floorUnits = rrWithFloor
+          .filter(u => u.inferredFloor === floor)
+          .sort((a, b) => naturalSort(a.unit.unit_number || '', b.unit.unit_number || ''));
+        for (let i = 0; i < Math.min(meshes.length, floorUnits.length); i++) {
+          uuidReg.set(meshes[i].uuid, floorUnits[i].unit);
+        }
+      }
+
+      // Distribute unmatched units to meshes that didn't get a match
+      const unmatchedUnits = rrWithFloor
+        .filter(u => u.inferredFloor === null || u.inferredFloor > totalFloors2)
+        .sort((a, b) => naturalSort(a.unit.unit_number || '', b.unit.unit_number || ''));
+      const unmatchedMeshes = allUnitMeshes.filter(m => !uuidReg.has(m.uuid));
+      for (let i = 0; i < Math.min(unmatchedMeshes.length, unmatchedUnits.length); i++) {
+        uuidReg.set(unmatchedMeshes[i].uuid, unmatchedUnits[i].unit);
+      }
+    } else {
+      // Fallback: sequential assignment
+      const sortedRR = [...dedupedRR].sort((a, b) =>
+        naturalSort(a.unit_number || '', b.unit_number || ''),
+      );
+      for (let i = 0; i < Math.min(allUnitMeshes.length, sortedRR.length); i++) {
+        uuidReg.set(allUnitMeshes[i].uuid, sortedRR[i]);
+      }
     }
 
     // Log first 10 assignments for verification
@@ -2240,15 +2378,22 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
 
   // ── In-canvas stats overlay ──
   const filterStats = useMemo(() => {
-    const total = rentRollUnits.length;
-    const occupied = rentRollUnits.filter(u => u.is_occupied === true || (u.status || '').toLowerCase().includes('occupied')).length;
-    const vacant = rentRollUnits.filter(u => u.is_occupied === false || (u.status || '').toLowerCase().includes('vacant')).length;
+    // Deduplicate by unit id to handle any residual DB duplicates
+    const seen = new Set<number>();
+    const uniqueUnits = rentRollUnits.filter(u => {
+      if (seen.has(u.id)) return false;
+      seen.add(u.id);
+      return true;
+    });
+    const total = uniqueUnits.length;
+    const occupied = uniqueUnits.filter(u => u.is_occupied === true || (u.status || '').toLowerCase().includes('occupied')).length;
+    const vacant = uniqueUnits.filter(u => u.is_occupied === false || (u.status || '').toLowerCase().includes('vacant')).length;
 
     switch (activeFilter) {
       case 'occupancy':
         return `${occupied} Occupied · ${vacant} Vacant · ${total > 0 ? ((occupied / total) * 100).toFixed(1) : 0}%`;
       case 'loss_to_lease': {
-        const withLTL = rentRollUnits.filter(u => u.market_rent && u.in_place_rent && u.market_rent > 0);
+        const withLTL = uniqueUnits.filter(u => u.market_rent && u.in_place_rent && u.market_rent > 0);
         const avgGap = withLTL.length > 0
           ? withLTL.reduce((s, u) => s + (u.market_rent! - u.in_place_rent!), 0) / withLTL.length
           : 0;
@@ -2257,12 +2402,12 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
       }
       case 'expirations': {
         const refDate = asOfDate ? new Date(asOfDate) : new Date();
-        const soon30 = rentRollUnits.filter(u => {
+        const soon30 = uniqueUnits.filter(u => {
           if (!u.lease_end) return false;
           const diff = (new Date(u.lease_end).getTime() - refDate.getTime()) / (1000*60*60*24);
           return diff <= 30;
         }).length;
-        const soon90 = rentRollUnits.filter(u => {
+        const soon90 = uniqueUnits.filter(u => {
           if (!u.lease_end) return false;
           const diff = (new Date(u.lease_end).getTime() - refDate.getTime()) / (1000*60*60*24);
           return diff <= 90;
@@ -2270,12 +2415,12 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
         return `${soon30} expiring ≤30d · ${soon90} expiring ≤90d`;
       }
       case 'market_rents': {
-        const withRent = rentRollUnits.filter(u => u.market_rent != null);
+        const withRent = uniqueUnits.filter(u => u.market_rent != null);
         const avg = withRent.length > 0 ? withRent.reduce((s, u) => s + u.market_rent!, 0) / withRent.length : 0;
         return `$${Math.round(avg).toLocaleString()} avg. market rent · ${withRent.length} units`;
       }
       case 'contract_rents': {
-        const withRent = rentRollUnits.filter(u => u.in_place_rent != null && u.in_place_rent > 0);
+        const withRent = uniqueUnits.filter(u => u.in_place_rent != null && u.in_place_rent > 0);
         const avg = withRent.length > 0 ? withRent.reduce((s, u) => s + u.in_place_rent!, 0) / withRent.length : 0;
         return `$${Math.round(avg).toLocaleString()} avg. in-place rent · ${withRent.length} units`;
       }

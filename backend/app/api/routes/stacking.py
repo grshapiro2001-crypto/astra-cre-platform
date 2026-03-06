@@ -160,12 +160,26 @@ def get_rent_roll_units(
     if not property_obj:
         raise HTTPException(status_code=404, detail="Property not found")
 
-    units = db.query(RentRollUnit).filter(
+    # Query all units, ordered by id DESC so newest rows come first
+    all_units = db.query(RentRollUnit).filter(
         RentRollUnit.property_id == property_id
-    ).order_by(RentRollUnit.unit_number).all()
+    ).order_by(RentRollUnit.id.desc()).all()
+
+    # Deduplicate by unit_number — keep only the first (newest) row per unit_number
+    seen_unit_numbers: set[str | None] = set()
+    deduped_units: list[RentRollUnit] = []
+    for u in all_units:
+        key = u.unit_number
+        if key in seen_unit_numbers:
+            continue
+        seen_unit_numbers.add(key)
+        deduped_units.append(u)
+
+    # Sort by unit_number for consistent ordering
+    deduped_units.sort(key=lambda u: u.unit_number or '')
 
     results = []
-    for u in units:
+    for u in deduped_units:
         results.append(RentRollUnitResponse(
             id=u.id,
             unit_number=u.unit_number,
