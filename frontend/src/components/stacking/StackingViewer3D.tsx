@@ -3,10 +3,11 @@
  * Generates 3D geometry from a StackingLayout, with interactive
  * raycasting for hover/click on individual units.
  */
-import { useRef, useEffect, useCallback, useState } from 'react';
+import { useRef, useEffect, useCallback, useState, useMemo } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { StackingLayout, StackingBuilding, RentRollUnit, StackingFilterType } from '@/types/property';
+import { Camera } from 'lucide-react';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 const UNIT_WIDTH = 4;
@@ -133,6 +134,7 @@ interface StackingViewer3DProps {
   activeFilter?: StackingFilterType;
   asOfDate?: string | null;
   checkedFloorPlans?: Set<string>;
+  explodedView?: boolean;
 }
 
 // ─── Matching logic ──────────────────────────────────────────────────────────
@@ -1275,7 +1277,7 @@ function addAmenityPads(layout: StackingLayout, scene: THREE.Scene, sceneCenter:
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFilter = 'occupancy', asOfDate, checkedFloorPlans }: StackingViewer3DProps) {
+export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFilter = 'occupancy', asOfDate, checkedFloorPlans, explodedView }: StackingViewer3DProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
@@ -1288,6 +1290,7 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
   const materialSnapshotRef = useRef<Map<string, MaterialSnapshot>>(new Map());
   const unitMeshesRef = useRef<THREE.Mesh[]>([]);
   const filterStateRef = useRef<Map<string, MaterialSnapshot>>(new Map());
+  const buildUpCompleteRef = useRef(false);
   const [isReady, setIsReady] = useState(false);
   const [hoveredUnit, setHoveredUnit] = useState<UnitMeshData | null>(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
@@ -1394,6 +1397,7 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
       antialias: true,
       alpha: false,
       powerPreference: 'high-performance',
+      preserveDrawingBuffer: true,
     });
     renderer.setSize(container.clientWidth, container.clientHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -1595,6 +1599,28 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
     });
     unitMeshesRef.current = collectedUnits;
 
+    // ── Store base Y positions for exploded view ──
+    scene.traverse((obj: THREE.Object3D) => {
+      if (obj instanceof THREE.Mesh || obj instanceof THREE.LineSegments || obj instanceof THREE.Sprite) {
+        obj.userData._baseY = obj.position.y;
+      }
+    });
+
+    // ── Build-up animation: store base opacity, then zero out ──
+    buildUpCompleteRef.current = false;
+    scene.traverse((obj: THREE.Object3D) => {
+      if (!(obj instanceof THREE.Mesh || obj instanceof THREE.LineSegments)) return;
+      if (obj.name.startsWith('amenity_')) return;
+      // Skip ground plane and grid
+      if (obj.position.y < -0.1) return;
+      const mat = obj.material as THREE.MeshStandardMaterial | THREE.MeshBasicMaterial;
+      if (!mat || typeof mat.opacity !== 'number') return;
+      obj.userData._baseOpacity = mat.opacity;
+      mat.transparent = true;
+      mat.opacity = 0;
+      mat.needsUpdate = true;
+    });
+
     // ── Camera position — 32° elevation, 45° azimuth for ground-floor visibility ──
     const maxDim = Math.max(sceneSize.x, sceneSize.z);
     const cameraDistance = maxDim * 1.05;
@@ -1622,7 +1648,10 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
 
     // ── Animate ──
     let flyInFrame = 0;
+    let buildUpFrame = 0;
     const FLY_IN_FRAMES = 60;
+    const BUILDUP_FRAMES_PER_FLOOR = 15;
+    const floorHeightBU = UNIT_HEIGHT + FLOOR_SLAB_HEIGHT;
     const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
 
     const animate = () => {
@@ -1637,6 +1666,50 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
         camera.lookAt(sceneCenter);
         if (flyInFrame === FLY_IN_FRAMES) {
           controls.autoRotate = true;
+        }
+      }
+
+      // Build-up animation: staggered floor reveal after fly-in
+      if (flyInFrame >= FLY_IN_FRAMES && !buildUpCompleteRef.current) {
+        buildUpFrame++;
+        let allDone = true;
+
+        scene.traverse((obj: THREE.Object3D) => {
+          if (!(obj instanceof THREE.Mesh || obj instanceof THREE.LineSegments)) return;
+          if (obj.userData._baseOpacity === undefined) return;
+
+          // Determine floor
+          let floor = 1;
+          if (obj instanceof THREE.Mesh && obj.name.startsWith('unit_')) {
+            floor = (obj.userData as UnitMeshData).floor;
+          } else {
+            const baseY: number = obj.userData._baseY ?? obj.position.y;
+            floor = Math.max(1, Math.round(baseY / floorHeightBU) + 1);
+          }
+
+          const floorStart = (floor - 1) * BUILDUP_FRAMES_PER_FLOOR;
+          const floorEnd = floor * BUILDUP_FRAMES_PER_FLOOR;
+          const baseOpacity: number = obj.userData._baseOpacity;
+
+          if (buildUpFrame >= floorEnd) {
+            // Floor fully revealed
+            const mat = obj.material as THREE.MeshStandardMaterial;
+            mat.opacity = baseOpacity;
+            mat.needsUpdate = true;
+          } else if (buildUpFrame >= floorStart) {
+            // Floor is being revealed
+            allDone = false;
+            const t = (buildUpFrame - floorStart) / BUILDUP_FRAMES_PER_FLOOR;
+            const mat = obj.material as THREE.MeshStandardMaterial;
+            mat.opacity = baseOpacity * easeOutCubic(t);
+            mat.needsUpdate = true;
+          } else {
+            allDone = false;
+          }
+        });
+
+        if (allDone) {
+          buildUpCompleteRef.current = true;
         }
       }
 
@@ -1766,6 +1839,145 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
     });
   }, [checkedFloorPlans]);
 
+  // ── Exploded view animation ──
+  useEffect(() => {
+    if (!sceneRef.current) return;
+    const scene = sceneRef.current;
+
+    // Force-complete build-up animation if it hasn't finished yet
+    if (!buildUpCompleteRef.current) {
+      scene.traverse((obj: THREE.Object3D) => {
+        if (!(obj instanceof THREE.Mesh || obj instanceof THREE.LineSegments)) return;
+        if (obj.userData._baseOpacity === undefined) return;
+        const mat = obj.material as THREE.MeshStandardMaterial;
+        mat.opacity = obj.userData._baseOpacity;
+        mat.needsUpdate = true;
+      });
+      buildUpCompleteRef.current = true;
+    }
+
+    const EXPLODE_GAP = UNIT_HEIGHT * 2.5;
+    const floorHeight = UNIT_HEIGHT + FLOOR_SLAB_HEIGHT;
+
+    // Collect all objects that need to move, with their start and target Y
+    const startPositions = new Map<string, number>();
+    const targetPositions = new Map<string, number>();
+
+    scene.traverse((obj: THREE.Object3D) => {
+      if (!(obj instanceof THREE.Mesh || obj instanceof THREE.LineSegments || obj instanceof THREE.Sprite)) return;
+      // Skip ground plane and grid
+      if (obj.userData._baseY === undefined) return;
+      const baseY: number = obj.userData._baseY;
+
+      // Determine which floor this object belongs to
+      let floor = 1;
+      if (obj instanceof THREE.Mesh && obj.name.startsWith('unit_')) {
+        floor = (obj.userData as UnitMeshData).floor;
+      } else if (obj instanceof THREE.Sprite) {
+        // Building labels sit above the top floor — move proportionally with max floor
+        const maxFloor = layout.buildings.reduce((m, b) => Math.max(m, b.num_floors), 1);
+        floor = maxFloor + 1; // treat labels as above the highest floor
+      } else {
+        // Infer floor from base Y position
+        floor = Math.max(1, Math.round(baseY / floorHeight) + 1);
+      }
+
+      const offset = explodedView ? (floor - 1) * EXPLODE_GAP : 0;
+
+      startPositions.set(obj.uuid, obj.position.y);
+      targetPositions.set(obj.uuid, baseY + offset);
+    });
+
+    // Animate over 30 frames
+    let frame = 0;
+    const ANIM_FRAMES = 30;
+    const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
+    let animId = 0;
+
+    const animateExplode = () => {
+      frame++;
+      const t = Math.min(frame / ANIM_FRAMES, 1);
+      const ease = easeOutCubic(t);
+
+      scene.traverse((obj: THREE.Object3D) => {
+        if (!(obj instanceof THREE.Mesh || obj instanceof THREE.LineSegments || obj instanceof THREE.Sprite)) return;
+        const start = startPositions.get(obj.uuid);
+        const target = targetPositions.get(obj.uuid);
+        if (start !== undefined && target !== undefined) {
+          obj.position.y = start + (target - start) * ease;
+        }
+      });
+
+      if (t < 1) {
+        animId = requestAnimationFrame(animateExplode);
+      }
+    };
+    animateExplode();
+
+    return () => cancelAnimationFrame(animId);
+  }, [explodedView, layout]);
+
+  // ── Screenshot export ──
+  const handleScreenshot = useCallback(() => {
+    if (!rendererRef.current || !sceneRef.current || !cameraRef.current) return;
+    rendererRef.current.render(sceneRef.current, cameraRef.current);
+    const dataUrl = rendererRef.current.domElement.toDataURL('image/png');
+    const link = document.createElement('a');
+    link.download = `ASTRA-stacking-${layout.buildings.map(b => b.label).join('-')}-${activeFilter}.png`;
+    link.href = dataUrl;
+    link.click();
+  }, [layout, activeFilter]);
+
+  // ── In-canvas stats overlay ──
+  const filterStats = useMemo(() => {
+    const total = rentRollUnits.length;
+    const occupied = rentRollUnits.filter(u => u.is_occupied === true || (u.status || '').toLowerCase().includes('occupied')).length;
+    const vacant = rentRollUnits.filter(u => u.is_occupied === false || (u.status || '').toLowerCase().includes('vacant')).length;
+
+    switch (activeFilter) {
+      case 'occupancy':
+        return `${occupied} Occupied · ${vacant} Vacant · ${total > 0 ? ((occupied / total) * 100).toFixed(1) : 0}%`;
+      case 'loss_to_lease': {
+        const withLTL = rentRollUnits.filter(u => u.market_rent && u.in_place_rent && u.market_rent > 0);
+        const avgGap = withLTL.length > 0
+          ? withLTL.reduce((s, u) => s + (u.market_rent! - u.in_place_rent!), 0) / withLTL.length
+          : 0;
+        const highLTL = withLTL.filter(u => ((u.market_rent! - u.in_place_rent!) / u.market_rent!) > 0.10).length;
+        return `$${Math.round(avgGap)}/unit avg. gap · ${highLTL} units >10% LTL`;
+      }
+      case 'expirations': {
+        const refDate = asOfDate ? new Date(asOfDate) : new Date();
+        const soon30 = rentRollUnits.filter(u => {
+          if (!u.lease_end) return false;
+          const diff = (new Date(u.lease_end).getTime() - refDate.getTime()) / (1000*60*60*24);
+          return diff <= 30;
+        }).length;
+        const soon90 = rentRollUnits.filter(u => {
+          if (!u.lease_end) return false;
+          const diff = (new Date(u.lease_end).getTime() - refDate.getTime()) / (1000*60*60*24);
+          return diff <= 90;
+        }).length;
+        return `${soon30} expiring ≤30d · ${soon90} expiring ≤90d`;
+      }
+      case 'market_rents': {
+        const withRent = rentRollUnits.filter(u => u.market_rent != null);
+        const avg = withRent.length > 0 ? withRent.reduce((s, u) => s + u.market_rent!, 0) / withRent.length : 0;
+        return `$${Math.round(avg).toLocaleString()} avg. market rent · ${withRent.length} units`;
+      }
+      case 'contract_rents': {
+        const withRent = rentRollUnits.filter(u => u.in_place_rent != null && u.in_place_rent > 0);
+        const avg = withRent.length > 0 ? withRent.reduce((s, u) => s + u.in_place_rent!, 0) / withRent.length : 0;
+        return `$${Math.round(avg).toLocaleString()} avg. in-place rent · ${withRent.length} units`;
+      }
+      case 'floor_level': {
+        const maxFloor = layout.buildings.reduce((m, b) => Math.max(m, b.num_floors), 1);
+        return `${layout.buildings.length} building${layout.buildings.length > 1 ? 's' : ''} · ${maxFloor} floors · ${total} units`;
+      }
+      default:
+        return `${total} units`;
+    }
+  }, [activeFilter, rentRollUnits, layout, asOfDate]);
+
   const rr = hoveredUnit?.rentRollUnit;
 
   return (
@@ -1778,6 +1990,18 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
       {!isReady && (
         <div className="absolute inset-0 flex items-center justify-center bg-background/80 rounded-2xl">
           <p className="text-muted-foreground text-sm">Loading 3D viewer...</p>
+        </div>
+      )}
+
+      {/* In-canvas stats overlay */}
+      {isReady && (
+        <div className="absolute top-3 left-3 bg-card/70 backdrop-blur-md border border-border/40 rounded-lg px-3 py-2 pointer-events-none">
+          <p className="text-[10px] font-semibold tracking-wider text-muted-foreground/70 uppercase mb-0.5">
+            {activeFilter?.replace(/_/g, ' ') || 'Occupancy'}
+          </p>
+          <p className="text-xs font-mono text-foreground/90">
+            {filterStats}
+          </p>
         </div>
       )}
 
@@ -1855,6 +2079,17 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
             </div>
           </div>
         </div>
+      )}
+
+      {/* Screenshot button */}
+      {isReady && (
+        <button
+          onClick={handleScreenshot}
+          className="absolute bottom-3 right-3 p-2 rounded-lg bg-card/60 backdrop-blur-sm border border-border/40 text-muted-foreground hover:text-foreground hover:bg-card/90 transition-colors"
+          title="Download screenshot"
+        >
+          <Camera className="w-4 h-4" />
+        </button>
       )}
 
       {/* Help text overlay */}

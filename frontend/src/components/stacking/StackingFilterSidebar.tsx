@@ -45,7 +45,7 @@ export function StackingFilterSidebar({
 
   return (
     <div className="w-64 shrink-0 bg-card/30 border-l border-border flex flex-col rounded-r-2xl overflow-hidden"
-         style={{ height: 480 }}>
+         style={{ height: 540 }}>
       {/* Visualization header */}
       <div className="px-4 pt-4 pb-2">
         <h3 className="text-[10px] font-semibold tracking-widest text-muted-foreground/70 uppercase">
