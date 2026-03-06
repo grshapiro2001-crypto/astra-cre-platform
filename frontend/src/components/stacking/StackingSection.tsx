@@ -6,7 +6,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Building2, Pencil, RotateCcw, Globe, Loader2, AlertCircle } from 'lucide-react';
+import { Building2, Pencil, RotateCcw, Globe, Loader2, AlertCircle, Layers } from 'lucide-react';
 import { LayoutEditor } from './LayoutEditor';
 import { StackingViewer3D } from './StackingViewer3D';
 import type { UnitMeshData } from './StackingViewer3D';
@@ -45,6 +45,9 @@ export function StackingSection({ property }: StackingSectionProps) {
   // Filter state
   const [activeFilter, setActiveFilter] = useState<StackingFilterType>('occupancy');
   const [checkedFloorPlans, setCheckedFloorPlans] = useState<Set<string>>(new Set());
+
+  // Exploded view state
+  const [explodedView, setExplodedView] = useState(false);
 
   // Phase 2: Satellite extraction state
   const [extractedLayout, setExtractedLayout] = useState<StackingLayout | null>(null);
@@ -287,6 +290,15 @@ export function StackingSection({ property }: StackingSectionProps) {
               Edit Layout
             </Button>
             <Button
+              variant={explodedView ? "default" : "outline"}
+              size="sm"
+              onClick={() => setExplodedView(v => !v)}
+              className="gap-1.5"
+            >
+              <Layers className="w-3.5 h-3.5" />
+              {explodedView ? 'Collapse' : 'Explode'}
+            </Button>
+            <Button
               variant="ghost"
               size="sm"
               onClick={handleReset}
@@ -411,6 +423,7 @@ export function StackingSection({ property }: StackingSectionProps) {
               activeFilter={activeFilter}
               asOfDate={property.rr_as_of_date}
               checkedFloorPlans={checkedFloorPlans}
+              explodedView={explodedView}
             />
           </div>
           <StackingFilterSidebar
