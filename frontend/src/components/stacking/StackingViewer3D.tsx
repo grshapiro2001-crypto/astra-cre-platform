@@ -478,6 +478,13 @@ function applyFilterToScene(
         color = statusToColor(ud.status);
     }
 
+    // Apply filter color to unit body material
+    const unitMat = obj.material as THREE.MeshPhysicalMaterial;
+    unitMat.emissive.copy(color);
+    unitMat.emissiveIntensity = 0.35;
+    unitMat.color.lerp(color, 0.4);
+    unitMat.needsUpdate = true;
+
     // Update status stripe color (child mesh named stripe_unit_*)
     obj.traverse((child: THREE.Object3D) => {
       if (child instanceof THREE.Mesh && child.name.startsWith('stripe_')) {
@@ -493,6 +500,7 @@ interface MaterialSnapshot {
   color: THREE.Color;
   opacity: number;
   emissive: THREE.Color;
+  emissiveIntensity: number;
 }
 
 function restoreFromSnapshot(
@@ -507,6 +515,7 @@ function restoreFromSnapshot(
     mat.color.copy(snap.color);
     mat.opacity = snap.opacity;
     if ('emissive' in mat) (mat as THREE.MeshStandardMaterial).emissive.copy(snap.emissive);
+    if ('emissiveIntensity' in mat) (mat as THREE.MeshPhysicalMaterial).emissiveIntensity = snap.emissiveIntensity;
     mat.needsUpdate = true;
   });
 }
@@ -1277,6 +1286,8 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
   const hoveredRef = useRef<THREE.Mesh | null>(null);
   const animationIdRef = useRef<number>(0);
   const materialSnapshotRef = useRef<Map<string, MaterialSnapshot>>(new Map());
+  const unitMeshesRef = useRef<THREE.Mesh[]>([]);
+  const filterStateRef = useRef<Map<string, MaterialSnapshot>>(new Map());
   const [isReady, setIsReady] = useState(false);
   const [hoveredUnit, setHoveredUnit] = useState<UnitMeshData | null>(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
@@ -1293,33 +1304,46 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
     // Raycasting for hover tooltip
     if (!cameraRef.current || !sceneRef.current) return;
     raycasterRef.current.setFromCamera(mouseRef.current, cameraRef.current);
-    const unitMeshes: THREE.Mesh[] = [];
-    sceneRef.current.traverse((obj) => {
-      if (obj instanceof THREE.Mesh && obj.name.startsWith('unit_') && !obj.name.startsWith('label_')) {
-        unitMeshes.push(obj);
-      }
-    });
-    const intersects = raycasterRef.current.intersectObjects(unitMeshes);
+    const units = unitMeshesRef.current;
+    const intersects = raycasterRef.current.intersectObjects(units);
 
-    // Reset previous hover
+    // Reset ALL units to their filter state (undoes previous dim/highlight)
     if (hoveredRef.current) {
-      const mat = hoveredRef.current.material as THREE.MeshPhysicalMaterial;
-      const status = (hoveredRef.current.userData as UnitMeshData).status;
-      mat.emissiveIntensity = status === 'unknown' ? 0.05 : 0.1;
-      mat.opacity = status === 'unknown' ? 0.85 : 0.9;
+      for (const mesh of units) {
+        const mat = mesh.material as THREE.MeshPhysicalMaterial;
+        const fs = filterStateRef.current.get(mesh.uuid);
+        if (fs) {
+          mat.emissiveIntensity = fs.emissiveIntensity;
+          mat.opacity = fs.opacity;
+        }
+        mat.clearcoat = 0.2;
+        mat.needsUpdate = true;
+      }
       hoveredRef.current = null;
     }
 
     if (intersects.length > 0) {
       const hit = intersects[0].object as THREE.Mesh;
       if (hit.name.startsWith('unit_')) {
+        // Highlight hovered unit
         const mat = hit.material as THREE.MeshPhysicalMaterial;
-        mat.emissiveIntensity = 0.6;
+        mat.emissiveIntensity = 0.8;
         mat.opacity = 1.0;
+        mat.clearcoat = 0.6;
+        mat.needsUpdate = true;
+
+        // Dim all OTHER unit meshes for contrast
+        for (const mesh of units) {
+          if (mesh === hit) continue;
+          const otherMat = mesh.material as THREE.MeshPhysicalMaterial;
+          if (otherMat.opacity <= 0.15) continue; // skip floor-plan-dimmed units
+          otherMat.opacity = 0.5;
+          otherMat.needsUpdate = true;
+        }
+
         hoveredRef.current = hit;
         containerRef.current.style.cursor = 'pointer';
-        const ud = hit.userData as UnitMeshData;
-        setHoveredUnit(ud);
+        setHoveredUnit(hit.userData as UnitMeshData);
       }
     } else {
       containerRef.current.style.cursor = 'grab';
@@ -1330,10 +1354,17 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
   const handleMouseLeave = useCallback(() => {
     setHoveredUnit(null);
     if (hoveredRef.current) {
-      const mat = hoveredRef.current.material as THREE.MeshPhysicalMaterial;
-      const status = (hoveredRef.current.userData as UnitMeshData).status;
-      mat.emissiveIntensity = status === 'vacant' ? 0.2 : status === 'occupied' ? 0.15 : 0.05;
-      mat.opacity = status === 'unknown' ? 0.75 : 0.88;
+      // Restore ALL units to their filter state
+      for (const mesh of unitMeshesRef.current) {
+        const mat = mesh.material as THREE.MeshPhysicalMaterial;
+        const fs = filterStateRef.current.get(mesh.uuid);
+        if (fs) {
+          mat.emissiveIntensity = fs.emissiveIntensity;
+          mat.opacity = fs.opacity;
+        }
+        mat.clearcoat = 0.2;
+        mat.needsUpdate = true;
+      }
       hoveredRef.current = null;
     }
   }, []);
@@ -1381,7 +1412,14 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
     controls.dampingFactor = 0.08;
     controls.minPolarAngle = THREE.MathUtils.degToRad(5);    // 5° — nearly top-down OK
     controls.maxPolarAngle = THREE.MathUtils.degToRad(88);   // 88° — near ground level OK
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = 0.8;
     controlsRef.current = controls;
+
+    // Stop auto-rotate on first user interaction
+    const stopAutoRotate = () => { controls.autoRotate = false; };
+    renderer.domElement.addEventListener('pointerdown', stopAutoRotate);
+    renderer.domElement.addEventListener('wheel', stopAutoRotate);
 
     // ── Lighting ──
     const ambient = new THREE.AmbientLight(0x8B8BBA, 0.4);
@@ -1548,17 +1586,34 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
     ground.receiveShadow = true;
     scene.add(ground);
 
-    // ── Camera position — 40° elevation, 45° azimuth for ground-floor visibility ──
+    // ── Collect unit meshes for efficient hover traversal ──
+    const collectedUnits: THREE.Mesh[] = [];
+    scene.traverse((obj) => {
+      if (obj instanceof THREE.Mesh && obj.name.startsWith('unit_') && !obj.name.startsWith('label_')) {
+        collectedUnits.push(obj);
+      }
+    });
+    unitMeshesRef.current = collectedUnits;
+
+    // ── Camera position — 32° elevation, 45° azimuth for ground-floor visibility ──
     const maxDim = Math.max(sceneSize.x, sceneSize.z);
-    const cameraDistance = maxDim * 1.5;
-    const elevation = THREE.MathUtils.degToRad(40);
+    const cameraDistance = maxDim * 1.05;
+    const elevation = THREE.MathUtils.degToRad(32);
     const azimuth = THREE.MathUtils.degToRad(45);
 
-    camera.position.set(
+    // Fly-in: start far away, animate to final position
+    const startDistance = cameraDistance * 2.5;
+    const endPos = new THREE.Vector3(
       sceneCenter.x + cameraDistance * Math.cos(elevation) * Math.sin(azimuth),
       sceneCenter.y + cameraDistance * Math.sin(elevation),
       sceneCenter.z + cameraDistance * Math.cos(elevation) * Math.cos(azimuth),
     );
+    const startPos = new THREE.Vector3(
+      sceneCenter.x + startDistance * Math.cos(elevation) * Math.sin(azimuth),
+      sceneCenter.y + startDistance * Math.sin(elevation) + 5,
+      sceneCenter.z + startDistance * Math.cos(elevation) * Math.cos(azimuth),
+    );
+    camera.position.copy(startPos);
     camera.lookAt(sceneCenter);
     controls.target.copy(sceneCenter);
     controls.minDistance = UNIT_DEPTH * 2;
@@ -1566,8 +1621,25 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
     controls.update();
 
     // ── Animate ──
+    let flyInFrame = 0;
+    const FLY_IN_FRAMES = 60;
+    const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
+
     const animate = () => {
       animationIdRef.current = requestAnimationFrame(animate);
+
+      // Fly-in animation (~1 second) — suppress auto-rotate during fly-in
+      if (flyInFrame < FLY_IN_FRAMES) {
+        controls.autoRotate = false;
+        flyInFrame++;
+        const ease = easeOutCubic(flyInFrame / FLY_IN_FRAMES);
+        camera.position.lerpVectors(startPos, endPos, ease);
+        camera.lookAt(sceneCenter);
+        if (flyInFrame === FLY_IN_FRAMES) {
+          controls.autoRotate = true;
+        }
+      }
+
       controls.update();
       renderer.render(scene, camera);
     };
@@ -1597,6 +1669,7 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
           color: mat.color.clone(),
           opacity: mat.opacity,
           emissive: 'emissive' in mat ? mat.emissive.clone() : new THREE.Color(0),
+          emissiveIntensity: 'emissiveIntensity' in mat ? (mat as THREE.MeshPhysicalMaterial).emissiveIntensity : 0,
         });
       }
     });
@@ -1608,6 +1681,8 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
       container.removeEventListener('mousemove', handleMouseMove);
       container.removeEventListener('mouseleave', handleMouseLeave);
       container.removeEventListener('click', handleClick);
+      renderer.domElement.removeEventListener('pointerdown', stopAutoRotate);
+      renderer.domElement.removeEventListener('wheel', stopAutoRotate);
       window.removeEventListener('resize', handleResize);
       controls.dispose();
       renderer.dispose();
@@ -1641,6 +1716,19 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
     const stats = computeRentStats(rentRollUnits, layout);
     const refDate = asOfDate ? new Date(asOfDate) : new Date();
     applyFilterToScene(sceneRef.current, activeFilter, stats, refDate);
+
+    // Capture post-filter state so hover can restore to it
+    const filterState = new Map<string, MaterialSnapshot>();
+    for (const mesh of unitMeshesRef.current) {
+      const mat = mesh.material as THREE.MeshPhysicalMaterial;
+      filterState.set(mesh.uuid, {
+        color: mat.color.clone(),
+        opacity: mat.opacity,
+        emissive: mat.emissive.clone(),
+        emissiveIntensity: mat.emissiveIntensity ?? 0,
+      });
+    }
+    filterStateRef.current = filterState;
   }, [activeFilter, rentRollUnits, layout, asOfDate]);
 
   // ── Floor plan opacity layer (dims unchecked floor plans to 15%) ──
@@ -1685,7 +1773,7 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
       <div
         ref={containerRef}
         className="w-full rounded-l-2xl overflow-hidden border border-border/60"
-        style={{ height: 480 }}
+        style={{ height: 540 }}
       />
       {!isReady && (
         <div className="absolute inset-0 flex items-center justify-center bg-background/80 rounded-2xl">

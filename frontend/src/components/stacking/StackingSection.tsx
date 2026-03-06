@@ -9,7 +9,9 @@ import { cn } from '@/lib/utils';
 import { Building2, Pencil, RotateCcw, Globe, Loader2, AlertCircle } from 'lucide-react';
 import { LayoutEditor } from './LayoutEditor';
 import { StackingViewer3D } from './StackingViewer3D';
+import type { UnitMeshData } from './StackingViewer3D';
 import { StackingFilterSidebar } from './StackingFilterSidebar';
+import { UnitDetailModal } from './UnitDetailModal';
 import { stackingService } from '@/services/stackingService';
 import type { PropertyDetail, StackingLayout, RentRollUnit, StackingFilterType, FilterLegend } from '@/types/property';
 
@@ -36,6 +38,10 @@ export function StackingSection({ property }: StackingSectionProps) {
   const [rentRollUnits, setRentRollUnits] = useState<RentRollUnit[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
+  // Unit detail modal state
+  const [selectedUnit, setSelectedUnit] = useState<UnitMeshData | null>(null);
+  const [unitModalOpen, setUnitModalOpen] = useState(false);
+
   // Filter state
   const [activeFilter, setActiveFilter] = useState<StackingFilterType>('occupancy');
   const [checkedFloorPlans, setCheckedFloorPlans] = useState<Set<string>>(new Set());
@@ -44,6 +50,11 @@ export function StackingSection({ property }: StackingSectionProps) {
   const [extractedLayout, setExtractedLayout] = useState<StackingLayout | null>(null);
   const [extractionError, setExtractionError] = useState<string | null>(null);
   const [confidence, setConfidence] = useState<ConfidenceInfo | null>(null);
+
+  const handleUnitClick = useCallback((data: UnitMeshData) => {
+    setSelectedUnit(data);
+    setUnitModalOpen(true);
+  }, []);
 
   // Parse existing layout from property
   useEffect(() => {
@@ -396,6 +407,7 @@ export function StackingSection({ property }: StackingSectionProps) {
             <StackingViewer3D
               layout={layout}
               rentRollUnits={rentRollUnits}
+              onUnitClick={handleUnitClick}
               activeFilter={activeFilter}
               asOfDate={property.rr_as_of_date}
               checkedFloorPlans={checkedFloorPlans}
@@ -415,6 +427,11 @@ export function StackingSection({ property }: StackingSectionProps) {
         </div>
       )}
 
+      <UnitDetailModal
+        data={selectedUnit}
+        open={unitModalOpen}
+        onOpenChange={setUnitModalOpen}
+      />
     </div>
   );
 }
