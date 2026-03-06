@@ -160,6 +160,8 @@ class Property(Base):
 
     # 3D Stacking layout (Phase 1: manual entry, Phase 2: scraper-based)
     stacking_layout_json = Column(Text, nullable=True)
+    # Floor plan extraction — raw unit position map from Claude Vision
+    unit_position_map_json = Column(Text, nullable=True)
 
     # Relationships
     unit_mix = relationship("PropertyUnitMix", backref="property", cascade="all, delete-orphan")

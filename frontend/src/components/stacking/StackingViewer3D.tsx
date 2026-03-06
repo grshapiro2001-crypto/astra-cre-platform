@@ -6,7 +6,7 @@
 import { useRef, useEffect, useCallback, useState, useMemo } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import type { StackingLayout, StackingBuilding, RentRollUnit, StackingFilterType } from '@/types/property';
+import type { StackingLayout, StackingBuilding, RentRollUnit, StackingFilterType, UnitPositionMap } from '@/types/property';
 import { Camera, Maximize2, Minimize2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -180,6 +180,7 @@ interface StackingViewer3DProps {
   isolatedFloor?: number | null;
   isFullscreen?: boolean;
   onFullscreenToggle?: () => void;
+  unitPositionMap?: UnitPositionMap | null;
 }
 
 // ─── Matching logic ──────────────────────────────────────────────────────────
@@ -232,6 +233,7 @@ function inferFloorFromUnitNumber(unitNumber: string, totalFloors: number): numb
 function matchUnitsToRentRoll(
   layout: StackingLayout,
   rentRollUnits: RentRollUnit[],
+  unitPositionMap?: UnitPositionMap | null,
 ): Map<string, RentRollUnit> {
   const map = new Map<string, RentRollUnit>();
   if (!rentRollUnits.length) return map;
@@ -244,6 +246,39 @@ function matchUnitsToRentRoll(
     return true;
   });
 
+  // ── Position-map matching: use exact unit-to-position mapping from floor plan extraction ──
+  if (unitPositionMap && unitPositionMap.floors.length > 0) {
+    // Build a lookup from unit_number → RentRollUnit
+    const unitByNumber = new Map<string, RentRollUnit>();
+    for (const u of deduped) {
+      if (u.unit_number) unitByNumber.set(u.unit_number, u);
+    }
+
+    // Use the first building (floor plan extraction generates a single building)
+    const bldgId = layout.buildings[0]?.id || 'A';
+
+    for (const floorData of unitPositionMap.floors) {
+      // Floor in the position map is 0-indexed from the floor plan, but our geometry
+      // uses 1-indexed floors. Map floor 0 → geometry floor 1, floor 1 → 2, etc.
+      const geometryFloor = floorData.floor + 1;
+
+      let posCounter = 1;
+      for (const wing of floorData.wings) {
+        for (const unitNum of wing.unit_numbers) {
+          const rr = unitByNumber.get(unitNum);
+          if (rr) {
+            const key = `${bldgId}_${geometryFloor}_${posCounter}`;
+            map.set(key, rr);
+          }
+          posCounter++;
+        }
+      }
+    }
+
+    return map;
+  }
+
+  // ── Heuristic matching (existing behavior) ──
   const totalFloors = layout.buildings.reduce((m, b) => Math.max(m, b.num_floors), 1);
 
   // Try to infer floor from unit number
@@ -1416,7 +1451,7 @@ function addAmenityPads(layout: StackingLayout, scene: THREE.Scene, sceneCenter:
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFilter = 'occupancy', asOfDate, checkedFloorPlans, explodedView, isolatedFloor, isFullscreen, onFullscreenToggle, selectedUnits }: StackingViewer3DProps) {
+export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFilter = 'occupancy', asOfDate, checkedFloorPlans, explodedView, isolatedFloor, isFullscreen, onFullscreenToggle, selectedUnits, unitPositionMap }: StackingViewer3DProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
@@ -1632,7 +1667,7 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
     scene.add(rimLight);
 
     // ── Build geometry (grid layout) ──
-    const unitMap = matchUnitsToRentRoll(layout, rentRollUnits);
+    const unitMap = matchUnitsToRentRoll(layout, rentRollUnits, unitPositionMap);
     const totalUnits = layout.buildings.reduce((sum, b) => sum + b.units_per_floor * b.num_floors, 0);
     const cols = Math.max(1, Math.ceil(Math.sqrt(layout.buildings.length)));
 
@@ -2089,7 +2124,7 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
         container.removeChild(renderer.domElement);
       }
     };
-  }, [layout, rentRollUnits, handleMouseDown, handleMouseMove, handleMouseLeave, handleClick]);
+  }, [layout, rentRollUnits, unitPositionMap, handleMouseDown, handleMouseMove, handleMouseLeave, handleClick]);
 
   // ── Filter recoloring (no scene rebuild — material color swaps only) ──
   useEffect(() => {

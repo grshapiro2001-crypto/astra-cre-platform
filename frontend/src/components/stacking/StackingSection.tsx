@@ -3,10 +3,11 @@
  * Manages state transitions: choosing → extracting → extracted → editing → viewing.
  * Phase 2 adds satellite auto-generation flow alongside manual entry.
  */
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
-import { Building2, Pencil, RotateCcw, Globe, Loader2, AlertCircle, Layers } from 'lucide-react';
+import { Building2, Pencil, RotateCcw, Globe, Loader2, AlertCircle, Layers, Map as MapIcon, Upload, X } from 'lucide-react';
 import { LayoutEditor } from './LayoutEditor';
 import { StackingViewer3D } from './StackingViewer3D';
 import type { UnitMeshData } from './StackingViewer3D';
@@ -14,7 +15,7 @@ import { StackingFilterSidebar } from './StackingFilterSidebar';
 import { UnitDetailPanel } from './UnitDetailPanel';
 import { UnitComparisonPanel } from './UnitComparisonPanel';
 import { stackingService } from '@/services/stackingService';
-import type { PropertyDetail, StackingLayout, RentRollUnit, StackingFilterType, FilterLegend } from '@/types/property';
+import type { PropertyDetail, StackingLayout, RentRollUnit, StackingFilterType, FilterLegend, UnitPositionMap } from '@/types/property';
 
 type SectionMode = 'choosing' | 'extracting' | 'extracted' | 'editing' | 'viewing';
 
@@ -63,6 +64,14 @@ export function StackingSection({ property }: StackingSectionProps) {
   const [extractionError, setExtractionError] = useState<string | null>(null);
   const [confidence, setConfidence] = useState<ConfidenceInfo | null>(null);
 
+  // Floor plan extraction state
+  const [unitPositionMap, setUnitPositionMap] = useState<UnitPositionMap | null>(null);
+  const [showFloorPlanUpload, setShowFloorPlanUpload] = useState(false);
+  const [floorPlanFiles, setFloorPlanFiles] = useState<File[]>([]);
+  const [isExtractingFloorPlan, setIsExtractingFloorPlan] = useState(false);
+  const [floorPlanError, setFloorPlanError] = useState<string | null>(null);
+  const floorPlanInputRef = useRef<HTMLInputElement>(null);
+
   const handleUnitClick = useCallback((data: UnitMeshData, event?: { ctrlKey?: boolean; metaKey?: boolean }) => {
     if (event?.ctrlKey || event?.metaKey) {
       // Multi-select: toggle this unit in the selection
@@ -80,7 +89,7 @@ export function StackingSection({ property }: StackingSectionProps) {
     }
   }, []);
 
-  // Parse existing layout from property
+  // Parse existing layout and unit position map from property
   useEffect(() => {
     if (property.stacking_layout_json) {
       try {
@@ -93,7 +102,12 @@ export function StackingSection({ property }: StackingSectionProps) {
     } else {
       setMode('choosing');
     }
-  }, [property.stacking_layout_json]);
+    if (property.unit_position_map_json) {
+      try {
+        setUnitPositionMap(JSON.parse(property.unit_position_map_json) as UnitPositionMap);
+      } catch { /* ignore parse errors */ }
+    }
+  }, [property.stacking_layout_json, property.unit_position_map_json]);
 
   // Fetch rent roll units
   useEffect(() => {
@@ -173,6 +187,50 @@ export function StackingSection({ property }: StackingSectionProps) {
       setIsSaving(false);
     }
   }, [property.id]);
+
+  const handleFloorPlanFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    setFloorPlanFiles(prev => [...prev, ...files]);
+    // Reset the input so the same file can be re-selected
+    if (floorPlanInputRef.current) floorPlanInputRef.current.value = '';
+  }, []);
+
+  const handleRemoveFloorPlanFile = useCallback((index: number) => {
+    setFloorPlanFiles(prev => prev.filter((_, i) => i !== index));
+  }, []);
+
+  const handleExtractFloorPlan = useCallback(async () => {
+    if (floorPlanFiles.length === 0) return;
+    setIsExtractingFloorPlan(true);
+    setFloorPlanError(null);
+
+    try {
+      const result = await stackingService.extractFromFloorPlan(property.id, floorPlanFiles);
+
+      const newLayout: StackingLayout = {
+        buildings: result.layout.buildings,
+        amenities: result.layout.amenities,
+        total_units: result.layout.total_units,
+        source: 'floor_plan',
+        confirmed_at: new Date().toISOString(),
+      };
+
+      // Save layout + position map
+      await stackingService.saveLayout(property.id, newLayout, result.unit_position_map);
+
+      setLayout(newLayout);
+      setUnitPositionMap(result.unit_position_map);
+      setShowFloorPlanUpload(false);
+      setFloorPlanFiles([]);
+      setMode('viewing');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      const axiosDetail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setFloorPlanError(axiosDetail || message);
+    } finally {
+      setIsExtractingFloorPlan(false);
+    }
+  }, [property.id, floorPlanFiles]);
 
   // Floor plan filter: init all checked when rent roll loads
   useEffect(() => {
@@ -350,6 +408,15 @@ export function StackingSection({ property }: StackingSectionProps) {
             <Button
               variant="outline"
               size="sm"
+              onClick={() => { setShowFloorPlanUpload(true); setFloorPlanFiles([]); setFloorPlanError(null); }}
+              className="gap-1.5"
+            >
+              <MapIcon className="w-3.5 h-3.5" />
+              Map from Floor Plan
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => setMode('editing')}
               className="gap-1.5"
             >
@@ -408,6 +475,14 @@ export function StackingSection({ property }: StackingSectionProps) {
             >
               <Globe className="w-4 h-4" />
               Auto-Generate from Satellite
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => { setShowFloorPlanUpload(true); setFloorPlanFiles([]); setFloorPlanError(null); }}
+              className="gap-2"
+            >
+              <MapIcon className="w-4 h-4" />
+              Map from Floor Plan
             </Button>
             <Button
               variant="outline"
@@ -495,6 +570,7 @@ export function StackingSection({ property }: StackingSectionProps) {
               isFullscreen={isFullscreen}
               onFullscreenToggle={() => setIsFullscreen(v => !v)}
               selectedUnits={selectedUnits}
+              unitPositionMap={unitPositionMap}
             />
             {/* Fullscreen sidebar overlay */}
             {isFullscreen && (
@@ -534,6 +610,96 @@ export function StackingSection({ property }: StackingSectionProps) {
           )}
         </div>
       )}
+
+      {/* Floor Plan Upload Dialog */}
+      <Dialog open={showFloorPlanUpload} onOpenChange={(open) => { if (!isExtractingFloorPlan) setShowFloorPlanUpload(open); }}>
+        <DialogContent className="sm:max-w-lg bg-card border-border">
+          <DialogHeader>
+            <DialogTitle>Map Units from Floor Plan</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground mb-4">
+            Upload screenshots of each floor from the property&apos;s website floor plan.
+            ASTRA will extract unit positions to accurately place units in the 3D model.
+          </p>
+
+          {/* Dropzone */}
+          <div
+            className="border-2 border-dashed border-border/60 rounded-xl p-8 text-center cursor-pointer hover:border-primary/40 transition-colors"
+            onClick={() => floorPlanInputRef.current?.click()}
+          >
+            <input
+              ref={floorPlanInputRef}
+              type="file"
+              multiple
+              accept="image/*"
+              onChange={handleFloorPlanFileSelect}
+              className="hidden"
+            />
+            <Upload className="w-8 h-8 text-muted-foreground/40 mx-auto mb-2" />
+            <p className="text-sm text-muted-foreground">
+              Drop floor plan screenshots here, or click to browse
+            </p>
+            <p className="text-xs text-muted-foreground/60 mt-1">
+              One image per floor &middot; PNG, JPG, or screenshot
+            </p>
+          </div>
+
+          {/* Selected files list */}
+          {floorPlanFiles.length > 0 && (
+            <div className="mt-4 space-y-2">
+              <p className="text-xs text-muted-foreground font-medium">{floorPlanFiles.length} file{floorPlanFiles.length > 1 ? 's' : ''} selected</p>
+              {floorPlanFiles.map((file, i) => (
+                <div key={`${file.name}-${i}`} className="flex items-center justify-between bg-card/50 border border-border/40 rounded-lg px-3 py-2">
+                  <span className="text-sm text-foreground truncate">{file.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveFloorPlanFile(i)}
+                    className="text-muted-foreground hover:text-red-400 ml-2"
+                    disabled={isExtractingFloorPlan}
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Error */}
+          {floorPlanError && (
+            <div className="mt-4 bg-rose-500/10 border border-rose-500/20 rounded-xl p-3">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-rose-400 mt-0.5 shrink-0" />
+                <p className="text-sm text-rose-400">{floorPlanError}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="flex items-center justify-end gap-3 mt-4">
+            {isExtractingFloorPlan && (
+              <div className="flex items-center gap-2 mr-auto">
+                <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                <span className="text-sm text-muted-foreground">Analyzing floor plans...</span>
+              </div>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowFloorPlanUpload(false)}
+              disabled={isExtractingFloorPlan}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleExtractFloorPlan}
+              disabled={floorPlanFiles.length === 0 || isExtractingFloorPlan}
+            >
+              Analyze {floorPlanFiles.length > 0 ? `${floorPlanFiles.length} Floor${floorPlanFiles.length > 1 ? 's' : ''}` : ''}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <UnitDetailPanel
         data={selectedUnit}
