@@ -1297,6 +1297,8 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
 
   const handleMouseMove = useCallback((event: MouseEvent) => {
     if (!containerRef.current) return;
+    // Skip hover logic during orbit drag — prevents accidental dim/highlight
+    if (event.buttons !== 0) return;
     const rect = containerRef.current.getBoundingClientRect();
     mouseRef.current.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
     mouseRef.current.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
@@ -1356,20 +1358,19 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
 
   const handleMouseLeave = useCallback(() => {
     setHoveredUnit(null);
-    if (hoveredRef.current) {
-      // Restore ALL units to their filter state
-      for (const mesh of unitMeshesRef.current) {
-        const mat = mesh.material as THREE.MeshPhysicalMaterial;
-        const fs = filterStateRef.current.get(mesh.uuid);
-        if (fs) {
-          mat.emissiveIntensity = fs.emissiveIntensity;
-          mat.opacity = fs.opacity;
-        }
-        mat.clearcoat = 0.2;
-        mat.needsUpdate = true;
+    // ALWAYS restore ALL units to their filter state, regardless of hoveredRef
+    // This prevents units staying dimmed when the mouse leaves during a drag
+    for (const mesh of unitMeshesRef.current) {
+      const mat = mesh.material as THREE.MeshPhysicalMaterial;
+      const fs = filterStateRef.current.get(mesh.uuid);
+      if (fs) {
+        mat.emissiveIntensity = fs.emissiveIntensity;
+        mat.opacity = fs.opacity;
       }
-      hoveredRef.current = null;
+      mat.clearcoat = 0.2;
+      mat.needsUpdate = true;
     }
+    hoveredRef.current = null;
   }, []);
 
   const handleClick = useCallback(() => {
@@ -1710,6 +1711,18 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
 
         if (allDone) {
           buildUpCompleteRef.current = true;
+          // Capture filter state now that build-up is done and opacities are final
+          const filterState = new Map<string, MaterialSnapshot>();
+          for (const mesh of unitMeshesRef.current) {
+            const mat = mesh.material as THREE.MeshPhysicalMaterial;
+            filterState.set(mesh.uuid, {
+              color: mat.color.clone(),
+              opacity: mat.opacity,
+              emissive: mat.emissive.clone(),
+              emissiveIntensity: mat.emissiveIntensity ?? 0,
+            });
+          }
+          filterStateRef.current = filterState;
         }
       }
 
@@ -1790,18 +1803,21 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
     const refDate = asOfDate ? new Date(asOfDate) : new Date();
     applyFilterToScene(sceneRef.current, activeFilter, stats, refDate);
 
-    // Capture post-filter state so hover can restore to it
-    const filterState = new Map<string, MaterialSnapshot>();
-    for (const mesh of unitMeshesRef.current) {
-      const mat = mesh.material as THREE.MeshPhysicalMaterial;
-      filterState.set(mesh.uuid, {
-        color: mat.color.clone(),
-        opacity: mat.opacity,
-        emissive: mat.emissive.clone(),
-        emissiveIntensity: mat.emissiveIntensity ?? 0,
-      });
+    // Only capture filter state after build-up is complete
+    // During build-up, opacity values are being animated and not reliable
+    if (buildUpCompleteRef.current) {
+      const filterState = new Map<string, MaterialSnapshot>();
+      for (const mesh of unitMeshesRef.current) {
+        const mat = mesh.material as THREE.MeshPhysicalMaterial;
+        filterState.set(mesh.uuid, {
+          color: mat.color.clone(),
+          opacity: mat.opacity,
+          emissive: mat.emissive.clone(),
+          emissiveIntensity: mat.emissiveIntensity ?? 0,
+        });
+      }
+      filterStateRef.current = filterState;
     }
-    filterStateRef.current = filterState;
   }, [activeFilter, rentRollUnits, layout, asOfDate]);
 
   // ── Floor plan opacity layer (dims unchecked floor plans to 15%) ──
@@ -1854,6 +1870,18 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
         mat.needsUpdate = true;
       });
       buildUpCompleteRef.current = true;
+      // Capture filter state now that opacities are final
+      const filterState = new Map<string, MaterialSnapshot>();
+      for (const mesh of unitMeshesRef.current) {
+        const mat = mesh.material as THREE.MeshPhysicalMaterial;
+        filterState.set(mesh.uuid, {
+          color: mat.color.clone(),
+          opacity: mat.opacity,
+          emissive: mat.emissive.clone(),
+          emissiveIntensity: mat.emissiveIntensity ?? 0,
+        });
+      }
+      filterStateRef.current = filterState;
     }
 
     const EXPLODE_GAP = UNIT_HEIGHT * 2.5;
