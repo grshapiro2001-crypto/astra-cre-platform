@@ -13,6 +13,7 @@ interface UnitDetailPanelProps {
   open: boolean;
   onClose: () => void;
   rentRollUnits: RentRollUnit[];
+  isFullscreen?: boolean;
 }
 
 function formatDate(dateStr: string | null | undefined): string {
@@ -37,7 +38,7 @@ function MetricRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-export function UnitDetailPanel({ data, open, onClose, rentRollUnits }: UnitDetailPanelProps) {
+export function UnitDetailPanel({ data, open, onClose, rentRollUnits, isFullscreen }: UnitDetailPanelProps) {
   if (!data) return null;
 
   const rr = data.rentRollUnit;
@@ -53,8 +54,9 @@ export function UnitDetailPanel({ data, open, onClose, rentRollUnits }: UnitDeta
   return (
     <div
       className={cn(
-        'fixed right-0 top-0 h-full w-[380px] bg-card border-l border-border shadow-2xl z-50',
+        'fixed top-0 h-full w-[380px] bg-card border-l border-border shadow-2xl',
         'transform transition-transform duration-300 ease-out overflow-y-auto',
+        isFullscreen ? 'right-[256px] z-[52]' : 'right-0 z-50',
         open ? 'translate-x-0' : 'translate-x-full',
       )}
     >

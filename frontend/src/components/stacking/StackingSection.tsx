@@ -540,6 +540,7 @@ export function StackingSection({ property }: StackingSectionProps) {
         open={unitModalOpen}
         onClose={() => setUnitModalOpen(false)}
         rentRollUnits={rentRollUnits}
+        isFullscreen={isFullscreen}
       />
 
       <UnitComparisonPanel

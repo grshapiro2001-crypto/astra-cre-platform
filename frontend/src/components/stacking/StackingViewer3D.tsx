@@ -1361,7 +1361,7 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
     if (!cameraRef.current || !sceneRef.current) return;
     raycasterRef.current.setFromCamera(mouseRef.current, cameraRef.current);
     const units = unitMeshesRef.current;
-    const intersects = raycasterRef.current.intersectObjects(units);
+    const intersects = raycasterRef.current.intersectObjects(units, true);
 
     // Reset ALL units to their filter state (undoes previous dim/highlight)
     if (hoveredRef.current) {
@@ -1379,8 +1379,13 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
     }
 
     if (intersects.length > 0) {
-      const hit = intersects[0].object as THREE.Mesh;
-      if (hit.name.startsWith('unit_')) {
+      // Walk up to the parent unit mesh if we hit a child (window recess, label, stripe)
+      let hitTarget: THREE.Object3D | null = intersects[0].object;
+      while (hitTarget && !(hitTarget instanceof THREE.Mesh && hitTarget.name.startsWith('unit_'))) {
+        hitTarget = hitTarget.parent;
+      }
+      const hit = hitTarget as THREE.Mesh | null;
+      if (hit && hit.name.startsWith('unit_')) {
         // Highlight hovered unit
         const mat = hit.material as THREE.MeshPhysicalMaterial;
         mat.emissiveIntensity = 0.8;
@@ -1448,12 +1453,16 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
 
     const raycaster = new THREE.Raycaster();
     raycaster.setFromCamera(mouse, cameraRef.current);
-    const intersects = raycaster.intersectObjects(unitMeshesRef.current);
+    const intersects = raycaster.intersectObjects(unitMeshesRef.current, true);
 
     if (intersects.length > 0) {
-      const hit = intersects[0].object as THREE.Mesh;
-      if (hit.name.startsWith('unit_')) {
-        onUnitClick(hit.userData as UnitMeshData, {
+      // Walk up to the parent unit mesh if we hit a child (window recess, label, stripe)
+      let hitObj: THREE.Object3D | null = intersects[0].object;
+      while (hitObj && !(hitObj instanceof THREE.Mesh && hitObj.name.startsWith('unit_'))) {
+        hitObj = hitObj.parent;
+      }
+      if (hitObj && hitObj instanceof THREE.Mesh) {
+        onUnitClick(hitObj.userData as UnitMeshData, {
           ctrlKey: event.ctrlKey,
           metaKey: event.metaKey,
         });
