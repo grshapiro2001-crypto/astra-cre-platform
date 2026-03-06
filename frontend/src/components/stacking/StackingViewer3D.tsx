@@ -485,6 +485,10 @@ function applyFilterToScene(
     unitMat.emissive.copy(color);
     unitMat.emissiveIntensity = 0.35;
     unitMat.color.lerp(color, 0.4);
+    // Ensure unit is visible (fix for build-up animation snapshot interaction)
+    if (unitMat.opacity < 0.5) {
+      unitMat.opacity = ud.status === 'unknown' ? 0.85 : 0.9;
+    }
     unitMat.needsUpdate = true;
 
     // Update status stripe color (child mesh named stripe_unit_*)
@@ -1607,6 +1611,21 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
       }
     });
 
+    // ── Material snapshot for safe filter restore (must be BEFORE build-up zeros opacity) ──
+    const snapshot = new Map<string, MaterialSnapshot>();
+    scene.traverse((obj) => {
+      if (obj instanceof THREE.Mesh && obj.material) {
+        const mat = obj.material as THREE.MeshStandardMaterial;
+        snapshot.set(obj.uuid, {
+          color: mat.color.clone(),
+          opacity: mat.opacity,
+          emissive: 'emissive' in mat ? mat.emissive.clone() : new THREE.Color(0),
+          emissiveIntensity: 'emissiveIntensity' in mat ? (mat as THREE.MeshPhysicalMaterial).emissiveIntensity : 0,
+        });
+      }
+    });
+    materialSnapshotRef.current = snapshot;
+
     // ── Build-up animation: store base opacity, then zero out ──
     buildUpCompleteRef.current = false;
     scene.traverse((obj: THREE.Object3D) => {
@@ -1745,21 +1764,6 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
       rendererRef.current.setSize(container.clientWidth, container.clientHeight);
     };
     window.addEventListener('resize', handleResize);
-
-    // ── Material snapshot for safe filter restore ──
-    const snapshot = new Map<string, MaterialSnapshot>();
-    scene.traverse((obj) => {
-      if (obj instanceof THREE.Mesh && obj.material) {
-        const mat = obj.material as THREE.MeshStandardMaterial;
-        snapshot.set(obj.uuid, {
-          color: mat.color.clone(),
-          opacity: mat.opacity,
-          emissive: 'emissive' in mat ? mat.emissive.clone() : new THREE.Color(0),
-          emissiveIntensity: 'emissiveIntensity' in mat ? (mat as THREE.MeshPhysicalMaterial).emissiveIntensity : 0,
-        });
-      }
-    });
-    materialSnapshotRef.current = snapshot;
 
     // ── Cleanup ──
     return () => {
