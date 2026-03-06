@@ -1243,6 +1243,12 @@ async def upload_document_to_property(
                     except (ValueError, TypeError):
                         pass
 
+                # Delete existing rent_roll_units before inserting new ones
+                # (prevents accumulation across re-uploads — matches backfill pattern at L1597)
+                db.query(RentRollUnit).filter(
+                    RentRollUnit.property_id == property_id
+                ).delete()
+
                 # Save unit-level data
                 for unit in extraction.get("units", []):
                     # Defensive: ensure in_place_rent derived from charge_details

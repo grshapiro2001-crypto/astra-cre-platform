@@ -49,6 +49,12 @@ export function StackingSection({ property }: StackingSectionProps) {
   // Exploded view state
   const [explodedView, setExplodedView] = useState(false);
 
+  // Fullscreen state
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Floor isolation state
+  const [isolatedFloor, setIsolatedFloor] = useState<number | null>(null);
+
   // Phase 2: Satellite extraction state
   const [extractedLayout, setExtractedLayout] = useState<StackingLayout | null>(null);
   const [extractionError, setExtractionError] = useState<string | null>(null);
@@ -248,6 +254,51 @@ export function StackingSection({ property }: StackingSectionProps) {
     }
   }, [activeFilter, rentRollUnits, layout]);
 
+  const maxFloors = layout?.buildings.reduce((m, b) => Math.max(m, b.num_floors), 1) ?? 1;
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (mode !== 'viewing') return;
+
+      const filters: StackingFilterType[] = ['occupancy', 'floor_level', 'expirations', 'loss_to_lease', 'market_rents', 'contract_rents'];
+
+      switch (e.key) {
+        case '1': case '2': case '3': case '4': case '5': case '6':
+          setActiveFilter(filters[parseInt(e.key) - 1]);
+          break;
+        case 'e': case 'E':
+          setExplodedView(v => !v);
+          break;
+        case 'f': case 'F':
+          setIsFullscreen(v => !v);
+          break;
+        case 'Escape':
+          if (isFullscreen) setIsFullscreen(false);
+          else if (isolatedFloor !== null) setIsolatedFloor(null);
+          else if (unitModalOpen) setUnitModalOpen(false);
+          break;
+        case 'ArrowUp':
+          e.preventDefault();
+          setIsolatedFloor(prev => {
+            if (prev === null) return 1;
+            return prev < maxFloors ? prev + 1 : null;
+          });
+          break;
+        case 'ArrowDown':
+          e.preventDefault();
+          setIsolatedFloor(prev => {
+            if (prev === null) return maxFloors;
+            return prev > 1 ? prev - 1 : null;
+          });
+          break;
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [mode, isFullscreen, isolatedFloor, unitModalOpen, maxFloors]);
+
   const hasAddress = Boolean(property.property_address?.trim());
 
   return (
@@ -424,19 +475,46 @@ export function StackingSection({ property }: StackingSectionProps) {
               asOfDate={property.rr_as_of_date}
               checkedFloorPlans={checkedFloorPlans}
               explodedView={explodedView}
+              isolatedFloor={isolatedFloor}
+              isFullscreen={isFullscreen}
+              onFullscreenToggle={() => setIsFullscreen(v => !v)}
             />
+            {/* Fullscreen sidebar overlay */}
+            {isFullscreen && (
+              <div className="fixed right-0 top-0 z-[51]">
+                <StackingFilterSidebar
+                  activeFilter={activeFilter}
+                  onFilterChange={setActiveFilter}
+                  legend={legend}
+                  asOfDate={property.rr_as_of_date}
+                  floorPlanCounts={floorPlanCounts}
+                  checkedFloorPlans={checkedFloorPlans}
+                  onFloorPlanToggle={handleFloorPlanToggle}
+                  onFloorPlanSelectAll={handleFloorPlanSelectAll}
+                  onFloorPlanClearAll={handleFloorPlanClearAll}
+                  isolatedFloor={isolatedFloor}
+                  onFloorIsolate={setIsolatedFloor}
+                  maxFloors={maxFloors}
+                />
+              </div>
+            )}
           </div>
-          <StackingFilterSidebar
-            activeFilter={activeFilter}
-            onFilterChange={setActiveFilter}
-            legend={legend}
-            asOfDate={property.rr_as_of_date}
-            floorPlanCounts={floorPlanCounts}
-            checkedFloorPlans={checkedFloorPlans}
-            onFloorPlanToggle={handleFloorPlanToggle}
-            onFloorPlanSelectAll={handleFloorPlanSelectAll}
-            onFloorPlanClearAll={handleFloorPlanClearAll}
-          />
+          {!isFullscreen && (
+            <StackingFilterSidebar
+              activeFilter={activeFilter}
+              onFilterChange={setActiveFilter}
+              legend={legend}
+              asOfDate={property.rr_as_of_date}
+              floorPlanCounts={floorPlanCounts}
+              checkedFloorPlans={checkedFloorPlans}
+              onFloorPlanToggle={handleFloorPlanToggle}
+              onFloorPlanSelectAll={handleFloorPlanSelectAll}
+              onFloorPlanClearAll={handleFloorPlanClearAll}
+              isolatedFloor={isolatedFloor}
+              onFloorIsolate={setIsolatedFloor}
+              maxFloors={maxFloors}
+            />
+          )}
         </div>
       )}
 
