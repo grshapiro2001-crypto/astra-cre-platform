@@ -478,6 +478,13 @@ function applyFilterToScene(
         color = statusToColor(ud.status);
     }
 
+    // Apply filter color to unit body material
+    const unitMat = obj.material as THREE.MeshPhysicalMaterial;
+    unitMat.emissive.copy(color);
+    unitMat.emissiveIntensity = 0.35;
+    unitMat.color.lerp(color, 0.4);
+    unitMat.needsUpdate = true;
+
     // Update status stripe color (child mesh named stripe_unit_*)
     obj.traverse((child: THREE.Object3D) => {
       if (child instanceof THREE.Mesh && child.name.startsWith('stripe_')) {
@@ -493,6 +500,7 @@ interface MaterialSnapshot {
   color: THREE.Color;
   opacity: number;
   emissive: THREE.Color;
+  emissiveIntensity: number;
 }
 
 function restoreFromSnapshot(
@@ -507,6 +515,7 @@ function restoreFromSnapshot(
     mat.color.copy(snap.color);
     mat.opacity = snap.opacity;
     if ('emissive' in mat) (mat as THREE.MeshStandardMaterial).emissive.copy(snap.emissive);
+    if ('emissiveIntensity' in mat) (mat as THREE.MeshPhysicalMaterial).emissiveIntensity = snap.emissiveIntensity;
     mat.needsUpdate = true;
   });
 }
@@ -1597,6 +1606,7 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
           color: mat.color.clone(),
           opacity: mat.opacity,
           emissive: 'emissive' in mat ? mat.emissive.clone() : new THREE.Color(0),
+          emissiveIntensity: 'emissiveIntensity' in mat ? (mat as THREE.MeshPhysicalMaterial).emissiveIntensity : 0,
         });
       }
     });
