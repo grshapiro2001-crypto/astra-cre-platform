@@ -1335,6 +1335,7 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
   const raycasterRef = useRef(new THREE.Raycaster());
   const mouseRef = useRef(new THREE.Vector2());
   const hoveredRef = useRef<THREE.Mesh | null>(null);
+  const mouseDownPosRef = useRef<{ x: number; y: number } | null>(null);
   const animationIdRef = useRef<number>(0);
   const materialSnapshotRef = useRef<Map<string, MaterialSnapshot>>(new Map());
   const unitMeshesRef = useRef<THREE.Mesh[]>([]);
@@ -1423,12 +1424,40 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
     hoveredRef.current = null;
   }, []);
 
+  const handleMouseDown = useCallback((event: MouseEvent) => {
+    mouseDownPosRef.current = { x: event.clientX, y: event.clientY };
+  }, []);
+
   const handleClick = useCallback((event: MouseEvent) => {
-    if (hoveredRef.current?.userData?.building_id && onUnitClick) {
-      onUnitClick(hoveredRef.current.userData as UnitMeshData, {
-        ctrlKey: event.ctrlKey,
-        metaKey: event.metaKey,
-      });
+    if (!containerRef.current || !cameraRef.current || !sceneRef.current || !onUnitClick) return;
+
+    // Ignore click if mouse moved significantly (was a drag, not a click)
+    if (mouseDownPosRef.current) {
+      const dx = event.clientX - mouseDownPosRef.current.x;
+      const dy = event.clientY - mouseDownPosRef.current.y;
+      if (Math.sqrt(dx * dx + dy * dy) > 5) return;
+    }
+
+    // Fresh raycast on click coordinates — don't rely on hoveredRef
+    // (hoveredRef may be null because handleMouseMove skips raycasting when buttons are pressed)
+    const rect = containerRef.current.getBoundingClientRect();
+    const mouse = new THREE.Vector2(
+      ((event.clientX - rect.left) / rect.width) * 2 - 1,
+      -((event.clientY - rect.top) / rect.height) * 2 + 1,
+    );
+
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(mouse, cameraRef.current);
+    const intersects = raycaster.intersectObjects(unitMeshesRef.current);
+
+    if (intersects.length > 0) {
+      const hit = intersects[0].object as THREE.Mesh;
+      if (hit.name.startsWith('unit_')) {
+        onUnitClick(hit.userData as UnitMeshData, {
+          ctrlKey: event.ctrlKey,
+          metaKey: event.metaKey,
+        });
+      }
     }
   }, [onUnitClick]);
 
@@ -1869,6 +1898,7 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
     setIsReady(true);
 
     // ── Event listeners ──
+    container.addEventListener('mousedown', handleMouseDown);
     container.addEventListener('mousemove', handleMouseMove);
     container.addEventListener('mouseleave', handleMouseLeave);
     container.addEventListener('click', handleClick);
@@ -1885,6 +1915,7 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
     // ── Cleanup ──
     return () => {
       cancelAnimationFrame(animationIdRef.current);
+      container.removeEventListener('mousedown', handleMouseDown);
       container.removeEventListener('mousemove', handleMouseMove);
       container.removeEventListener('mouseleave', handleMouseLeave);
       container.removeEventListener('click', handleClick);
@@ -1911,7 +1942,7 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
         container.removeChild(renderer.domElement);
       }
     };
-  }, [layout, rentRollUnits, handleMouseMove, handleMouseLeave, handleClick]);
+  }, [layout, rentRollUnits, handleMouseDown, handleMouseMove, handleMouseLeave, handleClick]);
 
   // ── Filter recoloring (no scene rebuild — material color swaps only) ──
   useEffect(() => {
