@@ -55,13 +55,14 @@ const MATERIALS = {
     emissive: 0x0f0f2a,
     emissiveIntensity: 0.05,
   }),
-  // Floor slab: dark concrete look
+  // Floor slab: dark concrete look with subtle faceted appearance
   slab: new THREE.MeshStandardMaterial({
     color: 0x1A1A2E,
-    metalness: 0.3,
-    roughness: 0.8,
+    metalness: 0.35,
+    roughness: 0.75,
     transparent: true,
-    opacity: 0.6,
+    opacity: 0.65,
+    flatShading: true,
   }),
   // Pool: translucent cyan water
   pool: new THREE.MeshPhysicalMaterial({
@@ -109,6 +110,16 @@ const MATERIALS = {
     emissive: 0x446688,
     emissiveIntensity: 0.1,
   }),
+  // Window recess: dark glass inset on unit exterior faces
+  windowRecess: new THREE.MeshPhysicalMaterial({
+    color: 0x0a0a1e,
+    metalness: 0.4,
+    roughness: 0.1,
+    transparent: true,
+    opacity: 0.7,
+    emissive: new THREE.Color(0x111133),
+    emissiveIntensity: 0.05,
+  }),
 };
 
 // Edge line material for unit borders
@@ -117,6 +128,35 @@ const EDGE_LINE_MATERIAL = new THREE.LineBasicMaterial({
   transparent: true,
   opacity: 0.4,
 });
+
+// Shared window recess geometry (reused across all units for performance)
+const WINDOW_RECESS_GEOM = new THREE.BoxGeometry(UNIT_WIDTH * 0.7, UNIT_HEIGHT * 0.5, 0.08);
+const RECESS_DEPTH = 0.08;
+
+function addWindowRecess(mesh: THREE.Mesh, wingDirection: string): void {
+  const recess = new THREE.Mesh(WINDOW_RECESS_GEOM, MATERIALS.windowRecess);
+  const halfDepth = UNIT_DEPTH / 2 - RECESS_DEPTH / 2 + 0.01;
+
+  switch (wingDirection) {
+    case 'south':
+      recess.position.set(0, 0.1, halfDepth);
+      break;
+    case 'north':
+      recess.position.set(0, 0.1, -halfDepth);
+      break;
+    case 'east':
+      recess.position.set(halfDepth, 0.1, 0);
+      recess.rotation.y = Math.PI / 2;
+      break;
+    case 'west':
+      recess.position.set(-halfDepth, 0.1, 0);
+      recess.rotation.y = Math.PI / 2;
+      break;
+  }
+
+  recess.name = `window_${mesh.name}`;
+  mesh.add(recess);
+}
 
 export interface UnitMeshData {
   building_id: string;
@@ -131,7 +171,8 @@ export interface UnitMeshData {
 interface StackingViewer3DProps {
   layout: StackingLayout;
   rentRollUnits: RentRollUnit[];
-  onUnitClick?: (data: UnitMeshData) => void;
+  onUnitClick?: (data: UnitMeshData, event?: { ctrlKey?: boolean; metaKey?: boolean }) => void;
+  selectedUnits?: UnitMeshData[];
   activeFilter?: StackingFilterType;
   asOfDate?: string | null;
   checkedFloorPlans?: Set<string>;
@@ -1285,7 +1326,7 @@ function addAmenityPads(layout: StackingLayout, scene: THREE.Scene, sceneCenter:
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFilter = 'occupancy', asOfDate, checkedFloorPlans, explodedView, isolatedFloor, isFullscreen, onFullscreenToggle }: StackingViewer3DProps) {
+export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFilter = 'occupancy', asOfDate, checkedFloorPlans, explodedView, isolatedFloor, isFullscreen, onFullscreenToggle, selectedUnits }: StackingViewer3DProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
@@ -1299,6 +1340,7 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
   const unitMeshesRef = useRef<THREE.Mesh[]>([]);
   const filterStateRef = useRef<Map<string, MaterialSnapshot>>(new Map());
   const buildUpCompleteRef = useRef(false);
+  const maxDimRef = useRef<number>(50);
   const [isReady, setIsReady] = useState(false);
   const [hoveredUnit, setHoveredUnit] = useState<UnitMeshData | null>(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
@@ -1381,9 +1423,12 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
     hoveredRef.current = null;
   }, []);
 
-  const handleClick = useCallback(() => {
+  const handleClick = useCallback((event: MouseEvent) => {
     if (hoveredRef.current?.userData?.building_id && onUnitClick) {
-      onUnitClick(hoveredRef.current.userData as UnitMeshData);
+      onUnitClick(hoveredRef.current.userData as UnitMeshData, {
+        ctrlKey: event.ctrlKey,
+        metaKey: event.metaKey,
+      });
     }
   }, [onUnitClick]);
 
@@ -1507,9 +1552,25 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
 
       // Building label above
       const center = new THREE.Vector3();
-      new THREE.Box3().setFromObject(group).getCenter(center);
+      const groupBox = new THREE.Box3().setFromObject(group);
+      groupBox.getCenter(center);
       const labelPos = new THREE.Vector3(center.x, building.num_floors * (UNIT_HEIGHT + FLOOR_SLAB_HEIGHT) + 1.5, center.z);
       scene.add(createBuildingLabel(building.label, labelPos));
+
+      // Ground shadow plane under building
+      const groupSize = new THREE.Vector3();
+      groupBox.getSize(groupSize);
+      const aoGeom = new THREE.PlaneGeometry(groupSize.x * 1.2, groupSize.z * 1.2);
+      const aoMat = new THREE.MeshBasicMaterial({
+        color: 0x000000,
+        transparent: true,
+        opacity: 0.3,
+        side: THREE.DoubleSide,
+      });
+      const aoPlane = new THREE.Mesh(aoGeom, aoMat);
+      aoPlane.rotation.x = -Math.PI / 2;
+      aoPlane.position.set(center.x, -UNIT_HEIGHT * 0.49, center.z);
+      scene.add(aoPlane);
     }
 
     // ── Fix 1: Post-build label refresh using real unit_numbers from rent roll ──
@@ -1566,6 +1627,45 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
       const unitNumber = rr?.unit_number ?? String(ud.position).padStart(3, '0');
       const labelRR = { unit_number: unitNumber } as RentRollUnit;
       addUnitLabel(mesh, labelRR, ud.wingDirection ?? 'south', totalUnits);
+
+      // Add window recess on the exterior face
+      addWindowRecess(mesh, ud.wingDirection ?? 'south');
+    }
+
+    // ── Floor summary sprites (LOD labels — shown when zoomed out) ──
+    const maxFloorCount = layout.buildings.reduce((m, b) => Math.max(m, b.num_floors), 1);
+    const lodSceneBox = new THREE.Box3().setFromObject(scene);
+    const sceneCenter2 = new THREE.Vector3();
+    lodSceneBox.getCenter(sceneCenter2);
+
+    for (let fl = 1; fl <= maxFloorCount; fl++) {
+      const floorUnits = allUnitMeshes.filter(m => (m.userData as UnitMeshData).floor === fl);
+      const vacantCount = floorUnits.filter(m => (m.userData as UnitMeshData).status === 'vacant').length;
+      const totalCount = floorUnits.length;
+      const text = `F${fl}: ${totalCount} units${vacantCount > 0 ? ` · ${vacantCount} vacant` : ''}`;
+
+      const canvas = document.createElement('canvas');
+      canvas.width = 512;
+      canvas.height = 64;
+      const ctx = canvas.getContext('2d')!;
+      ctx.clearRect(0, 0, 512, 64);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+      ctx.font = 'bold 24px monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, 256, 32);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      const mat = new THREE.SpriteMaterial({ map: texture, transparent: true });
+      const sprite = new THREE.Sprite(mat);
+
+      const floorY = (fl - 1) * (UNIT_HEIGHT + FLOOR_SLAB_HEIGHT) + UNIT_HEIGHT / 2;
+      sprite.position.set(sceneCenter2.x, floorY, sceneCenter2.z);
+      sprite.scale.set(12, 1.5, 1);
+      sprite.name = `floor_summary_${fl}`;
+      sprite.visible = false;
+      sprite.userData._baseY = floorY;
+      scene.add(sprite);
     }
 
     // ── Amenities ──
@@ -1633,11 +1733,11 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
     // ── Build-up animation: store base opacity, then zero out ──
     buildUpCompleteRef.current = false;
     scene.traverse((obj: THREE.Object3D) => {
-      if (!(obj instanceof THREE.Mesh || obj instanceof THREE.LineSegments)) return;
+      if (!(obj instanceof THREE.Mesh || obj instanceof THREE.LineSegments || obj instanceof THREE.Sprite)) return;
       if (obj.name.startsWith('amenity_')) return;
       // Skip ground plane and grid
       if (obj.position.y < -0.1) return;
-      const mat = obj.material as THREE.MeshStandardMaterial | THREE.MeshBasicMaterial;
+      const mat = obj.material as THREE.MeshStandardMaterial | THREE.MeshBasicMaterial | THREE.SpriteMaterial;
       if (!mat || typeof mat.opacity !== 'number') return;
       obj.userData._baseOpacity = mat.opacity;
       mat.transparent = true;
@@ -1647,6 +1747,7 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
 
     // ── Camera position — 32° elevation, 45° azimuth for ground-floor visibility ──
     const maxDim = Math.max(sceneSize.x, sceneSize.z);
+    maxDimRef.current = maxDim;
     const cameraDistance = maxDim * 1.05;
     const elevation = THREE.MathUtils.degToRad(32);
     const azimuth = THREE.MathUtils.degToRad(45);
@@ -1699,7 +1800,7 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
         let allDone = true;
 
         scene.traverse((obj: THREE.Object3D) => {
-          if (!(obj instanceof THREE.Mesh || obj instanceof THREE.LineSegments)) return;
+          if (!(obj instanceof THREE.Mesh || obj instanceof THREE.LineSegments || obj instanceof THREE.Sprite)) return;
           if (obj.userData._baseOpacity === undefined) return;
 
           // Determine floor
@@ -1747,6 +1848,18 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
           }
           filterStateRef.current = filterState;
         }
+      }
+
+      // LOD labels: toggle between unit labels and floor summaries based on zoom
+      if (buildUpCompleteRef.current) {
+        const camDist = camera.position.distanceTo(controls.target);
+        const lodThreshold = maxDimRef.current * 1.3;
+        const showUnitLabels = camDist < lodThreshold;
+
+        scene.traverse((obj) => {
+          if (obj.name.startsWith('label_')) obj.visible = showUnitLabels;
+          if (obj.name.startsWith('floor_summary_')) obj.visible = !showUnitLabels;
+        });
       }
 
       controls.update();
@@ -2034,6 +2147,36 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
     return () => cancelAnimationFrame(animId);
   }, [isolatedFloor]);
 
+  // ── Selected units highlight (multi-select comparison) ──
+  useEffect(() => {
+    const units = unitMeshesRef.current;
+    if (!units.length) return;
+
+    const selectedIds = new Set((selectedUnits || []).map(u => u.rentRollUnit?.id).filter(Boolean));
+
+    for (const mesh of units) {
+      const mat = mesh.material as THREE.MeshPhysicalMaterial;
+      const ud = mesh.userData as UnitMeshData;
+      const rrId = ud.rentRollUnit?.id;
+
+      if (selectedIds.size > 0 && rrId && selectedIds.has(rrId)) {
+        mat.emissive.set(0x7C3AED);
+        mat.emissiveIntensity = 1.0;
+        mat.clearcoat = 1.0;
+        mat.needsUpdate = true;
+      } else {
+        // Restore to filter state
+        const fs = filterStateRef.current.get(mesh.uuid);
+        if (fs) {
+          mat.emissive.copy(fs.emissive);
+          mat.emissiveIntensity = fs.emissiveIntensity;
+        }
+        mat.clearcoat = 0.2;
+        mat.needsUpdate = true;
+      }
+    }
+  }, [selectedUnits]);
+
   // ── Fullscreen resize ──
   useEffect(() => {
     if (!rendererRef.current || !cameraRef.current || !containerRef.current) return;
@@ -2232,7 +2375,7 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
 
       {/* Help text overlay */}
       <div className="absolute bottom-2 left-3 text-[10px] text-muted-foreground/50 pointer-events-none">
-        Hover a unit for details · Drag to rotate · Keys: 1-6 filters · E explode · F fullscreen
+        Hover for details · Click for unit info · Ctrl+Click to compare · Drag to rotate · Keys: 1-6 filters · E explode · F fullscreen
       </div>
     </div>
   );

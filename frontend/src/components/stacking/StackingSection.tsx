@@ -11,7 +11,8 @@ import { LayoutEditor } from './LayoutEditor';
 import { StackingViewer3D } from './StackingViewer3D';
 import type { UnitMeshData } from './StackingViewer3D';
 import { StackingFilterSidebar } from './StackingFilterSidebar';
-import { UnitDetailModal } from './UnitDetailModal';
+import { UnitDetailPanel } from './UnitDetailPanel';
+import { UnitComparisonPanel } from './UnitComparisonPanel';
 import { stackingService } from '@/services/stackingService';
 import type { PropertyDetail, StackingLayout, RentRollUnit, StackingFilterType, FilterLegend } from '@/types/property';
 
@@ -38,9 +39,11 @@ export function StackingSection({ property }: StackingSectionProps) {
   const [rentRollUnits, setRentRollUnits] = useState<RentRollUnit[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Unit detail modal state
+  // Unit detail panel state
   const [selectedUnit, setSelectedUnit] = useState<UnitMeshData | null>(null);
   const [unitModalOpen, setUnitModalOpen] = useState(false);
+  // Multi-unit comparison state
+  const [selectedUnits, setSelectedUnits] = useState<UnitMeshData[]>([]);
 
   // Filter state
   const [activeFilter, setActiveFilter] = useState<StackingFilterType>('occupancy');
@@ -60,9 +63,21 @@ export function StackingSection({ property }: StackingSectionProps) {
   const [extractionError, setExtractionError] = useState<string | null>(null);
   const [confidence, setConfidence] = useState<ConfidenceInfo | null>(null);
 
-  const handleUnitClick = useCallback((data: UnitMeshData) => {
-    setSelectedUnit(data);
-    setUnitModalOpen(true);
+  const handleUnitClick = useCallback((data: UnitMeshData, event?: { ctrlKey?: boolean; metaKey?: boolean }) => {
+    if (event?.ctrlKey || event?.metaKey) {
+      // Multi-select: toggle this unit in the selection
+      setSelectedUnits(prev => {
+        const exists = prev.find(u => u.rentRollUnit?.id === data.rentRollUnit?.id);
+        if (exists) return prev.filter(u => u.rentRollUnit?.id !== data.rentRollUnit?.id);
+        if (prev.length >= 5) return prev; // max 5 for comparison
+        return [...prev, data];
+      });
+    } else {
+      // Single click: open detail panel
+      setSelectedUnit(data);
+      setUnitModalOpen(true);
+      setSelectedUnits([]);
+    }
   }, []);
 
   // Parse existing layout from property
@@ -278,6 +293,7 @@ export function StackingSection({ property }: StackingSectionProps) {
           if (isFullscreen) setIsFullscreen(false);
           else if (isolatedFloor !== null) setIsolatedFloor(null);
           else if (unitModalOpen) setUnitModalOpen(false);
+          else if (selectedUnits.length > 0) setSelectedUnits([]);
           break;
         case 'ArrowUp':
           e.preventDefault();
@@ -297,7 +313,7 @@ export function StackingSection({ property }: StackingSectionProps) {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [mode, isFullscreen, isolatedFloor, unitModalOpen, maxFloors]);
+  }, [mode, isFullscreen, isolatedFloor, unitModalOpen, selectedUnits, maxFloors]);
 
   const hasAddress = Boolean(property.property_address?.trim());
 
@@ -478,6 +494,7 @@ export function StackingSection({ property }: StackingSectionProps) {
               isolatedFloor={isolatedFloor}
               isFullscreen={isFullscreen}
               onFullscreenToggle={() => setIsFullscreen(v => !v)}
+              selectedUnits={selectedUnits}
             />
             {/* Fullscreen sidebar overlay */}
             {isFullscreen && (
@@ -518,10 +535,16 @@ export function StackingSection({ property }: StackingSectionProps) {
         </div>
       )}
 
-      <UnitDetailModal
+      <UnitDetailPanel
         data={selectedUnit}
         open={unitModalOpen}
-        onOpenChange={setUnitModalOpen}
+        onClose={() => setUnitModalOpen(false)}
+        rentRollUnits={rentRollUnits}
+      />
+
+      <UnitComparisonPanel
+        selectedUnits={selectedUnits}
+        onClear={() => setSelectedUnits([])}
       />
     </div>
   );
