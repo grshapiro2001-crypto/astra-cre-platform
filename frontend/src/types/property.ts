@@ -237,10 +237,30 @@ export interface StackingLayout {
   buildings: StackingBuilding[];
   amenities: StackingAmenity[];
   total_units: number;
-  source: 'manual' | 'scraped' | 'satellite';
+  source: 'manual' | 'scraped' | 'satellite' | 'floor_plan';
   source_url?: string;
   source_image_url?: string;
   confirmed_at: string;
+}
+
+// ==================== FLOOR PLAN EXTRACTION TYPES ====================
+
+export interface FloorPlanWing {
+  name: string;
+  direction: string;
+  unit_numbers: string[];
+}
+
+export interface FloorPlanFloor {
+  floor: number;
+  total_units_on_floor: number;
+  wings: FloorPlanWing[];
+}
+
+export interface UnitPositionMap {
+  source: string;
+  extracted_at: string;
+  floors: FloorPlanFloor[];
 }
 
 export interface RentRollUnit {
@@ -367,6 +387,7 @@ export interface PropertyDetail {
   pipeline_notes?: string | null;
   // 3D Stacking layout
   stacking_layout_json?: string | null;
+  unit_position_map_json?: string | null;
 }
 
 /** Property list item for library views */

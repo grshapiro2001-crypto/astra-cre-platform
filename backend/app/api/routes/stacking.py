@@ -4,7 +4,7 @@ Phase 1: Manual layout entry. Phase 2: Satellite auto-generation.
 """
 import json
 import logging
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, File, UploadFile
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from typing import Any, Optional
@@ -15,6 +15,7 @@ from app.models.user import User
 from app.api.deps import get_current_user
 from app.services import property_service
 from app.services.stacking_extraction_service import extract_stacking_layout
+from app.services.floor_plan_extraction_service import extract_floor_plan_batch
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +24,7 @@ router = APIRouter()
 
 class StackingLayoutRequest(BaseModel):
     layout: dict
+    unit_position_map: Optional[dict] = None
 
 
 class StackingLayoutResponse(BaseModel):
@@ -63,6 +65,8 @@ def save_stacking_layout(
         raise HTTPException(status_code=404, detail="Property not found")
 
     property_obj.stacking_layout_json = json.dumps(body.layout)
+    if body.unit_position_map is not None:
+        property_obj.unit_position_map_json = json.dumps(body.unit_position_map)
     db.commit()
     db.refresh(property_obj)
 
@@ -143,6 +147,55 @@ async def extract_stacking_from_satellite(
             "amenities": layout.get("amenities", []),
             "total_units": layout.get("total_units", 0),
         },
+    }
+
+
+@router.post("/properties/{property_id}/extract-floor-plan")
+async def extract_floor_plan_units(
+    property_id: int,
+    floor_images: list[UploadFile] = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Extract unit positions from uploaded floor plan screenshots.
+
+    Accepts 1+ images (one per floor). Each image is analyzed by Claude Vision
+    to extract unit numbers and their spatial positions (wing, position within wing).
+
+    Returns a unit_position_map and generated layout for user review — does NOT auto-save.
+    """
+    property_obj = property_service.get_property(
+        db, property_id, current_user.id, update_view_date=False,
+        org_id=getattr(current_user, 'organization_id', None),
+    )
+    if not property_obj:
+        raise HTTPException(status_code=404, detail="Property not found")
+
+    if not floor_images:
+        raise HTTPException(status_code=400, detail="At least one floor plan image is required")
+
+    # Read all images
+    images: list[tuple[bytes, str]] = []
+    for upload in floor_images:
+        content = await upload.read()
+        images.append((content, upload.filename or "unknown.png"))
+
+    try:
+        result = await extract_floor_plan_batch(images)
+    except ValueError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    except Exception as e:
+        logger.error("Floor plan extraction failed for property %d: %s", property_id, e)
+        raise HTTPException(
+            status_code=502,
+            detail=f"Could not analyze floor plan images: {e}",
+        )
+
+    return {
+        "property_id": property_id,
+        "unit_position_map": result["unit_position_map"],
+        "layout": result["layout"],
     }
 
 
