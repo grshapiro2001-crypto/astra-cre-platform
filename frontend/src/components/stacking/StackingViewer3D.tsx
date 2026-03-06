@@ -1557,17 +1557,25 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
     ground.receiveShadow = true;
     scene.add(ground);
 
-    // ── Camera position — 40° elevation, 45° azimuth for ground-floor visibility ──
+    // ── Camera position — 32° elevation, 45° azimuth for ground-floor visibility ──
     const maxDim = Math.max(sceneSize.x, sceneSize.z);
-    const cameraDistance = maxDim * 1.5;
-    const elevation = THREE.MathUtils.degToRad(40);
+    const cameraDistance = maxDim * 1.05;
+    const elevation = THREE.MathUtils.degToRad(32);
     const azimuth = THREE.MathUtils.degToRad(45);
 
-    camera.position.set(
+    // Fly-in: start far away, animate to final position
+    const startDistance = cameraDistance * 2.5;
+    const endPos = new THREE.Vector3(
       sceneCenter.x + cameraDistance * Math.cos(elevation) * Math.sin(azimuth),
       sceneCenter.y + cameraDistance * Math.sin(elevation),
       sceneCenter.z + cameraDistance * Math.cos(elevation) * Math.cos(azimuth),
     );
+    const startPos = new THREE.Vector3(
+      sceneCenter.x + startDistance * Math.cos(elevation) * Math.sin(azimuth),
+      sceneCenter.y + startDistance * Math.sin(elevation) + 5,
+      sceneCenter.z + startDistance * Math.cos(elevation) * Math.cos(azimuth),
+    );
+    camera.position.copy(startPos);
     camera.lookAt(sceneCenter);
     controls.target.copy(sceneCenter);
     controls.minDistance = UNIT_DEPTH * 2;
@@ -1575,8 +1583,21 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
     controls.update();
 
     // ── Animate ──
+    let flyInFrame = 0;
+    const FLY_IN_FRAMES = 60;
+    const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
+
     const animate = () => {
       animationIdRef.current = requestAnimationFrame(animate);
+
+      // Fly-in animation (~1 second)
+      if (flyInFrame < FLY_IN_FRAMES) {
+        flyInFrame++;
+        const ease = easeOutCubic(flyInFrame / FLY_IN_FRAMES);
+        camera.position.lerpVectors(startPos, endPos, ease);
+        camera.lookAt(sceneCenter);
+      }
+
       controls.update();
       renderer.render(scene, camera);
     };
@@ -1695,7 +1716,7 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
       <div
         ref={containerRef}
         className="w-full rounded-l-2xl overflow-hidden border border-border/60"
-        style={{ height: 480 }}
+        style={{ height: 540 }}
       />
       {!isReady && (
         <div className="absolute inset-0 flex items-center justify-center bg-background/80 rounded-2xl">
