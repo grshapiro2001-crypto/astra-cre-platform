@@ -1412,7 +1412,14 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
     controls.dampingFactor = 0.08;
     controls.minPolarAngle = THREE.MathUtils.degToRad(5);    // 5° — nearly top-down OK
     controls.maxPolarAngle = THREE.MathUtils.degToRad(88);   // 88° — near ground level OK
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = 0.8;
     controlsRef.current = controls;
+
+    // Stop auto-rotate on first user interaction
+    const stopAutoRotate = () => { controls.autoRotate = false; };
+    renderer.domElement.addEventListener('pointerdown', stopAutoRotate);
+    renderer.domElement.addEventListener('wheel', stopAutoRotate);
 
     // ── Lighting ──
     const ambient = new THREE.AmbientLight(0x8B8BBA, 0.4);
@@ -1621,12 +1628,16 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
     const animate = () => {
       animationIdRef.current = requestAnimationFrame(animate);
 
-      // Fly-in animation (~1 second)
+      // Fly-in animation (~1 second) — suppress auto-rotate during fly-in
       if (flyInFrame < FLY_IN_FRAMES) {
+        controls.autoRotate = false;
         flyInFrame++;
         const ease = easeOutCubic(flyInFrame / FLY_IN_FRAMES);
         camera.position.lerpVectors(startPos, endPos, ease);
         camera.lookAt(sceneCenter);
+        if (flyInFrame === FLY_IN_FRAMES) {
+          controls.autoRotate = true;
+        }
       }
 
       controls.update();
@@ -1670,6 +1681,8 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
       container.removeEventListener('mousemove', handleMouseMove);
       container.removeEventListener('mouseleave', handleMouseLeave);
       container.removeEventListener('click', handleClick);
+      renderer.domElement.removeEventListener('pointerdown', stopAutoRotate);
+      renderer.domElement.removeEventListener('wheel', stopAutoRotate);
       window.removeEventListener('resize', handleResize);
       controls.dispose();
       renderer.dispose();
