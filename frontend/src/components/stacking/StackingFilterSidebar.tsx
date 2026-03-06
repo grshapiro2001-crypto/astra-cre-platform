@@ -18,6 +18,9 @@ interface StackingFilterSidebarProps {
   onFloorPlanToggle: (type: string) => void;
   onFloorPlanSelectAll: () => void;
   onFloorPlanClearAll: () => void;
+  isolatedFloor?: number | null;
+  onFloorIsolate?: (floor: number | null) => void;
+  maxFloors?: number;
 }
 
 const FILTER_OPTIONS: { id: StackingFilterType; label: string }[] = [
@@ -39,6 +42,9 @@ export function StackingFilterSidebar({
   onFloorPlanToggle,
   onFloorPlanSelectAll,
   onFloorPlanClearAll,
+  isolatedFloor,
+  onFloorIsolate,
+  maxFloors,
 }: StackingFilterSidebarProps) {
   const sortedFloorPlans = [...floorPlanCounts.entries()].sort((a, b) => a[0].localeCompare(b[0]));
   const allChecked = floorPlanCounts.size > 0 && checkedFloorPlans.size === floorPlanCounts.size;
@@ -102,6 +108,38 @@ export function StackingFilterSidebar({
                 <span className="flex-1 truncate">{type}</span>
                 <span className="text-[10px] text-muted-foreground/50 shrink-0">{count} units</span>
               </label>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Floor Isolation */}
+      {maxFloors && maxFloors > 1 && onFloorIsolate && (
+        <div className="border-t border-border/60 px-4 py-3">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-[10px] font-semibold tracking-widest text-muted-foreground/70 uppercase">
+              Floor Isolation
+            </h3>
+            {isolatedFloor !== null && isolatedFloor !== undefined && (
+              <button className="text-[10px] text-primary hover:underline" onClick={() => onFloorIsolate(null)}>
+                Show All
+              </button>
+            )}
+          </div>
+          <div className="flex gap-1">
+            {Array.from({ length: maxFloors }, (_, i) => i + 1).map(floor => (
+              <button
+                key={floor}
+                onClick={() => onFloorIsolate(isolatedFloor === floor ? null : floor)}
+                className={cn(
+                  "flex-1 py-1.5 text-xs font-mono rounded-md transition-colors",
+                  isolatedFloor === floor
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                )}
+              >
+                F{floor}
+              </button>
             ))}
           </div>
         </div>

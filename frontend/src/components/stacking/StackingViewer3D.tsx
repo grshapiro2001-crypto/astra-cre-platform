@@ -7,7 +7,8 @@ import { useRef, useEffect, useCallback, useState, useMemo } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { StackingLayout, StackingBuilding, RentRollUnit, StackingFilterType } from '@/types/property';
-import { Camera } from 'lucide-react';
+import { Camera, Maximize2, Minimize2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 const UNIT_WIDTH = 4;
@@ -135,6 +136,9 @@ interface StackingViewer3DProps {
   asOfDate?: string | null;
   checkedFloorPlans?: Set<string>;
   explodedView?: boolean;
+  isolatedFloor?: number | null;
+  isFullscreen?: boolean;
+  onFullscreenToggle?: () => void;
 }
 
 // ─── Matching logic ──────────────────────────────────────────────────────────
@@ -1281,7 +1285,7 @@ function addAmenityPads(layout: StackingLayout, scene: THREE.Scene, sceneCenter:
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFilter = 'occupancy', asOfDate, checkedFloorPlans, explodedView }: StackingViewer3DProps) {
+export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFilter = 'occupancy', asOfDate, checkedFloorPlans, explodedView, isolatedFloor, isFullscreen, onFullscreenToggle }: StackingViewer3DProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
@@ -1949,6 +1953,97 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
     return () => cancelAnimationFrame(animId);
   }, [explodedView, layout]);
 
+  // ── Floor isolation animation ──
+  useEffect(() => {
+    if (!sceneRef.current) return;
+    const units = unitMeshesRef.current;
+    if (!units.length) return;
+    const scene = sceneRef.current;
+    const floorHeight = UNIT_HEIGHT + FLOOR_SLAB_HEIGHT;
+
+    const ANIM_FRAMES = 20;
+    let frame = 0;
+
+    // Capture start opacities and compute targets
+    const startOpacities = new Map<string, number>();
+    const targetOpacities = new Map<string, number>();
+
+    // Unit meshes
+    for (const mesh of units) {
+      const mat = mesh.material as THREE.MeshPhysicalMaterial;
+      const ud = mesh.userData as UnitMeshData;
+      startOpacities.set(mesh.uuid, mat.opacity);
+
+      if (isolatedFloor === null || isolatedFloor === undefined) {
+        const fs = filterStateRef.current.get(mesh.uuid);
+        targetOpacities.set(mesh.uuid, fs?.opacity ?? 0.9);
+      } else {
+        targetOpacities.set(mesh.uuid, ud.floor === isolatedFloor ? (filterStateRef.current.get(mesh.uuid)?.opacity ?? 0.9) : 0.06);
+      }
+    }
+
+    // Non-unit meshes (slabs, window bands, etc.)
+    const nonUnitMeshes: THREE.Mesh[] = [];
+    scene.traverse((obj: THREE.Object3D) => {
+      if (!(obj instanceof THREE.Mesh)) return;
+      if (obj.name.startsWith('unit_')) return;
+      if (obj.userData._baseY === undefined) return;
+      nonUnitMeshes.push(obj);
+      const mat = obj.material as THREE.MeshStandardMaterial;
+      startOpacities.set(obj.uuid, mat.opacity);
+
+      if (isolatedFloor === null || isolatedFloor === undefined) {
+        targetOpacities.set(obj.uuid, obj.userData._baseOpacity ?? 1.0);
+      } else {
+        const baseY: number = obj.userData._baseY;
+        const inferredFloor = Math.max(1, Math.round(baseY / floorHeight) + 1);
+        targetOpacities.set(obj.uuid, inferredFloor === isolatedFloor ? (obj.userData._baseOpacity ?? 1.0) : 0.06);
+      }
+    });
+
+    const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
+    let animId = 0;
+
+    const animateIsolation = () => {
+      frame++;
+      const t = Math.min(frame / ANIM_FRAMES, 1);
+      const ease = easeOutCubic(t);
+
+      for (const mesh of units) {
+        const start = startOpacities.get(mesh.uuid) ?? 0.9;
+        const target = targetOpacities.get(mesh.uuid) ?? 0.9;
+        const mat = mesh.material as THREE.MeshPhysicalMaterial;
+        mat.opacity = start + (target - start) * ease;
+        mat.needsUpdate = true;
+      }
+
+      for (const mesh of nonUnitMeshes) {
+        const start = startOpacities.get(mesh.uuid) ?? 1.0;
+        const target = targetOpacities.get(mesh.uuid) ?? 1.0;
+        const mat = mesh.material as THREE.MeshStandardMaterial;
+        mat.opacity = start + (target - start) * ease;
+        mat.needsUpdate = true;
+      }
+
+      if (t < 1) {
+        animId = requestAnimationFrame(animateIsolation);
+      }
+    };
+    animateIsolation();
+
+    return () => cancelAnimationFrame(animId);
+  }, [isolatedFloor]);
+
+  // ── Fullscreen resize ──
+  useEffect(() => {
+    if (!rendererRef.current || !cameraRef.current || !containerRef.current) return;
+    const width = containerRef.current.clientWidth;
+    const height = isFullscreen ? window.innerHeight : 540;
+    rendererRef.current.setSize(width, height);
+    cameraRef.current.aspect = width / height;
+    cameraRef.current.updateProjectionMatrix();
+  }, [isFullscreen]);
+
   // ── Screenshot export ──
   const handleScreenshot = useCallback(() => {
     if (!rendererRef.current || !sceneRef.current || !cameraRef.current) return;
@@ -2013,11 +2108,11 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
   const rr = hoveredUnit?.rentRollUnit;
 
   return (
-    <div className="relative">
+    <div className={cn("relative", isFullscreen && "fixed inset-0 z-50 bg-background")}>
       <div
         ref={containerRef}
         className="w-full rounded-l-2xl overflow-hidden border border-border/60"
-        style={{ height: 540 }}
+        style={{ height: isFullscreen ? '100vh' : 540 }}
       />
       {!isReady && (
         <div className="absolute inset-0 flex items-center justify-center bg-background/80 rounded-2xl">
@@ -2113,6 +2208,17 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
         </div>
       )}
 
+      {/* Fullscreen toggle button */}
+      {isReady && onFullscreenToggle && (
+        <button
+          onClick={onFullscreenToggle}
+          className="absolute top-3 right-3 p-2 rounded-lg bg-card/60 backdrop-blur-sm border border-border/40 text-muted-foreground hover:text-foreground hover:bg-card/90 transition-colors z-20"
+          title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+        >
+          {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+        </button>
+      )}
+
       {/* Screenshot button */}
       {isReady && (
         <button
@@ -2126,7 +2232,7 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
 
       {/* Help text overlay */}
       <div className="absolute bottom-2 left-3 text-[10px] text-muted-foreground/50 pointer-events-none">
-        Hover a unit for details · Drag to rotate
+        Hover a unit for details · Drag to rotate · Keys: 1-6 filters · E explode · F fullscreen
       </div>
     </div>
   );
