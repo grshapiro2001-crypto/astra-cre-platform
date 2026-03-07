@@ -323,10 +323,8 @@ function matchUnitsToRentRoll(
           .filter(u => u.inferredFloor === floor)
           .sort((a, b) => naturalSort(a.unit.unit_number || '', b.unit.unit_number || ''));
 
-        // Clamp geometry floor to available floors in the 3D model
-        const geoFloor = Math.min(floor, bldg.num_floors);
         for (let pos = 0; pos < Math.min(floorUnits.length, bldg.units_per_floor); pos++) {
-          const key = `${bldg.id}_${geoFloor}_${pos + 1}`;
+          const key = `${bldg.id}_${floor}_${pos + 1}`;
           map.set(key, floorUnits[pos].unit);
         }
       }
@@ -369,6 +367,56 @@ function matchUnitsToRentRoll(
   }
 
   return map;
+}
+
+/**
+ * Adjust building num_floors and units_per_floor based on inferred floor counts
+ * from rent roll unit numbers. When units have 0xx numbers (ground floor), the
+ * floor offset shifts everything up by 1, potentially creating more floors than
+ * the layout specifies. This ensures geometry matches the matching logic.
+ */
+function adjustLayoutForInferredFloors(
+  layout: StackingLayout,
+  rentRollUnits: RentRollUnit[],
+): StackingLayout {
+  if (!rentRollUnits.length) return layout;
+
+  const totalFloors = layout.buildings.reduce((m, b) => Math.max(m, b.num_floors), 1);
+
+  // Infer floors for all units
+  const inferred = rentRollUnits.map(u =>
+    inferFloorFromUnitNumber(u.unit_number || '', totalFloors + 1),
+  );
+
+  const validFloors = inferred.filter((f): f is number => f !== null);
+  if (validFloors.length < rentRollUnits.length * 0.5) return layout;
+
+  const minFloor = Math.min(...validFloors);
+  const offset = minFloor === 0 ? 1 : 0;
+  const maxFloorAfterOffset = Math.max(...validFloors) + offset;
+
+  // Count units per floor after offset
+  const floorCounts = new Map<number, number>();
+  for (const f of validFloors) {
+    const adjusted = f + offset;
+    floorCounts.set(adjusted, (floorCounts.get(adjusted) || 0) + 1);
+  }
+  const maxUnitsOnAnyFloor = Math.max(...floorCounts.values(), 0);
+
+  // Check if any building needs adjustment
+  const needsAdjustment = layout.buildings.some(
+    b => maxFloorAfterOffset > b.num_floors || maxUnitsOnAnyFloor > b.units_per_floor,
+  );
+  if (!needsAdjustment) return layout;
+
+  return {
+    ...layout,
+    buildings: layout.buildings.map(bldg => ({
+      ...bldg,
+      num_floors: Math.max(bldg.num_floors, maxFloorAfterOffset),
+      units_per_floor: Math.max(bldg.units_per_floor, maxUnitsOnAnyFloor),
+    })),
+  };
 }
 
 // ─── Geometry builders ───────────────────────────────────────────────────────
@@ -1694,13 +1742,15 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
     scene.add(rimLight);
 
     // ── Build geometry (grid layout) ──
-    const unitMap = matchUnitsToRentRoll(layout, rentRollUnits, unitPositionMap);
-    const totalUnits = layout.buildings.reduce((sum, b) => sum + b.units_per_floor * b.num_floors, 0);
-    const cols = Math.max(1, Math.ceil(Math.sqrt(layout.buildings.length)));
+    // Adjust layout floor counts to match inferred floors from rent roll unit numbers
+    const adjustedLayout = adjustLayoutForInferredFloors(layout, rentRollUnits);
+    const unitMap = matchUnitsToRentRoll(adjustedLayout, rentRollUnits, unitPositionMap);
+    const totalUnits = adjustedLayout.buildings.reduce((sum, b) => sum + b.units_per_floor * b.num_floors, 0);
+    const cols = Math.max(1, Math.ceil(Math.sqrt(adjustedLayout.buildings.length)));
 
     // First pass: build all groups and measure their bounding boxes
     const buildingGroups: { group: THREE.Group; building: StackingBuilding; width: number; depth: number }[] = [];
-    for (const building of layout.buildings) {
+    for (const building of adjustedLayout.buildings) {
       const group = buildBuildingGroup(building, unitMap, totalUnits);
       const box = new THREE.Box3().setFromObject(group);
       const size = new THREE.Vector3();
@@ -1771,7 +1821,7 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
         allUnitMeshes.push(obj);
       }
     });
-    const buildingOrder = new Map(layout.buildings.map((b, idx) => [b.id, idx]));
+    const buildingOrder = new Map(adjustedLayout.buildings.map((b, idx) => [b.id, idx]));
     allUnitMeshes.sort((a, b) => {
       const ua = a.userData as UnitMeshData;
       const ub = b.userData as UnitMeshData;
@@ -1790,7 +1840,7 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
       return true;
     });
 
-    const totalFloors2 = layout.buildings.reduce((m, b) => Math.max(m, b.num_floors), 1);
+    const totalFloors2 = adjustedLayout.buildings.reduce((m, b) => Math.max(m, b.num_floors), 1);
 
     // Try floor-aware assignment using same inference as matchUnitsToRentRoll
     const rrWithFloor = dedupedRR.map(u => ({
