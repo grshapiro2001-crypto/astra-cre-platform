@@ -327,7 +327,44 @@ export function StackingSection({ property }: StackingSectionProps) {
     }
   }, [activeFilter, rentRollUnits, layout]);
 
-  const maxFloors = layout?.buildings.reduce((m, b) => Math.max(m, b.num_floors), 1) ?? 1;
+  const maxFloors = useMemo(() => {
+    const layoutFloors = layout?.buildings.reduce((m, b) => Math.max(m, b.num_floors), 1) ?? 1;
+
+    // Account for position map floors (0-indexed → +1 for geometry)
+    let posMapFloors = 0;
+    if (unitPositionMap && unitPositionMap.floors?.length) {
+      posMapFloors = Math.max(...unitPositionMap.floors.map(f => f.floor + 1));
+    }
+
+    // Infer floor count from rent roll unit numbers (e.g. unit 601 → floor 6)
+    let inferredFloors = 0;
+    if (rentRollUnits.length > 0) {
+      for (const u of rentRollUnits) {
+        const digits = (u.unit_number || '').replace(/^[A-Za-z0-9]*[-_]/, '').replace(/[^0-9]/g, '');
+        if (digits.length >= 3) {
+          const stripped = digits.replace(/^0+/, '') || '0';
+          if (stripped.length >= 3) {
+            const potentialFloor = parseInt(stripped.slice(0, -2), 10);
+            if (potentialFloor > 0 && potentialFloor <= 20) {
+              inferredFloors = Math.max(inferredFloors, potentialFloor);
+            }
+          }
+        }
+      }
+      // Account for ground floor offset (0xx units push everything up by 1)
+      const hasGroundFloor = rentRollUnits.some(u => {
+        const d = (u.unit_number || '').replace(/^[A-Za-z0-9]*[-_]/, '').replace(/[^0-9]/g, '');
+        if (d.length >= 3) {
+          const s = d.replace(/^0+/, '') || '0';
+          return s.length >= 3 && parseInt(s.slice(0, -2), 10) === 0;
+        }
+        return false;
+      });
+      if (hasGroundFloor && inferredFloors > 0) inferredFloors += 1;
+    }
+
+    return Math.max(layoutFloors, posMapFloors, inferredFloors);
+  }, [layout, unitPositionMap, rentRollUnits]);
 
   // Keyboard shortcuts
   useEffect(() => {

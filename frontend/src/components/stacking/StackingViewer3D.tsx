@@ -257,8 +257,20 @@ function matchUnitsToRentRoll(
     return true;
   });
 
-  // ── Position-map matching: use exact unit-to-position mapping from floor plan extraction ──
+  // ── Position-map matching: use position map for floor assignment, sequential placement within floor ──
   if (unitPositionMap && unitPositionMap.floors.length > 0) {
+    // Build floor assignment from position map: unit_number → geometry floor
+    const unitFloorMap = new Map<string, number>();
+    for (const floorData of unitPositionMap.floors) {
+      // Floor in the position map is 0-indexed; geometry uses 1-indexed
+      const geometryFloor = floorData.floor + 1;
+      for (const wing of floorData.wings) {
+        for (const unitNum of wing.unit_numbers) {
+          unitFloorMap.set(unitNum, geometryFloor);
+        }
+      }
+    }
+
     // Build a lookup from unit_number → RentRollUnit
     const unitByNumber = new Map<string, RentRollUnit>();
     for (const u of deduped) {
@@ -267,23 +279,37 @@ function matchUnitsToRentRoll(
 
     // Use the first building (floor plan extraction generates a single building)
     const bldgId = layout.buildings[0]?.id || 'A';
+    const maxFloor = Math.max(...unitFloorMap.values(), layout.buildings[0]?.num_floors || 5);
 
-    for (const floorData of unitPositionMap.floors) {
-      // Floor in the position map is 0-indexed from the floor plan, but our geometry
-      // uses 1-indexed floors. Map floor 0 → geometry floor 1, floor 1 → 2, etc.
-      const geometryFloor = floorData.floor + 1;
-
-      let posCounter = 1;
-      for (const wing of floorData.wings) {
-        for (const unitNum of wing.unit_numbers) {
+    // Group units by their position-map floor and assign sequentially within each floor
+    for (let floor = 1; floor <= maxFloor; floor++) {
+      const floorUnits: RentRollUnit[] = [];
+      for (const [unitNum, f] of unitFloorMap) {
+        if (f === floor) {
           const rr = unitByNumber.get(unitNum);
-          if (rr) {
-            const key = `${bldgId}_${geometryFloor}_${posCounter}`;
-            map.set(key, rr);
-          }
-          posCounter++;
+          if (rr) floorUnits.push(rr);
         }
       }
+      // Sort within floor for consistent ordering
+      floorUnits.sort((a, b) => naturalSort(a.unit_number || '', b.unit_number || ''));
+
+      // Assign sequentially within the floor's mesh positions
+      for (let pos = 0; pos < floorUnits.length; pos++) {
+        const key = `${bldgId}_${floor}_${pos + 1}`;
+        map.set(key, floorUnits[pos]);
+      }
+    }
+
+    // Handle units not in the position map — distribute to floors with remaining slots
+    const mappedUnitNumbers = new Set(unitFloorMap.keys());
+    const unmapped = deduped.filter(u => u.unit_number && !mappedUnitNumbers.has(u.unit_number));
+    const totalFloors = maxFloor;
+    for (const u of unmapped) {
+      const floor = inferFloorFromUnitNumber(u.unit_number || '', totalFloors) || 1;
+      // Find next available position on this floor
+      let pos = 1;
+      while (map.has(`${bldgId}_${floor}_${pos}`)) pos++;
+      map.set(`${bldgId}_${floor}_${pos}`, u);
     }
 
     return map;
@@ -1471,6 +1497,26 @@ function buildBuildingGroup(
     default:
       buildLinearBuilding(building, unitMap, group, totalUnits);
       break;
+  }
+
+  // Remove unmatched unit meshes (status "unknown") to eliminate "No Data" glass panes.
+  // These are positions in the geometry grid that have no corresponding rent roll data.
+  const toRemove: THREE.Object3D[] = [];
+  group.traverse((obj) => {
+    if (obj instanceof THREE.Mesh && obj.name.startsWith('unit_')) {
+      const ud = obj.userData as UnitMeshData;
+      if (ud.status === 'unknown' && !ud.rentRollUnit) {
+        toRemove.push(obj);
+      }
+    }
+  });
+  for (const obj of toRemove) {
+    // Dispose geometry and materials to prevent memory leaks
+    if (obj instanceof THREE.Mesh) {
+      obj.geometry.dispose();
+      if (obj.material instanceof THREE.Material) obj.material.dispose();
+    }
+    obj.removeFromParent();
   }
 
   return group;
