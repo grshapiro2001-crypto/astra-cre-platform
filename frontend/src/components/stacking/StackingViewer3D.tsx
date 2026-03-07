@@ -404,6 +404,7 @@ function matchUnitsToRentRoll(
 function adjustLayoutForInferredFloors(
   layout: StackingLayout,
   rentRollUnits: RentRollUnit[],
+  unitPositionMap?: UnitPositionMap | null,
 ): StackingLayout {
   if (!rentRollUnits.length) return layout;
 
@@ -415,11 +416,27 @@ function adjustLayoutForInferredFloors(
   );
 
   const validFloors = inferred.filter((f): f is number => f !== null);
-  if (validFloors.length < rentRollUnits.length * 0.5) return layout;
 
-  const minFloor = Math.min(...validFloors);
+  // Determine max floor from position map (0-indexed → 1-indexed)
+  let posMapMaxFloor = 0;
+  let posMapMaxUnitsOnFloor = 0;
+  if (unitPositionMap && unitPositionMap.floors.length > 0) {
+    for (const floorData of unitPositionMap.floors) {
+      const geometryFloor = floorData.floor + 1;
+      posMapMaxFloor = Math.max(posMapMaxFloor, geometryFloor);
+      posMapMaxUnitsOnFloor = Math.max(posMapMaxUnitsOnFloor, floorData.total_units_on_floor);
+    }
+  }
+
+  // If neither inference nor position map provides floor data, skip
+  if (validFloors.length < rentRollUnits.length * 0.5 && posMapMaxFloor === 0) return layout;
+
+  const minFloor = validFloors.length > 0 ? Math.min(...validFloors) : 1;
   const offset = minFloor === 0 ? 1 : 0;
-  const maxFloorAfterOffset = Math.max(...validFloors) + offset;
+  const maxFloorAfterOffset = Math.max(
+    validFloors.length > 0 ? Math.max(...validFloors) + offset : 0,
+    posMapMaxFloor,
+  );
 
   // Count units per floor after offset
   const floorCounts = new Map<number, number>();
@@ -427,7 +444,10 @@ function adjustLayoutForInferredFloors(
     const adjusted = f + offset;
     floorCounts.set(adjusted, (floorCounts.get(adjusted) || 0) + 1);
   }
-  const maxUnitsOnAnyFloor = Math.max(...floorCounts.values(), 0);
+  const maxUnitsOnAnyFloor = Math.max(
+    floorCounts.size > 0 ? Math.max(...floorCounts.values()) : 0,
+    posMapMaxUnitsOnFloor,
+  );
 
   // Check if any building needs adjustment
   const needsAdjustment = layout.buildings.some(
@@ -1789,7 +1809,7 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
 
     // ── Build geometry (grid layout) ──
     // Adjust layout floor counts to match inferred floors from rent roll unit numbers
-    const adjustedLayout = adjustLayoutForInferredFloors(layout, rentRollUnits);
+    const adjustedLayout = adjustLayoutForInferredFloors(layout, rentRollUnits, unitPositionMap);
     const unitMap = matchUnitsToRentRoll(adjustedLayout, rentRollUnits, unitPositionMap);
     const totalUnits = adjustedLayout.buildings.reduce((sum, b) => sum + b.units_per_floor * b.num_floors, 0);
     const cols = Math.max(1, Math.ceil(Math.sqrt(adjustedLayout.buildings.length)));
@@ -1888,29 +1908,26 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
 
     const totalFloors2 = adjustedLayout.buildings.reduce((m, b) => Math.max(m, b.num_floors), 1);
 
-    // Try floor-aware assignment using same inference as matchUnitsToRentRoll
-    const rrWithFloor = dedupedRR.map(u => ({
-      unit: u,
-      inferredFloor: inferFloorFromUnitNumber(u.unit_number || '', totalFloors2),
-    }));
-    const inferCount = rrWithFloor.filter(u => u.inferredFloor !== null).length;
-
-    // Detect ground floor (0xx) units and shift all floors up (same as matchUnitsToRentRoll)
-    const minFloor2 = rrWithFloor.reduce(
-      (m, u) => u.inferredFloor !== null ? Math.min(m, u.inferredFloor) : m, Infinity
-    );
-    const floorOffset2 = minFloor2 === 0 ? 1 : 0;
-    if (floorOffset2) {
-      for (const u of rrWithFloor) {
-        if (u.inferredFloor !== null) u.inferredFloor += floorOffset2;
-      }
-    }
-
-    const useFloorAware = inferCount > dedupedRR.length * 0.5;
-
     const uuidReg = new Map<string, RentRollUnit>();
 
-    if (useFloorAware) {
+    // Use position map for label refresh when available (consistent with matchUnitsToRentRoll)
+    if (unitPositionMap && unitPositionMap.floors.length > 0) {
+      // Build floor assignment from position map: unit_number → geometry floor
+      const unitFloorMap2 = new Map<string, number>();
+      for (const floorData of unitPositionMap.floors) {
+        const geometryFloor = floorData.floor + 1;
+        for (const wing of floorData.wings) {
+          for (const unitNum of wing.unit_numbers) {
+            unitFloorMap2.set(unitNum, geometryFloor);
+          }
+        }
+      }
+
+      const unitByNumber2 = new Map<string, RentRollUnit>();
+      for (const u of dedupedRR) {
+        if (u.unit_number) unitByNumber2.set(u.unit_number, u);
+      }
+
       // Group meshes by floor
       const meshesByFloor = new Map<number, THREE.Mesh[]>();
       for (const m of allUnitMeshes) {
@@ -1919,31 +1936,99 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
         meshesByFloor.get(floor)!.push(m);
       }
 
-      // Assign units to meshes on their inferred floor
+      // Group units by position-map floor and assign to meshes
       for (const [floor, meshes] of meshesByFloor) {
-        const floorUnits = rrWithFloor
-          .filter(u => u.inferredFloor === floor)
-          .sort((a, b) => naturalSort(a.unit.unit_number || '', b.unit.unit_number || ''));
+        const floorUnits: RentRollUnit[] = [];
+        for (const [unitNum, f] of unitFloorMap2) {
+          if (f === floor) {
+            const rr = unitByNumber2.get(unitNum);
+            if (rr) floorUnits.push(rr);
+          }
+        }
+        floorUnits.sort((a, b) => naturalSort(a.unit_number || '', b.unit_number || ''));
         for (let i = 0; i < Math.min(meshes.length, floorUnits.length); i++) {
-          uuidReg.set(meshes[i].uuid, floorUnits[i].unit);
+          uuidReg.set(meshes[i].uuid, floorUnits[i]);
         }
       }
 
-      // Distribute unmatched units to meshes that didn't get a match
-      const unmatchedUnits = rrWithFloor
-        .filter(u => u.inferredFloor === null || u.inferredFloor > totalFloors2)
-        .sort((a, b) => naturalSort(a.unit.unit_number || '', b.unit.unit_number || ''));
+      // Distribute units not in position map to remaining meshes
+      const mappedUnitNums = new Set(unitFloorMap2.keys());
+      const unmappedUnits = dedupedRR.filter(u => u.unit_number && !mappedUnitNums.has(u.unit_number));
+      const unmappedWithFloor = unmappedUnits.map(u => ({
+        unit: u,
+        inferredFloor: inferFloorFromUnitNumber(u.unit_number || '', totalFloors2) || 1,
+      }));
       const unmatchedMeshes = allUnitMeshes.filter(m => !uuidReg.has(m.uuid));
-      for (let i = 0; i < Math.min(unmatchedMeshes.length, unmatchedUnits.length); i++) {
-        uuidReg.set(unmatchedMeshes[i].uuid, unmatchedUnits[i].unit);
+      // Group unmatched meshes by floor for better distribution
+      const unmatchedByFloor = new Map<number, THREE.Mesh[]>();
+      for (const m of unmatchedMeshes) {
+        const floor = (m.userData as UnitMeshData).floor;
+        if (!unmatchedByFloor.has(floor)) unmatchedByFloor.set(floor, []);
+        unmatchedByFloor.get(floor)!.push(m);
+      }
+      for (const { unit, inferredFloor } of unmappedWithFloor) {
+        const floorMeshes = unmatchedByFloor.get(inferredFloor);
+        if (floorMeshes && floorMeshes.length > 0) {
+          const mesh = floorMeshes.shift()!;
+          uuidReg.set(mesh.uuid, unit);
+        }
       }
     } else {
-      // Fallback: sequential assignment
-      const sortedRR = [...dedupedRR].sort((a, b) =>
-        naturalSort(a.unit_number || '', b.unit_number || ''),
+      // Fallback: floor-aware or sequential assignment (no position map)
+      const rrWithFloor = dedupedRR.map(u => ({
+        unit: u,
+        inferredFloor: inferFloorFromUnitNumber(u.unit_number || '', totalFloors2),
+      }));
+      const inferCount = rrWithFloor.filter(u => u.inferredFloor !== null).length;
+
+      // Detect ground floor (0xx) units and shift all floors up (same as matchUnitsToRentRoll)
+      const minFloor2 = rrWithFloor.reduce(
+        (m, u) => u.inferredFloor !== null ? Math.min(m, u.inferredFloor) : m, Infinity
       );
-      for (let i = 0; i < Math.min(allUnitMeshes.length, sortedRR.length); i++) {
-        uuidReg.set(allUnitMeshes[i].uuid, sortedRR[i]);
+      const floorOffset2 = minFloor2 === 0 ? 1 : 0;
+      if (floorOffset2) {
+        for (const u of rrWithFloor) {
+          if (u.inferredFloor !== null) u.inferredFloor += floorOffset2;
+        }
+      }
+
+      const useFloorAware = inferCount > dedupedRR.length * 0.5;
+
+      if (useFloorAware) {
+        // Group meshes by floor
+        const meshesByFloor = new Map<number, THREE.Mesh[]>();
+        for (const m of allUnitMeshes) {
+          const floor = (m.userData as UnitMeshData).floor;
+          if (!meshesByFloor.has(floor)) meshesByFloor.set(floor, []);
+          meshesByFloor.get(floor)!.push(m);
+        }
+
+        // Assign units to meshes on their inferred floor
+        for (const [floor, meshes] of meshesByFloor) {
+          const floorUnits = rrWithFloor
+            .filter(u => u.inferredFloor === floor)
+            .sort((a, b) => naturalSort(a.unit.unit_number || '', b.unit.unit_number || ''));
+          for (let i = 0; i < Math.min(meshes.length, floorUnits.length); i++) {
+            uuidReg.set(meshes[i].uuid, floorUnits[i].unit);
+          }
+        }
+
+        // Distribute unmatched units to meshes that didn't get a match
+        const unmatchedUnits = rrWithFloor
+          .filter(u => u.inferredFloor === null || u.inferredFloor > totalFloors2)
+          .sort((a, b) => naturalSort(a.unit.unit_number || '', b.unit.unit_number || ''));
+        const unmatchedMeshes = allUnitMeshes.filter(m => !uuidReg.has(m.uuid));
+        for (let i = 0; i < Math.min(unmatchedMeshes.length, unmatchedUnits.length); i++) {
+          uuidReg.set(unmatchedMeshes[i].uuid, unmatchedUnits[i].unit);
+        }
+      } else {
+        // Fallback: sequential assignment
+        const sortedRR = [...dedupedRR].sort((a, b) =>
+          naturalSort(a.unit_number || '', b.unit_number || ''),
+        );
+        for (let i = 0; i < Math.min(allUnitMeshes.length, sortedRR.length); i++) {
+          uuidReg.set(allUnitMeshes[i].uuid, sortedRR[i]);
+        }
       }
     }
 
