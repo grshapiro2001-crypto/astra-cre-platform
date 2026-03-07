@@ -528,6 +528,10 @@ _COL_A_CHARGE_CODES = {
     "storage", "utility", "water", "sewer", "cable", "admin fee",
 }
 
+# Patterns that identify charge code / description columns — these must NOT
+# be claimed by the greedy "charge" / "rent" in_place_rent fallback keywords.
+_CHARGE_CODE_PATTERNS = ["charge code", "charge description", "description", "ledger"]
+
 
 def _parse_rent_roll_units(ws: Worksheet, header_row: int, headers: Dict[int, str]) -> List[Dict[str, Any]]:
     """
@@ -539,6 +543,11 @@ def _parse_rent_roll_units(ws: Worksheet, header_row: int, headers: Dict[int, st
     - A "Charge Total" row aggregating all charges
     """
     col_map = _map_rent_roll_columns(headers)
+
+    logger.warning(
+        "RENT ROLL PARSE DEBUG: header_row=%d, col_map=%s, headers=%s",
+        header_row, col_map, {k: v for k, v in headers.items()}
+    )
 
     units: List[Dict[str, Any]] = []
     current_unit: Optional[Dict[str, Any]] = None
@@ -556,6 +565,12 @@ def _parse_rent_roll_units(ws: Worksheet, header_row: int, headers: Dict[int, st
 
         # Scan entire row text for Charge Total / summary markers
         row_text = " ".join(str(c.value or "") for c in row).lower()
+
+        if row_idx <= header_row + 5:
+            logger.warning(
+                "RENT ROLL ROW %d: unit_val=%r, charge_code_val=%r, row_text=%s",
+                row_idx, unit_val, charge_code_val, row_text[:100]
+            )
 
         # ── Charge Total row ──
         if "charge total" in row_text or "total charges" in row_text:
@@ -580,6 +595,7 @@ def _parse_rent_roll_units(ws: Worksheet, header_row: int, headers: Dict[int, st
         # ── Charge detail sub-row: blank unit col, charge code populated ──
         if not unit_val and charge_code_val:
             amount = _get_numeric_value(row, rent_col)
+            logger.warning("CHARGE DETAIL: row=%d, charge_code=%r, amount=%r", row_idx, charge_code_val, amount)
             if amount:
                 charge_details[charge_code_val] = amount
             continue
@@ -611,6 +627,10 @@ def _parse_rent_roll_units(ws: Worksheet, header_row: int, headers: Dict[int, st
         # ── New unit header row ──
         # Finalize previous unit
         if current_unit is not None:
+            logger.warning(
+                "FINALIZE UNIT: unit=%s, charge_details=%s, in_place_rent=%s",
+                current_unit.get('unit_number'), charge_details, current_unit.get('in_place_rent')
+            )
             _finalize_unit(current_unit, charge_details)
             units.append(current_unit)
             charge_details = {}
@@ -678,10 +698,13 @@ def _map_rent_roll_columns(headers: Dict[int, str]) -> Dict[str, int]:
             "in place", "in-place", "current rent", "actual rent",
             "contract rent", "lease rent", "monthly rent",
             "charge amount", "scheduled rent", "scheduled charges",
-            "charge", "rent",
+            "amount", "charge", "rent",
         ]):
-            if "in_place_rent" not in col_map:
-                col_map["in_place_rent"] = col_idx
+            # Skip columns that are actually charge code/description columns
+            # (bare "charge"/"rent" keywords would otherwise greedily match them)
+            if not any(kw in header_lower for kw in _CHARGE_CODE_PATTERNS):
+                if "in_place_rent" not in col_map:
+                    col_map["in_place_rent"] = col_idx
 
         # Charge code column (used for charge detail sub-rows)
         if any(kw in header_lower for kw in ["charge code", "charge description", "description", "ledger"]):
