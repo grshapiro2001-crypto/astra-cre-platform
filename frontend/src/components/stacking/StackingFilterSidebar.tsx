@@ -21,6 +21,7 @@ interface StackingFilterSidebarProps {
   isolatedFloor?: number | null;
   onFloorIsolate?: (floor: number | null) => void;
   maxFloors?: number;
+  isFullscreen?: boolean;
 }
 
 const FILTER_OPTIONS: { id: StackingFilterType; label: string }[] = [
@@ -45,13 +46,14 @@ export function StackingFilterSidebar({
   isolatedFloor,
   onFloorIsolate,
   maxFloors,
+  isFullscreen,
 }: StackingFilterSidebarProps) {
   const sortedFloorPlans = [...floorPlanCounts.entries()].sort((a, b) => a[0].localeCompare(b[0]));
   const allChecked = floorPlanCounts.size > 0 && checkedFloorPlans.size === floorPlanCounts.size;
 
   return (
     <div className="w-64 shrink-0 bg-card/30 border-l border-border flex flex-col rounded-r-2xl overflow-hidden"
-         style={{ height: 540 }}>
+         style={{ height: isFullscreen ? '100vh' : 540 }}>
       {/* Visualization header */}
       <div className="px-4 pt-4 pb-2">
         <h3 className="text-[10px] font-semibold tracking-widest text-muted-foreground/70 uppercase">

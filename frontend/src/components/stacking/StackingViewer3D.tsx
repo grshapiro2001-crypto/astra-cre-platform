@@ -205,11 +205,17 @@ function inferFloorFromUnitNumber(unitNumber: string, totalFloors: number): numb
   const cleaned = num.replace(/^[A-Za-z0-9]*[-_]/, '');
   const digits = cleaned.replace(/[^0-9]/g, '');
 
+  if (!digits) return null;
+
+  const numericValue = parseInt(digits, 10);
+
+  // Pattern 1: 3-4 digit numbers where first significant digit(s) = floor
+  // "301" → floor 3, "0301" → floor 3, "002" → floor 0
   if (digits.length >= 3 && digits.length <= 4) {
     const withoutLeadingZeros = digits.replace(/^0+/, '') || '0';
     if (withoutLeadingZeros.length >= 3) {
       const potentialFloor = parseInt(withoutLeadingZeros.slice(0, -2), 10);
-      if (potentialFloor >= 1 && potentialFloor <= totalFloors) {
+      if (potentialFloor >= 0 && potentialFloor <= totalFloors) {
         return potentialFloor;
       }
     }
@@ -221,10 +227,15 @@ function inferFloorFromUnitNumber(unitNumber: string, totalFloors: number): numb
     const afterSep = separatorMatch[1].replace(/^0+/, '') || '0';
     if (afterSep.length >= 3) {
       const potentialFloor = parseInt(afterSep.slice(0, -2), 10);
-      if (potentialFloor >= 1 && potentialFloor <= totalFloors) {
+      if (potentialFloor >= 0 && potentialFloor <= totalFloors) {
         return potentialFloor;
       }
     }
+  }
+
+  // Pattern 3: Small numbers (< 100) with no floor pattern → floor 0 (ground)
+  if (numericValue < 100 && totalFloors > 1) {
+    return 0;
   }
 
   return null;
@@ -288,25 +299,41 @@ function matchUnitsToRentRoll(
   }));
 
   const inferredCount = unitsWithFloor.filter(u => u.inferredFloor !== null).length;
+
+  // Detect ground floor (0xx) units and shift all floors up so geometry stays 1-based
+  const minFloor = unitsWithFloor.reduce(
+    (m, u) => u.inferredFloor !== null ? Math.min(m, u.inferredFloor) : m, Infinity
+  );
+  const floorOffset = minFloor === 0 ? 1 : 0;
+  if (floorOffset) {
+    for (const u of unitsWithFloor) {
+      if (u.inferredFloor !== null) u.inferredFloor += floorOffset;
+    }
+  }
+
   const useInferredFloors = inferredCount > deduped.length * 0.5;
 
   if (useInferredFloors) {
     // Floor-aware grouping
+    const maxInferred = unitsWithFloor.reduce((m, u) => Math.max(m, u.inferredFloor || 0), 0);
     for (const bldg of layout.buildings) {
-      for (let floor = 1; floor <= bldg.num_floors; floor++) {
+      const effectiveFloors = Math.max(bldg.num_floors, maxInferred);
+      for (let floor = 1; floor <= effectiveFloors; floor++) {
         const floorUnits = unitsWithFloor
           .filter(u => u.inferredFloor === floor)
           .sort((a, b) => naturalSort(a.unit.unit_number || '', b.unit.unit_number || ''));
 
+        // Clamp geometry floor to available floors in the 3D model
+        const geoFloor = Math.min(floor, bldg.num_floors);
         for (let pos = 0; pos < Math.min(floorUnits.length, bldg.units_per_floor); pos++) {
-          const key = `${bldg.id}_${floor}_${pos + 1}`;
+          const key = `${bldg.id}_${geoFloor}_${pos + 1}`;
           map.set(key, floorUnits[pos].unit);
         }
       }
 
       // Distribute unmatched units to floors with remaining slots
       const unmatchedUnits = unitsWithFloor
-        .filter(u => u.inferredFloor === null || u.inferredFloor > bldg.num_floors)
+        .filter(u => u.inferredFloor === null || u.inferredFloor > effectiveFloors)
         .sort((a, b) => naturalSort(a.unit.unit_number || '', b.unit.unit_number || ''));
 
       let unmatchedIdx = 0;
@@ -1771,6 +1798,18 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
       inferredFloor: inferFloorFromUnitNumber(u.unit_number || '', totalFloors2),
     }));
     const inferCount = rrWithFloor.filter(u => u.inferredFloor !== null).length;
+
+    // Detect ground floor (0xx) units and shift all floors up (same as matchUnitsToRentRoll)
+    const minFloor2 = rrWithFloor.reduce(
+      (m, u) => u.inferredFloor !== null ? Math.min(m, u.inferredFloor) : m, Infinity
+    );
+    const floorOffset2 = minFloor2 === 0 ? 1 : 0;
+    if (floorOffset2) {
+      for (const u of rrWithFloor) {
+        if (u.inferredFloor !== null) u.inferredFloor += floorOffset2;
+      }
+    }
+
     const useFloorAware = inferCount > dedupedRR.length * 0.5;
 
     const uuidReg = new Map<string, RentRollUnit>();
@@ -2471,7 +2510,7 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
   const rr = hoveredUnit?.rentRollUnit;
 
   return (
-    <div className={cn("relative", isFullscreen && "fixed inset-0 z-50 bg-background")}>
+    <div className={cn("relative", isFullscreen && "fixed inset-0 z-[9999] bg-background")}>
       <div
         ref={containerRef}
         className="w-full rounded-l-2xl overflow-hidden border border-border/60"
