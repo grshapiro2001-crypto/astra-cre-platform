@@ -37,6 +37,8 @@ def run_migrations():
             ("pipeline_stage", "VARCHAR(50) DEFAULT 'screening'"),
             ("pipeline_notes", "TEXT"),
             ("pipeline_updated_at", "TIMESTAMP"),
+            # Floor plan extraction — raw unit position map from Claude Vision
+            ("unit_position_map_json", "TEXT"),
         ]
         for col_name, col_type in new_columns:
             if col_name not in existing_cols:
