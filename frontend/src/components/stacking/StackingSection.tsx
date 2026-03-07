@@ -574,8 +574,9 @@ export function StackingSection({ property }: StackingSectionProps) {
             />
             {/* Fullscreen sidebar overlay */}
             {isFullscreen && (
-              <div className="fixed right-0 top-0 z-[51]">
+              <div className="fixed right-0 top-0 z-[10000] h-screen">
                 <StackingFilterSidebar
+                  isFullscreen
                   activeFilter={activeFilter}
                   onFilterChange={setActiveFilter}
                   legend={legend}

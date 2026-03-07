@@ -56,7 +56,7 @@ export function UnitDetailPanel({ data, open, onClose, rentRollUnits, isFullscre
       className={cn(
         'fixed top-0 h-full w-[380px] bg-card border-l border-border shadow-2xl',
         'transform transition-transform duration-300 ease-out overflow-y-auto',
-        isFullscreen ? 'right-[256px] z-[52]' : 'right-0 z-50',
+        isFullscreen ? 'right-[256px] z-[10001]' : 'right-0 z-50',
         open ? 'translate-x-0' : 'translate-x-full',
       )}
     >
