@@ -267,7 +267,7 @@ export function StackingSection({ property }: StackingSectionProps) {
 
   // Match quality
   const matchedCount = rentRollUnits.length;
-  const totalModelUnits = layout?.total_units ?? 0;
+  const totalModelUnits = rentRollUnits.length;
   const matched = Math.min(matchedCount, totalModelUnits);
   const unlinked = totalModelUnits - matched;
 
