@@ -2,6 +2,8 @@ import json
 import anthropic
 from sqlalchemy.orm import Session
 
+from sqlalchemy import or_
+
 from app.config import settings
 from app.models.property import Property, RentRollUnit
 
@@ -44,7 +46,9 @@ def _parse_json_field(value):
 
 
 def build_deal_context(db: Session, org_id: int, property_id=None, deal_folder_id=None) -> str:
-    query = db.query(Property).filter(Property.organization_id == org_id)
+    query = db.query(Property).filter(
+        or_(Property.organization_id == org_id, Property.organization_id.is_(None))
+    )
 
     if property_id is not None:
         query = query.filter(Property.id == property_id)
