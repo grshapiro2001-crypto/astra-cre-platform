@@ -19,6 +19,7 @@ import { OnboardingWizard } from './components/onboarding/OnboardingWizard';
 import { Landing } from './pages/Landing';
 import { OrganizationSettings } from './pages/OrganizationSettings';
 import { Welcome } from './pages/Welcome';
+import { CommandCenter } from './pages/CommandCenter';
 
 function App() {
   const checkAuth = useAuthStore((state) => state.checkAuth);
@@ -86,6 +87,7 @@ function App() {
               <Route path="/compare" element={<ComparisonPage />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/organization" element={<ErrorBoundary><OrganizationSettings /></ErrorBoundary>} />
+              <Route path="/command-center" element={<CommandCenter />} />
             </Route>
           </Route>
 
