@@ -29,6 +29,7 @@ import {
   FileSpreadsheet,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAssistantStore } from '@/store/assistantStore';
 import { propertyService } from '@/services/propertyService';
 import { api } from '@/services/api';
 import { scoringService } from '@/services/scoringService';
@@ -293,6 +294,13 @@ const FinancialRow = ({
 export const PropertyDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+
+  // --- Assistant scope ---
+  const setScopedProperty = useAssistantStore((s) => s.setScopedProperty);
+  useEffect(() => {
+    if (id) setScopedProperty(Number(id));
+    return () => setScopedProperty(null);
+  }, [id, setScopedProperty]);
 
   // --- API state ---
   const [property, setProperty] = useState<PropertyDetailType | null>(null);

@@ -12,6 +12,7 @@ import { useNavigate } from 'react-router-dom';
 import { Plus, Users, X, Building2, ArrowRight } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAuthStore } from '@/store/authSlice';
+import { useAssistantStore } from '@/store/assistantStore';
 import { Button } from '@/components/ui/button';
 import organizationService from '@/services/organizationService';
 import type { Organization } from '@/services/organizationService';
@@ -123,6 +124,14 @@ export const Dashboard = () => {
   const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
   const firstName = user?.full_name?.split(' ')[0] || user?.email?.split('@')[0] || 'there';
+
+  // --- Clear assistant scope on dashboard ---
+  const setScopedProperty = useAssistantStore((s) => s.setScopedProperty);
+  const setScopedFolder = useAssistantStore((s) => s.setScopedFolder);
+  useEffect(() => {
+    setScopedProperty(null);
+    setScopedFolder(null);
+  }, [setScopedProperty, setScopedFolder]);
 
   // --- Data State ---
   const [properties, setProperties] = useState<PropertyWithFinancials[]>([]);

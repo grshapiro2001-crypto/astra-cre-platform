@@ -6,6 +6,8 @@ import { Sidebar, MobileSidebar } from './Sidebar';
 import { PageTransition } from './PageTransition';
 import { useUIStore } from '@/store/uiStore';
 import { cn } from '@/lib/utils';
+import { AssistantToggle } from '@/components/assistant/AssistantToggle';
+import { AssistantPanel } from '@/components/assistant/AssistantPanel';
 
 export const MainLayout = () => {
   const { sidebarCollapsed, setMobileSidebarOpen, theme } = useUIStore();
@@ -57,6 +59,10 @@ export const MainLayout = () => {
           </AnimatePresence>
         </main>
       </div>
+
+      {/* AI Assistant */}
+      <AssistantToggle />
+      <AssistantPanel />
     </div>
   );
 };
