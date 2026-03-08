@@ -16,7 +16,8 @@ import {
   Shield,
 } from 'lucide-react';
 
-const ADMIN_EMAILS = ['griffinshapiro11182001@gmail.com', 'grshapiro2001@gmail.com'];
+const ADMIN_EMAILS = ['griffinshapiro11182001@gmail.com', 'grshap2001@gmail.com'];
+
 import { useUIStore } from '@/store/uiStore';
 import { useAuthStore } from '@/store/authSlice';
 import { cn } from '@/lib/utils';

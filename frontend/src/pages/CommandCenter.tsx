@@ -238,7 +238,7 @@ export function CommandCenter() {
   }, [agentMessages]);
 
   // Admin gate — only show for Griffin's accounts
-  const ADMIN_EMAILS = ['griffinshapiro11182001@gmail.com', 'grshapiro2001@gmail.com'];
+  const ADMIN_EMAILS = ['griffinshapiro11182001@gmail.com', 'grshap2001@gmail.com'];
   if (!user || !ADMIN_EMAILS.includes(user.email)) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
