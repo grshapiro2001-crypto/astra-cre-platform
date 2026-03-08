@@ -574,7 +574,72 @@
 
 ---
 
-**Database:** SQLite with 13 tables, 12 migration files
-**Frontend Routes:** 8 pages (Dashboard, Library, Upload, PropertyDetail, ComparisonPage, DataBankPage, FolderDetail, Settings)
-**Backend Endpoints:** 50+ endpoints across 8 route files
-**Total Lines of Code:** ~15,000+ lines (backend: ~8,000, frontend: ~7,000)
+**Database:** SQLite with 14+ tables, 12 migration files
+**Frontend Routes:** 11 pages (Dashboard, Library, Upload, PropertyDetail, ComparisonPage, DataBankPage, FolderDetail, Settings, OrganizationSettings, Welcome, Landing)
+**Backend Endpoints:** 60+ endpoints across 9 route files
+**Total Lines of Code:** ~20,000+ lines (backend: ~10,000, frontend: ~10,000)
+
+---
+
+## New Since Feb 26, 2026
+
+### New Frontend Pages
+- `Welcome.tsx` — Post-onboarding welcome screen
+- `Landing.tsx` — Public landing page
+- `OrganizationSettings.tsx` — Team workspace management (`/organization`)
+
+### New Frontend Components
+
+**Stacking (`/components/stacking/`)** — Major new feature area
+- `StackingViewer3D.tsx` — Three.js 3D building model (~2000+ lines). Supports linear, L-shape, U-shape, courtyard, tower geometries. Color by floorplan/status/occupancy. Analyst workflow: unit click → side panel. Fullscreen mode. Floor isolation. Screenshot export. Keyboard shortcuts. Auto-rotate on load. Glass materials, LOD labels, build-up animation.
+- `StackingSection.tsx` — Container: handles API calls, state, toggle between 3D and 2D modes
+- `StackingFilterSidebar.tsx` — Persistent multi-select floor plan filter (opacity-based, not hide/show)
+- `FloorPlanOverlay.tsx` — 2D floor plan image display with colored unit markers per floor
+- `LayoutEditor.tsx` — Building layout editor for position map adjustments
+- `UnitDetailModal.tsx` — Click-through unit detail modal (used in non-fullscreen mode)
+- `UnitDetailPanel.tsx` — Side panel for unit detail in fullscreen analyst mode
+- `UnitComparisonPanel.tsx` — Multi-unit comparison in 3D viewer
+- `unitColorUtils.ts` — Shared color utilities for unit status/floorplan coloring
+
+**Organization (`/components/organization/`)**
+- `MigrateDealModal.tsx` — Move deals between organizations
+
+**Dashboard (`/components/dashboard/`)**
+- `KanbanBoard.tsx` — Extracted Kanban board component (now persists to DB)
+- `DealCard.tsx` — Individual deal card for Kanban
+- `DashboardMap.tsx` — Geographic portfolio map component
+- `ChatBar.tsx` — AI pipeline analyst chat bar
+- `AnalyticsRow.tsx` — Analytics metrics row
+- `PresetDropdown.tsx` — Scoring preset dropdown
+
+**Other**
+- `ErrorBoundary.tsx` — React error boundary wrapping full app
+
+### New Backend Routes
+- `backend/app/api/routes/organizations.py` — Organization CRUD, invite flow, member management
+- `backend/app/api/routes/stacking.py` — Stacking model endpoints (layout save/load, floor plan image upload/serve)
+
+### New Backend Models
+- `backend/app/models/organization.py` — Organization, OrganizationMember models
+- `backend/app/models/market_sentiment.py` — Cached market sentiment scores
+
+### New Backend Services
+- `stacking_extraction_service.py` — Satellite image analysis → building layout (shape, floors, units per floor, wings)
+- `floor_plan_extraction_service.py` — Floor plan screenshot → unit position map JSON
+- `market_research_extraction_service.py` — Market research PDF → structured sentiment data
+- `market_sentiment_scoring_service.py` — Layer 2 scoring from market research data
+- `excel_extraction_service.py` — T12 Excel upload → structured financial data
+- `geocoding_service.py` — Address → lat/lng via Google Geocoding API
+- `t12_taxonomy.py` — T12 field taxonomy for fuzzy header matching
+
+### New/Updated Property Model Fields
+- `unit_position_map_json` — Floor plan unit position map from extracted screenshots
+- `floor_plan_images_json` — Uploaded floor plan image file paths per floor
+- `organization_id` — FK to organizations table (multi-tenant support)
+
+### App.tsx Route Changes
+- Added `/welcome` — Welcome page (protected)
+- Added `/organization` — OrganizationSettings (protected)
+- Added `ErrorBoundary` wrapping entire app
+- Added `OnboardingWizard` modal triggered after auth if not completed
+- Added session-expired event listener (replaces `window.location.href` hack)
