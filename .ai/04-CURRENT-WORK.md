@@ -2,232 +2,117 @@
 
 **Purpose:** What am I working on RIGHT NOW? Update this daily or per session.
 **Length:** Keep under 150 lines. Archive completed work.
-**Last Updated:** February 11, 2026
+**Last Updated:** March 8, 2026
 
 ---
 
-## Just Completed (Feb 11, 2026)
+## Just Completed (Feb 26 – Mar 8, 2026)
 
-### Documentation Overhaul
-- ✅ Rewrote README.md in professional open-source style
-  - Hero section with description
-  - Comprehensive feature list (14 feature categories)
-  - Detailed tech stack breakdown (frontend, backend, APIs)
-  - Getting started guide with step-by-step setup
-  - Project structure tree
-  - Environment variables table
-  - API overview with all endpoint groups
-- ✅ Updated `.ai/01-CORE-RULES.md` with current development practices
-  - Added checks: Run `npx tsc --noEmit` and `npm run build` after frontend changes
-  - Added Alembic workflow for schema changes
-  - Updated tech stack versions
-  - Added common gotchas section
-- ✅ Updated `.ai/03-CODEBASE.md` with accurate architecture
-  - Complete backend structure (13 models, 8 route files, 12 services)
-  - Complete frontend structure (8 pages, 50+ components, 8 services)
-  - Key data flows documented
-  - Known issues catalogued
-- ✅ Updated `.ai/04-CURRENT-WORK.md` (this file) with current status
+### 🏗 3D Stacking Viewer — Full Feature Build (PRs #62–94, ~50 commits)
+**The biggest single feature shipped.** An interactive Three.js 3D building model wired directly to rent roll data.
 
-### First-Run Onboarding Wizard
-- ✅ Created `OnboardingWizard.tsx` component with 4-step wizard
-  - Step 1: Welcome screen with value props
-  - Step 2: Set investment criteria (optional)
-  - Step 3: Upload first document (optional)
-  - Step 4: Completion screen with quick links
-- ✅ Integrated onboarding into App.tsx
-- ✅ Added restart option to Settings page
+- ✅ **Phase 1** (PR #62): Base 3D model — linear, L-shape, U-shape, courtyard, tower building geometries
+- ✅ **Phase 2** (PR #63–65): Satellite auto-generation for layout inference; connected building / wing detection
+- ✅ **Phase 2.3–2.5** (PRs #66–68): Investor-grade visual polish — glass materials, unit labels, LTL guards, tooltip, as-of date; filter sidebar with floor plan type checkboxes
+- ✅ **Tier 3** (PR #79): Fullscreen mode, floor isolation, keyboard shortcuts, duplicate unit fix
+- ✅ **Tier 4** (PRs #80–82): Analyst workflow — unit click → side panel, LOD labels, multi-compare, glass materials; independent raycast for click precision
+- ✅ **Rent Roll Parser Rewrite** (PRs #69–73, #83, #86): Complete rewrite for charge-code sub-rows, charge code column misidentification fix, unit dedup, floor-aware mapping
+- ✅ **Floor Plan Extraction** (PRs #84–85): Upload screenshots → extract unit position map; `unit_position_map_json` column added, auto-migration added to `main.py`
+- ✅ **Floor Plan Overlay** (PR #94): 2D overlay mode alongside 3D viewer — floor tabs, image display, colored unit markers; toggle between "3D Model" and "Floor Plan"
+- ✅ **Proportional Unit Sizing** (PR #93): Unit widths proportional to sqft (0.5x–2.0x clamped)
+- ✅ **Unit Matching Fixes** (PRs #87–92): Floor inference logic, ground floor (0xx) support, position map priority for label assignment, glass pane removal for unmatched units, camera framing tightened to unit bounding box
 
----
+### 📊 Market Research + Layer 2 Scoring (PR #50)
+- ✅ Market research PDF extraction pipeline
+- ✅ Layer 2 AI sentiment scoring wired to market research documents
 
-## Previously Completed (Feb 10, 2026)
+### 🏢 Organizations Feature (PRs #46–49)
+- ✅ Team workspaces with invite flow
+- ✅ Organization context surfaced on Dashboard and Library
+- ✅ `OrganizationSettings` page added (`/organization`)
+- ✅ MigrateDealModal for moving deals between orgs
+- ✅ Black screen fix on `/organization` when API fails
 
-### Schema Expansion & Extraction Pipeline
-- ✅ Added `property_unit_mix` table (floorplan, bedrooms, bathrooms, rents)
-- ✅ Added `property_rent_comps` table (comps extracted FROM the OM document)
-- ✅ Added `metro` field to properties (fixes comp matching)
-- ✅ Added renovation fields (cost/unit, total cost, rent premium, ROI, duration)
-- ✅ Added granular T12/T3/Y1 financial line items (40+ fields)
-- ✅ Added screening fields (screening_verdict, screening_score, screening_details_json)
-- ✅ Added pipeline management fields (pipeline_stage, pipeline_notes, pipeline_updated_at)
-- ✅ Wired extraction pipeline end-to-end for all new fields
+### 🔧 Critical Bug Fixes
+- ✅ **BUG-005 FIXED** (PR #61): Kanban `moveDeal` now persists to DB with org-level template selection
+- ✅ T12 Excel upload extraction (PRs #56–60): Fuzzy matching engine with Claude AI fallback
+- ✅ Async re-analyze endpoint (PR #55): Fixed Render HTTP timeout
+- ✅ PDF memory spike fix (PR #56): Stays under 512 MB
+- ✅ Rent roll in_place_rent derivation from charge_details (PR #71)
 
-### Progressive Empty States
-- ✅ PropertyDetail shows what's available vs missing
-- ✅ Unit mix table with "No unit mix data" fallback
-- ✅ Rent comps section with "No rent comps" fallback
-- ✅ Renovation card with empty state when no renovation data
-- ✅ "—" displayed for null/undefined numeric values
+### 🆕 New Pages
+- `Welcome.tsx` — Post-onboarding welcome
+- `Landing.tsx` — Public landing page
+- `OrganizationSettings.tsx` — Team/org management
+- `ErrorBoundary.tsx` — React error boundary (wraps app)
 
-### Deal Score System (Three-Layer)
-- ✅ Three-layer architecture implemented
-  - Layer 1 (30%): Property Fundamentals (economic occupancy, opex ratio, supply pipeline)
-  - Layer 2 (20%): Market Intelligence (AI sentiment score, cached on property)
-  - Layer 3 (50%): Comp Analysis (relevance-weighted comp matching)
-- ✅ Configurable scoring weights via Settings
-- ✅ Four presets (Value-Add, Cash Flow, Core, Opportunistic)
-- ✅ Color-coded badges (green/yellow/red based on score)
-- ✅ Sortable comparison table by deal score
-- ✅ Deal score modal with detailed breakdown
-
-### Investment Criteria & Screening
-- ✅ `UserInvestmentCriteria` model for thresholds
-- ✅ Screening service evaluates properties against criteria
-- ✅ Pass/Fail/Review verdicts on property cards
-- ✅ Screening modal with detailed breakdown
-- ✅ Investment criteria form in Settings
-
-### Data Bank Feature
-- ✅ Excel upload with Claude-powered column classification
-- ✅ Sales comps table (properties sold in the market)
-- ✅ Pipeline projects table (developments in progress)
-- ✅ Submarket inventory (user-input denominators for supply pressure)
-- ✅ Document tracking (uploaded files, extraction status, record count)
-- ✅ Three tabs: Inventory, Sales Comps, Pipeline Projects
-- ✅ Comp matching service uses Data Bank for Layer 3 scoring
-
-### Comparison Page Enhancements
-- ✅ Wired to real API (`/api/v1/properties/compare`)
-- ✅ Gradient highlighting (best=green, worst=red, middle=yellow)
-- ✅ Investment criteria filtering (highlight rows by user-selected metrics)
-- ✅ CSV export of comparison data
-- ✅ Deal score column with sortable badges
-- ✅ Radar chart for multi-metric comparison
-
-### Dashboard Enhancements
-- ✅ Time-of-day greeting personalization
-- ✅ Pipeline Kanban board with customizable stages
-- ✅ Real API integration with properties and folders
-- ✅ Key metrics cards (NOI, cap rate, property count, folder count)
-- ✅ Geographic distribution bar chart
+### 🆕 New Backend Services
+- `stacking_extraction_service.py` — Satellite image analysis → building layout
+- `floor_plan_extraction_service.py` — Floor plan screenshot → unit position map
+- `market_research_extraction_service.py` — Market research PDF → sentiment data
+- `market_sentiment_scoring_service.py` — Layer 2 scoring from market research
+- `excel_extraction_service.py` — T12 Excel upload extraction
+- `geocoding_service.py` — Address → lat/lng for map markers
+- `t12_taxonomy.py` — T12 field taxonomy for fuzzy matching
 
 ---
 
-## Next Priority
+## Current State (Mar 8, 2026)
 
-### End-to-End Upload Testing
-1. **Upload 1160 Hammond test file** - Verify extraction pipeline with real OM
-2. **Validate all new fields extract correctly**:
-   - Unit mix rows
-   - Rent comps
-   - Renovation assumptions
-   - Metro field
-   - Granular financials
-   - Screening evaluation
-3. **Check progressive empty states** work when fields are missing
-4. **Test onboarding flow** for new users
-
-### Merge Conflict Resolution
-- **Review all feature branches** and resolve conflicts with main
-- **Ensure database migrations** are in correct order
-- **Test full application** after merge
-
-### Production Deployment Planning
-- **Environment configuration** for production
-- **Database migration strategy** (SQLite vs PostgreSQL)
-- **API key management** (secure storage for ANTHROPIC_API_KEY)
-- **CORS configuration** for production domains
-- **Frontend build optimization** (Vite build)
-- **Backend deployment** (Render, Railway, or similar)
-- **Frontend deployment** (Vercel, Netlify, or similar)
+**Production URL:** https://astra-cre-platform.vercel.app
+**Backend:** https://astra-cre-backend.onrender.com
+**Latest Deployment:** PR #94 — READY ✅ (Vercel confirmed)
+**Current PR:** #94 (last merged)
+**TypeScript:** Clean (last confirmed Feb 26, no regressions expected)
+**Total PRs Merged (all time):** 94
+**PRs Merged Since Feb 26:** 47+
 
 ---
 
-## Known Issues
+## Open Bugs (Carry-forward — See QA-AUDIT.md)
 
-### Critical
-- [ ] Need to re-upload 1160 Hammond OM to test unit_mix/rent_comps pipeline
-- [ ] ANTHROPIC_API_KEY env var override issue
-
-### Medium Priority
-- [ ] "Add Note" button doesn't persist notes (PropertyDetail line 1466)
-- [ ] "Ask Follow-up" button has no onClick handler (PropertyDetail line 1783)
-- [ ] "Save Comparison" button closes modal without saving form data (ComparisonPage line 1886)
-- [ ] Kanban `moveDeal` only console.logs (Dashboard line 499)
-- [ ] Settings page "Save Changes" button permanently disabled
-- [ ] Notification bell has no handler (Header component)
-- [ ] Sidebar pipeline stats hardcoded ($24.5M, 12 Active Deals - needs API)
-
-### Low Priority
-- [ ] 6 debug console.logs need removal
-- [ ] Tag filtering on Dashboard not fully implemented
-- [ ] `_cffi_backend` environment dependency warning on backend startup (pre-existing, non-blocking)
+| ID | Issue | Severity | Status |
+|----|-------|----------|--------|
+| BUG-001 | Google Maps API loaded multiple times | Critical | Open |
+| BUG-002 | Google Maps retired API v3.55 | Critical | Open |
+| BUG-003 | "Add Note" silently drops data | Critical | Open |
+| BUG-004 | "Ask Follow-up" button inert | Critical | Open |
+| BUG-005 | Kanban moveDeal not persisted | High | **FIXED PR #61** |
+| BUG-006 | "Save Comparison" doesn't save | High | Open |
+| BUG-007 | NOI chart shows "---" when T12 null | High | Open |
+| BUG-008 | Settings "Save Changes" disabled | High | Open |
+| BUG-009 | Dashboard metrics fluctuate cold start | Medium | Open (PR #41 pending) |
+| BUG-010 | Notification bell non-functional | Medium | Open |
+| BUG-011 | Notification prefs local only | Medium | Open |
+| BUG-012 | Debug console.logs in prod | Low | Open |
+| BUG-013 | API key labeled as placeholder | Low | Open |
 
 ---
 
-## Active Phase
+## Immediate Priorities (Mar 8, 2026)
 
-**Phase:** Documentation + Onboarding + Pre-Deployment Testing
-**Status:** Documentation complete, onboarding wizard complete, ready for testing and deployment planning
-
----
-
-## Architecture Notes
-
-### Database Schema (Feb 11, 2026)
-**Core Tables (13):**
-1. `users` - User accounts
-2. `properties` (~80 columns) - Core property table with 40+ financial fields
-3. `property_unit_mix` - Unit mix rows extracted from OM
-4. `property_rent_comps` - Rent comps extracted from OM
-5. `deal_folders` - Deal folder organization
-6. `bov_pricing_tiers` - Multi-tier pricing scenarios
-7. `bov_cap_rates` - Cap rates linked to tiers
-8. `sales_comps` - User-uploaded sales comp records
-9. `pipeline_projects` - User-uploaded pipeline/development projects
-10. `submarket_inventory` - User-input inventory denominators
-11. `user_scoring_weights` - Configurable scoring weights
-12. `user_investment_criteria` - Investment thresholds for screening
-13. `analysis_logs` - Audit log of extraction operations
-14. `data_bank_documents` - Uploaded Excel file tracking
-
-**Migrations:** 12 migration files tracking schema evolution
-
-### API Routes (8 prefixes)
-- `/api/v1/auth` - Authentication (register, login, logout, me)
-- `/api/v1/upload` - PDF upload and extraction (USES LLM)
-- `/api/v1/properties` - Property CRUD, reanalysis, comparison
-- `/api/v1/deal-folders` - Folder management
-- `/api/v1/scoring` - Deal scoring system (weights, presets, scoring)
-- `/api/v1/criteria` - Investment criteria and screening
-- `/api/v1/data-bank` - Data Bank (comps, pipeline, inventory, uploads)
-- `/api/v1/chat` - AI Pipeline Analyst chat (USES LLM)
-
-### Frontend Routes (8 pages)
-- `/` - Dashboard (Kanban board, metrics cards)
-- `/library` - Property library (grid/list view)
-- `/upload` - PDF upload page
-- `/properties/:id` - Property detail view
-- `/comparisons` - Side-by-side comparison
-- `/data-bank` - Data bank management
-- `/folders/:id` - Folder detail view
-- `/settings` - User settings (scoring weights, criteria)
+1. **Build Command Center** — Admin-only `/command-center` route (in progress)
+2. **Fix BUG-001 + BUG-002** — Google Maps API loaded multiple times + retire v3.55
+3. **Fix BUG-003** — "Add Note" persistence via `POST /api/v1/properties/{id}/notes`
+4. **Fix BUG-004** — Wire "Ask Follow-up" to Claude chat API
+5. **Fix BUG-006** — "Save Comparison" needs to POST to `/api/v1/comparisons`
+6. **Fix BUG-007** — NOI chart fallback: T12 null → T3 → Y1
+7. **Fix BUG-008** — Settings "Save Changes" dirty-state tracking
 
 ---
 
-## Before Next Session
+## Architecture Quick Reference
 
-**Read These First:**
-1. `.ai/01-CORE-RULES.md` - Coding standards and development practices
-2. `.ai/03-CODEBASE.md` - What exists (don't rebuild!)
-3. This file - Current priorities and active work
+### Backend
+- FastAPI + SQLAlchemy + SQLite (dev) / PostgreSQL (prod)
+- 14+ DB tables, 9 API route prefixes, 18+ services
+- LLM calls: upload extraction, re-analyze, data-bank Excel, chat, market research, floor plan extraction
+- Model: `claude-sonnet-4-5-20250929`
+- GOTCHA: `base_url="https://api.anthropic.com"` must be hardcoded in claude_extraction_service.py
 
-**Test Before Deploying:**
-1. Upload test OM (1160 Hammond) and verify extraction
-2. Test onboarding flow for new users
-3. Run `npx tsc --noEmit` and `npm run build` to verify no errors
-4. Test all key features: upload, scoring, screening, comparison, data bank
-5. Verify all API endpoints work correctly
-
-**Deployment Checklist:**
-- [ ] Set up production environment variables
-- [ ] Configure production database (SQLite or PostgreSQL)
-- [ ] Set up CORS for production domain
-- [ ] Build and test frontend production build
-- [ ] Set up backend hosting (Render, Railway, etc.)
-- [ ] Set up frontend hosting (Vercel, Netlify, etc.)
-- [ ] Test full application in production environment
-
----
-
-**Token Count:** ~650 (lightweight for context)
+### Frontend
+- React 18 + TypeScript + Vite + Tailwind + shadcn/ui + Zustand
+- **11 pages**, 60+ components, 8+ services
+- New major component: `StackingViewer3D.tsx` (Three.js, ~2000+ lines)
+- Path alias: `@` → `frontend/src/`
+- Design: purple theme only (`bg-primary`, never `bg-emerald-*`)

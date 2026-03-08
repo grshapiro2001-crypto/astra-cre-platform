@@ -13,7 +13,10 @@ import {
   ChevronsRight,
   TrendingUp,
   Users,
+  Shield,
 } from 'lucide-react';
+
+const ADMIN_EMAILS = ['griffinshapiro11182001@gmail.com', 'grshapiro2001@gmail.com'];
 import { useUIStore } from '@/store/uiStore';
 import { useAuthStore } from '@/store/authSlice';
 import { cn } from '@/lib/utils';
@@ -124,6 +127,39 @@ export const Sidebar = () => {
             </NavLink>
           );
         })}
+
+        {/* Admin-only: Command Center */}
+        {user && ADMIN_EMAILS.includes(user.email) && (
+          <>
+            {!sidebarCollapsed && (
+              <div className="flex items-center gap-2 px-3 mt-4 mb-1">
+                <div className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                <span className="text-amber-400/60 text-[10px] font-medium uppercase tracking-widest">
+                  Admin
+                </span>
+              </div>
+            )}
+            {sidebarCollapsed && <div className="my-2 border-t border-white/5" />}
+            <NavLink
+              to="/command-center"
+              className={({ isActive }) =>
+                cn(
+                  'flex items-center gap-3 rounded-xl text-sm font-medium transition-all duration-200',
+                  sidebarCollapsed
+                    ? 'justify-center px-0 py-2.5 mx-auto w-11 h-11'
+                    : 'px-3 py-2.5',
+                  isActive
+                    ? 'bg-amber-500/20 text-amber-300 shadow-sm border border-amber-500/20'
+                    : 'text-amber-300/60 hover:bg-amber-500/10 hover:text-amber-200'
+                )
+              }
+              title={sidebarCollapsed ? 'Command Center' : undefined}
+            >
+              <Shield className="w-5 h-5 shrink-0" strokeWidth={1.5} />
+              {!sidebarCollapsed && 'Command Center'}
+            </NavLink>
+          </>
+        )}
       </nav>
 
       {/* Org Pill */}
@@ -309,6 +345,33 @@ export const MobileSidebar = () => {
               </NavLink>
             );
           })}
+
+          {/* Admin-only: Command Center */}
+          {user && ADMIN_EMAILS.includes(user.email) && (
+            <>
+              <div className="flex items-center gap-2 px-3 mt-4 mb-1">
+                <div className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                <span className="text-amber-400/60 text-[10px] font-medium uppercase tracking-widest">
+                  Admin
+                </span>
+              </div>
+              <NavLink
+                to="/command-center"
+                onClick={() => setMobileSidebarOpen(false)}
+                className={({ isActive }) =>
+                  cn(
+                    'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200',
+                    isActive
+                      ? 'bg-amber-500/20 text-amber-300 shadow-sm border border-amber-500/20'
+                      : 'text-amber-300/60 hover:bg-amber-500/10 hover:text-amber-200'
+                  )
+                }
+              >
+                <Shield className="w-5 h-5 shrink-0" strokeWidth={1.5} />
+                Command Center
+              </NavLink>
+            </>
+          )}
         </nav>
 
         {/* Theme Toggle */}
