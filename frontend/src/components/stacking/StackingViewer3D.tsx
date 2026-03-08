@@ -853,6 +853,7 @@ function buildLinearBuilding(
       const pos = i + 1;
       const key = `${building.id}_${floor}_${pos}`;
       const rr = unitMap.get(key);
+      if (!rr) continue; // Skip unmatched positions — no "No Data" glass panes
       const status = getUnitStatus(rr);
 
       const geom = new THREE.BoxGeometry(UNIT_WIDTH, UNIT_HEIGHT, UNIT_DEPTH);
@@ -883,6 +884,7 @@ function buildLinearBuilding(
       const pos = rowACount + i + 1;
       const key = `${building.id}_${floor}_${pos}`;
       const rr = unitMap.get(key);
+      if (!rr) continue; // Skip unmatched positions — no "No Data" glass panes
       const status = getUnitStatus(rr);
 
       const geom = new THREE.BoxGeometry(UNIT_WIDTH, UNIT_HEIGHT, UNIT_DEPTH);
@@ -961,6 +963,7 @@ function buildLShapeBuilding(
       floorPos++;
       const key = `${building.id}_${floor}_${floorPos}`;
       const rr = unitMap.get(key);
+      if (!rr) continue; // Skip unmatched positions — no "No Data" glass panes
       const status = getUnitStatus(rr);
       const geom = new THREE.BoxGeometry(UNIT_WIDTH, UNIT_HEIGHT, UNIT_DEPTH);
       const mesh = new THREE.Mesh(geom, getMaterialForStatus(status));
@@ -978,6 +981,7 @@ function buildLShapeBuilding(
       floorPos++;
       const key = `${building.id}_${floor}_${floorPos}`;
       const rr = unitMap.get(key);
+      if (!rr) continue; // Skip unmatched positions — no "No Data" glass panes
       const status = getUnitStatus(rr);
       const geom = new THREE.BoxGeometry(UNIT_WIDTH, UNIT_HEIGHT, UNIT_DEPTH);
       const mesh = new THREE.Mesh(geom, getMaterialForStatus(status));
@@ -995,6 +999,7 @@ function buildLShapeBuilding(
       floorPos++;
       const key = `${building.id}_${floor}_${floorPos}`;
       const rr = unitMap.get(key);
+      if (!rr) continue; // Skip unmatched positions — no "No Data" glass panes
       const status = getUnitStatus(rr);
       const geom = new THREE.BoxGeometry(UNIT_DEPTH, UNIT_HEIGHT, UNIT_WIDTH);
       const mesh = new THREE.Mesh(geom, getMaterialForStatus(status));
@@ -1013,6 +1018,7 @@ function buildLShapeBuilding(
       floorPos++;
       const key = `${building.id}_${floor}_${floorPos}`;
       const rr = unitMap.get(key);
+      if (!rr) continue; // Skip unmatched positions — no "No Data" glass panes
       const status = getUnitStatus(rr);
       const geom = new THREE.BoxGeometry(UNIT_DEPTH, UNIT_HEIGHT, UNIT_WIDTH);
       const mesh = new THREE.Mesh(geom, getMaterialForStatus(status));
@@ -1068,6 +1074,7 @@ function buildUShapeBuilding(
     for (let i = 0; i < leftRowA; i++) {
       const key = `${building.id}_${floor}_${posCounter}`;
       const rr = unitMap.get(key);
+      if (!rr) { posCounter++; continue; } // Skip unmatched positions
       const status = getUnitStatus(rr);
       const geom = new THREE.BoxGeometry(UNIT_DEPTH, UNIT_HEIGHT, UNIT_WIDTH);
       const mesh = new THREE.Mesh(geom, getMaterialForStatus(status));
@@ -1085,6 +1092,7 @@ function buildUShapeBuilding(
     for (let i = 0; i < leftRowB; i++) {
       const key = `${building.id}_${floor}_${posCounter}`;
       const rr = unitMap.get(key);
+      if (!rr) { posCounter++; continue; } // Skip unmatched positions
       const status = getUnitStatus(rr);
       const geom = new THREE.BoxGeometry(UNIT_DEPTH, UNIT_HEIGHT, UNIT_WIDTH);
       const mesh = new THREE.Mesh(geom, getMaterialForStatus(status));
@@ -1103,6 +1111,7 @@ function buildUShapeBuilding(
     for (let i = 0; i < bottomRowA; i++) {
       const key = `${building.id}_${floor}_${posCounter}`;
       const rr = unitMap.get(key);
+      if (!rr) { posCounter++; continue; } // Skip unmatched positions
       const status = getUnitStatus(rr);
       const geom = new THREE.BoxGeometry(UNIT_WIDTH, UNIT_HEIGHT, UNIT_DEPTH);
       const mesh = new THREE.Mesh(geom, getMaterialForStatus(status));
@@ -1122,6 +1131,7 @@ function buildUShapeBuilding(
     for (let i = 0; i < bottomRowB; i++) {
       const key = `${building.id}_${floor}_${posCounter}`;
       const rr = unitMap.get(key);
+      if (!rr) { posCounter++; continue; } // Skip unmatched positions
       const status = getUnitStatus(rr);
       const geom = new THREE.BoxGeometry(UNIT_WIDTH, UNIT_HEIGHT, UNIT_DEPTH);
       const mesh = new THREE.Mesh(geom, getMaterialForStatus(status));
@@ -1140,6 +1150,7 @@ function buildUShapeBuilding(
     for (let i = 0; i < rightRowA; i++) {
       const key = `${building.id}_${floor}_${posCounter}`;
       const rr = unitMap.get(key);
+      if (!rr) { posCounter++; continue; } // Skip unmatched positions
       const status = getUnitStatus(rr);
       const geom = new THREE.BoxGeometry(UNIT_DEPTH, UNIT_HEIGHT, UNIT_WIDTH);
       const mesh = new THREE.Mesh(geom, getMaterialForStatus(status));
@@ -1157,6 +1168,7 @@ function buildUShapeBuilding(
     for (let i = 0; i < rightRowB; i++) {
       const key = `${building.id}_${floor}_${posCounter}`;
       const rr = unitMap.get(key);
+      if (!rr) { posCounter++; continue; } // Skip unmatched positions
       const status = getUnitStatus(rr);
       const geom = new THREE.BoxGeometry(UNIT_DEPTH, UNIT_HEIGHT, UNIT_WIDTH);
       const mesh = new THREE.Mesh(geom, getMaterialForStatus(status));
@@ -1225,6 +1237,7 @@ function buildTowerBuilding(
         if (posCounter > building.units_per_floor) break;
         const key = `${building.id}_${floor}_${posCounter}`;
         const rr = unitMap.get(key);
+        if (!rr) { posCounter++; continue; } // Skip unmatched positions
         const status = getUnitStatus(rr);
 
         const geom = new THREE.BoxGeometry(UNIT_WIDTH, UNIT_HEIGHT, UNIT_DEPTH);
@@ -1314,6 +1327,7 @@ function buildCourtyardBuilding(
     for (let i = 0; i < nRowA; i++) {
       const key = `${building.id}_${floor}_${posCounter}`;
       const rr = unitMap.get(key);
+      if (!rr) { posCounter++; continue; } // Skip unmatched positions
       const status = getUnitStatus(rr);
       const geom = new THREE.BoxGeometry(UNIT_WIDTH, UNIT_HEIGHT, UNIT_DEPTH);
       const mesh = new THREE.Mesh(geom, getMaterialForStatus(status));
@@ -1332,6 +1346,7 @@ function buildCourtyardBuilding(
     for (let i = 0; i < nRowB; i++) {
       const key = `${building.id}_${floor}_${posCounter}`;
       const rr = unitMap.get(key);
+      if (!rr) { posCounter++; continue; } // Skip unmatched positions
       const status = getUnitStatus(rr);
       const geom = new THREE.BoxGeometry(UNIT_WIDTH, UNIT_HEIGHT, UNIT_DEPTH);
       const mesh = new THREE.Mesh(geom, getMaterialForStatus(status));
@@ -1356,6 +1371,7 @@ function buildCourtyardBuilding(
       for (let i = 0; i < eRowA; i++) {
         const key = `${building.id}_${floor}_${posCounter}`;
         const rr = unitMap.get(key);
+        if (!rr) { posCounter++; continue; } // Skip unmatched positions
         const status = getUnitStatus(rr);
         const geom = new THREE.BoxGeometry(UNIT_DEPTH, UNIT_HEIGHT, UNIT_WIDTH);
         const mesh = new THREE.Mesh(geom, getMaterialForStatus(status));
@@ -1374,6 +1390,7 @@ function buildCourtyardBuilding(
       for (let i = 0; i < eRowB; i++) {
         const key = `${building.id}_${floor}_${posCounter}`;
         const rr = unitMap.get(key);
+        if (!rr) { posCounter++; continue; } // Skip unmatched positions
         const status = getUnitStatus(rr);
         const geom = new THREE.BoxGeometry(UNIT_DEPTH, UNIT_HEIGHT, UNIT_WIDTH);
         const mesh = new THREE.Mesh(geom, getMaterialForStatus(status));
@@ -1399,6 +1416,7 @@ function buildCourtyardBuilding(
       for (let i = 0; i < sRowA; i++) {
         const key = `${building.id}_${floor}_${posCounter}`;
         const rr = unitMap.get(key);
+        if (!rr) { posCounter++; continue; } // Skip unmatched positions
         const status = getUnitStatus(rr);
         const geom = new THREE.BoxGeometry(UNIT_WIDTH, UNIT_HEIGHT, UNIT_DEPTH);
         const mesh = new THREE.Mesh(geom, getMaterialForStatus(status));
@@ -1417,6 +1435,7 @@ function buildCourtyardBuilding(
       for (let i = 0; i < sRowB; i++) {
         const key = `${building.id}_${floor}_${posCounter}`;
         const rr = unitMap.get(key);
+        if (!rr) { posCounter++; continue; } // Skip unmatched positions
         const status = getUnitStatus(rr);
         const geom = new THREE.BoxGeometry(UNIT_WIDTH, UNIT_HEIGHT, UNIT_DEPTH);
         const mesh = new THREE.Mesh(geom, getMaterialForStatus(status));
@@ -1442,6 +1461,7 @@ function buildCourtyardBuilding(
       for (let i = 0; i < wRowA; i++) {
         const key = `${building.id}_${floor}_${posCounter}`;
         const rr = unitMap.get(key);
+        if (!rr) { posCounter++; continue; } // Skip unmatched positions
         const status = getUnitStatus(rr);
         const geom = new THREE.BoxGeometry(UNIT_DEPTH, UNIT_HEIGHT, UNIT_WIDTH);
         const mesh = new THREE.Mesh(geom, getMaterialForStatus(status));
@@ -1460,6 +1480,7 @@ function buildCourtyardBuilding(
       for (let i = 0; i < wRowB; i++) {
         const key = `${building.id}_${floor}_${posCounter}`;
         const rr = unitMap.get(key);
+        if (!rr) { posCounter++; continue; } // Skip unmatched positions
         const status = getUnitStatus(rr);
         const geom = new THREE.BoxGeometry(UNIT_DEPTH, UNIT_HEIGHT, UNIT_WIDTH);
         const mesh = new THREE.Mesh(geom, getMaterialForStatus(status));
@@ -2177,9 +2198,25 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
     });
 
     // ── Camera position — 32° elevation, 45° azimuth for ground-floor visibility ──
+    // Compute bounding box of unit meshes only for tighter framing
+    const unitBox = new THREE.Box3();
+    scene.traverse((child) => {
+      if (child instanceof THREE.Mesh && child.name.startsWith('unit_')) {
+        unitBox.expandByObject(child);
+      }
+    });
     const maxDim = Math.max(sceneSize.x, sceneSize.z);
     maxDimRef.current = maxDim;
-    const cameraDistance = maxDim * 1.05;
+    let cameraDistance: number;
+    if (!unitBox.isEmpty()) {
+      const unitSize = unitBox.getSize(new THREE.Vector3());
+      const maxUnitDim = Math.max(unitSize.x, unitSize.y, unitSize.z);
+      const fov = camera.fov * (Math.PI / 180);
+      // Distance so building fills ~75% of viewport
+      cameraDistance = (maxUnitDim / 2) / Math.tan(fov / 2) * 1.35;
+    } else {
+      cameraDistance = maxDim * 1.05; // fallback
+    }
     const elevation = THREE.MathUtils.degToRad(32);
     const azimuth = THREE.MathUtils.degToRad(45);
 
