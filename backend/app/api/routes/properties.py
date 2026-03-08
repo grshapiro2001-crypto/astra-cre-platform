@@ -936,6 +936,7 @@ def build_property_detail_response(property_obj: Property, db: Session) -> Prope
         rr_as_of_date=property_obj.rr_as_of_date,
         stacking_layout_json=property_obj.stacking_layout_json,
         unit_position_map_json=property_obj.unit_position_map_json,
+        floor_plan_images_json=property_obj.floor_plan_images_json,
     )
 
 

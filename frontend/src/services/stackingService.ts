@@ -76,4 +76,12 @@ export const stackingService = {
     );
     return response.data;
   },
+
+  /**
+   * Get the URL for a floor plan image (used as <img> src).
+   */
+  getFloorPlanImageUrl(propertyId: number, floor: number): string {
+    const baseURL = api.defaults.baseURL || '';
+    return `${baseURL}/properties/${propertyId}/floor-plan-image/${floor}`;
+  },
 };

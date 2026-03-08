@@ -4,11 +4,14 @@ Phase 1: Manual layout entry. Phase 2: Satellite auto-generation.
 """
 import json
 import logging
+from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, File, UploadFile
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from typing import Any, Optional
 
+from app.config import settings
 from app.database import get_db
 from app.models.property import Property, RentRollUnit
 from app.models.user import User
@@ -192,11 +195,63 @@ async def extract_floor_plan_units(
             detail=f"Could not analyze floor plan images: {e}",
         )
 
+    # Save floor plan images to disk for the Floor Plan overlay viewer
+    floor_plan_dir = Path(settings.UPLOAD_DIR) / "floor_plans"
+    floor_plan_dir.mkdir(parents=True, exist_ok=True)
+
+    floors_data = result["unit_position_map"].get("floors", [])
+    saved_paths: list[dict] = []
+    for idx, (content, filename) in enumerate(images):
+        ext = Path(filename).suffix or ".png"
+        # Use the actual floor number from extraction if available
+        floor_num = floors_data[idx]["floor"] if idx < len(floors_data) else idx + 1
+        save_name = f"property_{property_id}_floor_{floor_num}{ext}"
+        save_path = floor_plan_dir / save_name
+        save_path.write_bytes(content)
+        saved_paths.append({"floor": floor_num, "path": str(save_path)})
+
+    property_obj.floor_plan_images_json = json.dumps(saved_paths)
+    db.commit()
+    logger.info("Saved %d floor plan images for property %d", len(saved_paths), property_id)
+
     return {
         "property_id": property_id,
         "unit_position_map": result["unit_position_map"],
         "layout": result["layout"],
+        "floor_plan_images": saved_paths,
     }
+
+
+@router.get("/properties/{property_id}/floor-plan-image/{floor}")
+def get_floor_plan_image(
+    property_id: int,
+    floor: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Serve a saved floor plan image for a specific floor."""
+    property_obj = property_service.get_property(
+        db, property_id, current_user.id, update_view_date=False,
+        org_id=getattr(current_user, 'organization_id', None),
+    )
+    if not property_obj:
+        raise HTTPException(status_code=404, detail="Property not found")
+
+    if not property_obj.floor_plan_images_json:
+        raise HTTPException(status_code=404, detail="No floor plan images available")
+
+    images = json.loads(property_obj.floor_plan_images_json)
+    for entry in images:
+        if entry["floor"] == floor:
+            path = Path(entry["path"])
+            if path.exists():
+                media_type = "image/png"
+                if path.suffix.lower() in (".jpg", ".jpeg"):
+                    media_type = "image/jpeg"
+                return FileResponse(str(path), media_type=media_type)
+            raise HTTPException(status_code=404, detail="Image file not found on disk")
+
+    raise HTTPException(status_code=404, detail=f"No image for floor {floor}")
 
 
 @router.get("/properties/{property_id}/rent-roll-units")

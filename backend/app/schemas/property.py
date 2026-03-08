@@ -309,6 +309,7 @@ class PropertyDetail(BaseModel):
     # 3D Stacking layout
     stacking_layout_json: Optional[str] = None
     unit_position_map_json: Optional[str] = None
+    floor_plan_images_json: Optional[str] = None
 
     class Config:
         from_attributes = True

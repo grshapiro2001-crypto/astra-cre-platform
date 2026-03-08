@@ -698,31 +698,34 @@ function addUnitLabel(
 }
 
 // ─── Filter color helpers ───────────────────────────────────────────────────
+// Core color logic lives in unitColorUtils.ts (shared with FloorPlanOverlay).
+// These wrappers convert hex strings to THREE.Color for the 3D renderer.
+
+import {
+  lerpColorHex,
+  statusToColorHex,
+  getExpirationColorHex,
+  getLTLColorHex,
+  getRentGradientColorHex,
+  computeRentStatsFromUnits,
+  type RentStats,
+} from './unitColorUtils';
 
 function lerpColor(c1: number, c2: number, t: number): THREE.Color {
-  const color1 = new THREE.Color(c1);
-  const color2 = new THREE.Color(c2);
-  return color1.lerp(color2, Math.max(0, Math.min(1, t)));
+  const hex = lerpColorHex(
+    '#' + c1.toString(16).padStart(6, '0'),
+    '#' + c2.toString(16).padStart(6, '0'),
+    t,
+  );
+  return new THREE.Color(hex);
 }
 
 function statusToColor(status: 'occupied' | 'vacant' | 'unknown'): THREE.Color {
-  switch (status) {
-    case 'occupied': return new THREE.Color(0x7C3AED);
-    case 'vacant': return new THREE.Color(0xF43F5E);
-    case 'unknown': return new THREE.Color(0x3F3F5A);
-  }
+  return new THREE.Color(statusToColorHex(status));
 }
 
 function getExpirationColor(leaseEnd: string | null | undefined, refDate: Date): THREE.Color {
-  if (!leaseEnd) return new THREE.Color(0x6B7280);
-  const end = new Date(leaseEnd);
-  const diffMs = end.getTime() - refDate.getTime();
-  const diffDays = diffMs / (1000 * 60 * 60 * 24);
-  if (diffDays <= 30) return new THREE.Color(0xEF4444);   // expired or urgent
-  if (diffDays <= 90) return new THREE.Color(0xF97316);   // soon
-  if (diffDays <= 180) return new THREE.Color(0xEAB308);  // approaching
-  if (diffDays <= 365) return new THREE.Color(0x22C55E);  // stable
-  return new THREE.Color(0x3B82F6);                        // long-term
+  return new THREE.Color(getExpirationColorHex(leaseEnd, refDate));
 }
 
 function formatLTL(
@@ -737,13 +740,7 @@ function formatLTL(
 }
 
 function getLTLColor(marketRent: number | null | undefined, inPlaceRent: number | null | undefined): THREE.Color {
-  if (marketRent == null || inPlaceRent == null || marketRent <= 0 || inPlaceRent <= 0) return new THREE.Color(0x6B7280);
-  const ltl = (marketRent - inPlaceRent) / marketRent;
-  if (ltl <= 0) return new THREE.Color(0x3B82F6);      // at or above market
-  if (ltl <= 0.05) return new THREE.Color(0x22C55E);    // 1-5%
-  if (ltl <= 0.10) return new THREE.Color(0xEAB308);    // 5-10%
-  if (ltl <= 0.20) return new THREE.Color(0xF97316);    // 10-20%
-  return new THREE.Color(0xEF4444);                      // 20%+
+  return new THREE.Color(getLTLColorHex(marketRent, inPlaceRent));
 }
 
 function getRentGradientColor(
@@ -753,41 +750,18 @@ function getRentGradientColor(
   colorMin: number,
   colorMax: number,
 ): THREE.Color {
-  if (value == null) return new THREE.Color(0x6B7280);
-  const range = max - min;
-  const t = range > 0 ? (value - min) / range : 0.5;
-  return lerpColor(colorMin, colorMax, t);
-}
-
-interface RentStats {
-  minMarketRent: number;
-  maxMarketRent: number;
-  minContractRent: number;
-  maxContractRent: number;
-  maxFloor: number;
+  return new THREE.Color(getRentGradientColorHex(
+    value,
+    min,
+    max,
+    '#' + colorMin.toString(16).padStart(6, '0'),
+    '#' + colorMax.toString(16).padStart(6, '0'),
+  ));
 }
 
 function computeRentStats(rentRollUnits: RentRollUnit[], layout: StackingLayout): RentStats {
-  let minMarket = Infinity, maxMarket = -Infinity;
-  let minContract = Infinity, maxContract = -Infinity;
-  for (const u of rentRollUnits) {
-    if (u.market_rent != null) {
-      minMarket = Math.min(minMarket, u.market_rent);
-      maxMarket = Math.max(maxMarket, u.market_rent);
-    }
-    if (u.in_place_rent != null) {
-      minContract = Math.min(minContract, u.in_place_rent);
-      maxContract = Math.max(maxContract, u.in_place_rent);
-    }
-  }
   const maxFloor = layout.buildings.reduce((m, b) => Math.max(m, b.num_floors), 1);
-  return {
-    minMarketRent: minMarket === Infinity ? 0 : minMarket,
-    maxMarketRent: maxMarket === -Infinity ? 0 : maxMarket,
-    minContractRent: minContract === Infinity ? 0 : minContract,
-    maxContractRent: maxContract === -Infinity ? 0 : maxContract,
-    maxFloor,
-  };
+  return computeRentStatsFromUnits(rentRollUnits, maxFloor);
 }
 
 function applyFilterToScene(
