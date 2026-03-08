@@ -162,6 +162,8 @@ class Property(Base):
     stacking_layout_json = Column(Text, nullable=True)
     # Floor plan extraction — raw unit position map from Claude Vision
     unit_position_map_json = Column(Text, nullable=True)
+    # Floor plan images — JSON array of {floor, path} for uploaded floor plan screenshots
+    floor_plan_images_json = Column(Text, nullable=True)
 
     # Relationships
     unit_mix = relationship("PropertyUnitMix", backref="property", cascade="all, delete-orphan")

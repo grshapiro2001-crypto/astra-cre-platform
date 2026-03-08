@@ -263,6 +263,11 @@ export interface UnitPositionMap {
   floors: FloorPlanFloor[];
 }
 
+export interface FloorPlanImageEntry {
+  floor: number;
+  path: string;
+}
+
 export interface RentRollUnit {
   id: number;
   unit_number: string | null;
@@ -388,6 +393,7 @@ export interface PropertyDetail {
   // 3D Stacking layout
   stacking_layout_json?: string | null;
   unit_position_map_json?: string | null;
+  floor_plan_images_json?: string | null;
 }
 
 /** Property list item for library views */

@@ -14,8 +14,9 @@ import type { UnitMeshData } from './StackingViewer3D';
 import { StackingFilterSidebar } from './StackingFilterSidebar';
 import { UnitDetailPanel } from './UnitDetailPanel';
 import { UnitComparisonPanel } from './UnitComparisonPanel';
+import FloorPlanOverlay from './FloorPlanOverlay';
 import { stackingService } from '@/services/stackingService';
-import type { PropertyDetail, StackingLayout, RentRollUnit, StackingFilterType, FilterLegend, UnitPositionMap } from '@/types/property';
+import type { PropertyDetail, StackingLayout, RentRollUnit, StackingFilterType, FilterLegend, UnitPositionMap, FloorPlanImageEntry } from '@/types/property';
 
 type SectionMode = 'choosing' | 'extracting' | 'extracted' | 'editing' | 'viewing';
 
@@ -71,6 +72,27 @@ export function StackingSection({ property }: StackingSectionProps) {
   const [isExtractingFloorPlan, setIsExtractingFloorPlan] = useState(false);
   const [floorPlanError, setFloorPlanError] = useState<string | null>(null);
   const floorPlanInputRef = useRef<HTMLInputElement>(null);
+
+  // View mode: 3D model vs floor plan overlay
+  type ViewMode = '3d' | 'floorplan';
+  const [viewMode, setViewMode] = useState<ViewMode>('3d');
+
+  // Parse floor plan images from property
+  const floorPlanImages: FloorPlanImageEntry[] = useMemo(() => {
+    if (!property.floor_plan_images_json) return [];
+    try {
+      return JSON.parse(property.floor_plan_images_json) as FloorPlanImageEntry[];
+    } catch { return []; }
+  }, [property.floor_plan_images_json]);
+
+  const hasFloorPlanImages = floorPlanImages.length > 0 && unitPositionMap !== null;
+
+  // Reset to 3D if floor plan images become unavailable
+  useEffect(() => {
+    if (!hasFloorPlanImages && viewMode === 'floorplan') {
+      setViewMode('3d');
+    }
+  }, [hasFloorPlanImages, viewMode]);
 
   const handleUnitClick = useCallback((data: UnitMeshData, event?: { ctrlKey?: boolean; metaKey?: boolean }) => {
     if (event?.ctrlKey || event?.metaKey) {
@@ -431,6 +453,29 @@ export function StackingSection({ property }: StackingSectionProps) {
         </div>
         {mode === 'viewing' && (
           <div className="flex items-center gap-2">
+            {/* View mode toggle: 3D Model / Floor Plan */}
+            {hasFloorPlanImages && (
+              <div className="flex items-center bg-muted/50 rounded-lg p-0.5 mr-1">
+                <button
+                  className={cn('px-3 py-1 text-xs rounded-md transition-colors',
+                    viewMode === '3d' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                  )}
+                  onClick={() => setViewMode('3d')}
+                >
+                  <Building2 className="w-3.5 h-3.5 inline mr-1" />
+                  3D Model
+                </button>
+                <button
+                  className={cn('px-3 py-1 text-xs rounded-md transition-colors',
+                    viewMode === 'floorplan' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                  )}
+                  onClick={() => setViewMode('floorplan')}
+                >
+                  <MapIcon className="w-3.5 h-3.5 inline mr-1" />
+                  Floor Plan
+                </button>
+              </div>
+            )}
             {hasAddress && (
               <Button
                 variant="outline"
@@ -460,15 +505,17 @@ export function StackingSection({ property }: StackingSectionProps) {
               <Pencil className="w-3.5 h-3.5" />
               Edit Layout
             </Button>
-            <Button
-              variant={explodedView ? "default" : "outline"}
-              size="sm"
-              onClick={() => setExplodedView(v => !v)}
-              className="gap-1.5"
-            >
-              <Layers className="w-3.5 h-3.5" />
-              {explodedView ? 'Collapse' : 'Explode'}
-            </Button>
+            {viewMode === '3d' && (
+              <Button
+                variant={explodedView ? "default" : "outline"}
+                size="sm"
+                onClick={() => setExplodedView(v => !v)}
+                className="gap-1.5"
+              >
+                <Layers className="w-3.5 h-3.5" />
+                {explodedView ? 'Collapse' : 'Explode'}
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="sm"
@@ -591,24 +638,37 @@ export function StackingSection({ property }: StackingSectionProps) {
         </div>
       )}
 
-      {/* Viewing — 3D model + filter sidebar */}
+      {/* Viewing — 3D model or Floor Plan overlay + filter sidebar */}
       {mode === 'viewing' && layout && layout.buildings.length > 0 && (
         <div className="flex gap-0">
           <div className="flex-1 min-w-0">
-            <StackingViewer3D
-              layout={layout}
-              rentRollUnits={rentRollUnits}
-              onUnitClick={handleUnitClick}
-              activeFilter={activeFilter}
-              asOfDate={property.rr_as_of_date}
-              checkedFloorPlans={checkedFloorPlans}
-              explodedView={explodedView}
-              isolatedFloor={isolatedFloor}
-              isFullscreen={isFullscreen}
-              onFullscreenToggle={() => setIsFullscreen(v => !v)}
-              selectedUnits={selectedUnits}
-              unitPositionMap={unitPositionMap}
-            />
+            {viewMode === '3d' ? (
+              <StackingViewer3D
+                layout={layout}
+                rentRollUnits={rentRollUnits}
+                onUnitClick={handleUnitClick}
+                activeFilter={activeFilter}
+                asOfDate={property.rr_as_of_date}
+                checkedFloorPlans={checkedFloorPlans}
+                explodedView={explodedView}
+                isolatedFloor={isolatedFloor}
+                isFullscreen={isFullscreen}
+                onFullscreenToggle={() => setIsFullscreen(v => !v)}
+                selectedUnits={selectedUnits}
+                unitPositionMap={unitPositionMap}
+              />
+            ) : (
+              <FloorPlanOverlay
+                propertyId={property.id}
+                unitPositionMap={unitPositionMap!}
+                rentRollUnits={rentRollUnits}
+                activeFilter={activeFilter}
+                asOfDate={property.rr_as_of_date}
+                floorPlanImages={floorPlanImages}
+                onUnitClick={handleUnitClick}
+                selectedUnits={selectedUnits}
+              />
+            )}
             {/* Fullscreen sidebar overlay */}
             {isFullscreen && (
               <div className="fixed right-0 top-0 z-[10000] h-screen">
