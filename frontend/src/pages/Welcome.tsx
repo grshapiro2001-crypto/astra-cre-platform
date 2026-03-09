@@ -4,8 +4,8 @@ import { Building2, Users, Check, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { TrendingUp } from 'lucide-react';
 import { toast } from 'sonner';
+import { TalismanLogo } from '@/components/ui/TalismanLogo';
 import organizationService from '@/services/organizationService';
 
 export const Welcome = () => {
@@ -59,9 +59,7 @@ export const Welcome = () => {
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-purple-950 via-slate-950 to-purple-950 px-4 py-12">
       {/* Logo */}
       <div className="flex items-center gap-2.5 mb-8">
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
-          <TrendingUp className="w-5 h-5 text-white" />
-        </div>
+        <TalismanLogo className="w-10 h-10" />
         <h1 className="text-2xl font-bold">
           <span className="text-white">Talisman</span>
           <span className="text-purple-300/70 ml-1.5 font-normal text-sm">IO</span>

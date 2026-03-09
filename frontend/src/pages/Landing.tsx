@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence, useInView, useMotionValue, useSpring } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { TalismanLogo } from '@/components/ui/TalismanLogo';
 
 // ─────────────────────────────────────────────────────────────────
 // Types
@@ -438,7 +439,10 @@ function Footer() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-10 mb-12">
           {/* Brand */}
           <div className="col-span-2 md:col-span-1">
-            <span className="font-display text-xl font-bold text-foreground tracking-tight">Talisman</span>
+            <span className="flex items-center gap-2">
+              <TalismanLogo className="w-6 h-6" />
+              <span className="font-display text-xl font-bold text-foreground tracking-tight">Talisman</span>
+            </span>
             <p className="text-sm text-muted-foreground mt-3 leading-relaxed max-w-xs">
               The all-in-one multifamily investment platform. AI-native underwriting for the modern CRE firm.
             </p>
@@ -520,7 +524,10 @@ export function Landing() {
       {/* ── Nav ──────────────────────────────────────────────── */}
       <nav className="fixed top-0 inset-x-0 z-50 h-16 flex items-center px-6 border-b border-border/30 bg-background/70 backdrop-blur-xl">
         <div className="flex items-center justify-between w-full max-w-7xl mx-auto">
-          <span className="font-display text-xl font-bold tracking-tight text-foreground">Talisman</span>
+          <span className="flex items-center gap-2">
+            <TalismanLogo className="w-7 h-7" />
+            <span className="font-display text-xl font-bold tracking-tight text-foreground">Talisman</span>
+          </span>
 
           <div className="hidden md:flex items-center gap-7 text-sm text-muted-foreground">
             {['Product', 'Market Intel', 'Pricing', 'Docs', 'Blog'].map((item) => (
@@ -551,6 +558,14 @@ export function Landing() {
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-background" />
 
         <div className="relative z-10 max-w-5xl mx-auto px-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+            className="flex justify-center mb-8"
+          >
+            <TalismanLogo className="w-20 h-20 md:w-28 md:h-28 drop-shadow-[0_0_30px_rgba(139,92,246,0.3)]" />
+          </motion.div>
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
