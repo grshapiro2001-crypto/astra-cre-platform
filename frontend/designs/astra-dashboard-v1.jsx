@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
 
 /**
- * ASTRA CRE - DASHBOARD V1
+ * Talisman IO - DASHBOARD V1
  * "Your Configurable Deal Command Center"
  * 
  * CORE FEATURES:
@@ -16,7 +16,7 @@ import { motion, AnimatePresence, Reorder } from 'framer-motion';
  * DESIGN: Purple palette matching Library V3 and Comparison V3
  */
 
-const AstraDashboard = () => {
+const TalismanDashboard = () => {
   // === STATE ===
   const [darkMode, setDarkMode] = useState(true);
   const [selectedTags, setSelectedTags] = useState([]);
@@ -1377,4 +1377,4 @@ const CheckIcon = ({ className }) => (
   </svg>
 );
 
-export default AstraDashboard;
+export default TalismanDashboard;

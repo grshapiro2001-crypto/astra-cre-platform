@@ -1,4 +1,4 @@
-# Astra CRE — Market Intelligence API Research
+# Talisman IO — Market Intelligence API Research
 
 ## Summary
 
@@ -87,13 +87,13 @@ There are strong free and low-cost data sources that can power the AI market int
 ### Google Maps Platform
 - **Geocoding:** $5 per 1,000 requests (10,000 free/month under Essentials)
 - **Places API:** Varies by tier ($0-$32 per 1,000 depending on fields requested)
-- **What it provides for Astra:**
+- **What it provides for Talisman:**
   - Convert property addresses to lat/lng coordinates
   - Validate and standardize addresses
   - Get neighborhood context (nearby amenities, transit, etc.)
   - Map display for property locations
 - **CRE relevance:** Every property needs geocoding. Neighborhood amenity data could feed into a "location quality" sub-score.
-- **Cost estimate for Astra:** At 100-500 properties/month, you'd stay well within the free tier. Even at scale, ~$5-25/month.
+- **Cost estimate for Talisman:** At 100-500 properties/month, you'd stay well within the free tier. Even at scale, ~$5-25/month.
 - **Integration effort:** Low — well-documented REST API, Python client libraries available.
 
 ### RentCast API
@@ -106,7 +106,7 @@ There are strong free and low-cost data sources that can power the AI market int
 ### CoStar / RealPage / Yardi Matrix
 - **Cost:** $10,000-50,000+/year (institutional pricing)
 - **What they have:** Everything — property-level rents, unit mixes, concession data, supply pipeline, transaction history
-- **Worth it?** Not for MVP. These are the gold standard but priced for institutional shops. Maybe when Astra has paying customers.
+- **Worth it?** Not for MVP. These are the gold standard but priced for institutional shops. Maybe when Talisman has paying customers.
 
 ---
 
@@ -123,7 +123,7 @@ There are strong free and low-cost data sources that can power the AI market int
 5. **Google Maps Geocoding** — Standardize addresses, enable map display
 6. **HUD FMR** — Add government rent benchmarks as comparison point
 
-### Phase 4c: Premium Intelligence (when Astra has revenue)
+### Phase 4c: Premium Intelligence (when Talisman has revenue)
 7. **RentCast** — Property-level rent comps
 8. **CoStar/RealPage** — Institutional-grade data (requires partnership or enterprise license)
 
@@ -153,4 +153,4 @@ When a user uploads an OM for a property in Atlanta, GA (Buckhead submarket), th
 5. **Synthesize:** Employment strong but supply elevated and rents softening → market adjustment: +1 (slightly positive, employment strength offsets supply concerns)
 6. **Rationale:** "Atlanta MSA shows healthy employment growth of 2.8% YoY, but elevated multifamily permitting and metro-wide rent decline of 0.5% suggest supply pressure. Buckhead specifically benefits from strong corporate tenant demand. Net adjustment: +1."
 
-This is the kind of analysis that would take a junior analyst 30 minutes. Astra does it in 15 seconds.
+This is the kind of analysis that would take a junior analyst 30 minutes. Talisman does it in 15 seconds.

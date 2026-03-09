@@ -2769,7 +2769,7 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
     rendererRef.current.render(sceneRef.current, cameraRef.current);
     const dataUrl = rendererRef.current.domElement.toDataURL('image/png');
     const link = document.createElement('a');
-    link.download = `ASTRA-stacking-${layout.buildings.map(b => b.label).join('-')}-${activeFilter}.png`;
+    link.download = `Talisman-stacking-${layout.buildings.map(b => b.label).join('-')}-${activeFilter}.png`;
     link.href = dataUrl;
     link.click();
   }, [layout, activeFilter]);

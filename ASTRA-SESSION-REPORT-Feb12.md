@@ -1,4 +1,4 @@
-# ASTRA CRE Platform — Session Report
+# Talisman IO Platform — Session Report
 **Date:** February 12, 2026
 **Sessions:** 2 (continued from context overflow)
 
@@ -44,7 +44,7 @@ When T12 NOI is negative (due to high vacancy), the cap-rate-implied price becom
 Cap rates extracted without a specific type were showing "Unknown" in the UI. Now displays "Cap Rate" as a clean fallback.
 
 ### 6. Ecosystem Map Update
-Updated `astra-ecosystem-map.html` across all 7 architecture tiers to reflect current state: stats bar (9 models, 8 services, 39 uncommitted files), new utilities/services, hardened upload flow, ErrorBoundary, and roadmap progress (Option A mostly complete, Option D all LIVE).
+Updated `talisman-ecosystem-map.html` across all 7 architecture tiers to reflect current state: stats bar (9 models, 8 services, 39 uncommitted files), new utilities/services, hardened upload flow, ErrorBoundary, and roadmap progress (Option A mostly complete, Option D all LIVE).
 
 ---
 

@@ -1,0 +1,26 @@
+<svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="64" height="64" rx="12" fill="#1a1025"/>
+  <path d="M32 8L36 21H28L32 8Z" fill="url(#mg)"/>
+  <path d="M32 56L28 43H36L32 56Z" fill="url(#mg)"/>
+  <path d="M56 32L43 36V28L56 32Z" fill="url(#mg)"/>
+  <path d="M8 32L21 28V36L8 32Z" fill="url(#mg)"/>
+  <path d="M48 16L42 24L38 20L48 16Z" fill="#B8B8C8" opacity="0.6"/>
+  <path d="M48 48L38 42L42 38L48 48Z" fill="#B8B8C8" opacity="0.6"/>
+  <path d="M16 48L22 38L26 42L16 48Z" fill="#B8B8C8" opacity="0.6"/>
+  <path d="M16 16L26 22L22 26L16 16Z" fill="#B8B8C8" opacity="0.6"/>
+  <circle cx="32" cy="32" r="11" stroke="#9090A0" stroke-width="0.8" opacity="0.3"/>
+  <circle cx="32" cy="32" r="5.5" fill="url(#gem)"/>
+  <ellipse cx="30.5" cy="30" rx="2" ry="1.5" fill="white" opacity="0.25"/>
+  <defs>
+    <linearGradient id="mg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#E8E8EE"/>
+      <stop offset="50%" stop-color="#B8B8C8"/>
+      <stop offset="100%" stop-color="#7A7A8E"/>
+    </linearGradient>
+    <radialGradient id="gem" cx="0.4" cy="0.35" r="0.6">
+      <stop offset="0%" stop-color="hsl(210,80%,65%)"/>
+      <stop offset="60%" stop-color="hsl(210,70%,50%)"/>
+      <stop offset="100%" stop-color="hsl(210,60%,35%)"/>
+    </radialGradient>
+  </defs>
+</svg>

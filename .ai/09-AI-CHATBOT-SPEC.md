@@ -1,4 +1,4 @@
-# AI Chatbot Feature - Astra CRE Platform
+# AI Chatbot Feature - Talisman IO Platform
 
 **Purpose:** Specification for context-aware AI chatbot integrated throughout the platform
 **Priority:** 9/10 - Golden Feature
@@ -9,7 +9,7 @@
 
 ## Executive Summary
 
-The AI Chatbot is a persistent, context-aware assistant accessible from anywhere in the Astra CRE platform. It acts as a "lazy interface" for quick queries about deals, portfolios, market research, and general CRE questions. The chatbot:
+The AI Chatbot is a persistent, context-aware assistant accessible from anywhere in the Talisman IO platform. It acts as a "lazy interface" for quick queries about deals, portfolios, market research, and general CRE questions. The chatbot:
 
 1. **Always Available** - Animated icon in fixed position (bottom-right)
 2. **Context-Aware** - Knows current page, deal being viewed, portfolio selection
@@ -28,7 +28,7 @@ The AI Chatbot is a persistent, context-aware assistant accessible from anywhere
 **Visual Design:**
 ```
 ┌─────────────────────────────────────────────────────┐
-│                   Astra CRE Platform                │
+│                   Talisman IO Platform                │
 ├─────────────────────────────────────────────────────┤
 │                                                  ╭──┐│
 │   [Content Area]                                │⊙ ││ <- Animated Icon
@@ -226,7 +226,7 @@ export const useChatbotStore = create<ChatbotState>()(
       clearUnread: () => set({ unreadCount: 0 }),
     }),
     {
-      name: 'astra-chatbot-storage',
+      name: 'talisman-chatbot-storage',
       partialize: (state) => ({
         messages: state.messages.slice(-50), // Keep last 50 messages
         currentContext: state.currentContext,
@@ -770,7 +770,7 @@ class ChatbotService:
     def _build_system_prompt(self, user_id: str, context: Dict[str, Any]) -> str:
         """Build Claude system prompt with context"""
         context_text = f"""
-You are an expert CRE (Commercial Real Estate) AI Assistant for the Astra CRE platform.
+You are an expert CRE (Commercial Real Estate) AI Assistant for the Talisman IO platform.
 You help users analyze deals, portfolios, and market research.
 
 ## Current Context

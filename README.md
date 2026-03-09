@@ -1,4 +1,4 @@
-# Astra CRE — AI-Powered Commercial Real Estate Investment Platform
+# Talisman IO — AI-Powered Commercial Real Estate Investment Platform
 
 AI-powered commercial real estate deal analysis platform. Upload offering memorandums (OMs) and broker opinion of values (BOVs), extract financial metrics with Claude AI, score deals against benchmarks, screen against custom investment criteria, and manage your deal pipeline with an interactive Kanban board. Built for real estate investors, analysts, and firms who need fast, intelligent underwriting and portfolio management.
 
@@ -134,8 +134,8 @@ All features below are **fully implemented and working** in the codebase:
 
 ### 1. Clone Repository
 ```bash
-git clone https://github.com/yourusername/astra-cre-platform.git
-cd astra-cre-platform
+git clone https://github.com/yourusername/talisman-io.git
+cd talisman-io
 ```
 
 ### 2. Backend Setup
@@ -182,7 +182,7 @@ Navigate to `http://localhost:5173` and create an account to get started.
 ## Project Structure
 
 ```
-astra-cre-platform/
+talisman-io/
 ├── backend/
 │   ├── app/
 │   │   ├── api/routes/          # API endpoints
@@ -221,7 +221,7 @@ astra-cre-platform/
 │   ├── alembic/                 # Database migration files
 │   ├── requirements.txt         # Python dependencies
 │   ├── .env.example             # Example environment variables
-│   └── astra.db                 # SQLite database file
+│   └── talisman.db                 # SQLite database file
 ├── frontend/
 │   ├── src/
 │   │   ├── components/          # React components

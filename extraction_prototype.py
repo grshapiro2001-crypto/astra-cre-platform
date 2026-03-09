@@ -1,5 +1,5 @@
 """
-Astra CRE — Intent-Based Excel Extraction Prototype
+Talisman IO — Intent-Based Excel Extraction Prototype
 =====================================================
 This module extracts CRE financial data from ANY Excel file without
 file-specific configuration. It uses a two-phase approach:

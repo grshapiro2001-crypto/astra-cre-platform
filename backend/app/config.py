@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     GOOGLE_MAPS_API_KEY: str = ""
 
     # Application
-    APP_NAME: str = "CRE Platform"
+    APP_NAME: str = "Talisman IO"
     DEBUG: bool = False
     UPLOAD_DIR: str = "./uploads"
 

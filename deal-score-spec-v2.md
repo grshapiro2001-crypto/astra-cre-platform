@@ -9,7 +9,7 @@
 - **Added Data Bank Extraction** — backend service for parsing Excel uploads (sales comps, pipeline trackers, underwriting models)
 
 ## Overview
-Build a 0-100 Deal Score system for the Astra CRE Platform. Every property gets a score based on three layers: property fundamentals, AI market intelligence, and deal comp analysis from the Data Bank. Users can customize metric weights in Settings. Scores appear in Library cards, Property Detail, and Comparison view. Clicking a score badge opens a detailed breakdown modal.
+Build a 0-100 Deal Score system for the Talisman IO Platform. Every property gets a score based on three layers: property fundamentals, AI market intelligence, and deal comp analysis from the Data Bank. Users can customize metric weights in Settings. Scores appear in Library cards, Property Detail, and Comparison view. Clicking a score badge opens a detailed breakdown modal.
 
 ---
 

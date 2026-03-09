@@ -4,6 +4,7 @@ import { useAuthStore } from '@/store/authSlice';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { TalismanLogo } from '@/components/ui/TalismanLogo';
 
 export const LoginForm = () => {
   const navigate = useNavigate();
@@ -29,20 +30,10 @@ export const LoginForm = () => {
       <div className="max-w-md w-full bg-white/95 backdrop-blur-md rounded-xl shadow-2xl border border-purple-200/20 p-8">
         <div className="text-center mb-6">
           <div className="flex justify-center mb-4">
-            <div className="w-14 h-14 rounded-xl bg-primary flex items-center justify-center shadow-lg">
-              <svg
-                className="w-8 h-8 text-white"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-              </svg>
-            </div>
+            <TalismanLogo className="w-14 h-14" />
           </div>
           <h2 className="text-2xl font-bold font-display text-gray-900">
-            Sign in to <span className="text-primary">Astra CRE</span>
+            Sign in to <span className="text-primary">Talisman IO</span>
           </h2>
           <p className="mt-2 text-sm text-gray-500">
             Or{' '}

@@ -1,4 +1,4 @@
-# QA Audit — Astra CRE Platform
+# QA Audit — Talisman IO Platform
 
 **Inspected:** March 8, 2026
 **Scope:** Full codebase audit via git log, Vercel deployments, source file inspection

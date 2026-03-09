@@ -1,4 +1,4 @@
-# Property Scoring System (0-100) - Astra CRE Platform
+# Property Scoring System (0-100) - Talisman IO Platform
 
 **Purpose:** Design specification for institutional-grade multifamily property scoring system
 **Priority:** 9/10 - Golden Feature

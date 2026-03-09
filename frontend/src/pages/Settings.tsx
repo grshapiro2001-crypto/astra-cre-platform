@@ -235,7 +235,7 @@ const AppearanceSection = () => {
             variant="outline"
             size="sm"
             onClick={() => {
-              localStorage.removeItem('astra_onboarding_complete');
+              localStorage.removeItem('talisman_onboarding_complete');
               window.location.reload();
             }}
           >
@@ -284,7 +284,7 @@ const NotificationsSection = () => {
 };
 
 const ApiSection = () => {
-  const maskedKey = 'sk-astra-••••••••••••••••••••3f8a';
+  const maskedKey = 'sk-talisman-••••••••••••••••••••3f8a';
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {

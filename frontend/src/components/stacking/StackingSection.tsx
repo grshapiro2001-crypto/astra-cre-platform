@@ -717,7 +717,7 @@ export function StackingSection({ property }: StackingSectionProps) {
           </DialogHeader>
           <p className="text-sm text-muted-foreground mb-4">
             Upload screenshots of each floor from the property&apos;s website floor plan.
-            ASTRA will extract unit positions to accurately place units in the 3D model.
+            Talisman will extract unit positions to accurately place units in the 3D model.
           </p>
 
           {/* Dropzone */}

@@ -47,7 +47,7 @@ function App() {
   // Check if user needs onboarding
   useEffect(() => {
     if (isAuthenticated) {
-      const onboardingComplete = localStorage.getItem('astra_onboarding_complete');
+      const onboardingComplete = localStorage.getItem('talisman_onboarding_complete');
       if (!onboardingComplete) {
         setShowOnboarding(true);
       }

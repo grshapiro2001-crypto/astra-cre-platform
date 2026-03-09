@@ -54,7 +54,7 @@ export const MigrateDealModal = ({ org, onClose }: MigrateDealModalProps) => {
     try {
       await organizationService.migrateDeals(Array.from(selectedIds));
       toast.success(`Migrated ${selectedIds.size} deal${selectedIds.size > 1 ? 's' : ''} to ${org.name}`);
-      localStorage.setItem('astra_migration_seen', 'true');
+      localStorage.setItem('talisman_migration_seen', 'true');
       onClose();
     } catch (err: any) {
       toast.error(err?.response?.data?.detail || 'Failed to migrate deals');
@@ -64,7 +64,7 @@ export const MigrateDealModal = ({ org, onClose }: MigrateDealModalProps) => {
   };
 
   const handleSkip = () => {
-    localStorage.setItem('astra_migration_seen', 'true');
+    localStorage.setItem('talisman_migration_seen', 'true');
     onClose();
   };
 

@@ -87,7 +87,7 @@ export const OnboardingWizard = ({ isOpen, onClose }: OnboardingWizardProps) => 
 
   // Handle completion
   const handleComplete = () => {
-    localStorage.setItem('astra_onboarding_complete', 'true');
+    localStorage.setItem('talisman_onboarding_complete', 'true');
     onClose();
   };
 
@@ -123,7 +123,7 @@ export const OnboardingWizard = ({ isOpen, onClose }: OnboardingWizardProps) => 
             {/* Welcome Text */}
             <div className="text-center space-y-2">
               <h2 className="text-3xl font-bold bg-gradient-to-r from-violet-600 to-purple-600 bg-clip-text text-transparent">
-                Welcome to Astra CRE
+                Welcome to Talisman IO
               </h2>
               <p className="text-lg text-muted-foreground">
                 Your AI-powered investment analysis platform
@@ -297,7 +297,7 @@ export const OnboardingWizard = ({ isOpen, onClose }: OnboardingWizardProps) => 
             <div className="text-center space-y-2">
               <h2 className="text-2xl font-bold">Upload First Document</h2>
               <p className="text-sm text-muted-foreground">
-                Upload your first OM or BOV to see Astra in action
+                Upload your first OM or BOV to see Talisman in action
               </p>
             </div>
 
@@ -381,7 +381,7 @@ export const OnboardingWizard = ({ isOpen, onClose }: OnboardingWizardProps) => 
             <div className="text-center space-y-2">
               <h2 className="text-3xl font-bold">You're all set!</h2>
               <p className="text-sm text-muted-foreground">
-                Start exploring Astra CRE and manage your deal pipeline
+                Start exploring Talisman IO and manage your deal pipeline
               </p>
             </div>
 

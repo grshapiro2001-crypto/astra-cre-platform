@@ -76,7 +76,7 @@ export const useUIStore = create<UIState>()(
       clearComparison: () => set({ comparisonPropertyIds: [] }),
     }),
     {
-      name: 'astra-ui-storage',
+      name: 'talisman-ui-storage',
       partialize: (state) => ({
         theme: state.theme,
         sidebarCollapsed: state.sidebarCollapsed,

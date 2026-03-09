@@ -1,7 +1,7 @@
 # Deal Score Calibration Test Plan
 
 ## Purpose
-After the scoring engine is live, run 5-10 known deals through it and compare Astra's score to your own gut assessment. This validates the benchmarks, thresholds, and weight distributions before you share the tool with anyone.
+After the scoring engine is live, run 5-10 known deals through it and compare Talisman's score to your own gut assessment. This validates the benchmarks, thresholds, and weight distributions before you share the tool with anyone.
 
 ## Methodology
 
@@ -46,7 +46,7 @@ For each deal, record:
 ```
 Deal: _______________
 Your gut score: ___/100
-Astra score: ___/100
+Talisman score: ___/100
 Delta: ___
 
 Layer 1 (Fundamentals): ___/100
@@ -97,11 +97,11 @@ Based on patterns, adjust:
 
 After tuning, re-score all test deals and check if:
 - Scores are more spread out (20-85 range)
-- Your gut ranking matches the Astra ranking order
+- Your gut ranking matches the Talisman ranking order
 - The highest-scored deal is one you'd actually pursue
 - The lowest-scored deal is one you'd actually pass on
 
-You don't need the absolute numbers to match your gut — the RANKING is more important. If Astra ranks Deal A > Deal B > Deal C and you agree, the weights are working even if the exact scores are off by 10 points.
+You don't need the absolute numbers to match your gut — the RANKING is more important. If Talisman ranks Deal A > Deal B > Deal C and you agree, the weights are working even if the exact scores are off by 10 points.
 
 ---
 

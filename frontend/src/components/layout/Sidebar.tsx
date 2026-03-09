@@ -11,10 +11,10 @@ import {
   Moon,
   ChevronsLeft,
   ChevronsRight,
-  TrendingUp,
   Users,
   Shield,
 } from 'lucide-react';
+import { TalismanLogo } from '@/components/ui/TalismanLogo';
 
 const ADMIN_EMAILS = ['griffinshapiro11182001@gmail.com', 'grshap2001@gmail.com'];
 
@@ -76,13 +76,11 @@ export const Sidebar = () => {
         )}
       >
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shrink-0">
-            <TrendingUp className="w-4 h-4 text-white" />
-          </div>
+          <TalismanLogo className="w-8 h-8" />
           {!sidebarCollapsed && (
             <h1 className="text-lg font-bold font-display tracking-tight">
-              <span className="text-white">Astra</span>
-              <span className="text-purple-300/70 ml-1 font-normal text-xs">CRE</span>
+              <span className="text-white">Talisman</span>
+              <span className="text-purple-300/70 ml-1 font-normal text-xs">IO</span>
             </h1>
           )}
         </div>
@@ -306,12 +304,10 @@ export const MobileSidebar = () => {
         {/* Logo */}
         <div className="flex items-center h-16 px-5 border-b border-white/5">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
-              <TrendingUp className="w-4 h-4 text-white" />
-            </div>
+            <TalismanLogo className="w-8 h-8" />
             <h1 className="text-lg font-bold font-display tracking-tight">
-              <span className="text-white">Astra</span>
-              <span className="text-purple-300/70 ml-1 font-normal text-xs">CRE</span>
+              <span className="text-white">Talisman</span>
+              <span className="text-purple-300/70 ml-1 font-normal text-xs">IO</span>
             </h1>
           </div>
         </div>

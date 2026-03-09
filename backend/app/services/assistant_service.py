@@ -12,7 +12,7 @@ client = anthropic.Anthropic(
     base_url="https://api.anthropic.com",
 )
 
-SYSTEM_PROMPT_TEMPLATE = """You are ASTRA AI, an expert commercial real estate (CRE) investment analyst. You have access to the user's deal data below.
+SYSTEM_PROMPT_TEMPLATE = """You are Talisman AI, an expert commercial real estate (CRE) investment analyst. You have access to the user's deal data below.
 
 Rules:
 - Always reference specific numbers from the data when answering.

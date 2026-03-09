@@ -1,4 +1,4 @@
-# Architecture & Technical Decisions - Astra CRE Platform
+# Architecture & Technical Decisions - Talisman IO Platform
 
 **Purpose:** Explains WHY we made certain technical choices. Reference when making similar decisions.  
 **Length:** Keep under 250 lines. Details in code comments, not here.

@@ -82,7 +82,7 @@ const FEATURES: Feature[] = [
   { id: 'F-006', title: 'Fix BUG-008: Settings Profile Save', description: 'Track dirty state, PUT /api/v1/auth/me on save', column: 'Backlog', effort: 'Med', impact: 'Med' },
   { id: 'F-007', title: 'Notification System (BUG-010/011)', description: 'Bell → panel, persist prefs to backend', column: 'Backlog', effort: 'High', impact: 'Med' },
   { id: 'F-008', title: 'BatchData Real Estate MCP', description: 'Address verification, market comps auto-fetch on upload', column: 'Backlog', effort: 'High', impact: 'High' },
-  { id: 'F-009', title: 'Custom Astra MCP Server', description: 'Expose Astra DB via MCP — search, pipeline, scoring tools', column: 'Backlog', effort: 'High', impact: 'High' },
+  { id: 'F-009', title: 'Custom Talisman MCP Server', description: 'Expose Talisman DB via MCP — search, pipeline, scoring tools', column: 'Backlog', effort: 'High', impact: 'High' },
   { id: 'F-010', title: 'LOI Generation', description: 'Auto-populate LOI template from property data, e-sign via Lumin', column: 'Backlog', effort: 'High', impact: 'High' },
   { id: 'F-011', title: 'React Query Migration', description: 'Replace direct API calls with React Query for caching', column: 'Backlog', effort: 'High', impact: 'Med' },
   { id: 'F-012', title: 'Deal Analytics Dashboard', description: 'Upload trends, score distribution, pipeline velocity', column: 'Backlog', effort: 'Med', impact: 'High' },
@@ -154,7 +154,7 @@ function getAgentResponse(input: string): string {
   }
 
   if (q.includes('health') || q.includes('status') || q.includes('production')) {
-    return `💚 App Health (Mar 8, 2026):\n\n• Production: https://astra-cre-platform.vercel.app\n• Latest deploy: PR #94 — READY ✅\n• Backend: Render.com (free tier — cold starts expected)\n• TypeScript: Clean (last confirmed Feb 26)\n• All 7 core API endpoints: 200 OK\n• Deals in DB: 3 (The Skylark, Adley City Springs, 1160 Hammond)\n\n⚠️ Watch: BUG-009 — metrics fluctuate on cold start. PR #41 (cold-start banner) pending merge.`;
+    return `💚 App Health (Mar 8, 2026):\n\n• Production: https://talisman-io.vercel.app\n• Latest deploy: PR #94 — READY ✅\n• Backend: Render.com (free tier — cold starts expected)\n• TypeScript: Clean (last confirmed Feb 26)\n• All 7 core API endpoints: 200 OK\n• Deals in DB: 3 (The Skylark, Adley City Springs, 1160 Hammond)\n\n⚠️ Watch: BUG-009 — metrics fluctuate on cold start. PR #41 (cold-start banner) pending merge.`;
   }
 
   if (q.includes('stacking') || q.includes('3d') || q.includes('three')) {
@@ -162,11 +162,11 @@ function getAgentResponse(input: string): string {
   }
 
   if (q.includes('fix') && q.includes('note')) {
-    return `🔧 Fixing BUG-003 ("Add Note"):\n\n**Current behavior:** onClick calls console.log() then clears input. Data is lost.\n\n**Fix steps:**\n1. Add notes endpoint to backend: POST /api/v1/properties/{id}/notes\n2. Create PropertyNote model in DB\n3. Wire UI to call API on submit\n4. Append returned note to notes list\n\nUse the astra-cre:fix skill with prompt: "Fix BUG-003 — Add Note persistence in PropertyDetail.tsx"`;
+    return `🔧 Fixing BUG-003 ("Add Note"):\n\n**Current behavior:** onClick calls console.log() then clears input. Data is lost.\n\n**Fix steps:**\n1. Add notes endpoint to backend: POST /api/v1/properties/{id}/notes\n2. Create PropertyNote model in DB\n3. Wire UI to call API on submit\n4. Append returned note to notes list\n\nUse the talisman-io:fix skill with prompt: "Fix BUG-003 — Add Note persistence in PropertyDetail.tsx"`;
   }
 
   if (q.includes('fix') && (q.includes('follow') || q.includes('ask'))) {
-    return `🔧 Fixing BUG-004 ("Ask Follow-up"):\n\n**Current behavior:** Button has no onClick — completely inert.\n\n**Fix steps:**\n1. Wire button onClick to existing POST /api/v1/chat endpoint\n2. Pass property context (id, name, key financials) as system context\n3. Stream response into AI Insights panel (same pattern as pipeline analyst)\n\nUse the astra-cre:fix skill with prompt: "Fix BUG-004 — wire Ask Follow-up button to chat API in PropertyDetail.tsx"`;
+    return `🔧 Fixing BUG-004 ("Ask Follow-up"):\n\n**Current behavior:** Button has no onClick — completely inert.\n\n**Fix steps:**\n1. Wire button onClick to existing POST /api/v1/chat endpoint\n2. Pass property context (id, name, key financials) as system context\n3. Stream response into AI Insights panel (same pattern as pipeline analyst)\n\nUse the talisman-io:fix skill with prompt: "Fix BUG-004 — wire Ask Follow-up button to chat API in PropertyDetail.tsx"`;
   }
 
   if (q.includes('cost') || q.includes('api cost') || q.includes('llm')) {
@@ -178,14 +178,14 @@ function getAgentResponse(input: string): string {
   }
 
   if (q.includes('hello') || q.includes('hi ') || q === 'hi' || q.includes('hey')) {
-    return `👋 Hey Griffin. I'm your Astra PM agent.\n\nI have full context on the project: 94 PRs, 16 open bugs, current deployments, feature pipeline, and architecture.\n\nTry asking:\n• "What are the critical bugs?"\n• "What shipped since Feb 26?"\n• "What should we fix next?"\n• "How do I fix the Add Note bug?"\n• "What's the production health status?"`;
+    return `👋 Hey Griffin. I'm your Talisman PM agent.\n\nI have full context on the project: 94 PRs, 16 open bugs, current deployments, feature pipeline, and architecture.\n\nTry asking:\n• "What are the critical bugs?"\n• "What shipped since Feb 26?"\n• "What should we fix next?"\n• "How do I fix the Add Note bug?"\n• "What's the production health status?"`;
   }
 
   if (q.includes('next') && (q.includes('build') || q.includes('work') || q.includes('do'))) {
     return `🎯 My Recommendation — What To Do Next:\n\n**Immediate (this week):**\n1. Merge PR #41 (cold-start banner) — 5 min\n2. Fix BUG-001/002 (Google Maps API) — 30 min\n3. Fix BUG-003 (Add Note) — 1 hour\n4. Fix BUG-004 (Ask Follow-up) — 2 hours\n\n**Short term:**\n5. Fix BUG-006 (Save Comparison)\n6. Fix BUG-007 (NOI chart fallback)\n7. Fix BUG-008 (Settings Save Changes)\n\nAll 4 critical bugs are "UI lies" — buttons that appear functional but do nothing. Fix these before any new features for demo readiness.`;
   }
 
-  return `I understand you're asking about "${input}". I have context on Astra's bugs, PRs, features, architecture, and deployment status.\n\nTry being more specific:\n• "What critical bugs are open?"\n• "What shipped since Feb 26?"\n• "What's the production health?"\n• "How do I fix the Add Note bug?"\n• "What's next to build?"`;
+  return `I understand you're asking about "${input}". I have context on Talisman's bugs, PRs, features, architecture, and deployment status.\n\nTry being more specific:\n• "What critical bugs are open?"\n• "What shipped since Feb 26?"\n• "What's the production health?"\n• "How do I fix the Add Note bug?"\n• "What's next to build?"`;
 }
 
 // ─── Subcomponents ────────────────────────────────────────────────────────────
@@ -226,7 +226,7 @@ export function CommandCenter() {
   const [agentMessages, setAgentMessages] = useState<ChatMessage[]>([
     {
       role: 'assistant',
-      content: `👋 Hey Griffin. I'm your Astra PM agent — fully briefed on 94 PRs, 16 bugs, all deployments, and the full roadmap.\n\nAsk me anything about the project.`,
+      content: `👋 Hey Griffin. I'm your Talisman PM agent — fully briefed on 94 PRs, 16 bugs, all deployments, and the full roadmap.\n\nAsk me anything about the project.`,
       timestamp: new Date().toLocaleTimeString(),
     }
   ]);
@@ -313,7 +313,7 @@ export function CommandCenter() {
             <Circle className="w-2 h-2 fill-emerald-400" /> Production READY
           </span>
           <a
-            href="https://astra-cre-platform.vercel.app"
+            href="https://talisman-io.vercel.app"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-1 text-xs text-slate-400 hover:text-purple-400 transition-colors"
@@ -589,8 +589,8 @@ export function CommandCenter() {
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {[
-                  { label: 'Frontend (Vercel)', status: '✅ READY', url: 'https://astra-cre-platform.vercel.app' },
-                  { label: 'Backend (Render)', status: '⚠️ Free tier (cold starts)', url: 'https://astra-cre-backend.onrender.com' },
+                  { label: 'Frontend (Vercel)', status: '✅ READY', url: 'https://talisman-io.vercel.app' },
+                  { label: 'Backend (Render)', status: '⚠️ Free tier (cold starts)', url: 'https://talisman-io-backend.onrender.com' },
                   { label: 'TypeScript', status: '✅ Clean (Feb 26)' },
                   { label: 'API Endpoints', status: '✅ 7/7 returning 200' },
                 ].map(({ label, status, url }) => (
@@ -721,7 +721,7 @@ export function CommandCenter() {
                   </div>
                 ))}
                 <a
-                  href="https://github.com/grshapiro2001-crypto/astra-cre-platform/pulls?q=is%3Apr+is%3Amerged"
+                  href="https://github.com/grshapiro2001-crypto/talisman-io/pulls?q=is%3Apr+is%3Amerged"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-1 text-xs text-purple-400 hover:underline pt-2"

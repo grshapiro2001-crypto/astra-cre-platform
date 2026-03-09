@@ -41,7 +41,7 @@ function getRouteConfig(pathname: string): RouteConfig {
     return { title: 'Property Detail', description: 'Detailed property analysis' };
   }
 
-  return { title: 'Astra CRE', description: '' };
+  return { title: 'Talisman IO', description: '' };
 }
 
 function getBreadcrumbs(pathname: string): Array<{ label: string; path?: string }> {

@@ -161,4 +161,4 @@ export const PIPELINE_PRESETS: PipelinePreset[] = [
   },
 ];
 
-export const STORAGE_KEY = 'astra_pipeline_preset';
+export const STORAGE_KEY = 'talisman_pipeline_preset';

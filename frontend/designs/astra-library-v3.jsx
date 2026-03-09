@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 /**
- * ASTRA CRE - LIBRARY PAGE V3
+ * Talisman IO - LIBRARY PAGE V3
  * "Your Deal Pipeline Command Center"
  * 
  * DESIGN SYSTEM:
@@ -20,7 +20,7 @@ import { motion, AnimatePresence } from 'framer-motion';
  * - Pipeline stats overview
  */
 
-const AstraLibraryV3 = () => {
+const TalismanLibraryV3 = () => {
   // === STATE ===
   const [darkMode, setDarkMode] = useState(true);
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list'
@@ -409,10 +409,10 @@ const AstraLibraryV3 = () => {
             </div>
             <div>
               <span className="font-display text-2xl font-bold tracking-tight" style={{ color: t.text }}>
-                Astra
+                Talisman
               </span>
               <span className="font-display text-sm font-medium ml-1" style={{ color: t.primary }}>
-                CRE
+                IO
               </span>
             </div>
           </div>
@@ -1276,4 +1276,4 @@ const MoonIcon = ({ className }) => (
   </svg>
 );
 
-export default AstraLibraryV3;
+export default TalismanLibraryV3;
