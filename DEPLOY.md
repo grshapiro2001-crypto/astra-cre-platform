@@ -1,4 +1,4 @@
-# Astra CRE Platform — Production Deployment Guide
+# Talisman IO Platform — Production Deployment Guide
 
 ## Architecture Overview
 
@@ -8,7 +8,7 @@
 │   React + Vite + TS  │                     │  FastAPI + SQLAlchemy│
 │   Tailwind + shadcn  │                     │  SQLite + Anthropic  │
 │                      │                     │                      │
-│  astra-cre.vercel.app│                     │  astra-cre-backend.  │
+│  talisman-io.vercel.app│                     │  talisman-io-backend.  │
 │                      │                     │  onrender.com        │
 └─────────────────────┘                     └──────────────────────┘
 ```
@@ -26,14 +26,14 @@
 
 | Variable | Value | Description |
 |----------|-------|-------------|
-| `VITE_API_URL` | `https://astra-cre-backend.onrender.com/api/v1` | Backend API base URL |
+| `VITE_API_URL` | `https://talisman-io-backend.onrender.com/api/v1` | Backend API base URL |
 
 ### Backend (Render)
 
 | Variable | Value | Description |
 |----------|-------|-------------|
 | `ANTHROPIC_API_KEY` | `sk-ant-...` | Your Anthropic API key for Claude |
-| `CORS_ORIGINS` | `https://astra-cre.vercel.app` | Comma-separated allowed frontend origins |
+| `CORS_ORIGINS` | `https://talisman-io.vercel.app` | Comma-separated allowed frontend origins |
 | `SECRET_KEY` | *(auto-generated)* | JWT signing key (Render generates this) |
 | `DATABASE_URL` | `sqlite:///./app.db` | Database connection string |
 | `ANTHROPIC_BASE_URL` | `https://api.anthropic.com` | Anthropic API endpoint |
@@ -46,7 +46,7 @@
 
 1. **Sign up / log in** at [vercel.com](https://vercel.com)
 2. Click **"Add New Project"**
-3. **Import Git Repository**: Connect your GitHub account and select `grshapiro2001-crypto/astra-cre-platform`
+3. **Import Git Repository**: Connect your GitHub account and select `grshapiro2001-crypto/talisman-io-platform`
 4. **Configure project settings**:
    - **Root Directory**: `frontend`
    - **Framework Preset**: Vite (should auto-detect from `vercel.json`)
@@ -54,9 +54,9 @@
    - **Output Directory**: `dist` (auto-detected)
 5. **Add Environment Variable**:
    - Key: `VITE_API_URL`
-   - Value: `https://astra-cre-backend.onrender.com/api/v1`
+   - Value: `https://talisman-io-backend.onrender.com/api/v1`
 6. Click **"Deploy"**
-7. After deployment, note the assigned URL (e.g., `https://astra-cre.vercel.app` or similar)
+7. After deployment, note the assigned URL (e.g., `https://talisman-io.vercel.app` or similar)
 8. (Optional) Go to **Settings → Domains** to set a custom domain
 
 ---
@@ -65,16 +65,16 @@
 
 1. **Sign up / log in** at [render.com](https://render.com)
 2. Click **"New +"** → **"Web Service"**
-3. **Connect Repository**: Link your GitHub account and select `grshapiro2001-crypto/astra-cre-platform`
+3. **Connect Repository**: Link your GitHub account and select `grshapiro2001-crypto/talisman-io-platform`
 4. **Configure service**:
-   - **Name**: `astra-cre-backend`
+   - **Name**: `talisman-io-backend`
    - **Root Directory**: `backend`
    - **Runtime**: Python
    - **Build Command**: `pip install -r requirements.txt`
    - **Start Command**: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
 5. **Add Environment Variables** (under "Environment" section):
    - `ANTHROPIC_API_KEY` = your `sk-ant-...` key
-   - `CORS_ORIGINS` = the Vercel URL from step 7 above (e.g., `https://astra-cre.vercel.app`)
+   - `CORS_ORIGINS` = the Vercel URL from step 7 above (e.g., `https://talisman-io.vercel.app`)
    - `SECRET_KEY` = click "Generate" or paste a random 32+ char string
    - `DATABASE_URL` = `sqlite:///./app.db`
    - `ANTHROPIC_BASE_URL` = `https://api.anthropic.com`
@@ -91,7 +91,7 @@
 
 After both services are deployed:
 
-- [ ] **Set CORS_ORIGINS on Render** to the actual Vercel URL (e.g., `https://astra-cre.vercel.app`)
+- [ ] **Set CORS_ORIGINS on Render** to the actual Vercel URL (e.g., `https://talisman-io.vercel.app`)
 - [ ] **Set ANTHROPIC_API_KEY on Render** to your real `sk-ant-...` key
 - [ ] **Test**: Can load the frontend in browser
 - [ ] **Test**: Can register a new account and log in
@@ -108,8 +108,8 @@ After both services are deployed:
 
 - Open browser DevTools → Console. Look for `Access-Control-Allow-Origin` errors.
 - **Fix**: On Render, set `CORS_ORIGINS` to exactly match your Vercel URL (no trailing slash).
-  - Correct: `https://astra-cre.vercel.app`
-  - Wrong: `https://astra-cre.vercel.app/`
+  - Correct: `https://talisman-io.vercel.app`
+  - Wrong: `https://talisman-io.vercel.app/`
 
 ### Frontend loads but shows blank page / routing broken
 

@@ -16,7 +16,7 @@ Read these spec documents first:
 /Users/griffinshapiro/Documents/Claude Test/deal-score-spec-v2.md
 /Users/griffinshapiro/Documents/Claude Test/comp-matching-logic.md
 
-This is the Astra CRE Platform at /Users/griffinshapiro/Documents/Claude Test.
+This is the Talisman IO Platform at /Users/griffinshapiro/Documents/Claude Test.
 Frontend: /frontend (React+TypeScript at :5173)
 Backend: /backend (FastAPI+SQLAlchemy at :8000)
 
@@ -77,7 +77,7 @@ Read this spec document:
 Also look at this HTML file for the exact modal design:
 /Users/griffinshapiro/Documents/Claude Test/deal-score-modal.html
 
-This is the Astra CRE Platform at /Users/griffinshapiro/Documents/Claude Test.
+This is the Talisman IO Platform at /Users/griffinshapiro/Documents/Claude Test.
 Frontend: /frontend (React+TypeScript at :5173)
 Backend: /backend (FastAPI+SQLAlchemy at :8000)
 
@@ -99,7 +99,7 @@ Backend: /backend (FastAPI+SQLAlchemy at :8000)
 
 3. CREATE src/components/scoring/DealScoreModal.tsx
    - MATCH THE DESIGN in deal-score-modal.html exactly
-   - Use Astra purple dark theme tokens from globals.css
+   - Use Talisman purple dark theme tokens from globals.css
    - Three layer sections with metric rows, bars, and scores
    - Supply pipeline detail breakdown
    - Market intelligence with AI rationale text
@@ -143,7 +143,7 @@ Read this spec document:
 Also read the extraction prototype (for reference, do NOT copy it directly):
 /Users/griffinshapiro/Documents/Claude Test/extraction_prototype.py
 
-This is the Astra CRE Platform at /Users/griffinshapiro/Documents/Claude Test.
+This is the Talisman IO Platform at /Users/griffinshapiro/Documents/Claude Test.
 Backend: /backend (FastAPI+SQLAlchemy at :8000)
 
 ## Task: Build the Data Bank extraction service

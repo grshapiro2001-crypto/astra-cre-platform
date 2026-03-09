@@ -125,12 +125,12 @@ def test_extraction_service():
     db = SessionLocal()
     try:
         # Create a test user if not exists
-        test_user = db.query(User).filter(User.email == "test@astra.dev").first()
+        test_user = db.query(User).filter(User.email == "test@talisman.dev").first()
         if not test_user:
             from passlib.context import CryptContext
             pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
             test_user = User(
-                email="test@astra.dev",
+                email="test@talisman.dev",
                 hashed_password=pwd_ctx.hash("testpass123"),
                 full_name="Test User",
             )
@@ -221,7 +221,7 @@ def test_api_endpoints():
 
     # Login to get auth token
     login_resp = client.post("/api/v1/auth/login", json={
-        "email": "test@astra.dev",
+        "email": "test@talisman.dev",
         "password": "testpass123",
     })
     print(f"\nLogin response: {login_resp.status_code}")
@@ -230,13 +230,13 @@ def test_api_endpoints():
         print(f"  Login failed: {login_resp.text}")
         print("  Creating user first...")
         reg_resp = client.post("/api/v1/auth/register", json={
-            "email": "test@astra.dev",
+            "email": "test@talisman.dev",
             "password": "testpass123",
             "full_name": "Test User",
         })
         print(f"  Register response: {reg_resp.status_code}")
         login_resp = client.post("/api/v1/auth/login", json={
-            "email": "test@astra.dev",
+            "email": "test@talisman.dev",
             "password": "testpass123",
         })
         print(f"  Login retry: {login_resp.status_code}")

@@ -1,5 +1,5 @@
 # Market Intelligence API Integration Spec
-# Layer 2 Data Sources for Astra CRE Deal Score
+# Layer 2 Data Sources for Talisman IO Deal Score
 
 ## Overview
 Layer 2 (Market Intelligence) produces a -10 to +10 adjustment based on macro market conditions. It combines structured API data with Claude's web search for qualitative context. This spec maps the exact API endpoints, series ID patterns, and implementation details.
@@ -304,7 +304,7 @@ GET /2022/acs/acs5
 - **Cost:** $0.005/autocomplete, $0.007/place details, $0.005/geocode
 - **Budget estimate:** ~$5-15/month at moderate usage
 
-### Use Cases for Astra
+### Use Cases for Talisman
 
 1. **Address geocoding** — Convert property address to lat/lng for distance calculations in comp matching
 2. **Submarket proximity** — Calculate distances between properties for geographic comp relevance

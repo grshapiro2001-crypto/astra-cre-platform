@@ -1,4 +1,4 @@
-# Comp Matching Logic — Astra CRE Deal Score Layer 3
+# Comp Matching Logic — Talisman IO Deal Score Layer 3
 
 ## The Problem
 When scoring a property, we need to answer: "Which comps from the Data Bank are relevant to THIS deal?" The wrong comps produce a meaningless score. The right comps tell you whether the pricing is fair.
