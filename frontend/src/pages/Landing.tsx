@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence, useInView, useMotionValue, useSpring } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { TalismanLogo } from '@/components/ui/TalismanLogo';
+import TalismanCompass3D from '@/components/ui/TalismanCompass3D';
 
 // ─────────────────────────────────────────────────────────────────
 // Types
@@ -440,7 +440,7 @@ function Footer() {
           {/* Brand */}
           <div className="col-span-2 md:col-span-1">
             <span className="flex items-center gap-2">
-              <TalismanLogo className="w-6 h-6" />
+              <TalismanCompass3D size={24} speed={1.25} />
               <span className="font-display text-xl font-bold text-foreground tracking-tight">Talisman</span>
             </span>
             <p className="text-sm text-muted-foreground mt-3 leading-relaxed max-w-xs">
@@ -525,7 +525,7 @@ export function Landing() {
       <nav className="fixed top-0 inset-x-0 z-50 h-16 flex items-center px-6 border-b border-border/30 bg-background/70 backdrop-blur-xl">
         <div className="flex items-center justify-between w-full max-w-7xl mx-auto">
           <span className="flex items-center gap-2">
-            <TalismanLogo className="w-7 h-7" />
+            <TalismanCompass3D size={28} speed={1.25} />
             <span className="font-display text-xl font-bold tracking-tight text-foreground">Talisman</span>
           </span>
 
@@ -564,7 +564,7 @@ export function Landing() {
             transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
             className="flex justify-center mb-8"
           >
-            <TalismanLogo className="w-20 h-20 md:w-28 md:h-28 drop-shadow-[0_0_30px_rgba(139,92,246,0.3)]" />
+            <TalismanCompass3D size={320} speed={1.25} />
           </motion.div>
           <motion.div
             initial={{ opacity: 0, y: 20 }}

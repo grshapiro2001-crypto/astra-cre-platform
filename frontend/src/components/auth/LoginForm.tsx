@@ -4,7 +4,7 @@ import { useAuthStore } from '@/store/authSlice';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { TalismanLogo } from '@/components/ui/TalismanLogo';
+import TalismanCompass3D from '@/components/ui/TalismanCompass3D';
 
 export const LoginForm = () => {
   const navigate = useNavigate();
@@ -30,7 +30,7 @@ export const LoginForm = () => {
       <div className="max-w-md w-full bg-white/95 backdrop-blur-md rounded-xl shadow-2xl border border-purple-200/20 p-8">
         <div className="text-center mb-6">
           <div className="flex justify-center mb-4">
-            <TalismanLogo className="w-14 h-14" />
+            <TalismanCompass3D size={120} speed={1.25} />
           </div>
           <h2 className="text-2xl font-bold font-display text-gray-900">
             Sign in to <span className="text-primary">Talisman IO</span>

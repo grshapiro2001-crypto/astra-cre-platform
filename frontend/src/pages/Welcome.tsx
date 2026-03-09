@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { TalismanLogo } from '@/components/ui/TalismanLogo';
+import TalismanCompass3D from '@/components/ui/TalismanCompass3D';
 import organizationService from '@/services/organizationService';
 
 export const Welcome = () => {
@@ -59,7 +59,7 @@ export const Welcome = () => {
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-purple-950 via-slate-950 to-purple-950 px-4 py-12">
       {/* Logo */}
       <div className="flex items-center gap-2.5 mb-8">
-        <TalismanLogo className="w-10 h-10" />
+        <TalismanCompass3D size={48} speed={1.25} />
         <h1 className="text-2xl font-bold">
           <span className="text-white">Talisman</span>
           <span className="text-purple-300/70 ml-1.5 font-normal text-sm">IO</span>
