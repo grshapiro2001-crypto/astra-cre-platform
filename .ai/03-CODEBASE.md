@@ -1,4 +1,4 @@
-# Codebase Inventory - Astra CRE Platform
+# Codebase Inventory - Talisman IO Platform
 
 **Purpose:** Quick reference of what EXISTS. Check this BEFORE building anything new.
 **Update:** Add new files/components as you create them.

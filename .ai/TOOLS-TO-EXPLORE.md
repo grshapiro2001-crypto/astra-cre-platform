@@ -1,4 +1,4 @@
-# AI Tools Discovery Log - Astra CRE
+# AI Tools Discovery Log - Talisman IO
 
 **Purpose:** Track AI tools and technologies that could enhance the platform.  
 **Updated:** Automatically by Cowork Tool Scout (daily at 6 AM)
@@ -10,7 +10,7 @@
 ### Example Tool - Discovered [Date]
 **Category:** [Document AI / Visualization / Automation / PropTech / DevTools]
 **What it does:** [1-2 sentence description]
-**Relevance to Astra:** [Specific use case for our platform]
+**Relevance to Talisman:** [Specific use case for our platform]
 **Cost:** [Free / $X/mo / Enterprise]
 **Priority:** [High / Medium / Low]
 **Status:** 🟡 To Review
@@ -24,7 +24,7 @@
 ### Claude Artifacts - Used Daily
 **Category:** AI Development
 **What it does:** Interactive code generation and visualization in Claude
-**Relevance to Astra:** We use this for rapid prototyping UI components
+**Relevance to Talisman:** We use this for rapid prototyping UI components
 **Cost:** Free (included in Claude subscription)
 **Status:** 🟢 Actively Using
 **Notes:** Core tool for development workflow
@@ -102,7 +102,7 @@
 
 **Replace Task 6 instructions with this:**
 ```
-GOAL: Find AI tools that directly solve Astra CRE problems.
+GOAL: Find AI tools that directly solve Talisman IO problems.
 
 DAILY SCAN (6:00 AM):
 - Product Hunt: Filter "AI" + "Developer Tools" + "PropTech" (last 24 hours)
@@ -188,7 +188,7 @@ IF NO MATCHES: Note "No relevant tools discovered [Date]" (don't force it)
 
 ## **TASK 7: Budget Alert System**
 
-**Task Name:** `Astra CRE - Budget Watchdog`
+**Task Name:** `Talisman IO - Budget Watchdog`
 
 **Trigger:** After each logged session OR daily at 9 PM
 
@@ -212,7 +212,7 @@ BUDGET THRESHOLDS:
 IF YELLOW OR RED:
 Send alert email/notification:
 
-Subject: 💰 Astra CRE Budget Alert
+Subject: 💰 Talisman IO Budget Alert
 
 You've spent $[X] this week ($[Y] this month).
 Current pace: $[Z]/month
@@ -233,7 +233,7 @@ Budget pace: [On track / Review needed]
 
 ## **TASK 8: Feature Progress Tracker**
 
-**Task Name:** `Astra CRE - Feature Momentum`
+**Task Name:** `Talisman IO - Feature Momentum`
 
 **Trigger:** Every 3 days at 8 PM
 
@@ -273,7 +273,7 @@ Healthy tasks (active progress):
 
 ## **TASK 9: Learning Topic Reminder**
 
-**Task Name:** `Astra CRE - Learning Nudge`
+**Task Name:** `Talisman IO - Learning Nudge`
 
 **Trigger:** Every Friday at 6 PM
 
@@ -311,7 +311,7 @@ Or should we move them to "Maybe Later" queue?
 
 ## **TASK 10: GitHub Commit Reminder**
 
-**Task Name:** `Astra CRE - Git Safety Net`
+**Task Name:** `Talisman IO - Git Safety Net`
 
 **Trigger:** End of any session where code was modified
 

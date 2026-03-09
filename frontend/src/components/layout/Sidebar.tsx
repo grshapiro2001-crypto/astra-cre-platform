@@ -81,8 +81,8 @@ export const Sidebar = () => {
           </div>
           {!sidebarCollapsed && (
             <h1 className="text-lg font-bold font-display tracking-tight">
-              <span className="text-white">Astra</span>
-              <span className="text-purple-300/70 ml-1 font-normal text-xs">CRE</span>
+              <span className="text-white">Talisman</span>
+              <span className="text-purple-300/70 ml-1 font-normal text-xs">IO</span>
             </h1>
           )}
         </div>
@@ -310,8 +310,8 @@ export const MobileSidebar = () => {
               <TrendingUp className="w-4 h-4 text-white" />
             </div>
             <h1 className="text-lg font-bold font-display tracking-tight">
-              <span className="text-white">Astra</span>
-              <span className="text-purple-300/70 ml-1 font-normal text-xs">CRE</span>
+              <span className="text-white">Talisman</span>
+              <span className="text-purple-300/70 ml-1 font-normal text-xs">IO</span>
             </h1>
           </div>
         </div>

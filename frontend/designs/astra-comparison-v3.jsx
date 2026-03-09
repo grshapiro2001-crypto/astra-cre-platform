@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 /**
- * ASTRA CRE - COMPARISON VIEW V3
+ * Talisman IO - COMPARISON VIEW V3
  * "The Deal Decision Accelerator"
  * 
  * DESIGN PHILOSOPHY:
@@ -23,7 +23,7 @@ import { motion, AnimatePresence } from 'framer-motion';
  * - Data: JetBrains Mono (precision, credibility)
  */
 
-const AstraComparisonV3 = () => {
+const TalismanComparisonV3 = () => {
   // === STATE ===
   const [darkMode, setDarkMode] = useState(true);
   const [viewMode, setViewMode] = useState('quick'); // 'quick' | 'deep'
@@ -1471,4 +1471,4 @@ const SparkleIcon = ({ className, style }) => (
   </svg>
 );
 
-export default AstraComparisonV3;
+export default TalismanComparisonV3;

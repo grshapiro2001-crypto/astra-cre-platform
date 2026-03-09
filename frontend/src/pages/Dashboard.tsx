@@ -18,7 +18,7 @@ import organizationService from '@/services/organizationService';
 import type { Organization } from '@/services/organizationService';
 import { MigrateDealModal } from '@/components/organization/MigrateDealModal';
 
-const DEAL_STAGES_KEY = 'astra-deal-stages';
+const DEAL_STAGES_KEY = 'talisman-deal-stages';
 import { DashboardSkeleton } from '@/components/ui/PageSkeleton';
 import { SlowLoadBanner } from '@/components/common/SlowLoadBanner';
 import { propertyService } from '@/services/propertyService';
@@ -149,7 +149,7 @@ export const Dashboard = () => {
   // --- Org State ---
   const [userOrg, setUserOrg] = useState<Organization | null>(null);
   const [bannerDismissed, setBannerDismissed] = useState(() =>
-    localStorage.getItem('astra_org_banner_dismissed') === 'true'
+    localStorage.getItem('talisman_org_banner_dismissed') === 'true'
   );
   const [showMigrationModal, setShowMigrationModal] = useState(false);
 
@@ -256,7 +256,7 @@ export const Dashboard = () => {
   useEffect(() => {
     organizationService.getMyOrg().then((org) => {
       setUserOrg(org);
-      const migrationSeen = localStorage.getItem('astra_migration_seen');
+      const migrationSeen = localStorage.getItem('talisman_migration_seen');
       if (!migrationSeen && org.your_role === 'member') {
         setShowMigrationModal(true);
       }
@@ -425,7 +425,7 @@ export const Dashboard = () => {
                       size="sm"
                       variant="ghost"
                       onClick={() => {
-                        localStorage.setItem('astra_org_banner_dismissed', 'true');
+                        localStorage.setItem('talisman_org_banner_dismissed', 'true');
                         setBannerDismissed(true);
                       }}
                     >

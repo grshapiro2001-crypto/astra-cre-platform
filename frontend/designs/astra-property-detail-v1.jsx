@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 /**
- * ASTRA CRE - PROPERTY DETAIL PAGE V1
+ * Talisman IO - PROPERTY DETAIL PAGE V1
  * "Where Raw Data Becomes Investment Intelligence"
  * 
  * DESIGN PRINCIPLES:
@@ -25,7 +25,7 @@ import { motion, AnimatePresence } from 'framer-motion';
  * - Data Sources
  */
 
-const AstraPropertyDetail = () => {
+const TalismanPropertyDetail = () => {
   // === STATE ===
   const [darkMode, setDarkMode] = useState(true);
   const [financialPeriod, setFinancialPeriod] = useState('t12'); // 't3' | 't12' | 'y1'
@@ -1636,4 +1636,4 @@ const EditIcon = ({ className, style }) => (
   </svg>
 );
 
-export default AstraPropertyDetail;
+export default TalismanPropertyDetail;

@@ -1,4 +1,4 @@
-# Current Work - Astra CRE Platform
+# Current Work - Talisman IO Platform
 
 **Purpose:** What am I working on RIGHT NOW? Update this daily or per session.
 **Length:** Keep under 150 lines. Archive completed work.
@@ -59,8 +59,8 @@
 
 ## Current State (Mar 8, 2026)
 
-**Production URL:** https://astra-cre-platform.vercel.app
-**Backend:** https://astra-cre-backend.onrender.com
+**Production URL:** https://talisman-io-platform.vercel.app
+**Backend:** https://talisman-io-backend.onrender.com
 **Latest Deployment:** PR #94 — READY ✅ (Vercel confirmed)
 **Current PR:** #94 (last merged)
 **TypeScript:** Clean (last confirmed Feb 26, no regressions expected)

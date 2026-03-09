@@ -60,7 +60,7 @@ const FEATURE_TABS: FeatureTab[] = [
     label: 'AI Deal Scoring',
     icon: '⚡',
     headline: 'Know if a deal is worth your time in seconds.',
-    body: "ASTRA's proprietary scoring model ingests rent rolls, T-12s, market data, and submarket comps to produce a 0-100 deal score with full factor breakdown. No more spreadsheet roulette.",
+    body: "Talisman's proprietary scoring model ingests rent rolls, T-12s, market data, and submarket comps to produce a 0-100 deal score with full factor breakdown. No more spreadsheet roulette.",
     stats: [
       { label: 'Avg. underwriting time', value: '4 min' },
       { label: 'Deals scored to date', value: '12,400+' },
@@ -72,7 +72,7 @@ const FEATURE_TABS: FeatureTab[] = [
     label: 'Document AI',
     icon: '📄',
     headline: 'Upload an OM. Get a model.',
-    body: "Drop any PDF — offering memorandum, rent roll, or T-12 — and ASTRA's extraction pipeline parses every line item, cross-references market data, and populates your underwriting model automatically.",
+    body: "Drop any PDF — offering memorandum, rent roll, or T-12 — and Talisman's extraction pipeline parses every line item, cross-references market data, and populates your underwriting model automatically.",
     stats: [
       { label: 'Document types supported', value: '28+' },
       { label: 'Extraction accuracy', value: '97.3%' },
@@ -401,7 +401,7 @@ function FeatureTabs() {
               ))}
             </div>
             <p className="text-muted-foreground">
-              <span className="text-green-400">$</span> astra analyze ./deal-docs/parkview-om.pdf
+              <span className="text-green-400">$</span> talisman analyze ./deal-docs/parkview-om.pdf
             </p>
             <p className="text-muted-foreground mt-1">
               <span className="text-primary/70">→</span> Extracting rent roll... <span className="text-green-400">✓</span>
@@ -438,7 +438,7 @@ function Footer() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-10 mb-12">
           {/* Brand */}
           <div className="col-span-2 md:col-span-1">
-            <span className="font-display text-xl font-bold text-foreground tracking-tight">ASTRA</span>
+            <span className="font-display text-xl font-bold text-foreground tracking-tight">Talisman</span>
             <p className="text-sm text-muted-foreground mt-3 leading-relaxed max-w-xs">
               The all-in-one multifamily investment platform. AI-native underwriting for the modern CRE firm.
             </p>
@@ -473,7 +473,7 @@ function Footer() {
         </div>
 
         <div className="flex flex-col md:flex-row justify-between items-center gap-4 pt-8 border-t border-border/40 text-xs text-muted-foreground">
-          <p>© 2026 ASTRA Technologies, Inc. All rights reserved.</p>
+          <p>© 2026 Talisman IO, Inc. All rights reserved.</p>
           <p className="font-mono">v2.4.1 · Built on Vercel · Powered by OpenAI</p>
         </div>
       </div>
@@ -520,7 +520,7 @@ export function Landing() {
       {/* ── Nav ──────────────────────────────────────────────── */}
       <nav className="fixed top-0 inset-x-0 z-50 h-16 flex items-center px-6 border-b border-border/30 bg-background/70 backdrop-blur-xl">
         <div className="flex items-center justify-between w-full max-w-7xl mx-auto">
-          <span className="font-display text-xl font-bold tracking-tight text-foreground">ASTRA</span>
+          <span className="font-display text-xl font-bold tracking-tight text-foreground">Talisman</span>
 
           <div className="hidden md:flex items-center gap-7 text-sm text-muted-foreground">
             {['Product', 'Market Intel', 'Pricing', 'Docs', 'Blog'].map((item) => (
@@ -581,7 +581,7 @@ export function Landing() {
             transition={{ duration: 0.7, delay: 0.25, ease: [0.22, 1, 0.36, 1] }}
             className="mt-7 text-xl md:text-2xl text-white/60 max-w-3xl mx-auto leading-relaxed"
           >
-            ASTRA is the AI-native multifamily investment platform. Upload a deal in 30 seconds,
+            Talisman is the AI-native multifamily investment platform. Upload a deal in 30 seconds,
             get a full underwriting model with comps, score, and risk flags — instantly.
           </motion.p>
 
@@ -656,7 +656,7 @@ export function Landing() {
               Live Demo
             </span>
             <h2 className="font-display text-4xl md:text-5xl font-bold mt-5 mb-4 text-foreground">
-              See ASTRA score a deal.
+              See Talisman score a deal.
             </h2>
             <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
               Real properties, real submarket data, real AI scores. This is what hits your dashboard on day one.
@@ -688,7 +688,7 @@ export function Landing() {
               Ready to underwrite at the speed of AI?
             </h2>
             <p className="text-muted-foreground text-lg mb-10">
-              Join 400+ investment firms already using ASTRA. Free trial, no credit card required.
+              Join 400+ investment firms already using Talisman. Free trial, no credit card required.
             </p>
             <a
               href="/register"

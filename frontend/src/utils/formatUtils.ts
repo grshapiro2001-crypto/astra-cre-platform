@@ -1,5 +1,5 @@
 /**
- * Centralized formatting utilities for the Astra CRE Platform.
+ * Centralized formatting utilities for the Talisman IO Platform.
  *
  * The Claude extraction pipeline returns percentage values in two
  * different forms depending on the source document:

@@ -63,13 +63,13 @@ export const Welcome = () => {
           <TrendingUp className="w-5 h-5 text-white" />
         </div>
         <h1 className="text-2xl font-bold">
-          <span className="text-white">Astra</span>
-          <span className="text-purple-300/70 ml-1.5 font-normal text-sm">CRE</span>
+          <span className="text-white">Talisman</span>
+          <span className="text-purple-300/70 ml-1.5 font-normal text-sm">IO</span>
         </h1>
       </div>
 
       {/* Heading */}
-      <h2 className="text-3xl font-bold text-white mb-2">Welcome to ASTRA CRE</h2>
+      <h2 className="text-3xl font-bold text-white mb-2">Welcome to Talisman IO</h2>
       <p className="text-purple-200/60 text-sm mb-10">Set up your workspace to get started</p>
 
       {/* Cards */}

@@ -42,7 +42,7 @@ export const LoginForm = () => {
             </div>
           </div>
           <h2 className="text-2xl font-bold font-display text-gray-900">
-            Sign in to <span className="text-primary">Astra CRE</span>
+            Sign in to <span className="text-primary">Talisman IO</span>
           </h2>
           <p className="mt-2 text-sm text-gray-500">
             Or{' '}

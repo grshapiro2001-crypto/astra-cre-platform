@@ -1,5 +1,5 @@
 /**
- * ChatBar — Inline ASTRA chat bar for the dashboard
+ * ChatBar — Inline Talisman chat bar for the dashboard
  *
  * Features:
  * - Input with prism icon and send button
@@ -122,7 +122,7 @@ export const ChatBar: React.FC<ChatBarProps> = ({ deals }) => {
     <div className="flex-1 min-w-0">
       {/* Context text */}
       <p className="font-mono text-2xs uppercase tracking-wider text-muted-foreground/60 mb-1.5 font-semibold">
-        Ask ASTRA about your pipeline
+        Ask Talisman about your pipeline
       </p>
 
       {/* Input bar */}

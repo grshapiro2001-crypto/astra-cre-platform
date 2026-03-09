@@ -114,7 +114,7 @@ export const AssistantPanel = () => {
             <div>
               <div className="flex items-center gap-2">
                 <Sparkles className="h-5 w-5 text-primary" />
-                <span className="font-display text-lg font-semibold">ASTRA AI</span>
+                <span className="font-display text-lg font-semibold">Talisman AI</span>
               </div>
               <p className="text-xs text-muted-foreground">
                 {scopedPropertyId

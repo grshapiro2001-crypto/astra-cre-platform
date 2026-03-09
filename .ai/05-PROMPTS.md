@@ -1,4 +1,4 @@
-# Prompt Templates - Astra CRE Platform
+# Prompt Templates - Talisman IO Platform
 
 **Purpose:** Reusable, proven prompt templates for Claude Code sessions.  
 **Usage:** Copy template, fill in specifics, paste to Claude Code.  

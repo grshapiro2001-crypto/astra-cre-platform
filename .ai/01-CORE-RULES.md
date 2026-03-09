@@ -1,4 +1,4 @@
-# Core Development Rules - Astra CRE Platform
+# Core Development Rules - Talisman IO Platform
 
 **Purpose:** Essential coding standards and constraints. Read this FIRST every session.
 **Last Updated:** February 11, 2026

@@ -1,6 +1,6 @@
-# Automation & Integration Roadmap - Astra CRE Platform
+# Automation & Integration Roadmap - Talisman IO Platform
 
-**Purpose:** Comprehensive guide to automating and enhancing Astra CRE with plugins, MCPs, and workflows.
+**Purpose:** Comprehensive guide to automating and enhancing Talisman IO with plugins, MCPs, and workflows.
 **Last Updated:** February 7, 2026
 **Status:** Research Complete - Ready for Implementation
 
@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-Based on extensive research of the MCP ecosystem, Cowork plugins, and workflow automation platforms, this document outlines a strategic roadmap to transform Astra CRE from a standalone deal analysis tool into a **centralized thought hub** for commercial real estate investment workflows.
+Based on extensive research of the MCP ecosystem, Cowork plugins, and workflow automation platforms, this document outlines a strategic roadmap to transform Talisman IO from a standalone deal analysis tool into a **centralized thought hub** for commercial real estate investment workflows.
 
 **Key Findings:**
 - ✅ **60+ relevant MCPs** available for CRE deal management
@@ -407,35 +407,35 @@ Trigger: Meeting ends (via calendar integration)
 
 ## Custom MCP Development Opportunities
 
-### 4.3 Astra CRE Custom MCPs
+### 4.3 Talisman IO Custom MCPs
 
 Based on your unique workflows, consider building these:
 
-**1. Astra Property Search MCP**
+**1. Talisman Property Search MCP**
 ```
 Tools:
-- astra_search_properties(filters)
-- astra_get_property_details(property_id)
-- astra_get_comp_properties(property_id)
-- astra_update_property(property_id, fields)
+- talisman_search_properties(filters)
+- talisman_get_property_details(property_id)
+- talisman_get_comp_properties(property_id)
+- talisman_update_property(property_id, fields)
 ```
 
-**2. Astra Deal Pipeline MCP**
+**2. Talisman Deal Pipeline MCP**
 ```
 Tools:
-- astra_list_deals(stage, status)
-- astra_move_deal(property_id, new_stage)
-- astra_get_deal_history(property_id)
-- astra_flag_deal_risk(property_id, reason)
+- talisman_list_deals(stage, status)
+- talisman_move_deal(property_id, new_stage)
+- talisman_get_deal_history(property_id)
+- talisman_flag_deal_risk(property_id, reason)
 ```
 
-**3. Astra Document Analysis MCP**
+**3. Talisman Document Analysis MCP**
 ```
 Tools:
-- astra_reanalyze_document(property_id)
-- astra_extract_specific_field(document_id, field_name)
-- astra_compare_bov_tiers(property_id)
-- astra_generate_investor_memo(property_id)
+- talisman_reanalyze_document(property_id)
+- talisman_extract_specific_field(document_id, field_name)
+- talisman_compare_bov_tiers(property_id)
+- talisman_generate_investor_memo(property_id)
 ```
 
 **Development Time:** 1-2 weeks per MCP
@@ -537,7 +537,7 @@ Tools:
 ```
 Trigger: Email with PDF attachment (Gmail)
 → Download PDF to Google Drive
-→ Call Astra /api/v1/upload endpoint
+→ Call Talisman /api/v1/upload endpoint
 → Wait for Claude extraction
 → Verify address with BatchData
 → Enrich owner contact with ZoomInfo
@@ -548,7 +548,7 @@ Trigger: Email with PDF attachment (Gmail)
 
 **2. Deal Stage Automation**
 ```
-Trigger: Property stage updated (webhook from Astra)
+Trigger: Property stage updated (webhook from Talisman)
 → If stage = "Due Diligence":
   - Create ClickUp inspection tasks
   - Send Slack alert to team
@@ -575,7 +575,7 @@ Trigger: New property saved (webhook)
 **4. Weekly Deal Report**
 ```
 Trigger: Every Monday 8am
-→ Query Astra API for deals by stage
+→ Query Talisman API for deals by stage
 → Call Data plugin: /analyze deal pipeline
 → Generate charts with /create-viz
 → Build HTML dashboard
@@ -586,7 +586,7 @@ Trigger: Every Monday 8am
 **5. Investor Communication**
 ```
 Trigger: Deal reaches milestone
-→ Generate property summary from Astra
+→ Generate property summary from Talisman
 → Use Sales plugin to draft investor update
 → Create PDF with Lumin
 → Send via Gmail
@@ -602,7 +602,7 @@ Trigger: Deal reaches milestone
 ┌─────────────────────────────────────────────────────────────┐
 │                    Cowork (Central Hub)                      │
 │  ┌──────────────────────────────────────────────────────┐  │
-│  │              Astra CRE Application                    │  │
+│  │              Talisman IO Application                    │  │
 │  │  ┌────────────┐  ┌────────────┐  ┌────────────┐    │  │
 │  │  │  FastAPI   │  │   React    │  │  SQLite    │    │  │
 │  │  │  Backend   │◄─┤  Frontend  │◄─┤  Database  │    │  │
