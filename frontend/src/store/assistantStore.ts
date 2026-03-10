@@ -1,8 +1,10 @@
 import { create } from 'zustand';
 import type { ChatMessage } from '@/types/assistant';
+import { useUIStore } from '@/store/uiStore';
 
 interface AssistantState {
   isOpen: boolean;
+  _prevSidebarCollapsed: boolean | null;
   messages: ChatMessage[];
   isLoading: boolean;
   scopedPropertyId: number | null;
@@ -21,13 +23,43 @@ interface AssistantState {
 
 export const useAssistantStore = create<AssistantState>((set) => ({
   isOpen: false,
+  _prevSidebarCollapsed: null,
   messages: [],
   isLoading: false,
   scopedPropertyId: null,
   scopedFolderId: null,
 
-  togglePanel: () => set((s) => ({ isOpen: !s.isOpen })),
-  setOpen: (open) => set({ isOpen: open }),
+  togglePanel: () =>
+    set((s) => {
+      const ui = useUIStore.getState();
+      if (!s.isOpen) {
+        // Opening: save sidebar state then collapse
+        const prev = ui.sidebarCollapsed;
+        if (!ui.sidebarCollapsed) ui.setSidebarCollapsed(true);
+        return { isOpen: true, _prevSidebarCollapsed: prev };
+      } else {
+        // Closing: restore sidebar state
+        if (s._prevSidebarCollapsed !== null) {
+          ui.setSidebarCollapsed(s._prevSidebarCollapsed);
+        }
+        return { isOpen: false, _prevSidebarCollapsed: null };
+      }
+    }),
+  setOpen: (open) =>
+    set((s) => {
+      const ui = useUIStore.getState();
+      if (open && !s.isOpen) {
+        const prev = ui.sidebarCollapsed;
+        if (!ui.sidebarCollapsed) ui.setSidebarCollapsed(true);
+        return { isOpen: true, _prevSidebarCollapsed: prev };
+      } else if (!open && s.isOpen) {
+        if (s._prevSidebarCollapsed !== null) {
+          ui.setSidebarCollapsed(s._prevSidebarCollapsed);
+        }
+        return { isOpen: false, _prevSidebarCollapsed: null };
+      }
+      return { isOpen: open };
+    }),
 
   addMessage: (msg) => set((s) => ({ messages: [...s.messages, msg] })),
 

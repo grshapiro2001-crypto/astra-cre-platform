@@ -1,4 +1,5 @@
-import { User, Sparkles } from 'lucide-react';
+import { User } from 'lucide-react';
+import TalismanCompass3D from '@/components/TalismanCompass3D';
 import { cn } from '@/lib/utils';
 import type { ChatMessage as ChatMessageType } from '@/types/assistant';
 
@@ -14,13 +15,13 @@ export const ChatMessage = ({ message }: ChatMessageProps) => {
       <div
         className={cn(
           'flex h-8 w-8 shrink-0 items-center justify-center rounded-full',
-          isUser ? 'bg-muted' : 'bg-primary/10'
+          isUser ? 'bg-muted' : ''
         )}
       >
         {isUser ? (
           <User className="h-4 w-4 text-muted-foreground" />
         ) : (
-          <Sparkles className="h-4 w-4 text-primary" />
+          <TalismanCompass3D size={24} spin={false} speed={0} />
         )}
       </div>
 

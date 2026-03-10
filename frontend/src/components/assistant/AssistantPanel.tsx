@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Sparkles, Trash2, X } from 'lucide-react';
+import { Trash2, X } from 'lucide-react';
+import TalismanCompass3D from '@/components/TalismanCompass3D';
 import { Button } from '@/components/ui/button';
 import { useAssistantStore } from '@/store/assistantStore';
 import { streamChat } from '@/services/assistantService';
@@ -113,7 +114,7 @@ export const AssistantPanel = () => {
           <div className="flex items-center justify-between border-b border-border/60 px-4 py-3">
             <div>
               <div className="flex items-center gap-2">
-                <Sparkles className="h-5 w-5 text-primary" />
+                <TalismanCompass3D size={28} spin={true} speed={1.0} />
                 <span className="font-display text-lg font-semibold">Talisman AI</span>
               </div>
               <p className="text-xs text-muted-foreground">
@@ -149,7 +150,7 @@ export const AssistantPanel = () => {
             {messages.length === 0 ? (
               <div className="flex h-full flex-col items-center justify-center text-center">
                 <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-                  <Sparkles className="h-6 w-6 text-primary" />
+                  <TalismanCompass3D size={32} spin={true} speed={1.0} />
                 </div>
                 <h3 className="font-display text-base font-semibold">
                   Ask me anything about your deals
