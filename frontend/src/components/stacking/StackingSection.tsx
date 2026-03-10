@@ -298,13 +298,13 @@ export function StackingSection({ property }: StackingSectionProps) {
     switch (activeFilter) {
       case 'occupancy':
         return { type: 'categorical', items: [
-          { color: '#7C3AED', label: 'Occupied' },
+          { color: '#D4AF37', label: 'Occupied' },
           { color: '#F43F5E', label: 'Vacant' },
-          { color: '#3F3F5A', label: 'No Data' },
+          { color: '#555550', label: 'No Data' },
         ] };
       case 'floor_level': {
         const maxFloor = layout?.buildings.reduce((m, b) => Math.max(m, b.num_floors), 1) ?? 1;
-        return { type: 'gradient', minColor: '#1E3A5F', maxColor: '#38BDF8', minLabel: 'Floor 1', maxLabel: `Floor ${maxFloor}` };
+        return { type: 'gradient', minColor: '#5C4A1E', maxColor: '#D4AF37', minLabel: 'Floor 1', maxLabel: `Floor ${maxFloor}` };
       }
       case 'expirations':
         return { type: 'categorical', items: [
@@ -312,17 +312,17 @@ export function StackingSection({ property }: StackingSectionProps) {
           { color: '#F97316', label: '31–90 days' },
           { color: '#EAB308', label: '91–180 days' },
           { color: '#22C55E', label: '181–365 days' },
-          { color: '#3B82F6', label: '365+ days' },
-          { color: '#6B7280', label: 'No data' },
+          { color: '#D4AF37', label: '365+ days' },
+          { color: '#555550', label: 'No data' },
         ] };
       case 'loss_to_lease':
         return { type: 'categorical', items: [
-          { color: '#3B82F6', label: '≤0% (at/above market)' },
+          { color: '#22C55E', label: '≤0% (at/above market)' },
           { color: '#22C55E', label: '1–5%' },
           { color: '#EAB308', label: '5–10%' },
           { color: '#F97316', label: '10–20%' },
           { color: '#EF4444', label: '20%+' },
-          { color: '#6B7280', label: 'No data' },
+          { color: '#555550', label: 'No data' },
         ] };
       case 'market_rents': {
         let min = Infinity, max = -Infinity;
@@ -338,13 +338,13 @@ export function StackingSection({ property }: StackingSectionProps) {
           if (u.in_place_rent != null) { min = Math.min(min, u.in_place_rent); max = Math.max(max, u.in_place_rent); }
         }
         if (min === Infinity) { min = 0; max = 0; }
-        return { type: 'gradient', minColor: '#1E3A5F', maxColor: '#8B5CF6', minLabel: `$${min.toLocaleString()}`, maxLabel: `$${max.toLocaleString()}` };
+        return { type: 'gradient', minColor: '#1E3A5F', maxColor: '#D4AF37', minLabel: `$${min.toLocaleString()}`, maxLabel: `$${max.toLocaleString()}` };
       }
       default:
         return { type: 'categorical', items: [
-          { color: '#7C3AED', label: 'Occupied' },
+          { color: '#D4AF37', label: 'Occupied' },
           { color: '#F43F5E', label: 'Vacant' },
-          { color: '#3F3F5A', label: 'No Data' },
+          { color: '#555550', label: 'No Data' },
         ] };
     }
   }, [activeFilter, rentRollUnits, layout]);
