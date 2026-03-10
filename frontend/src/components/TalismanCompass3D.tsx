@@ -19,7 +19,7 @@ const TalismanCompass3D = ({ size = 500, spin = true, speed = 1.0 }: TalismanCom
     renderer.setSize(size, size);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.6;
+    renderer.toneMappingExposure = size <= 64 ? 2.4 : size <= 120 ? 2.0 : 1.6;
     container.innerHTML = "";
     container.appendChild(renderer.domElement);
 
@@ -54,6 +54,23 @@ const TalismanCompass3D = ({ size = 500, spin = true, speed = 1.0 }: TalismanCom
       clearcoat: 0.6, clearcoatRoughness: 0.1,
       transparent: true, opacity: 0.88, side: THREE.DoubleSide,
     });
+
+    // At small sizes, PBR reflections don't register — add emissive self-glow
+    // so the compass reads as gold instead of a dark blob
+    const emissiveBoost = size <= 64 ? 0.35 : size <= 120 ? 0.15 : 0.0;
+    if (emissiveBoost > 0) {
+      const emissiveColor = new THREE.Color(0xd4af37);
+      [gunmetalBright, gunmetalDark, gunmetalMid, ringMat].forEach(mat => {
+        mat.emissive = emissiveColor;
+        mat.emissiveIntensity = emissiveBoost;
+      });
+    }
+
+    if (size <= 64) {
+      [gunmetalBright, gunmetalDark, gunmetalMid, ringMat].forEach(mat => {
+        mat.opacity = Math.min(mat.opacity + 0.15, 1.0);
+      });
+    }
 
     // ═══════════════════════════════════════
     // COMPASS GROUP
