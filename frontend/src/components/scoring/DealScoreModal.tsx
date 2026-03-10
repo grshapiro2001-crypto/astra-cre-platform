@@ -77,9 +77,9 @@ const LAYER_CONFIG = [
     key: 'market_intelligence',
     label: 'Layer 2: Market Intelligence',
     icon: Brain,
-    color: 'text-violet-400',
-    borderColor: 'border-violet-500/20',
-    bgColor: 'bg-violet-500/5',
+    color: 'text-amber-400',
+    borderColor: 'border-amber-500/20',
+    bgColor: 'bg-amber-500/5',
   },
   {
     key: 'deal_comp_analysis',

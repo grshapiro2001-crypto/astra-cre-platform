@@ -89,8 +89,8 @@ const STATUS_CONFIG: Record<
   closed: {
     label: 'CLOSED',
     badgeClass:
-      'bg-purple-500/10 text-purple-600 dark:bg-purple-500/15 dark:text-purple-400',
-    dotClass: 'bg-purple-500',
+      'bg-primary/10 text-primary dark:bg-primary/15 dark:text-primary',
+    dotClass: 'bg-primary',
   },
 };
 
@@ -331,14 +331,14 @@ export const Library = () => {
                 Deal Library
               </h1>
               <p className="mt-1 text-sm text-muted-foreground">
-                <span className="font-mono text-primary">
+                <span className="font-display text-primary">
                   {filteredProperties.length}
                 </span>{' '}
                 deals
                 {pipelineStats.totalUnits > 0 && (
                   <>
                     {' \u00b7 '}
-                    <span className="font-mono">
+                    <span className="font-display">
                       {pipelineStats.totalUnits.toLocaleString()}
                     </span>{' '}
                     units
@@ -415,7 +415,7 @@ export const Library = () => {
               {/* Upload */}
               <Link
                 to="/upload"
-                className="px-4 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2 whitespace-nowrap text-white bg-gradient-to-r from-primary to-violet-700 dark:from-violet-500 dark:to-purple-600 shadow-lg shadow-primary/20 transition-all duration-300"
+                className="px-4 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2 whitespace-nowrap text-white bg-gradient-to-r from-primary to-amber-700 dark:from-amber-500 dark:to-yellow-600 shadow-lg shadow-primary/20 transition-all duration-300"
               >
                 <Plus className="w-4 h-4" />
                 <span className="hidden sm:inline">New Deal</span>
@@ -440,7 +440,7 @@ export const Library = () => {
                     )}
                   >
                     {filter.label}
-                    <span className="ml-1 font-mono text-[10px] text-muted-foreground">
+                    <span className="ml-1 font-display text-[10px] text-muted-foreground">
                       {statusCounts[filter.id] ?? 0}
                     </span>
                   </button>
@@ -763,7 +763,7 @@ export const Library = () => {
                           <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
                             Units
                           </p>
-                          <p className="font-mono text-sm font-semibold mt-0.5 text-foreground">
+                          <p className="font-display text-sm font-semibold mt-0.5 text-foreground">
                             {property.total_units?.toLocaleString() ||
                               '\u2014'}
                           </p>
@@ -772,7 +772,7 @@ export const Library = () => {
                           <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
                             T12 NOI
                           </p>
-                          <p className="font-mono text-sm font-semibold mt-0.5 text-emerald-600 dark:text-emerald-400">
+                          <p className="font-display text-sm font-semibold mt-0.5 text-emerald-600 dark:text-emerald-400">
                             {formatPrice(property.t12_noi)}
                           </p>
                         </div>
@@ -780,7 +780,7 @@ export const Library = () => {
                           <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
                             Y1 NOI
                           </p>
-                          <p className="font-mono text-sm font-semibold mt-0.5 text-foreground">
+                          <p className="font-display text-sm font-semibold mt-0.5 text-foreground">
                             {formatPrice(property.y1_noi)}
                           </p>
                         </div>
@@ -819,7 +819,7 @@ export const Library = () => {
                             e.stopPropagation();
                             navigate(`/library/${property.id}`);
                           }}
-                          className="w-full py-2.5 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-primary to-violet-700 dark:from-violet-500 dark:to-purple-600 transition-all duration-200 hover:opacity-90"
+                          className="w-full py-2.5 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-primary to-amber-700 dark:from-amber-500 dark:to-yellow-600 transition-all duration-200 hover:opacity-90"
                         >
                           View Analysis &rarr;
                         </button>
@@ -972,17 +972,17 @@ export const Library = () => {
                   </div>
 
                   {/* Units */}
-                  <div className="text-right font-mono text-sm text-foreground">
+                  <div className="text-right font-display text-sm text-foreground">
                     {property.total_units?.toLocaleString() || '\u2014'}
                   </div>
 
                   {/* T12 NOI */}
-                  <div className="text-right font-mono text-sm text-emerald-600 dark:text-emerald-400">
+                  <div className="text-right font-display text-sm text-emerald-600 dark:text-emerald-400">
                     {formatPrice(property.t12_noi)}
                   </div>
 
                   {/* Y1 NOI */}
-                  <div className="text-right font-mono text-sm text-foreground">
+                  <div className="text-right font-display text-sm text-foreground">
                     {formatPrice(property.y1_noi)}
                   </div>
 
@@ -1055,7 +1055,7 @@ export const Library = () => {
             {!searchQuery && selectedFilter === 'all' && (
               <Link
                 to="/upload"
-                className="inline-flex items-center gap-2 mt-6 px-5 py-3 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-primary to-violet-700 dark:from-violet-500 dark:to-purple-600 shadow-lg shadow-primary/20 transition-all duration-300"
+                className="inline-flex items-center gap-2 mt-6 px-5 py-3 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-primary to-amber-700 dark:from-amber-500 dark:to-yellow-600 shadow-lg shadow-primary/20 transition-all duration-300"
               >
                 <Upload className="w-4 h-4" />
                 Upload Document

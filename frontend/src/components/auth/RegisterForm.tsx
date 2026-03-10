@@ -39,8 +39,8 @@ export const RegisterForm = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-950 via-slate-950 to-purple-950 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full bg-white/95 backdrop-blur-md rounded-xl shadow-2xl border border-purple-200/20 p-8">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-950 via-slate-950 to-amber-950 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full bg-white/95 backdrop-blur-md rounded-xl shadow-2xl border border-amber-200/20 p-8">
         <div className="text-center mb-6">
           <div className="flex justify-center mb-4">
             <div className="w-14 h-14 rounded-xl bg-primary flex items-center justify-center shadow-lg">
@@ -76,7 +76,7 @@ export const RegisterForm = () => {
                 type="text"
                 autoComplete="name"
                 placeholder="John Doe"
-                className="border-purple-200/50 focus:border-primary focus:ring-primary/20"
+                className="border-amber-200/50 focus:border-primary focus:ring-primary/20"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
               />
@@ -91,7 +91,7 @@ export const RegisterForm = () => {
                 autoComplete="email"
                 required
                 placeholder="you@example.com"
-                className="border-purple-200/50 focus:border-primary focus:ring-primary/20"
+                className="border-amber-200/50 focus:border-primary focus:ring-primary/20"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
@@ -106,7 +106,7 @@ export const RegisterForm = () => {
                 autoComplete="new-password"
                 required
                 placeholder="At least 8 characters"
-                className="border-purple-200/50 focus:border-primary focus:ring-primary/20"
+                className="border-amber-200/50 focus:border-primary focus:ring-primary/20"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
@@ -121,7 +121,7 @@ export const RegisterForm = () => {
                 autoComplete="new-password"
                 required
                 placeholder="Confirm your password"
-                className="border-purple-200/50 focus:border-primary focus:ring-primary/20"
+                className="border-amber-200/50 focus:border-primary focus:ring-primary/20"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
               />

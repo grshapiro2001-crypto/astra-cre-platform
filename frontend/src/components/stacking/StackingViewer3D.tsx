@@ -1926,11 +1926,11 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
     keyLight.shadow.camera.bottom = -100;
     scene.add(keyLight);
 
-    const fillLight = new THREE.DirectionalLight(0xC4B5FD, 0.3);
+    const fillLight = new THREE.DirectionalLight(0xD4AF37, 0.3);
     fillLight.position.set(-40, 40, -20);
     scene.add(fillLight);
 
-    const rimLight = new THREE.DirectionalLight(0xA78BFA, 0.2);
+    const rimLight = new THREE.DirectionalLight(0xB89530, 0.2);
     rimLight.position.set(0, 20, -60);
     scene.add(rimLight);
 

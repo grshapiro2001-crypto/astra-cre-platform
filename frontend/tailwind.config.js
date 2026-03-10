@@ -70,8 +70,8 @@ export default {
         sm: "calc(var(--radius) - 4px)",
       },
       fontFamily: {
-        sans: ['Instrument Sans', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
-        display: ['Syne', 'sans-serif'],
+        sans: ['Questrial', 'sans-serif'],
+        display: ['Cinzel', 'serif'],
         mono: ['JetBrains Mono', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
       },
       fontSize: {

@@ -259,28 +259,28 @@ function getPropertyMetric(
 
 function getScoreHex(score: number): string {
   if (score >= 80) return '#10b981';
-  if (score >= 60) return '#8b5cf6';
+  if (score >= 60) return '#D4AF37';
   if (score >= 40) return '#f59e0b';
   return '#f43f5e';
 }
 
 function getScoreColorClass(score: number): string {
   if (score >= 80) return 'text-emerald-500 dark:text-emerald-400';
-  if (score >= 60) return 'text-violet-500 dark:text-violet-400';
+  if (score >= 60) return 'text-amber-500 dark:text-amber-400';
   if (score >= 40) return 'text-amber-500 dark:text-amber-400';
   return 'text-rose-500 dark:text-rose-400';
 }
 
 function getScoreBgClass(score: number): string {
   if (score >= 80) return 'bg-emerald-500/10 dark:bg-emerald-500/15';
-  if (score >= 60) return 'bg-violet-500/10 dark:bg-violet-500/15';
+  if (score >= 60) return 'bg-amber-500/10 dark:bg-amber-500/15';
   if (score >= 40) return 'bg-amber-500/10 dark:bg-amber-500/15';
   return 'bg-rose-500/10 dark:bg-rose-500/15';
 }
 
 function getScoreBarBg(score: number): string {
   if (score >= 80) return 'bg-emerald-500';
-  if (score >= 60) return 'bg-violet-500';
+  if (score >= 60) return 'bg-amber-500';
   if (score >= 40) return 'bg-amber-500';
   return 'bg-rose-500';
 }
@@ -369,7 +369,7 @@ function isBestEconomicOccupancy(
 // Constants
 // ============================================================
 
-const PROPERTY_COLORS = ['#8b5cf6', '#10b981', '#f59e0b', '#f43f5e', '#0ea5e9'];
+const PROPERTY_COLORS = ['#D4AF37', '#10b981', '#f59e0b', '#f43f5e', '#0ea5e9'];
 
 const METRIC_DEFS: Record<CompMetricKey, MetricDef> = {
   going_in_cap: {
@@ -1430,11 +1430,11 @@ export const ComparisonPage = () => {
                   Deal Comparison
                 </h1>
                 <p className="text-sm mt-0.5 text-muted-foreground">
-                  <span className="font-mono text-primary">
+                  <span className="font-display text-primary">
                     {properties.length}
                   </span>{' '}
                   properties{' '}
-                  <span className="font-mono ml-1">
+                  <span className="font-display ml-1">
                     {formatPrice(totalValue)}
                   </span>{' '}
                   total
@@ -1638,7 +1638,7 @@ export const ComparisonPage = () => {
                             <div className="absolute inset-0 flex items-center justify-center">
                               <span
                                 className={cn(
-                                  'font-mono text-lg font-bold',
+                                  'font-display text-lg font-bold',
                                   getScoreColorClass(scoreTotal)
                                 )}
                               >
@@ -1654,7 +1654,7 @@ export const ComparisonPage = () => {
                             <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
                               Units
                             </p>
-                            <p className="font-mono text-base font-semibold text-foreground">
+                            <p className="font-display text-base font-semibold text-foreground">
                               {property.total_units?.toLocaleString() ?? EM_DASH}
                             </p>
                           </div>
@@ -1662,7 +1662,7 @@ export const ComparisonPage = () => {
                             <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
                               Year Built
                             </p>
-                            <p className="font-mono text-base font-semibold text-foreground">
+                            <p className="font-display text-base font-semibold text-foreground">
                               {property.year_built ?? EM_DASH}
                             </p>
                           </div>
@@ -1703,7 +1703,7 @@ export const ComparisonPage = () => {
                                     }}
                                   />
                                 </div>
-                                <span className="font-mono text-xs w-16 text-right text-foreground">
+                                <span className="font-display text-xs w-16 text-right text-foreground">
                                   {def.format(metricValue)}
                                 </span>
                               </div>
@@ -1797,7 +1797,7 @@ export const ComparisonPage = () => {
                                 </span>
                               )}
                             </div>
-                            <span className="text-xs text-muted-foreground font-mono">
+                            <span className="text-xs text-muted-foreground font-display">
                               Target: {def.format(scoring.target)}
                             </span>
                           </div>
@@ -1875,7 +1875,7 @@ export const ComparisonPage = () => {
                                           : '0%',
                                       }}
                                     />
-                                    <span className="absolute right-3 top-1/2 -translate-y-1/2 font-mono text-sm font-semibold text-foreground">
+                                    <span className="absolute right-3 top-1/2 -translate-y-1/2 font-display text-sm font-semibold text-foreground">
                                       {def.format(pv.value)}
                                     </span>
                                   </div>
@@ -1896,7 +1896,7 @@ export const ComparisonPage = () => {
                                   {property.property_name}
                                 </span>
                                 <div className="flex-1 h-8 rounded-lg flex items-center justify-center bg-muted">
-                                  <span className="font-mono text-sm text-muted-foreground">
+                                  <span className="font-display text-sm text-muted-foreground">
                                     N/A
                                   </span>
                                 </div>
@@ -1931,7 +1931,7 @@ export const ComparisonPage = () => {
                       <span className="text-sm text-muted-foreground">
                         Target Cap Rate
                       </span>
-                      <span className="font-mono text-lg font-bold text-primary">
+                      <span className="font-display text-lg font-bold text-primary">
                         {sensitivityCapRate.toFixed(2)}%
                       </span>
                     </div>
@@ -1946,7 +1946,7 @@ export const ComparisonPage = () => {
                       }
                       className="w-full accent-primary"
                     />
-                    <div className="flex justify-between text-xs mt-1 text-muted-foreground font-mono">
+                    <div className="flex justify-between text-xs mt-1 text-muted-foreground font-display">
                       <span>3.00%</span>
                       <span>8.00%</span>
                     </div>
@@ -1972,7 +1972,7 @@ export const ComparisonPage = () => {
                             </span>
                             <span
                               className={cn(
-                                'text-xs font-mono font-semibold whitespace-nowrap',
+                                'text-xs font-display font-semibold whitespace-nowrap',
                                 impact.priceChange < 0
                                   ? 'text-emerald-500 dark:text-emerald-400'
                                   : 'text-rose-500 dark:text-rose-400'
@@ -1987,7 +1987,7 @@ export const ComparisonPage = () => {
                               <span className="text-muted-foreground">
                                 New Price:{' '}
                               </span>
-                              <span className="font-mono text-foreground">
+                              <span className="font-display text-foreground">
                                 {formatPrice(impact.newPrice)}
                               </span>
                             </div>
@@ -1997,7 +1997,7 @@ export const ComparisonPage = () => {
                               </span>
                               <span
                                 className={cn(
-                                  'font-mono',
+                                  'font-display',
                                   impact.priceChangePct < 0
                                     ? 'text-emerald-500 dark:text-emerald-400'
                                     : 'text-rose-500 dark:text-rose-400'
@@ -2068,7 +2068,7 @@ export const ComparisonPage = () => {
                             </p>
                           </div>
                           <div className="text-right">
-                            <p className="font-mono font-bold text-emerald-500 dark:text-emerald-400">
+                            <p className="font-display font-bold text-emerald-500 dark:text-emerald-400">
                               {def.format(winner.value)}
                             </p>
                           </div>
@@ -2099,7 +2099,7 @@ export const ComparisonPage = () => {
                         {scoredProperties[0].property.property_name}
                       </strong>{' '}
                       leads with a score of{' '}
-                      <strong className="font-mono">
+                      <strong className="font-display">
                         {scoredProperties[0].score?.total ?? 0}
                       </strong>
                       .
@@ -2153,7 +2153,7 @@ export const ComparisonPage = () => {
                       </span>
                       <span
                         className={cn(
-                          'font-mono text-xs',
+                          'font-display text-xs',
                           getScoreColorClass(sp.score?.total ?? 0)
                         )}
                       >
@@ -2242,7 +2242,7 @@ export const ComparisonPage = () => {
                     tableSortByScore ? 'text-primary' : 'text-muted-foreground'
                   )} />
                   {tableSortByScore && (
-                    <span className="text-[10px] text-primary font-mono">
+                    <span className="text-[10px] text-primary font-display">
                       {tableSortByScore === 'desc' ? 'Hi\u2013Lo' : 'Lo\u2013Hi'}
                     </span>
                   )}
@@ -2329,7 +2329,7 @@ export const ComparisonPage = () => {
                           >
                             <span
                               className={cn(
-                                'font-mono text-sm inline-flex items-center gap-1 px-2 py-1 rounded-lg transition-all',
+                                'font-display text-sm inline-flex items-center gap-1 px-2 py-1 rounded-lg transition-all',
                                 isBest && 'font-bold',
                                 isBest
                                   ? 'text-emerald-600 dark:text-emerald-400'

@@ -491,9 +491,9 @@ export const Dashboard = () => {
                     {(screeningCounts.pass + screeningCounts.review + screeningCounts.fail) > 0 && (
                       <div className="hidden sm:flex items-center gap-1 px-3 py-1.5 rounded-lg bg-card border border-border/60 text-xs">
                         <span className="text-muted-foreground font-medium mr-1">Screening:</span>
-                        <span className="px-1.5 py-0.5 rounded bg-green-500/10 text-green-400 font-mono font-bold">{screeningCounts.pass} Pass</span>
-                        <span className="px-1.5 py-0.5 rounded bg-yellow-500/10 text-yellow-400 font-mono font-bold">{screeningCounts.review} Review</span>
-                        <span className="px-1.5 py-0.5 rounded bg-red-500/10 text-red-400 font-mono font-bold">{screeningCounts.fail} Fail</span>
+                        <span className="px-1.5 py-0.5 rounded bg-green-500/10 text-green-400 font-display font-bold">{screeningCounts.pass} Pass</span>
+                        <span className="px-1.5 py-0.5 rounded bg-yellow-500/10 text-yellow-400 font-display font-bold">{screeningCounts.review} Review</span>
+                        <span className="px-1.5 py-0.5 rounded bg-red-500/10 text-red-400 font-display font-bold">{screeningCounts.fail} Fail</span>
                       </div>
                     )}
 
@@ -521,7 +521,7 @@ export const Dashboard = () => {
                     <div className="flex gap-3 items-start">
                       <div className="flex-shrink-0 w-[195px] border border-border/60 rounded-2xl bg-card/50 p-4">
                         <div className="flex items-center justify-between mb-2">
-                          <span className="font-mono text-2xs uppercase tracking-wider text-muted-foreground font-semibold">
+                          <span className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-muted-foreground">
                             Total Volume
                           </span>
                           <Sparkline values={volumeSparkline} color="hsl(var(--primary))" />
@@ -533,7 +533,7 @@ export const Dashboard = () => {
 
                       <div className="flex-shrink-0 w-[195px] border border-border/60 rounded-2xl bg-card/50 p-4">
                         <div className="flex items-center justify-between mb-2">
-                          <span className="font-mono text-2xs uppercase tracking-wider text-muted-foreground font-semibold">
+                          <span className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-muted-foreground">
                             Total Units
                           </span>
                           <Sparkline values={unitSparkline} color="#60A5FA" />
@@ -541,7 +541,7 @@ export const Dashboard = () => {
                         <p className="font-display text-xl font-bold text-blue-400">
                           {totalUnits.toLocaleString()}
                         </p>
-                        <p className="font-mono text-2xs text-muted-foreground mt-0.5">
+                        <p className="font-sans text-[10px] text-muted-foreground mt-0.5">
                           {deals.length} properties
                         </p>
                       </div>

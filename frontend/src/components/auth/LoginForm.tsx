@@ -4,7 +4,7 @@ import { useAuthStore } from '@/store/authSlice';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { TalismanLogo } from '@/components/ui/TalismanLogo';
+import TalismanCompass3D from '@/components/TalismanCompass3D';
 
 export const LoginForm = () => {
   const navigate = useNavigate();
@@ -26,11 +26,11 @@ export const LoginForm = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-950 via-slate-950 to-purple-950 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full bg-white/95 backdrop-blur-md rounded-xl shadow-2xl border border-purple-200/20 p-8">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-950 via-slate-950 to-amber-950 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full bg-white/95 backdrop-blur-md rounded-xl shadow-2xl border border-amber-200/20 p-8">
         <div className="text-center mb-6">
           <div className="flex justify-center mb-4">
-            <TalismanLogo className="w-14 h-14" />
+            <TalismanCompass3D size={56} />
           </div>
           <h2 className="text-2xl font-bold font-display text-gray-900">
             Sign in to <span className="text-primary">Talisman IO</span>
@@ -60,7 +60,7 @@ export const LoginForm = () => {
                 autoComplete="email"
                 required
                 placeholder="Enter your email"
-                className="border-purple-200/50 focus:border-primary focus:ring-primary/20"
+                className="border-amber-200/50 focus:border-primary focus:ring-primary/20"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
@@ -74,7 +74,7 @@ export const LoginForm = () => {
                 autoComplete="current-password"
                 required
                 placeholder="Enter your password"
-                className="border-purple-200/50 focus:border-primary focus:ring-primary/20"
+                className="border-amber-200/50 focus:border-primary focus:ring-primary/20"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />

@@ -69,12 +69,12 @@ export const PricingAnalysis = ({ financials_by_period, initialPricingGuidance }
     : null;
 
   return (
-    <div className="bg-gradient-to-br from-indigo-50 to-purple-50 shadow-lg rounded-lg p-6 border-2 border-indigo-200">
+    <div className="bg-gradient-to-br from-amber-50 to-yellow-50 shadow-lg rounded-lg p-6 border-2 border-amber-200">
       <div className="flex items-center mb-4">
-        <svg className="h-6 w-6 text-indigo-600 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg className="h-6 w-6 text-amber-600 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
         </svg>
-        <h3 className="text-2xl font-bold text-indigo-900">PRICING ANALYSIS</h3>
+        <h3 className="text-2xl font-bold text-amber-900">PRICING ANALYSIS</h3>
       </div>
 
       {/* Input Field */}
@@ -87,7 +87,7 @@ export const PricingAnalysis = ({ financials_by_period, initialPricingGuidance }
           value={displayValue}
           onChange={handleInputChange}
           placeholder="Enter pricing guidance (e.g., $30,000,000)"
-          className="w-full px-4 py-3 text-2xl font-bold border-2 border-indigo-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+          className="w-full px-4 py-3 text-2xl font-bold border-2 border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
         />
       </div>
 
@@ -97,10 +97,10 @@ export const PricingAnalysis = ({ financials_by_period, initialPricingGuidance }
           <h4 className="text-lg font-semibold text-gray-800 mb-3">Auto-Calculated Cap Rates:</h4>
 
           {/* Proforma/Y1 Cap Rate */}
-          <div className="bg-white p-4 rounded-lg border border-indigo-200">
+          <div className="bg-white p-4 rounded-lg border border-amber-200">
             <div className="flex justify-between items-center mb-2">
-              <span className="text-sm font-semibold text-indigo-800">{proformaLabel} Cap Rate</span>
-              <span className="text-3xl font-bold text-indigo-900">
+              <span className="text-sm font-semibold text-amber-800">{proformaLabel} Cap Rate</span>
+              <span className="text-3xl font-bold text-amber-900">
                 {proformaCapRate != null ? `${proformaCapRate.toFixed(2)}%` : 'N/A'}
               </span>
             </div>
@@ -109,7 +109,7 @@ export const PricingAnalysis = ({ financials_by_period, initialPricingGuidance }
                 <div className="text-xs text-gray-600 mb-1">
                   <strong>Formula:</strong> {proformaLabel} NOI / Pricing Guidance
                 </div>
-                <div className="text-xs font-mono text-gray-700 bg-gray-50 p-2 rounded">
+                <div className="text-xs font-display text-gray-700 bg-gray-50 p-2 rounded">
                   {formatCurrency(proformaNOI)} / {formatCurrency(pricingNumber)} = {proformaCapRate.toFixed(2)}%
                 </div>
               </>
@@ -119,10 +119,10 @@ export const PricingAnalysis = ({ financials_by_period, initialPricingGuidance }
           </div>
 
           {/* Trailing Cap Rate */}
-          <div className="bg-white p-4 rounded-lg border border-indigo-200">
+          <div className="bg-white p-4 rounded-lg border border-amber-200">
             <div className="flex justify-between items-center mb-2">
-              <span className="text-sm font-semibold text-indigo-800">{trailingLabel} Cap Rate</span>
-              <span className="text-3xl font-bold text-indigo-900">
+              <span className="text-sm font-semibold text-amber-800">{trailingLabel} Cap Rate</span>
+              <span className="text-3xl font-bold text-amber-900">
                 {trailingCapRate != null ? `${trailingCapRate.toFixed(2)}%` : 'N/A'}
               </span>
             </div>
@@ -131,7 +131,7 @@ export const PricingAnalysis = ({ financials_by_period, initialPricingGuidance }
                 <div className="text-xs text-gray-600 mb-1">
                   <strong>Formula:</strong> {trailingLabel} NOI / Pricing Guidance
                 </div>
-                <div className="text-xs font-mono text-gray-700 bg-gray-50 p-2 rounded">
+                <div className="text-xs font-display text-gray-700 bg-gray-50 p-2 rounded">
                   {formatCurrency(trailingNOI)} / {formatCurrency(pricingNumber)} = {trailingCapRate.toFixed(2)}%
                 </div>
               </>

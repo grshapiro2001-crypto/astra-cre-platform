@@ -192,7 +192,7 @@ export default function FloorPlanOverlay({
               className={cn(
                 'px-3 py-1 text-xs rounded-md transition-colors',
                 activeFloor === f.floor
-                  ? 'bg-violet-600 text-white'
+                  ? 'bg-amber-600 text-white'
                   : hasImage
                     ? 'bg-white/5 text-muted-foreground hover:bg-white/10 hover:text-white'
                     : 'bg-white/[0.02] text-muted-foreground/40 cursor-not-allowed',
@@ -214,7 +214,7 @@ export default function FloorPlanOverlay({
         {/* Loading state */}
         {imageUrl && !imageLoaded && !imageError && (
           <div className="absolute inset-0 flex items-center justify-center z-10">
-            <Loader2 className="w-8 h-8 text-violet-400 animate-spin" />
+            <Loader2 className="w-8 h-8 text-amber-400 animate-spin" />
           </div>
         )}
 

@@ -210,7 +210,7 @@ function EffortBadge({ effort }: { effort: 'Low' | 'Med' | 'High' }) {
 }
 
 function ImpactBadge({ impact }: { impact: 'Low' | 'Med' | 'High' }) {
-  const colors = { Low: 'text-slate-400', Med: 'text-blue-400', High: 'text-purple-400' };
+  const colors = { Low: 'text-slate-400', Med: 'text-blue-400', High: 'text-primary' };
   return <span className={`text-xs font-mono ${colors[impact]}`}>Impact:{impact}</span>;
 }
 
@@ -243,8 +243,8 @@ export function CommandCenter() {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center space-y-3">
-          <div className="w-16 h-16 rounded-full bg-purple-500/10 flex items-center justify-center mx-auto">
-            <Terminal className="w-8 h-8 text-purple-400" />
+          <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
+            <Terminal className="w-8 h-8 text-primary" />
           </div>
           <p className="text-slate-400 text-sm">Access restricted</p>
         </div>
@@ -300,7 +300,7 @@ export function CommandCenter() {
       {/* ── Header ── */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-600 to-violet-800 flex items-center justify-center shadow-lg shadow-purple-900/30">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-600 to-yellow-800 flex items-center justify-center shadow-lg shadow-amber-900/30">
             <Terminal className="w-5 h-5 text-white" />
           </div>
           <div>
@@ -316,7 +316,7 @@ export function CommandCenter() {
             href="https://talisman-io.vercel.app"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1 text-xs text-slate-400 hover:text-purple-400 transition-colors"
+            className="flex items-center gap-1 text-xs text-slate-400 hover:text-primary transition-colors"
           >
             <ExternalLink className="w-3 h-3" /> Live App
           </a>
@@ -326,7 +326,7 @@ export function CommandCenter() {
       {/* ── Vitals Strip ── */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
         {[
-          { label: 'Total PRs', value: ANALYTICS.totalPRs, icon: GitBranch, color: 'text-purple-400' },
+          { label: 'Total PRs', value: ANALYTICS.totalPRs, icon: GitBranch, color: 'text-primary' },
           { label: 'PRs Since Feb 26', value: `${ANALYTICS.prsSinceFeb26}+`, icon: TrendingUp, color: 'text-blue-400' },
           { label: 'Open Bugs', value: ANALYTICS.openBugs, icon: Bug, color: 'text-orange-400' },
           { label: 'Critical Bugs', value: ANALYTICS.criticalBugs, icon: AlertTriangle, color: 'text-red-400' },
@@ -366,8 +366,8 @@ export function CommandCenter() {
                   onClick={() => setBugFilter(f)}
                   className={`text-xs px-3 py-1.5 rounded-full border transition-all ${
                     bugFilter === f
-                      ? 'bg-purple-600 border-purple-500 text-white'
-                      : 'border-border/60 text-slate-400 hover:border-purple-500/50'
+                      ? 'bg-primary border-primary text-white'
+                      : 'border-border/60 text-slate-400 hover:border-primary/50'
                   }`}
                 >
                   {f}
@@ -380,8 +380,8 @@ export function CommandCenter() {
                   onClick={() => setBugStatusFilter(f)}
                   className={`text-xs px-3 py-1.5 rounded-full border transition-all ${
                     bugStatusFilter === f
-                      ? 'bg-purple-600 border-purple-500 text-white'
-                      : 'border-border/60 text-slate-400 hover:border-purple-500/50'
+                      ? 'bg-primary border-primary text-white'
+                      : 'border-border/60 text-slate-400 hover:border-primary/50'
                   }`}
                 >
                   {f}
@@ -392,7 +392,7 @@ export function CommandCenter() {
               size="sm"
               variant="outline"
               onClick={() => setShowBugForm(v => !v)}
-              className="gap-1.5 border-purple-500/40 text-purple-400 hover:bg-purple-500/10"
+              className="gap-1.5 border-primary/40 text-primary hover:bg-primary/10"
             >
               <Plus className="w-3.5 h-3.5" /> Log Bug
             </Button>
@@ -400,8 +400,8 @@ export function CommandCenter() {
 
           {/* Bug Logger Form */}
           {showBugForm && (
-            <Card className="bg-card/60 border-purple-500/30 p-4 space-y-3">
-              <p className="text-sm font-semibold text-purple-400">Log New Bug</p>
+            <Card className="bg-card/60 border-primary/30 p-4 space-y-3">
+              <p className="text-sm font-semibold text-primary">Log New Bug</p>
               <div className="grid grid-cols-2 gap-3">
                 <Input
                   placeholder="Bug ID (e.g. BUG-017)"
@@ -438,7 +438,7 @@ export function CommandCenter() {
                 />
               </div>
               <div className="flex gap-2">
-                <Button size="sm" onClick={logNewBug} className="bg-purple-600 hover:bg-purple-700">Save Bug</Button>
+                <Button size="sm" onClick={logNewBug} className="bg-primary hover:bg-amber-700">Save Bug</Button>
                 <Button size="sm" variant="ghost" onClick={() => setShowBugForm(false)}>Cancel</Button>
               </div>
             </Card>
@@ -455,7 +455,7 @@ export function CommandCenter() {
                 className={`flex items-start gap-4 p-4 rounded-xl border transition-all ${
                   bug.status === 'Fixed'
                     ? 'bg-emerald-500/5 border-emerald-500/20 opacity-60'
-                    : 'bg-card/40 border-border/60 hover:border-purple-500/30'
+                    : 'bg-card/40 border-border/60 hover:border-primary/30'
                 }`}
               >
                 <div className="flex flex-col items-start gap-1 min-w-[80px]">
@@ -547,7 +547,7 @@ export function CommandCenter() {
               </CardHeader>
               <CardContent className="space-y-3">
                 {[
-                  { label: 'Total PRs (all time)', value: '94', color: 'text-purple-400' },
+                  { label: 'Total PRs (all time)', value: '94', color: 'text-primary' },
                   { label: 'PRs since Feb 26', value: '47+', color: 'text-blue-400' },
                   { label: 'Avg PRs/day (since Feb 26)', value: '~4.7', color: 'text-cyan-400' },
                   { label: 'Largest feature sprint', value: 'Stacking (30 PRs)', color: 'text-orange-400' },
@@ -598,7 +598,7 @@ export function CommandCenter() {
                     <p className="text-xs text-slate-500">{label}</p>
                     {url ? (
                       <a href={url} target="_blank" rel="noopener noreferrer"
-                        className="text-xs text-purple-400 hover:underline block truncate">
+                        className="text-xs text-primary hover:underline block truncate">
                         {status}
                       </a>
                     ) : (
@@ -611,7 +611,7 @@ export function CommandCenter() {
                 <p className="text-xs text-slate-500 mb-2">Deals in Database</p>
                 <div className="flex gap-3">
                   {['The Skylark', 'Adley City Springs', '1160 Hammond'].map(deal => (
-                    <span key={deal} className="text-xs bg-purple-500/10 border border-purple-500/20 text-purple-400 px-2 py-1 rounded-md">
+                    <span key={deal} className="text-xs bg-primary/10 border border-primary/20 text-primary px-2 py-1 rounded-md">
                       {deal}
                     </span>
                   ))}
@@ -621,16 +621,16 @@ export function CommandCenter() {
           </Card>
 
           {/* Analytics Coming Soon Banner */}
-          <Card className="bg-gradient-to-r from-purple-900/20 to-violet-900/10 border-purple-500/20">
+          <Card className="bg-gradient-to-r from-amber-900/20 to-yellow-900/10 border-primary/20">
             <CardContent className="pt-5 pb-4">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center flex-shrink-0">
-                  <BarChart3 className="w-4 h-4 text-purple-400" />
+                <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center flex-shrink-0">
+                  <BarChart3 className="w-4 h-4 text-primary" />
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-foreground">Real User Analytics — Not Yet Instrumented</p>
                   <p className="text-xs text-slate-400 mt-0.5">
-                    Integrate <span className="text-purple-300">PostHog</span> or <span className="text-purple-300">Mixpanel</span> to track:
+                    Integrate <span className="text-amber-300">PostHog</span> or <span className="text-amber-300">Mixpanel</span> to track:
                     uploads/week, page views, deal pipeline velocity, session duration, feature adoption.
                     This is Feature F-012 in the backlog.
                   </p>
@@ -652,12 +652,12 @@ export function CommandCenter() {
                   <div
                     className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm whitespace-pre-wrap ${
                       msg.role === 'user'
-                        ? 'bg-purple-600 text-white rounded-br-sm'
+                        ? 'bg-primary text-white rounded-br-sm'
                         : 'bg-card/70 border border-border/60 text-foreground rounded-bl-sm'
                     }`}
                   >
                     {msg.content}
-                    <p className={`text-xs mt-1 ${msg.role === 'user' ? 'text-purple-200' : 'text-slate-500'}`}>
+                    <p className={`text-xs mt-1 ${msg.role === 'user' ? 'text-amber-200' : 'text-slate-500'}`}>
                       {msg.timestamp}
                     </p>
                   </div>
@@ -677,7 +677,7 @@ export function CommandCenter() {
                 <button
                   key={prompt}
                   onClick={() => { setAgentInput(prompt); }}
-                  className="text-xs px-3 py-1.5 rounded-full border border-purple-500/30 text-purple-400 hover:bg-purple-500/10 transition-colors"
+                  className="text-xs px-3 py-1.5 rounded-full border border-primary/30 text-primary hover:bg-primary/10 transition-colors"
                 >
                   {prompt}
                 </button>
@@ -692,7 +692,7 @@ export function CommandCenter() {
                 placeholder="Ask about bugs, PRs, features, production status..."
                 className="bg-card/60 border-border/60 flex-1"
               />
-              <Button onClick={sendAgentMessage} className="bg-purple-600 hover:bg-purple-700 gap-1.5">
+              <Button onClick={sendAgentMessage} className="bg-primary hover:bg-amber-700 gap-1.5">
                 <Send className="w-4 h-4" />
               </Button>
             </div>
@@ -706,13 +706,13 @@ export function CommandCenter() {
             <Card className="bg-card/50 border-border/60">
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
-                  <GitBranch className="w-4 h-4 text-purple-400" /> Recent Merged PRs
+                  <GitBranch className="w-4 h-4 text-primary" /> Recent Merged PRs
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
                 {RECENT_PRS.map(pr => (
                   <div key={pr.id} className="flex items-start gap-3 p-2 rounded-lg hover:bg-background/60 transition-colors">
-                    <span className="text-xs font-mono text-purple-400 flex-shrink-0 mt-0.5">{pr.id}</span>
+                    <span className="text-xs font-mono text-primary flex-shrink-0 mt-0.5">{pr.id}</span>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs text-foreground leading-snug">{pr.title}</p>
                       <p className="text-xs text-slate-500 mt-0.5">{pr.date}</p>
@@ -724,7 +724,7 @@ export function CommandCenter() {
                   href="https://github.com/grshapiro2001-crypto/talisman-io/pulls?q=is%3Apr+is%3Amerged"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-xs text-purple-400 hover:underline pt-2"
+                  className="flex items-center gap-1 text-xs text-primary hover:underline pt-2"
                 >
                   <ExternalLink className="w-3 h-3" /> View all PRs on GitHub
                 </a>
@@ -775,7 +775,7 @@ export function CommandCenter() {
                       prs: 'PRs #62–94 (~30 PRs)',
                       files: '9 new components + 3 backend services',
                       description: 'Three.js building model, rent roll parser, floor plan overlay, satellite extraction',
-                      color: 'border-purple-500/30 bg-purple-500/5',
+                      color: 'border-primary/30 bg-primary/5',
                     },
                     {
                       area: 'Organizations',

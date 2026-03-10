@@ -31,9 +31,9 @@ export const MainLayout = () => {
     <div className="min-h-screen bg-background relative overflow-x-hidden">
       {/* Ambient background orbs (dark mode only) */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden dark:block hidden" aria-hidden="true">
-        <div className="absolute -top-40 -right-40 w-96 h-96 rounded-full bg-violet-500/[0.03] blur-3xl animate-float" />
+        <div className="absolute -top-40 -right-40 w-96 h-96 rounded-full bg-amber-500/[0.03] blur-3xl animate-float" />
         <div className="absolute top-1/3 -left-20 w-72 h-72 rounded-full bg-emerald-500/[0.03] blur-3xl animate-float-slow" />
-        <div className="absolute bottom-20 right-1/4 w-80 h-80 rounded-full bg-purple-500/[0.02] blur-3xl animate-float" />
+        <div className="absolute bottom-20 right-1/4 w-80 h-80 rounded-full bg-primary/[0.02] blur-3xl animate-float" />
       </div>
 
       {/* Desktop Sidebar */}

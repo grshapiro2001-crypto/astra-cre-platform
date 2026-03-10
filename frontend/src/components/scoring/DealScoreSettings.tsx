@@ -57,7 +57,7 @@ const PRESET_CARDS: PresetConfig[] = [
     name: 'Value-Add',
     description: 'Maximize upside through renovations & repositioning',
     icon: TrendingUp,
-    color: 'text-purple-400',
+    color: 'text-primary',
   },
   {
     key: 'cash_flow',
