@@ -14,7 +14,7 @@ import {
   Users,
   Shield,
 } from 'lucide-react';
-import { TalismanLogo } from '@/components/ui/TalismanLogo';
+import TalismanCompass3D from '@/components/TalismanCompass3D';
 
 const ADMIN_EMAILS = ['griffinshapiro11182001@gmail.com', 'grshap2001@gmail.com'];
 
@@ -76,7 +76,7 @@ export const Sidebar = () => {
         )}
       >
         <div className="flex items-center gap-2.5">
-          <TalismanLogo className="w-8 h-8" />
+          <TalismanCompass3D size={36} spin={true} speed={1.0} />
           {!sidebarCollapsed && (
             <h1 className="text-lg font-bold font-display tracking-tight">
               <span className="text-white">Talisman</span>
@@ -304,7 +304,7 @@ export const MobileSidebar = () => {
         {/* Logo */}
         <div className="flex items-center h-16 px-5 border-b border-white/5">
           <div className="flex items-center gap-2.5">
-            <TalismanLogo className="w-8 h-8" />
+            <TalismanCompass3D size={36} spin={true} speed={1.0} />
             <h1 className="text-lg font-bold font-display tracking-tight">
               <span className="text-white">Talisman</span>
               <span className="text-amber-300/70 ml-1 font-normal text-xs">IO</span>
