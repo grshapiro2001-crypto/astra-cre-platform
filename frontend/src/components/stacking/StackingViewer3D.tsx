@@ -74,43 +74,43 @@ function precomputeRowWidths(
 
 // ─── Material palette — Lumen/Beans.AI inspired dark theme ───────────────────
 const MATERIALS = {
-  // Occupied unit: unified blue-grey facade
+  // Occupied unit: warm dark gold-brown facade
   occupied: new THREE.MeshPhysicalMaterial({
-    color: 0x2d3561,
+    color: 0x3d3525,
     metalness: 0.2,
     roughness: 0.5,
     transparent: true,
     opacity: 0.9,
-    emissive: 0x1a1a3e,
+    emissive: 0x1a1510,
     emissiveIntensity: 0.1,
     clearcoat: 0.2,
     clearcoatRoughness: 0.3,
   }),
   // Vacant unit: same facade base (status shown via stripe)
   vacant: new THREE.MeshPhysicalMaterial({
-    color: 0x2d3561,
+    color: 0x3d3525,
     metalness: 0.2,
     roughness: 0.5,
     transparent: true,
     opacity: 0.9,
-    emissive: 0x1a1a3e,
+    emissive: 0x1a1510,
     emissiveIntensity: 0.1,
     clearcoat: 0.2,
     clearcoatRoughness: 0.3,
   }),
   // No data: darker facade
   noData: new THREE.MeshPhysicalMaterial({
-    color: 0x1a1a3e,
+    color: 0x1a1815,
     metalness: 0.15,
     roughness: 0.6,
     transparent: true,
     opacity: 0.85,
-    emissive: 0x0f0f2a,
+    emissive: 0x0f0e08,
     emissiveIntensity: 0.05,
   }),
   // Floor slab: dark concrete look with subtle faceted appearance
   slab: new THREE.MeshStandardMaterial({
-    color: 0x1A1A2E,
+    color: 0x1a1815,
     metalness: 0.35,
     roughness: 0.75,
     transparent: true,
@@ -147,7 +147,7 @@ const MATERIALS = {
   }),
   // Ground plane
   ground: new THREE.MeshStandardMaterial({
-    color: 0x0D0D1A,
+    color: 0x0D0B08,
     metalness: 0.0,
     roughness: 1.0,
     transparent: true,
@@ -155,29 +155,29 @@ const MATERIALS = {
   }),
   // Window band: glass between floors
   windowBand: new THREE.MeshPhysicalMaterial({
-    color: 0x88aacc,
+    color: 0xaa9870,
     metalness: 0.3,
     roughness: 0.1,
     transparent: true,
     opacity: 0.7,
-    emissive: 0x446688,
+    emissive: 0x554830,
     emissiveIntensity: 0.1,
   }),
   // Window recess: dark glass inset on unit exterior faces
   windowRecess: new THREE.MeshPhysicalMaterial({
-    color: 0x0a0a1e,
+    color: 0x0a0908,
     metalness: 0.4,
     roughness: 0.1,
     transparent: true,
     opacity: 0.7,
-    emissive: new THREE.Color(0x111133),
+    emissive: new THREE.Color(0x111008),
     emissiveIntensity: 0.05,
   }),
 };
 
 // Edge line material for unit borders
 const EDGE_LINE_MATERIAL = new THREE.LineBasicMaterial({
-  color: 0x1E1B4B,
+  color: 0x2a2520,
   transparent: true,
   opacity: 0.4,
 });
@@ -780,7 +780,7 @@ function applyFilterToScene(
         color = statusToColor(ud.status);
         break;
       case 'floor_level':
-        color = lerpColor(0x1E3A5F, 0x38BDF8, (ud.floor - 1) / Math.max(stats.maxFloor - 1, 1));
+        color = lerpColor(0x5C4A1E, 0xD4AF37, (ud.floor - 1) / Math.max(stats.maxFloor - 1, 1));
         break;
       case 'expirations':
         color = getExpirationColor(ud.rentRollUnit?.lease_end, refDate);
@@ -792,7 +792,7 @@ function applyFilterToScene(
         color = getRentGradientColor(ud.rentRollUnit?.market_rent, stats.minMarketRent, stats.maxMarketRent, 0x1E3A5F, 0xF59E0B);
         break;
       case 'contract_rents':
-        color = getRentGradientColor(ud.rentRollUnit?.in_place_rent, stats.minContractRent, stats.maxContractRent, 0x1E3A5F, 0x8B5CF6);
+        color = getRentGradientColor(ud.rentRollUnit?.in_place_rent, stats.minContractRent, stats.maxContractRent, 0x1E3A5F, 0xD4AF37);
         break;
       default:
         color = statusToColor(ud.status);
@@ -1677,7 +1677,7 @@ function createBuildingLabel(text: string, position: THREE.Vector3): THREE.Sprit
   ctx.fillStyle = 'rgba(0, 0, 0, 0)';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.font = 'bold 28px sans-serif';
-  ctx.fillStyle = '#A78BFA';
+  ctx.fillStyle = '#D4AF37';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(text, canvas.width / 2, canvas.height / 2);
@@ -1869,8 +1869,8 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
 
     // ── Scene ──
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x1a1a2e);
-    scene.fog = new THREE.FogExp2(0x1a1a2e, 0.003);
+    scene.background = new THREE.Color(0x1a1815);
+    scene.fog = new THREE.FogExp2(0x1a1815, 0.003);
     sceneRef.current = scene;
 
     // ── Camera ──
@@ -1891,7 +1891,7 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    renderer.setClearColor(0x1a1a2e, 1);
+    renderer.setClearColor(0x1a1815, 1);
     container.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
@@ -1911,7 +1911,7 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
     renderer.domElement.addEventListener('wheel', stopAutoRotate);
 
     // ── Lighting ──
-    const ambient = new THREE.AmbientLight(0x8B8BBA, 0.4);
+    const ambient = new THREE.AmbientLight(0x8B8575, 0.4);
     scene.add(ambient);
 
     const keyLight = new THREE.DirectionalLight(0xFFF5E6, 0.8);
@@ -2247,7 +2247,7 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
     sceneBox.getCenter(sceneCenter);
     const groundSize = Math.max(sceneSize.x, sceneSize.z) + 40;
 
-    const gridHelper = new THREE.GridHelper(groundSize, Math.max(10, Math.floor(groundSize / 2)), 0x2a2a4a, 0x1a1a3a);
+    const gridHelper = new THREE.GridHelper(groundSize, Math.max(10, Math.floor(groundSize / 2)), 0x2a2520, 0x1a1815);
     gridHelper.position.set(sceneCenter.x, -UNIT_HEIGHT * 0.5, sceneCenter.z);
     scene.add(gridHelper);
     const groundGeom = new THREE.PlaneGeometry(groundSize, groundSize);
@@ -2736,7 +2736,7 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
       const rrId = ud.rentRollUnit?.id;
 
       if (selectedIds.size > 0 && rrId && selectedIds.has(rrId)) {
-        mat.emissive.set(0x7C3AED);
+        mat.emissive.set(0xD4AF37);
         mat.emissiveIntensity = 1.0;
         mat.clearcoat = 1.0;
         mat.needsUpdate = true;

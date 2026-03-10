@@ -178,9 +178,9 @@ export default function FloorPlanOverlay({
   );
 
   return (
-    <div className="relative w-full bg-[#0f0f1a] rounded-xl overflow-hidden" style={{ minHeight: 500 }}>
+    <div className="relative w-full bg-[#0f0e08] rounded-xl overflow-hidden" style={{ minHeight: 500 }}>
       {/* Floor tabs */}
-      <div className="flex items-center gap-1 px-4 pt-3 pb-2 bg-[#1a1a2e]/80 border-b border-white/5">
+      <div className="flex items-center gap-1 px-4 pt-3 pb-2 bg-[#1a1815]/80 border-b border-white/5">
         <span className="text-xs text-muted-foreground mr-2">Floor:</span>
         {floors.map((f) => {
           const hasImage = floorImageMap.has(f.floor);
@@ -292,7 +292,7 @@ export default function FloorPlanOverlay({
                             'transition-all duration-150 hover:scale-110 hover:z-10',
                             'border border-white/10 hover:border-white/30',
                             'min-w-[36px] min-h-[24px]',
-                            isSelected && 'ring-2 ring-white ring-offset-1 ring-offset-[#0f0f1a] scale-110 z-10',
+                            isSelected && 'ring-2 ring-white ring-offset-1 ring-offset-[#0f0e08] scale-110 z-10',
                           )}
                           style={{
                             backgroundColor: color,

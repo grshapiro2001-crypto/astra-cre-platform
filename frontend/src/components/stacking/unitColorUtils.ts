@@ -6,29 +6,29 @@ import type { RentRollUnit, StackingFilterType } from '../../types/property';
 
 // ─── Color constants ────────────────────────────────────────────────────────
 
-const OCCUPIED = '#7C3AED';
+const OCCUPIED = '#D4AF37';
 const VACANT = '#F43F5E';
-const UNKNOWN = '#3F3F5A';
-const NO_DATA = '#6B7280';
+const UNKNOWN = '#555550';
+const NO_DATA = '#555550';
 
 const EXPIRATION_URGENT = '#EF4444';
 const EXPIRATION_SOON = '#F97316';
 const EXPIRATION_APPROACHING = '#EAB308';
 const EXPIRATION_STABLE = '#22C55E';
-const EXPIRATION_LONG = '#3B82F6';
+const EXPIRATION_LONG = '#D4AF37';
 
-const LTL_AT_MARKET = '#3B82F6';
+const LTL_AT_MARKET = '#22C55E';
 const LTL_LOW = '#22C55E';
 const LTL_MODERATE = '#EAB308';
 const LTL_HIGH = '#F97316';
 const LTL_VERY_HIGH = '#EF4444';
 
-const FLOOR_MIN = '#1E3A5F';
-const FLOOR_MAX = '#38BDF8';
+const FLOOR_MIN = '#5C4A1E';
+const FLOOR_MAX = '#D4AF37';
 const MARKET_RENT_MIN = '#1E3A5F';
 const MARKET_RENT_MAX = '#F59E0B';
 const CONTRACT_RENT_MIN = '#1E3A5F';
-const CONTRACT_RENT_MAX = '#8B5CF6';
+const CONTRACT_RENT_MAX = '#D4AF37';
 
 // ─── Hex color helpers ──────────────────────────────────────────────────────
 
