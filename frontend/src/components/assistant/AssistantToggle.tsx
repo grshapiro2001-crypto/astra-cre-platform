@@ -1,19 +1,25 @@
-import { motion } from 'framer-motion';
-import { MessageSquare } from 'lucide-react';
+import TalismanCompass3D from '@/components/TalismanCompass3D';
 import { useAssistantStore } from '@/store/assistantStore';
 
 export const AssistantToggle = () => {
   const togglePanel = useAssistantStore((s) => s.togglePanel);
 
   return (
-    <motion.button
+    <button
       onClick={togglePanel}
-      whileHover={{ scale: 1.05 }}
-      whileTap={{ scale: 0.95 }}
-      className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/25"
+      style={{
+        position: 'fixed',
+        bottom: 24,
+        right: 24,
+        zIndex: 50,
+        background: 'transparent',
+        border: 'none',
+        cursor: 'pointer',
+        padding: 0,
+      }}
       aria-label="Toggle Talisman Assistant"
     >
-      <MessageSquare className="h-6 w-6" />
-    </motion.button>
+      <TalismanCompass3D size={48} spin={true} speed={1.25} />
+    </button>
   );
 };
