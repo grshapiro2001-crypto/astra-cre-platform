@@ -62,7 +62,7 @@ export const Sidebar = () => {
     <aside
       className={cn(
         'fixed top-0 left-0 z-40 h-screen flex flex-col',
-        'bg-gradient-to-b from-violet-950 via-purple-950 to-indigo-950',
+        'bg-gradient-to-b from-amber-950 via-yellow-950 to-amber-950',
         'border-r border-white/5 transition-all duration-300',
         'hidden lg:flex',
         sidebarCollapsed ? 'w-[72px]' : 'w-64'
@@ -80,7 +80,7 @@ export const Sidebar = () => {
           {!sidebarCollapsed && (
             <h1 className="text-lg font-bold font-display tracking-tight">
               <span className="text-white">Talisman</span>
-              <span className="text-purple-300/70 ml-1 font-normal text-xs">IO</span>
+              <span className="text-amber-300/70 ml-1 font-normal text-xs">IO</span>
             </h1>
           )}
         </div>
@@ -94,9 +94,9 @@ export const Sidebar = () => {
             sidebarCollapsed ? 'justify-center px-0' : 'px-3'
           )}
         >
-          <div className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
+          <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
           {!sidebarCollapsed && (
-            <span className="text-purple-300/60 text-[10px] font-medium uppercase tracking-widest">
+            <span className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-muted-foreground">
               Navigation
             </span>
           )}
@@ -116,7 +116,7 @@ export const Sidebar = () => {
                     : 'px-3 py-2.5',
                   isActive
                     ? 'bg-white/10 text-white shadow-sm border border-white/10'
-                    : 'text-purple-200/70 hover:bg-white/5 hover:text-white'
+                    : 'text-amber-200/70 hover:bg-white/5 hover:text-white'
                 )
               }
               title={sidebarCollapsed ? item.name : undefined}
@@ -174,13 +174,13 @@ export const Sidebar = () => {
       {/* Pipeline Stats */}
       {!sidebarCollapsed && (
         <div className="px-4 py-3 mx-3 mb-3 rounded-xl bg-white/5 border border-white/5">
-          <div className="text-[10px] font-medium uppercase tracking-widest text-purple-300/50 mb-2">
+          <div className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-muted-foreground mb-2">
             Pipeline
           </div>
           <div className="flex justify-between items-baseline">
             <div className="text-right">
               <span className="text-white text-lg font-bold font-mono">{dealCount ?? '\u2014'}</span>
-              <p className="text-purple-300/50 text-[10px] mt-0.5">Active Deals</p>
+              <p className="text-amber-300/50 text-[10px] mt-0.5">Active Deals</p>
             </div>
           </div>
         </div>
@@ -198,7 +198,7 @@ export const Sidebar = () => {
           size="sm"
           onClick={toggleTheme}
           className={cn(
-            'text-purple-200/70 hover:text-white hover:bg-white/5',
+            'text-amber-200/70 hover:text-white hover:bg-white/5',
             sidebarCollapsed ? 'w-11 h-11 p-0' : 'w-full justify-start gap-3 px-3'
           )}
           title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
@@ -229,7 +229,7 @@ export const Sidebar = () => {
             sidebarCollapsed ? 'justify-center' : 'px-3 py-2'
           )}
         >
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shrink-0">
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500 to-yellow-600 flex items-center justify-center shrink-0">
             <span className="text-white text-xs font-bold">{initials}</span>
           </div>
           {!sidebarCollapsed && (
@@ -237,7 +237,7 @@ export const Sidebar = () => {
               <p className="text-white text-sm font-medium truncate">
                 {user?.full_name || 'User'}
               </p>
-              <p className="text-purple-300/50 text-[11px] truncate">
+              <p className="text-amber-300/50 text-[11px] truncate">
                 {user?.email || ''}
               </p>
             </div>
@@ -257,7 +257,7 @@ export const Sidebar = () => {
           size="sm"
           onClick={toggleSidebar}
           className={cn(
-            'text-purple-200/70 hover:text-white hover:bg-white/5',
+            'text-amber-200/70 hover:text-white hover:bg-white/5',
             sidebarCollapsed ? 'w-11 h-11 p-0' : 'w-full justify-start gap-3 px-3'
           )}
           title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
@@ -300,14 +300,14 @@ export const MobileSidebar = () => {
       />
 
       {/* Sidebar */}
-      <aside className="absolute top-0 left-0 h-full w-64 flex flex-col bg-gradient-to-b from-violet-950 via-purple-950 to-indigo-950 border-r border-white/5 shadow-2xl">
+      <aside className="absolute top-0 left-0 h-full w-64 flex flex-col bg-gradient-to-b from-amber-950 via-yellow-950 to-amber-950 border-r border-white/5 shadow-2xl">
         {/* Logo */}
         <div className="flex items-center h-16 px-5 border-b border-white/5">
           <div className="flex items-center gap-2.5">
             <TalismanLogo className="w-8 h-8" />
             <h1 className="text-lg font-bold font-display tracking-tight">
               <span className="text-white">Talisman</span>
-              <span className="text-purple-300/70 ml-1 font-normal text-xs">IO</span>
+              <span className="text-amber-300/70 ml-1 font-normal text-xs">IO</span>
             </h1>
           </div>
         </div>
@@ -315,8 +315,8 @@ export const MobileSidebar = () => {
         {/* Nav */}
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
           <div className="flex items-center gap-2 px-3 mb-3">
-            <div className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
-            <span className="text-purple-300/60 text-[10px] font-medium uppercase tracking-widest">
+            <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+            <span className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-muted-foreground">
               Navigation
             </span>
           </div>
@@ -333,7 +333,7 @@ export const MobileSidebar = () => {
                     'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200',
                     isActive
                       ? 'bg-white/10 text-white shadow-sm border border-white/10'
-                      : 'text-purple-200/70 hover:bg-white/5 hover:text-white'
+                      : 'text-amber-200/70 hover:bg-white/5 hover:text-white'
                   )
                 }
               >
@@ -377,7 +377,7 @@ export const MobileSidebar = () => {
             variant="ghost"
             size="sm"
             onClick={toggleTheme}
-            className="w-full justify-start gap-3 px-3 text-purple-200/70 hover:text-white hover:bg-white/5"
+            className="w-full justify-start gap-3 px-3 text-amber-200/70 hover:text-white hover:bg-white/5"
           >
             {theme === 'dark' ? (
               <Sun className="w-4 h-4 shrink-0" />
@@ -393,14 +393,14 @@ export const MobileSidebar = () => {
         {/* User */}
         <div className="px-3 pb-4 border-t border-white/5 pt-3">
           <div className="flex items-center gap-3 px-3 py-2">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shrink-0">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500 to-yellow-600 flex items-center justify-center shrink-0">
               <span className="text-white text-xs font-bold">{initials}</span>
             </div>
             <div className="overflow-hidden">
               <p className="text-white text-sm font-medium truncate">
                 {user?.full_name || 'User'}
               </p>
-              <p className="text-purple-300/50 text-[11px] truncate">
+              <p className="text-amber-300/50 text-[11px] truncate">
                 {user?.email || ''}
               </p>
             </div>

@@ -164,7 +164,7 @@ const docBadgeClass = (docType: string): string => {
   if (d === 'BOV')
     return 'bg-blue-500/10 text-blue-600 dark:text-blue-400';
   if (d === 'OM')
-    return 'bg-purple-500/10 text-purple-600 dark:text-purple-400';
+    return 'bg-primary/10 text-primary dark:text-primary';
   return 'bg-muted text-muted-foreground';
 };
 
@@ -175,7 +175,7 @@ const docCategoryBadge = (category: string): { label: string; className: string 
     case 'bov':
       return { label: 'BOV', className: 'bg-blue-500/20 text-blue-400' };
     case 'rent_roll':
-      return { label: 'Rent Roll', className: 'bg-purple-500/20 text-purple-400' };
+      return { label: 'Rent Roll', className: 'bg-primary/20 text-primary' };
     case 't12':
       return { label: 'T-12', className: 'bg-amber-500/20 text-amber-400' };
     default:
@@ -196,9 +196,9 @@ const financialSourceBadge = (source: string | null | undefined): { label: strin
   if (!source) return null;
   switch (source) {
     case 't12_excel':
-      return { label: 'T-12 Excel', className: 'bg-purple-500/20 text-purple-400' };
+      return { label: 'T-12 Excel', className: 'bg-primary/20 text-primary' };
     case 'rent_roll_excel':
-      return { label: 'Rent Roll Excel', className: 'bg-purple-500/20 text-purple-400' };
+      return { label: 'Rent Roll Excel', className: 'bg-primary/20 text-primary' };
     case 'om':
       return { label: 'From OM', className: 'bg-gray-500/20 text-gray-400' };
     case 'bov':
@@ -938,7 +938,7 @@ export const PropertyDetail = () => {
                 className={cn(
                   "flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium border transition-colors",
                   property && comparisonPropertyIds.includes(property.id)
-                    ? "bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/20 hover:bg-violet-500/20"
+                    ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20 hover:bg-amber-500/20"
                     : "bg-card text-muted-foreground border-border hover:bg-accent"
                 )}
               >
@@ -969,7 +969,7 @@ export const PropertyDetail = () => {
               <button
                 onClick={() => !isReanalyzing && setShowReanalyzeDialog(true)}
                 disabled={isReanalyzing}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 hover:bg-purple-500/20 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-primary/10 text-primary dark:text-primary border border-primary/20 hover:bg-primary/20 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {isReanalyzing ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -1506,7 +1506,7 @@ export const PropertyDetail = () => {
                         </button>
                       )}
                       {guidanceSaved && pricingGuidance === savedGuidanceValue && (
-                        <span className="flex items-center gap-1 text-sm text-purple-600 dark:text-purple-400 whitespace-nowrap animate-fade-in">
+                        <span className="flex items-center gap-1 text-sm text-primary dark:text-primary whitespace-nowrap animate-fade-in">
                           <CheckCircle className="h-4 w-4" /> Saved!
                         </span>
                       )}
@@ -2439,7 +2439,7 @@ export const PropertyDetail = () => {
             <div className={`mb-4 p-3 rounded-xl text-sm border ${
               uploadMessage.isError
                 ? 'bg-red-500/10 text-red-400 border-red-500/20'
-                : 'bg-purple-500/10 text-purple-400 border-purple-500/20'
+                : 'bg-primary/10 text-primary border-primary/20'
             }`}>
               {uploadMessage.text}
             </div>

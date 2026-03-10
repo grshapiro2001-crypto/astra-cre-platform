@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { TalismanLogo } from '@/components/ui/TalismanLogo';
+import TalismanCompass3D from '@/components/TalismanCompass3D';
 import organizationService from '@/services/organizationService';
 
 export const Welcome = () => {
@@ -56,19 +56,19 @@ export const Welcome = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-purple-950 via-slate-950 to-purple-950 px-4 py-12">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-amber-950 via-slate-950 to-amber-950 px-4 py-12">
       {/* Logo */}
       <div className="flex items-center gap-2.5 mb-8">
-        <TalismanLogo className="w-10 h-10" />
+        <TalismanCompass3D size={40} spin={false} />
         <h1 className="text-2xl font-bold">
           <span className="text-white">Talisman</span>
-          <span className="text-purple-300/70 ml-1.5 font-normal text-sm">IO</span>
+          <span className="text-amber-300/70 ml-1.5 font-normal text-sm">IO</span>
         </h1>
       </div>
 
       {/* Heading */}
       <h2 className="text-3xl font-bold text-white mb-2">Welcome to Talisman IO</h2>
-      <p className="text-purple-200/60 text-sm mb-10">Set up your workspace to get started</p>
+      <p className="text-amber-200/60 text-sm mb-10">Set up your workspace to get started</p>
 
       {/* Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl w-full">
@@ -79,12 +79,12 @@ export const Welcome = () => {
           </div>
           <div>
             <h3 className="text-lg font-semibold text-white">Create a New Organization</h3>
-            <p className="text-sm text-purple-200/50 mt-1">
+            <p className="text-sm text-amber-200/50 mt-1">
               Start a shared workspace for your team. You'll get an invite code to share with colleagues.
             </p>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="welcomeOrgName" className="text-purple-200/70 text-sm">Organization name</Label>
+            <Label htmlFor="welcomeOrgName" className="text-amber-200/70 text-sm">Organization name</Label>
             <Input
               id="welcomeOrgName"
               placeholder="e.g. Acme Capital"
@@ -102,11 +102,11 @@ export const Welcome = () => {
         {/* Join */}
         <div className="bg-white/[0.04] backdrop-blur border border-white/10 rounded-2xl p-6 space-y-4">
           <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center">
-            <Users className="w-5 h-5 text-purple-200/60" />
+            <Users className="w-5 h-5 text-amber-200/60" />
           </div>
           <div>
             <h3 className="text-lg font-semibold text-white">Join an Organization</h3>
-            <p className="text-sm text-purple-200/50 mt-1">
+            <p className="text-sm text-amber-200/50 mt-1">
               Have an invite code? Enter it below to request access. The owner will approve your request.
             </p>
           </div>
@@ -115,7 +115,7 @@ export const Welcome = () => {
             <div className="bg-primary/10 border border-primary/20 rounded-lg p-4 text-center">
               <Check className="w-5 h-5 text-primary mx-auto mb-2" />
               <p className="text-sm text-white font-medium">Request sent!</p>
-              <p className="text-xs text-purple-200/50 mt-1">You'll get access once the owner approves.</p>
+              <p className="text-xs text-amber-200/50 mt-1">You'll get access once the owner approves.</p>
               <button
                 onClick={() => navigate('/dashboard')}
                 className="inline-flex items-center gap-1 text-sm text-primary mt-3 hover:underline"
@@ -126,7 +126,7 @@ export const Welcome = () => {
           ) : (
             <>
               <div className="space-y-2">
-                <Label htmlFor="welcomeJoinCode" className="text-purple-200/70 text-sm">Invite code</Label>
+                <Label htmlFor="welcomeJoinCode" className="text-amber-200/70 text-sm">Invite code</Label>
                 <Input
                   id="welcomeJoinCode"
                   placeholder="e.g. aX9kR2mQ"
@@ -147,7 +147,7 @@ export const Welcome = () => {
       {/* Skip link */}
       <button
         onClick={() => navigate('/dashboard')}
-        className="mt-8 text-sm text-purple-300/50 hover:text-purple-200/70 transition-colors"
+        className="mt-8 text-sm text-amber-300/50 hover:text-amber-200/70 transition-colors"
       >
         Skip for now — I'll set this up later
       </button>

@@ -264,7 +264,7 @@ export const SensitivityAnalysis = ({ property }: SensitivityAnalysisProps) => {
                 step={100000}
                 value={purchasePrice}
                 onChange={(e) => setPurchasePrice(Number(e.target.value))}
-                className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-purple-600"
+                className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
               />
             </div>
 
@@ -272,7 +272,7 @@ export const SensitivityAnalysis = ({ property }: SensitivityAnalysisProps) => {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium text-muted-foreground">Going-In Cap (T3)</label>
-                <span className="text-sm font-mono text-muted-foreground">
+                <span className="text-sm font-display text-muted-foreground">
                   {fmtPercent(calculations?.goingInCap)}
                 </span>
               </div>
@@ -311,7 +311,7 @@ export const SensitivityAnalysis = ({ property }: SensitivityAnalysisProps) => {
                 step={0.25}
                 value={rentGrowth}
                 onChange={(e) => setRentGrowth(Number(e.target.value))}
-                className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-purple-600"
+                className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
               />
             </div>
 
@@ -345,7 +345,7 @@ export const SensitivityAnalysis = ({ property }: SensitivityAnalysisProps) => {
                 step={0.25}
                 value={expenseGrowth}
                 onChange={(e) => setExpenseGrowth(Number(e.target.value))}
-                className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-purple-600"
+                className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
               />
             </div>
 
@@ -379,7 +379,7 @@ export const SensitivityAnalysis = ({ property }: SensitivityAnalysisProps) => {
                 step={0.25}
                 value={exitCap}
                 onChange={(e) => setExitCap(Number(e.target.value))}
-                className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-purple-600"
+                className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
               />
             </div>
 
@@ -404,7 +404,7 @@ export const SensitivityAnalysis = ({ property }: SensitivityAnalysisProps) => {
                 step={1}
                 value={holdPeriod}
                 onChange={(e) => setHoldPeriod(Number(e.target.value))}
-                className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-purple-600"
+                className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
               />
             </div>
 
@@ -438,7 +438,7 @@ export const SensitivityAnalysis = ({ property }: SensitivityAnalysisProps) => {
                 step={5}
                 value={ltv}
                 onChange={(e) => setLtv(Number(e.target.value))}
-                className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-purple-600"
+                className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
               />
             </div>
 
@@ -451,7 +451,7 @@ export const SensitivityAnalysis = ({ property }: SensitivityAnalysisProps) => {
                     onClick={() => setDebtType('io')}
                     className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
                       debtType === 'io'
-                        ? 'bg-purple-600 text-white'
+                        ? 'bg-primary text-white'
                         : 'text-muted-foreground hover:text-foreground'
                     }`}
                   >
@@ -461,7 +461,7 @@ export const SensitivityAnalysis = ({ property }: SensitivityAnalysisProps) => {
                     onClick={() => setDebtType('amort')}
                     className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
                       debtType === 'amort'
-                        ? 'bg-purple-600 text-white'
+                        ? 'bg-primary text-white'
                         : 'text-muted-foreground hover:text-foreground'
                     }`}
                   >
@@ -501,7 +501,7 @@ export const SensitivityAnalysis = ({ property }: SensitivityAnalysisProps) => {
                 step={0.25}
                 value={interestRate}
                 onChange={(e) => setInterestRate(Number(e.target.value))}
-                className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-purple-600"
+                className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
               />
             </div>
           </div>
@@ -517,7 +517,7 @@ export const SensitivityAnalysis = ({ property }: SensitivityAnalysisProps) => {
               {/* Unlevered IRR */}
               <div className="bg-background/60 border border-border/50 rounded-lg p-4">
                 <div className="text-xs text-muted-foreground mb-1">Unlevered IRR</div>
-                <div className="text-2xl font-mono font-bold text-foreground">
+                <div className="text-2xl font-display font-bold text-foreground">
                   {calculations?.unleveredIRR != null ? fmtPercent(calculations.unleveredIRR) : '---'}
                 </div>
               </div>
@@ -525,7 +525,7 @@ export const SensitivityAnalysis = ({ property }: SensitivityAnalysisProps) => {
               {/* Levered IRR */}
               <div className="bg-background/60 border border-border/50 rounded-lg p-4">
                 <div className="text-xs text-muted-foreground mb-1">Levered IRR</div>
-                <div className="text-2xl font-mono font-bold text-foreground">
+                <div className="text-2xl font-display font-bold text-foreground">
                   {calculations?.leveredIRR != null ? fmtPercent(calculations.leveredIRR) : '---'}
                 </div>
               </div>
@@ -533,7 +533,7 @@ export const SensitivityAnalysis = ({ property }: SensitivityAnalysisProps) => {
               {/* Equity Multiple */}
               <div className="bg-background/60 border border-border/50 rounded-lg p-4">
                 <div className="text-xs text-muted-foreground mb-1">Equity Multiple</div>
-                <div className="text-2xl font-mono font-bold text-foreground">
+                <div className="text-2xl font-display font-bold text-foreground">
                   {calculations?.equityMultiple != null ? `${calculations.equityMultiple.toFixed(2)}x` : '---'}
                 </div>
               </div>
@@ -541,7 +541,7 @@ export const SensitivityAnalysis = ({ property }: SensitivityAnalysisProps) => {
               {/* Avg Cash-on-Cash */}
               <div className="bg-background/60 border border-border/50 rounded-lg p-4">
                 <div className="text-xs text-muted-foreground mb-1">Avg Cash-on-Cash</div>
-                <div className="text-2xl font-mono font-bold text-foreground">
+                <div className="text-2xl font-display font-bold text-foreground">
                   {fmtPercent(calculations?.avgCashOnCash)}
                 </div>
               </div>
@@ -549,7 +549,7 @@ export const SensitivityAnalysis = ({ property }: SensitivityAnalysisProps) => {
               {/* Year 1 Cash-on-Cash */}
               <div className="bg-background/60 border border-border/50 rounded-lg p-4">
                 <div className="text-xs text-muted-foreground mb-1">Year 1 Cash-on-Cash</div>
-                <div className="text-2xl font-mono font-bold text-foreground">
+                <div className="text-2xl font-display font-bold text-foreground">
                   {fmtPercent(calculations?.year1CashOnCash)}
                 </div>
               </div>
@@ -557,7 +557,7 @@ export const SensitivityAnalysis = ({ property }: SensitivityAnalysisProps) => {
               {/* Terminal Value */}
               <div className="bg-background/60 border border-border/50 rounded-lg p-4">
                 <div className="text-xs text-muted-foreground mb-1">Terminal Value</div>
-                <div className="text-2xl font-mono font-bold text-foreground">
+                <div className="text-2xl font-display font-bold text-foreground">
                   {fmtCurrency(calculations?.terminalValue, true)}
                 </div>
               </div>
@@ -584,10 +584,10 @@ export const SensitivityAnalysis = ({ property }: SensitivityAnalysisProps) => {
                       {calculations?.years.map((year) => (
                         <tr key={year.year} className="border-b border-border/50 last:border-0">
                           <td className="px-3 py-2 font-medium">{year.year}</td>
-                          <td className="px-3 py-2 text-right font-mono">{fmtCurrency(year.noi, true)}</td>
-                          <td className="px-3 py-2 text-right font-mono">{fmtCurrency(year.debtService, true)}</td>
-                          <td className="px-3 py-2 text-right font-mono">{fmtCurrency(year.cashFlow, true)}</td>
-                          <td className="px-3 py-2 text-right font-mono">{fmtPercent(year.cashOnCash)}</td>
+                          <td className="px-3 py-2 text-right font-display">{fmtCurrency(year.noi, true)}</td>
+                          <td className="px-3 py-2 text-right font-display">{fmtCurrency(year.debtService, true)}</td>
+                          <td className="px-3 py-2 text-right font-display">{fmtCurrency(year.cashFlow, true)}</td>
+                          <td className="px-3 py-2 text-right font-display">{fmtPercent(year.cashOnCash)}</td>
                         </tr>
                       ))}
                     </tbody>

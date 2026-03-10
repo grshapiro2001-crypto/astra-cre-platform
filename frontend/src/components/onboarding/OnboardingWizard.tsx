@@ -115,14 +115,14 @@ export const OnboardingWizard = ({ isOpen, onClose }: OnboardingWizardProps) => 
           <div className="space-y-6">
             {/* Welcome Icon */}
             <div className="flex justify-center">
-              <div className="w-20 h-20 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+              <div className="w-20 h-20 rounded-full bg-gradient-to-br from-amber-500 to-yellow-600 flex items-center justify-center">
                 <Sparkles className="w-10 h-10 text-white" />
               </div>
             </div>
 
             {/* Welcome Text */}
             <div className="text-center space-y-2">
-              <h2 className="text-3xl font-bold bg-gradient-to-r from-violet-600 to-purple-600 bg-clip-text text-transparent">
+              <h2 className="text-3xl font-bold bg-gradient-to-r from-amber-600 to-yellow-600 bg-clip-text text-transparent">
                 Welcome to Talisman IO
               </h2>
               <p className="text-lg text-muted-foreground">
@@ -175,8 +175,8 @@ export const OnboardingWizard = ({ isOpen, onClose }: OnboardingWizardProps) => 
           <div className="space-y-6">
             {/* Step Icon */}
             <div className="flex justify-center">
-              <div className="w-16 h-16 rounded-full bg-violet-500/20 flex items-center justify-center">
-                <Target className="w-8 h-8 text-violet-600" />
+              <div className="w-16 h-16 rounded-full bg-amber-500/20 flex items-center justify-center">
+                <Target className="w-8 h-8 text-amber-600" />
               </div>
             </div>
 
@@ -288,8 +288,8 @@ export const OnboardingWizard = ({ isOpen, onClose }: OnboardingWizardProps) => 
           <div className="space-y-6">
             {/* Step Icon */}
             <div className="flex justify-center">
-              <div className="w-16 h-16 rounded-full bg-violet-500/20 flex items-center justify-center">
-                <Upload className="w-8 h-8 text-violet-600" />
+              <div className="w-16 h-16 rounded-full bg-amber-500/20 flex items-center justify-center">
+                <Upload className="w-8 h-8 text-amber-600" />
               </div>
             </div>
 

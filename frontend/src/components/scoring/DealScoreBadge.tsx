@@ -2,7 +2,7 @@
  * DealScoreBadge — Circular badge showing the Deal Score (0-100)
  *
  * Sizes: sm (40px — library cards), md (64px — property detail), lg (80px — comparison)
- * Color: 80+ green, 60-79 primary/purple, 40-59 yellow, 0-39 red
+ * Color: 80+ green, 60-79 primary/gold, 40-59 yellow, 0-39 red
  * null/undefined: muted "—"
  */
 import { useState } from 'react';
@@ -115,13 +115,13 @@ export function DealScoreBadge({
       {/* Center content */}
       <div className="absolute inset-0 flex items-center justify-center">
         {isNull ? (
-          <span className="font-mono text-muted-foreground font-semibold">&mdash;</span>
+          <span className="font-display text-muted-foreground font-semibold">&mdash;</span>
         ) : hovered && onClick ? (
           <span className={cn(config.hoverFontSize, 'font-semibold text-muted-foreground leading-tight text-center')}>
             View<br />Details
           </span>
         ) : (
-          <span className={cn('font-mono font-bold', config.fontSize, getScoreColor(displayScore))}>
+          <span className={cn('font-display font-bold', config.fontSize, getScoreColor(displayScore))}>
             {displayScore}
           </span>
         )}

@@ -483,7 +483,7 @@ const DocumentsTab = () => {
                     <TableCell>
                       <div className="flex items-center gap-2">
                         {doc.document_type === 'market_research' ? (
-                          <FileText className="w-4 h-4 text-violet-500 shrink-0" />
+                          <FileText className="w-4 h-4 text-amber-500 shrink-0" />
                         ) : (
                           <FileSpreadsheet className="w-4 h-4 text-primary shrink-0" />
                         )}

@@ -5,7 +5,7 @@
  *   80+  → Green (#10B981)
  *   60-79 → Yellow (#F59E0B)
  *   <60  → Red (#EF4444)
- *   No score → Purple (#8B5CF6)
+ *   No score → Amber (#F59E0B)
  *
  * Full-height map with selected deal info panel, legend overlay,
  * and bidirectional sync with kanban cards.
@@ -68,7 +68,7 @@ const SCORE_COLORS = {
   high: '#10B981',
   medium: '#F59E0B',
   low: '#EF4444',
-  none: '#8B5CF6',
+  none: '#F59E0B',
 } as const;
 
 // ============================================================
@@ -391,7 +391,7 @@ export const DashboardMap: React.FC<DashboardMapProps> = ({
                 </div>
                 <button
                   onClick={() => navigate(`/library/${selectedPinData.deal.id}`)}
-                  className="mt-2 text-xs font-semibold text-purple-600 hover:text-purple-800 transition-colors"
+                  className="mt-2 text-xs font-semibold text-primary hover:text-amber-800 transition-colors"
                 >
                   View Analysis &rarr;
                 </button>

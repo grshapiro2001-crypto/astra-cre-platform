@@ -111,7 +111,7 @@ export const DealCard = ({ deal, isSelected, onClick, onDoubleClick }: DealCardP
         </span>
         <span
           className={cn(
-            'font-mono font-semibold',
+            'font-display font-semibold',
             deal.dealValue
               ? 'text-emerald-600 dark:text-emerald-400'
               : 'text-muted-foreground',
@@ -132,7 +132,7 @@ export const DealCard = ({ deal, isSelected, onClick, onDoubleClick }: DealCardP
             <Award className="w-3 h-3" />
             <span
               className={cn(
-                'text-xs font-mono font-bold',
+                'text-xs font-display font-bold',
                 getScoreColor(deal.dealScore),
               )}
             >

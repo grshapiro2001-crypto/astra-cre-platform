@@ -87,7 +87,7 @@ const PipelineDonut: React.FC<{ deals: DashboardDeal[]; stages: PipelineStage[];
 
   return (
     <div className="bg-card/50 border border-border/60 rounded-2xl p-4">
-      <h3 className="font-mono text-2xs uppercase tracking-wider text-muted-foreground font-semibold mb-4">
+      <h3 className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-muted-foreground mb-4">
         Pipeline by Stage
       </h3>
       <div className="flex items-center gap-4">
@@ -110,8 +110,8 @@ const PipelineDonut: React.FC<{ deals: DashboardDeal[]; stages: PipelineStage[];
             )}
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className="font-mono text-lg font-bold text-foreground">{total}</span>
-            <span className="font-mono text-2xs uppercase text-muted-foreground">Deals</span>
+            <span className="font-display text-lg font-bold text-foreground">{total}</span>
+            <span className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-muted-foreground">Deals</span>
           </div>
         </div>
 
@@ -121,7 +121,7 @@ const PipelineDonut: React.FC<{ deals: DashboardDeal[]; stages: PipelineStage[];
             <div key={s.id} className="flex items-center gap-2 text-xs">
               <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
               <span className="text-muted-foreground truncate flex-1">{s.label}</span>
-              <span className="font-mono font-semibold text-foreground">{s.count}</span>
+              <span className="font-display font-semibold text-foreground">{s.count}</span>
             </div>
           ))}
         </div>
@@ -151,10 +151,10 @@ const SubmarketBars: React.FC<{ deals: DashboardDeal[] }> = ({ deals }) => {
   return (
     <div className="bg-card/50 border border-border/60 rounded-2xl p-4">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="font-mono text-2xs uppercase tracking-wider text-muted-foreground font-semibold">
+        <h3 className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-muted-foreground">
           By Submarket
         </h3>
-        <span className="font-mono text-2xs uppercase text-muted-foreground/50">Volume $</span>
+        <span className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-muted-foreground/50">Volume $</span>
       </div>
       <div className="space-y-2.5">
         {submarketData.length === 0 ? (
@@ -164,7 +164,7 @@ const SubmarketBars: React.FC<{ deals: DashboardDeal[] }> = ({ deals }) => {
             <div key={name}>
               <div className="flex items-center justify-between mb-1">
                 <span className="text-xs text-foreground truncate max-w-[60%]">{name}</span>
-                <span className="font-mono text-2xs text-muted-foreground">{formatDollarCompact(volume)}</span>
+                <span className="font-display text-2xs text-muted-foreground">{formatDollarCompact(volume)}</span>
               </div>
               <div className="h-2 rounded-full bg-muted overflow-hidden">
                 <div
@@ -233,22 +233,22 @@ const ScoreDistribution: React.FC<{ deals: DashboardDeal[] }> = ({ deals }) => {
 
   return (
     <div className="bg-card/50 border border-border/60 rounded-2xl p-4">
-      <h3 className="font-mono text-2xs uppercase tracking-wider text-muted-foreground font-semibold mb-3">
+      <h3 className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-muted-foreground mb-3">
         Score Distribution
       </h3>
 
       {/* Summary numbers */}
       <div className="flex items-center gap-4 mb-4">
         <div className="text-center">
-          <p className="font-mono text-lg font-bold" style={{ color: SCORE_COLORS.high }}>{strong}</p>
+          <p className="font-display text-lg font-bold" style={{ color: SCORE_COLORS.high }}>{strong}</p>
           <p className="text-2xs text-muted-foreground">Strong (80+)</p>
         </div>
         <div className="text-center">
-          <p className="font-mono text-lg font-bold" style={{ color: SCORE_COLORS.medium }}>{review}</p>
+          <p className="font-display text-lg font-bold" style={{ color: SCORE_COLORS.medium }}>{review}</p>
           <p className="text-2xs text-muted-foreground">Review (60-79)</p>
         </div>
         <div className="text-center">
-          <p className="font-mono text-lg font-bold" style={{ color: SCORE_COLORS.low }}>{weak}</p>
+          <p className="font-display text-lg font-bold" style={{ color: SCORE_COLORS.low }}>{weak}</p>
           <p className="text-2xs text-muted-foreground">Weak (&lt;60)</p>
         </div>
       </div>
@@ -259,9 +259,9 @@ const ScoreDistribution: React.FC<{ deals: DashboardDeal[] }> = ({ deals }) => {
           {/* Axis line */}
           <div className="absolute bottom-0 left-0 right-0 h-px bg-border" />
           {/* Axis labels */}
-          <span className="absolute bottom-[-14px] left-0 font-mono text-2xs text-muted-foreground/50">0</span>
-          <span className="absolute bottom-[-14px] left-1/2 -translate-x-1/2 font-mono text-2xs text-muted-foreground/50">50</span>
-          <span className="absolute bottom-[-14px] right-0 font-mono text-2xs text-muted-foreground/50">100</span>
+          <span className="absolute bottom-[-14px] left-0 font-display text-2xs text-muted-foreground/50">0</span>
+          <span className="absolute bottom-[-14px] left-1/2 -translate-x-1/2 font-display text-2xs text-muted-foreground/50">50</span>
+          <span className="absolute bottom-[-14px] right-0 font-display text-2xs text-muted-foreground/50">100</span>
 
           {/* Zone backgrounds */}
           <div className="absolute inset-0 flex">

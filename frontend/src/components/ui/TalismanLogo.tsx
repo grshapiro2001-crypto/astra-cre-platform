@@ -6,7 +6,7 @@ interface TalismanLogoProps {
 
 /**
  * Talisman IO compass rose logo.
- * Metallic compass points with blue gem accent at center.
+ * Metallic compass points with gold gem accent at center.
  * Works at 24px, 32px, 48px, 128px+.
  */
 export const TalismanLogo = ({ className }: TalismanLogoProps) => (
@@ -42,7 +42,7 @@ export const TalismanLogo = ({ className }: TalismanLogoProps) => (
     {/* Inner decorative ring */}
     <circle cx="32" cy="32" r="12" stroke="url(#metalRing)" strokeWidth="1" opacity="0.3" />
 
-    {/* Blue gem center */}
+    {/* Gold gem center */}
     <circle cx="32" cy="32" r="5" fill="url(#gemGrad)" />
     <circle cx="32" cy="32" r="5" fill="url(#gemShine)" />
 
@@ -50,30 +50,30 @@ export const TalismanLogo = ({ className }: TalismanLogoProps) => (
     <ellipse cx="30.5" cy="30" rx="2" ry="1.5" fill="white" opacity="0.3" />
 
     <defs>
-      {/* Metallic silver-to-gunmetal gradient for main points */}
+      {/* Gold metallic gradient for main points */}
       <linearGradient id="metalGrad" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0%" stopColor="#E8E8EE" />
-        <stop offset="40%" stopColor="#B8B8C8" />
-        <stop offset="100%" stopColor="#7A7A8E" />
+        <stop offset="0%" stopColor="#F0D060" />
+        <stop offset="40%" stopColor="#D4AF37" />
+        <stop offset="100%" stopColor="#8A7025" />
       </linearGradient>
 
-      {/* Lighter metallic for intercardinal points */}
+      {/* Lighter gold for intercardinal points */}
       <linearGradient id="metalGradLight" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0%" stopColor="#D0D0DE" />
-        <stop offset="100%" stopColor="#9A9AAE" />
+        <stop offset="0%" stopColor="#E8C94A" />
+        <stop offset="100%" stopColor="#B89530" />
       </linearGradient>
 
       {/* Ring gradient */}
       <linearGradient id="metalRing" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0%" stopColor="#C0C0D0" />
-        <stop offset="100%" stopColor="#808090" />
+        <stop offset="0%" stopColor="#D4AF37" />
+        <stop offset="100%" stopColor="#8A7025" />
       </linearGradient>
 
-      {/* Blue gem gradient */}
+      {/* Gold gem gradient */}
       <radialGradient id="gemGrad" cx="0.4" cy="0.35" r="0.6">
-        <stop offset="0%" stopColor="hsl(210, 80%, 65%)" />
-        <stop offset="60%" stopColor="hsl(210, 70%, 50%)" />
-        <stop offset="100%" stopColor="hsl(210, 60%, 35%)" />
+        <stop offset="0%" stopColor="hsl(43, 80%, 65%)" />
+        <stop offset="60%" stopColor="hsl(43, 70%, 50%)" />
+        <stop offset="100%" stopColor="hsl(43, 60%, 35%)" />
       </radialGradient>
 
       {/* Gem shine overlay */}
