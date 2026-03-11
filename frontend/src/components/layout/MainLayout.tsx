@@ -8,9 +8,11 @@ import { useUIStore } from '@/store/uiStore';
 import { cn } from '@/lib/utils';
 import { AssistantToggle } from '@/components/assistant/AssistantToggle';
 import { AssistantPanel } from '@/components/assistant/AssistantPanel';
+import { useAssistantStore } from '@/store/assistantStore';
 
 export const MainLayout = () => {
   const { sidebarCollapsed, setMobileSidebarOpen, theme } = useUIStore();
+  const isAssistantOpen = useAssistantStore((s) => s.isOpen);
   const location = useLocation();
 
   // Apply theme on mount
@@ -47,7 +49,9 @@ export const MainLayout = () => {
         className={cn(
           'flex flex-col min-h-screen transition-all duration-300',
           // Desktop: shift content for sidebar
-          sidebarCollapsed ? 'lg:ml-[72px]' : 'lg:ml-64'
+          sidebarCollapsed ? 'lg:ml-[72px]' : 'lg:ml-64',
+          // Push content left when assistant panel is open
+          isAssistantOpen && 'lg:mr-[28rem]'
         )}
       >
         <Header />
