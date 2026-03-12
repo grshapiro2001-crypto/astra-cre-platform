@@ -88,39 +88,44 @@ const FEATURES: Feature[] = [
   { id: 'F-012', title: 'Deal Analytics Dashboard', description: 'Upload trends, score distribution, pipeline velocity', column: 'Backlog', effort: 'Med', impact: 'High' },
   { id: 'F-013', title: 'Contact Enrichment (ZoomInfo/Clay)', description: 'Auto-enrich property owner from OM, store in contacts table', column: 'Backlog', effort: 'High', impact: 'High' },
   { id: 'F-014', title: '3D Stacking Viewer — Tier 5', description: 'Rent roll diff view, time-slider, occupancy trend animation', column: 'Backlog', effort: 'High', impact: 'Med' },
-  { id: 'F-015', title: 'Command Center', description: 'Admin-only CEO dashboard — live project status', column: 'In Flight', effort: 'Med', impact: 'High' },
+  { id: 'F-015', title: 'Command Center', description: 'Admin-only CEO dashboard — live project status', column: 'Shipped', effort: 'Med', impact: 'High' },
   { id: 'F-016', title: '3D Stacking Viewer', description: '4-tier investor-grade 3D building model, floor plan overlay', column: 'Shipped', effort: 'High', impact: 'High' },
   { id: 'F-017', title: 'Organizations & Team Workspaces', description: 'Multi-user orgs, invite flow, org-level context', column: 'Shipped', effort: 'High', impact: 'High' },
   { id: 'F-018', title: 'Market Research Extraction + Layer 2', description: 'PDF → AI sentiment scoring for Layer 2 deal score', column: 'Shipped', effort: 'Med', impact: 'High' },
   { id: 'F-019', title: 'Kanban Persistence (BUG-005)', description: 'Pipeline stage now saves to DB', column: 'Shipped', effort: 'Low', impact: 'High' },
   { id: 'F-020', title: 'T12 Excel Upload + Fuzzy Extraction', description: 'Fuzzy matching T12 engine with Claude AI fallback', column: 'Shipped', effort: 'High', impact: 'High' },
+  { id: 'F-021', title: 'AI Chat Assistant Panel', description: 'Floating SSE-streaming pipeline analyst — wired to Claude with full deal context', column: 'Shipped', effort: 'Med', impact: 'High' },
+  { id: 'F-022', title: 'Talisman IO Rebrand', description: 'Full codebase rebrand from ASTRA CRE → Talisman IO, new favicon and meta', column: 'Shipped', effort: 'Low', impact: 'High' },
+  { id: 'F-023', title: 'Design System v2 — Champagne Gold', description: 'Cinzel + Questrial fonts, Champagne Gold (#D4A853) accent, crystal compass brand identity', column: 'Shipped', effort: 'Med', impact: 'High' },
+  { id: 'F-024', title: 'Property Detail 7-tab Redesign', description: 'Restructured property detail into 7 tabs; compact two-row header replacing Street View hero', column: 'Shipped', effort: 'Med', impact: 'High' },
+  { id: 'F-025', title: 'TalismanCompass3D Navigation', description: 'Interactive Three.js 3D compass in sidebar + chat toggle with emissive gold glow', column: 'Shipped', effort: 'Med', impact: 'Med' },
 ];
 
 const ANALYTICS = {
   properties: 3,
   folders: 4,
-  totalPRs: 94,
-  prsSinceFeb26: 47,
-  deployments: 20,
+  totalPRs: 107,
+  prsSinceFeb26: 60,
+  deployments: 32,
   openBugs: 14,
   fixedBugs: 1,
   criticalBugs: 4,
   newServices: 7,
-  newComponents: 15,
-  linesOfCode: '~20,000',
+  newComponents: 20,
+  linesOfCode: '~22,000',
 };
 
 const RECENT_PRS = [
-  { id: '#94', title: 'Floor Plan 2D overlay mode alongside 3D stacking viewer', date: 'Mar 7', status: 'Merged' },
-  { id: '#93', title: 'Width-proportional unit sizing based on sqft in 3D viewer', date: 'Mar 7', status: 'Merged' },
-  { id: '#92', title: 'Remove "No Data" glass panes, tighten camera framing', date: 'Mar 7', status: 'Merged' },
-  { id: '#91', title: 'Fix stacking model showing too few colored unit boxes', date: 'Mar 7', status: 'Merged' },
-  { id: '#90', title: 'Fix stacking model showing too few colored unit boxes (v2)', date: 'Mar 7', status: 'Merged' },
-  { id: '#89', title: 'Use rent roll count instead of stale layout.total_units for badge', date: 'Mar 7', status: 'Merged' },
-  { id: '#88', title: 'Fix 313/345 unit matching — adjust geometry floor count', date: 'Mar 7', status: 'Merged' },
-  { id: '#87', title: 'Fix stacking plan bugs: fullscreen z-index, ground floor units', date: 'Mar 7', status: 'Merged' },
-  { id: '#86', title: 'Fix rent roll column mapping to prevent charge code misidentification', date: 'Mar 7', status: 'Merged' },
-  { id: '#85', title: 'Add unit_position_map_json to run_migrations()', date: 'Mar 6', status: 'Merged' },
+  { id: '#107', title: 'Chat panel logos → TalismanCompass3D, sidebar auto-collapses on chat open', date: 'Mar 11', status: 'Merged' },
+  { id: '#106', title: 'Stacking model unit colors updated from Astra purple to Talisman gold', date: 'Mar 11', status: 'Merged' },
+  { id: '#105', title: 'Fix compass emissive glow at small sizes so gold reads on dark bg', date: 'Mar 11', status: 'Merged' },
+  { id: '#104', title: 'Add TalismanCompass3D — replace sidebar logo and chat toggle', date: 'Mar 11', status: 'Merged' },
+  { id: '#103', title: 'Redesign property detail header — compact two-row layout, remove Street View hero', date: 'Mar 11', status: 'Merged' },
+  { id: '#102', title: 'Restructure property detail page into 7-tab interface', date: 'Mar 11', status: 'Merged' },
+  { id: '#101', title: 'Design system v2 — Cinzel/Questrial fonts, Champagne Gold accent', date: 'Mar 11', status: 'Merged' },
+  { id: '#100', title: 'Rebrand: ASTRA CRE → Talisman IO across entire codebase', date: 'Mar 11', status: 'Merged' },
+  { id: '#99', title: 'Fix AI chat panel — include NULL org properties in deal context', date: 'Mar 11', status: 'Merged' },
+  { id: '#98', title: 'Add AI assistant chat panel with SSE streaming', date: 'Mar 11', status: 'Merged' },
 ];
 
 // ─── Agent Intelligence ───────────────────────────────────────────────────────
@@ -141,11 +146,11 @@ function getAgentResponse(input: string): string {
   }
 
   if (q.includes('pr') || q.includes('pull request') || q.includes('merged')) {
-    return `🔀 PR Activity:\n• **94 total PRs** merged all-time\n• **47 PRs merged** since Feb 26 audit\n• Latest: PR #94 — Floor Plan 2D overlay mode\n• Most active area: 3D Stacking Viewer (PRs #62–94, ~30 PRs)\n• Production deploys: 20 in last batch`;
+    return `🔀 PR Activity:\n• **107 total PRs** merged all-time\n• **60+ PRs merged** since Feb 26 audit\n• Latest: PR #107 — compass in chat panel + sidebar auto-collapse\n• Most active area: 3D Stacking Viewer (PRs #62–94, ~30 PRs)\n• Production deploys: 32 total`;
   }
 
   if (q.includes('what shipped') || q.includes('recent') || q.includes('latest')) {
-    return `🚀 Recently Shipped (Feb 26 → Mar 8):\n\n1. **3D Stacking Viewer** (Tiers 1–4) — interactive Three.js building model wired to rent roll\n2. **Floor Plan Overlay** — 2D mode with unit markers\n3. **Organizations** — team workspaces + invite flow\n4. **Market Research Extraction** — Layer 2 sentiment scoring\n5. **T12 Excel Upload** — fuzzy matching + Claude AI fallback\n6. **Kanban Persistence Fix** (BUG-005 ✅)\n\nThat's 47 PRs in ~10 days.`;
+    return `🚀 Recently Shipped (Mar 8 → Mar 11):\n\n1. **AI Chat Panel** (PRs #97–99) — SSE streaming pipeline analyst with deal context\n2. **Talisman IO Rebrand** (PR #100) — full rename from ASTRA CRE\n3. **Design System v2** (PR #101) — Champagne Gold + Cinzel/Questrial fonts\n4. **Property Detail 7-tab Redesign** (PR #102) — new tab layout, compact header\n5. **TalismanCompass3D** (PR #104) — Three.js compass in sidebar + chat toggle\n6. **Stacking model gold colors** (PR #106) — unified with Talisman brand\n7. **Command Center** (PR #95/96) — this dashboard\n\nAll-time highlights: 3D Stacking Viewer (Tiers 1–4), Organizations, Market Research Layer 2, T12 Excel Upload.\n\nTotal: 60+ PRs since Feb 26.`;
   }
 
   if (q.includes('feature') && (q.includes('next') || q.includes('priority') || q.includes('backlog'))) {
@@ -154,7 +159,7 @@ function getAgentResponse(input: string): string {
   }
 
   if (q.includes('health') || q.includes('status') || q.includes('production')) {
-    return `💚 App Health (Mar 8, 2026):\n\n• Production: https://talisman-io.vercel.app\n• Latest deploy: PR #94 — READY ✅\n• Backend: Render.com (free tier — cold starts expected)\n• TypeScript: Clean (last confirmed Feb 26)\n• All 7 core API endpoints: 200 OK\n• Deals in DB: 3 (The Skylark, Adley City Springs, 1160 Hammond)\n\n⚠️ Watch: BUG-009 — metrics fluctuate on cold start. PR #41 (cold-start banner) pending merge.`;
+    return `💚 App Health (Mar 11, 2026):\n\n• Production: https://talisman-io-platform.vercel.app\n• Latest deploy: PR #107 — READY ✅\n• Backend: Render.com (free tier — cold starts expected)\n• TypeScript: Clean\n• All 7 core API endpoints: 200 OK\n• Deals in DB: 3 (The Skylark, Adley City Springs, 1160 Hammond)\n• Brand: Talisman IO (rebranded Mar 11 from ASTRA CRE)\n• Design: Champagne Gold (#D4A853) + Cinzel/Questrial fonts\n\n⚠️ Watch: BUG-009 — metrics fluctuate on cold start. BUG-001/002 — Google Maps API needs upgrade.`;
   }
 
   if (q.includes('stacking') || q.includes('3d') || q.includes('three')) {
@@ -173,16 +178,28 @@ function getAgentResponse(input: string): string {
     return `💰 API Cost Overview:\n\n• Claude API: ~$0.50–$2.00 per document upload/extraction\n• Cached reads: $0 (all views are DB-only, no LLM calls)\n• LLM call triggers: upload, re-analyze, data-bank Excel, chat, market research, floor plan extraction\n• Current DB: 3 deals → minimal cost\n• At 100 deals: ~$100–200 in extraction costs (one-time)\n\nCost optimization rule: **LLM only on explicit user action, never on view.**`;
   }
 
+  if (q.includes('rebrand') || q.includes('talisman') || q.includes('brand')) {
+    return `🪄 Rebrand — ASTRA CRE → Talisman IO (PR #100–101, Mar 11):\n\n• **Name:** Talisman IO (was "ASTRA CRE")\n• **Tagline:** AI-native CRE deal intelligence\n• **Colors:** Champagne Gold (#D4A853) replaces purple accent\n• **Fonts:** Cinzel (display/headings) + Questrial (body)\n• **Logo:** TalismanCompass3D — interactive Three.js 3D compass with emissive gold glow (PR #104)\n• **Favicon + meta tags:** Updated in index.html\n• **Design tokens:** bg-primary now maps to gold, not purple\n• **Scope:** All pages, components, docs, and deployment configs rebranded`;
+  }
+
+  if (q.includes('chat') || q.includes('assistant') || q.includes('ai panel')) {
+    return `💬 AI Chat Assistant Panel (PRs #97–99, #107, Mar 11):\n\n• Floating sidebar panel — SSE streaming responses\n• Powered by POST /api/v1/chat (streaming endpoint)\n• Full deal context injected: all 3 properties, pipeline stages, key financials\n• Toggle: TalismanCompass3D button in header (sidebar auto-collapses on open)\n• Conversation history persisted in backend\n• Logo/branding updated to compass (PR #107)\n\n**Note:** BUG-004 (PropertyDetail "Ask Follow-up" button) is still open — this is the new floating panel, not the per-property follow-up in PropertyDetail.`;
+  }
+
+  if (q.includes('compass') || q.includes('logo') || q.includes('3d logo')) {
+    return `🧭 TalismanCompass3D (PR #104–105, Mar 11):\n\nCustom Three.js component — an animated 3D compass rose:\n• 8 cardinal/intercardinal direction points in Champagne Gold\n• Emissive glow effect (boosted at small sizes — PR #105 fix)\n• Used in: sidebar header, AI chat panel toggle button\n• Auto-rotates and responds to hover\n• Component: components/TalismanCompass3D.tsx`;
+  }
+
   if (q.includes('architecture') || q.includes('stack') || q.includes('tech')) {
     return `🏛 Architecture:\n\n**Frontend:** React 18 + TypeScript + Vite + Tailwind + shadcn/ui + Zustand\n**Backend:** FastAPI + Python + SQLAlchemy + Pydantic\n**DB:** SQLite (dev) / PostgreSQL (prod via Render)\n**AI:** Claude claude-sonnet-4-5-20250929 via Anthropic SDK\n**Deploy:** Vercel (frontend) + Render.com (backend, free tier)\n**Maps:** Google Maps API (⚠️ needs upgrade from v3.55)\n**3D:** Three.js (r128) for stacking viewer\n**PDF:** pdfplumber + ReportLab`;
   }
 
   if (q.includes('hello') || q.includes('hi ') || q === 'hi' || q.includes('hey')) {
-    return `👋 Hey Griffin. I'm your Talisman PM agent.\n\nI have full context on the project: 94 PRs, 16 open bugs, current deployments, feature pipeline, and architecture.\n\nTry asking:\n• "What are the critical bugs?"\n• "What shipped since Feb 26?"\n• "What should we fix next?"\n• "How do I fix the Add Note bug?"\n• "What's the production health status?"`;
+    return `👋 Hey Griffin. I'm your Talisman PM agent.\n\nI have full context on the project: 107 PRs, 14 open bugs, current deployments, feature pipeline, and architecture. Brand is now Talisman IO with Champagne Gold design system.\n\nTry asking:\n• "What are the critical bugs?"\n• "What shipped recently?"\n• "What should we fix next?"\n• "How do I fix the Add Note bug?"\n• "What's the production health status?"`;
   }
 
   if (q.includes('next') && (q.includes('build') || q.includes('work') || q.includes('do'))) {
-    return `🎯 My Recommendation — What To Do Next:\n\n**Immediate (this week):**\n1. Merge PR #41 (cold-start banner) — 5 min\n2. Fix BUG-001/002 (Google Maps API) — 30 min\n3. Fix BUG-003 (Add Note) — 1 hour\n4. Fix BUG-004 (Ask Follow-up) — 2 hours\n\n**Short term:**\n5. Fix BUG-006 (Save Comparison)\n6. Fix BUG-007 (NOI chart fallback)\n7. Fix BUG-008 (Settings Save Changes)\n\nAll 4 critical bugs are "UI lies" — buttons that appear functional but do nothing. Fix these before any new features for demo readiness.`;
+    return `🎯 My Recommendation — What To Do Next:\n\n**Immediate (this week):**\n1. Fix BUG-001/002 (Google Maps API loaded multiple times + retire v3.55) — 30 min\n2. Fix BUG-003 (Add Note persistence in PropertyDetail) — 1 hour\n3. Fix BUG-004 (Ask Follow-up button — wire to existing chat API) — 1 hour\n4. Fix BUG-007 (NOI chart "---" fallback: T12 null → T3 → Y1) — 30 min\n\n**Short term:**\n5. Fix BUG-006 (Save Comparison — POST to /api/v1/comparisons)\n6. Fix BUG-008 (Settings Save Changes — PUT /api/v1/auth/me)\n\nAll 4 critical bugs are "UI lies" — buttons that appear functional but silently fail. Fix these before any new features for demo readiness.\n\n**New feature to consider:** BatchData MCP (auto-fetch market comps on upload) — highest impact backlog item.`;
   }
 
   return `I understand you're asking about "${input}". I have context on Talisman's bugs, PRs, features, architecture, and deployment status.\n\nTry being more specific:\n• "What critical bugs are open?"\n• "What shipped since Feb 26?"\n• "What's the production health?"\n• "How do I fix the Add Note bug?"\n• "What's next to build?"`;
@@ -226,7 +243,7 @@ export function CommandCenter() {
   const [agentMessages, setAgentMessages] = useState<ChatMessage[]>([
     {
       role: 'assistant',
-      content: `👋 Hey Griffin. I'm your Talisman PM agent — fully briefed on 94 PRs, 16 bugs, all deployments, and the full roadmap.\n\nAsk me anything about the project.`,
+      content: `👋 Hey Griffin. I'm your Talisman PM agent — fully briefed on 107 PRs, 14 open bugs, all deployments, and the full roadmap.\n\nRecent highlights: AI chat panel, Talisman IO rebrand, Champagne Gold design system, property detail 7-tab redesign, and TalismanCompass3D.\n\nAsk me anything about the project.`,
       timestamp: new Date().toLocaleTimeString(),
     }
   ]);
@@ -305,7 +322,7 @@ export function CommandCenter() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-foreground font-['Syne']">Command Center</h1>
-            <p className="text-xs text-slate-500">CEO view · Admin only · Last updated Mar 8, 2026</p>
+            <p className="text-xs text-slate-500">CEO view · Admin only · Last updated Mar 11, 2026</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
