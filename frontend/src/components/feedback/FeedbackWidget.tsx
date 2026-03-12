@@ -69,8 +69,8 @@ export function FeedbackWidget() {
   // In-app screenshot via html2canvas (lazy loaded)
   const captureScreenshot = async () => {
     try {
-      // @ts-expect-error — html2canvas types may not be installed
-      const html2canvas = (await import('html2canvas')).default as (el: HTMLElement, opts: Record<string, unknown>) => Promise<HTMLCanvasElement>;
+      const mod = await import('html2canvas');
+      const html2canvas = (mod.default ?? mod) as unknown as (el: HTMLElement, opts: Record<string, unknown>) => Promise<HTMLCanvasElement>;
       const canvas = await html2canvas(document.body, {
         scale: 0.5,
         logging: false,
