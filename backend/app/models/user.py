@@ -4,6 +4,9 @@ from sqlalchemy.sql import func
 import uuid
 from app.database import Base
 
+# Admin emails — hardcoded for demo phase
+ADMIN_EMAILS = ['griffinshapiro11182001@gmail.com', 'grshap2001@gmail.com']
+
 
 class User(Base):
     __tablename__ = "users"
@@ -14,6 +17,9 @@ class User(Base):
     hashed_password = Column(String(255), nullable=False)
     full_name = Column(String(255), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
+    # Demo approval gate: pending → active → suspended
+    account_status = Column(String(20), nullable=False, default="pending")
+    is_admin = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 

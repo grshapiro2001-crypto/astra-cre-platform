@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Astra CRE — Map Intelligence</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #0d0d12;
+            color: #f0f0f5;
+            overflow: hidden;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 65px;
+            background: #141420;
+            border-right: 1px solid rgba(255, 255, 255, 0.08);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 16px 0;
+            gap: 24px;
+        }
+
+        .sidebar-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 18px;
+            transition: all 0.3s ease;
+            background: transparent;
+        }
+
+        .sidebar-icon:hover {
+            background: rgba(124, 92, 252, 0.2);
+            color: #7c5cfc;
+        }
+
+        .sidebar-icon.active {
+            background: rgba(124, 92, 252, 0.3);
+            color: #7c5cfc;
+        }
+
+        /* Main content */
+        .main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, #7c5cfc, #a78bfa);
+            padding: 16px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 70px;
+            box-shadow: 0 2px 8px rgba(124, 92, 252, 0.15);
+        }
+
+        .header-left h1 {
+            font-size: 24px;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .header-right {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .user-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #fff;
+            font-size: 14px;
+        }
+
+        .notif-icon {
+            width: 32px;
+            height: 32px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+
+        .notif-icon:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        /* Content area */
+        .content {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 55% 1fr;
+            gap: 16px;
+            padding: 20px;
+            overflow: hidden;
+        }
+
+        /* Map area */
+        .map-container {
+            background: #141420;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            overflow: hidden;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .map-placeholder {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, rgba(124, 92, 252, 0.1), rgba(167, 139, 250, 0.1));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            color: #8b8b9e;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .map-pin {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            background: radial-gradient(circle, rgba(124, 92, 252, 0.8), rgba(124, 92, 252, 0.3));
+            border: 2px solid #7c5cfc;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+
+        .map-pin:hover {
+            background: radial-gradient(circle, rgba(167, 139, 250, 1), rgba(124, 92, 252, 0.4));
+            width: 50px;
+            height: 50px;
+            box-shadow: 0 0 24px rgba(124, 92, 252, 0.4);
+        }
+
+        .pin-label {
+            font-size: 10px;
+            position: absolute;
+            top: -20px;
+            background: #141420;
+            border: 1px solid rgba(124, 92, 252, 0.5);
+            padding: 4px 8px;
+            border-radius: 4px;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .map-pin:hover .pin-label {
+            opacity: 1;
+        }
+
+        /* Deal list */
+        .deal-list-container {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            overflow-y: auto;
+        }
+
+        .panel-title {
+            font-size: 12px;
+            color: #8b8b9e;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .deal-item {
+            background: #141420;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            padding: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .deal-item:hover {
+            border-color: rgba(124, 92, 252, 0.5);
+            box-shadow: 0 4px 12px rgba(124, 92, 252, 0.1);
+            background: rgba(124, 92, 252, 0.05);
+        }
+
+        .deal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 8px;
+        }
+
+        .deal-name {
+            font-size: 13px;
+            font-weight: 700;
+            color: #f0f0f5;
+        }
+
+        .deal-rank {
+            background: linear-gradient(135deg, #7c5cfc, #a78bfa);
+            color: #fff;
+            font-size: 10px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        .deal-metrics {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 8px;
+            font-size: 11px;
+        }
+
+        .metric-small {
+            background: rgba(124, 92, 252, 0.08);
+            padding: 6px 8px;
+            border-radius: 6px;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .metric-small-label {
+            color: #8b8b9e;
+            font-size: 9px;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            font-weight: 600;
+        }
+
+        .metric-small-value {
+            color: #7c5cfc;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            font-size: 12px;
+        }
+
+        .deal-location {
+            font-size: 10px;
+            color: #8b8b9e;
+        }
+
+        .deal-verdict {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 10px;
+            font-weight: 600;
+            padding: 4px 8px;
+            border-radius: 4px;
+            width: fit-content;
+        }
+
+        .verdict-pass {
+            background: rgba(34, 197, 94, 0.15);
+            color: #22c55e;
+            border: 1px solid rgba(34, 197, 94, 0.2);
+        }
+
+        .verdict-review {
+            background: rgba(234, 179, 8, 0.15);
+            color: #eab308;
+            border: 1px solid rgba(234, 179, 8, 0.2);
+        }
+
+        .verdict-fail {
+            background: rgba(239, 68, 68, 0.15);
+            color: #ef4444;
+            border: 1px solid rgba(239, 68, 68, 0.2);
+        }
+
+        /* Scrollbars */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        /* Version badge */
+        .version-badge {
+            position: absolute;
+            top: 20px;
+            left: 85px;
+            background: rgba(124, 92, 252, 0.2);
+            border: 1px solid rgba(124, 92, 252, 0.4);
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 10px;
+            color: #7c5cfc;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-icon active" title="Dashboard">📊</div>
+            <div class="sidebar-icon" title="Library">📚</div>
+            <div class="sidebar-icon" title="Upload">⬆️</div>
+            <div class="sidebar-icon" title="Compare">⚖️</div>
+            <div class="sidebar-icon" title="Data Bank">🏦</div>
+            <div class="sidebar-icon" title="Settings">⚙️</div>
+        </div>
+
+        <div class="main">
+            <!-- Header -->
+            <div class="header">
+                <div class="header-left">
+                    <h1>Astra CRE</h1>
+                </div>
+                <div class="header-right">
+                    <div class="user-badge">
+                        <span>Griffin</span>
+                    </div>
+                    <div class="notif-icon">🔔</div>
+                </div>
+            </div>
+
+            <div class="version-badge">v4: Map Intelligence</div>
+
+            <!-- Content -->
+            <div class="content">
+                <!-- Map -->
+                <div class="map-container">
+                    <div class="map-placeholder">
+                        <!-- Pin 1: 1160 Hammond - top center -->
+                        <div class="map-pin" style="top: 35%; left: 45%;" title="1160 Hammond">
+                            <div class="pin-label">1160 Hammond</div>
+                            📍
+                        </div>
+                        <!-- Pin 2: The Skylark - left side -->
+                        <div class="map-pin" style="top: 55%; left: 25%;" title="The Skylark">
+                            <div class="pin-label">The Skylark</div>
+                            📍
+                        </div>
+                        <!-- Pin 3: Adley City Springs - right side -->
+                        <div class="map-pin" style="top: 60%; left: 65%;" title="Adley City Springs">
+                            <div class="pin-label">Adley City Springs</div>
+                            📍
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right panel: Deal list -->
+                <div class="deal-list-container">
+                    <div class="panel-title">Ranked Deals by Score</div>
+
+                    <!-- Deal 1: 1160 Hammond -->
+                    <div class="deal-item">
+                        <div class="deal-header">
+                            <div class="deal-name">1160 Hammond</div>
+                            <div class="deal-rank">Rank #1</div>
+                        </div>
+                        <div class="deal-metrics">
+                            <div class="metric-small">
+                                <div class="metric-small-label">Score</div>
+                                <div class="metric-small-value">83</div>
+                            </div>
+                            <div class="metric-small">
+                                <div class="metric-small-label">NOI</div>
+                                <div class="metric-small-value">$4.3M</div>
+                            </div>
+                            <div class="metric-small">
+                                <div class="metric-small-label">Units</div>
+                                <div class="metric-small-value">345</div>
+                            </div>
+                        </div>
+                        <div class="deal-location">📍 Sandy Springs, GA</div>
+                        <div class="deal-verdict verdict-pass">✓ PASS</div>
+                    </div>
+
+                    <!-- Deal 2: The Skylark -->
+                    <div class="deal-item">
+                        <div class="deal-header">
+                            <div class="deal-name">The Skylark</div>
+                            <div class="deal-rank">Rank #2</div>
+                        </div>
+                        <div class="deal-metrics">
+                            <div class="metric-small">
+                                <div class="metric-small-label">Score</div>
+                                <div class="metric-small-value">79</div>
+                            </div>
+                            <div class="metric-small">
+                                <div class="metric-small-label">NOI</div>
+                                <div class="metric-small-value">$3.7M</div>
+                            </div>
+                            <div class="metric-small">
+                                <div class="metric-small-label">Units</div>
+                                <div class="metric-small-value">319</div>
+                            </div>
+                        </div>
+                        <div class="deal-location">📍 Atlanta, GA</div>
+                        <div class="deal-verdict verdict-review">◆ REVIEW</div>
+                    </div>
+
+                    <!-- Deal 3: Adley City Springs -->
+                    <div class="deal-item">
+                        <div class="deal-header">
+                            <div class="deal-name">Adley City Springs</div>
+                            <div class="deal-rank">Rank #3</div>
+                        </div>
+                        <div class="deal-metrics">
+                            <div class="metric-small">
+                                <div class="metric-small-label">Score</div>
+                                <div class="metric-small-value">67</div>
+                            </div>
+                            <div class="metric-small">
+                                <div class="metric-small-label">NOI</div>
+                                <div class="metric-small-value">$4.0M</div>
+                            </div>
+                            <div class="metric-small">
+                                <div class="metric-small-label">Units</div>
+                                <div class="metric-small-value">291</div>
+                            </div>
+                        </div>
+                        <div class="deal-location">📍 Sandy Springs, GA</div>
+                        <div class="deal-verdict verdict-fail">✕ FAIL</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

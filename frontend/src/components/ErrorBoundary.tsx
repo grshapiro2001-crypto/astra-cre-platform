@@ -34,6 +34,19 @@ export class ErrorBoundary extends Component<Props, State> {
     this.setState({ errorInfo });
     // Log to console for debugging
     console.error('[ErrorBoundary] Caught render crash:', error, errorInfo);
+    // Auto-report to event tracker for demo analytics
+    try {
+      import('../services/eventTracker').then(({ eventTracker }) => {
+        eventTracker.trackError(
+          error,
+          'ErrorBoundary',
+          errorInfo.componentStack || undefined,
+        );
+        eventTracker.flush(); // Flush immediately for errors
+      });
+    } catch {
+      // Silently fail — error tracking should never cause more errors
+    }
   }
 
   handleReload = () => {

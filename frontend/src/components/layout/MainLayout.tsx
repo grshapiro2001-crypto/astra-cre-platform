@@ -8,6 +8,7 @@ import { useUIStore } from '@/store/uiStore';
 import { cn } from '@/lib/utils';
 import { AssistantToggle } from '@/components/assistant/AssistantToggle';
 import { AssistantPanel } from '@/components/assistant/AssistantPanel';
+import { FeedbackWidget } from '@/components/feedback/FeedbackWidget';
 
 export const MainLayout = () => {
   const { sidebarCollapsed, setMobileSidebarOpen, theme } = useUIStore();
@@ -63,6 +64,9 @@ export const MainLayout = () => {
       {/* AI Assistant */}
       <AssistantToggle />
       <AssistantPanel />
+
+      {/* Feedback Widget — all authenticated users */}
+      <FeedbackWidget />
     </div>
   );
 };

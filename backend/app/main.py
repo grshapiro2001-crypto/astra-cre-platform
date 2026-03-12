@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.database import engine, Base
 import app.models  # noqa: F401 — import all models so Base.metadata knows about them
-from app.api.routes import auth, upload, properties, deal_folders, scoring, data_bank, criteria, chat, organizations, stacking, assistant
+from app.api.routes import auth, upload, properties, deal_folders, scoring, data_bank, criteria, chat, organizations, stacking, assistant, admin, feedback, events
 
 logger = logging.getLogger(__name__)
 
@@ -110,6 +110,26 @@ def run_migrations():
         except Exception as e:
             logger.warning(f"Migration unit_mix error: {e}")
 
+        # Add account_status and is_admin to users if missing
+        try:
+            user_cols = {c['name'] for c in inspector.get_columns('users')}
+            if 'account_status' not in user_cols:
+                conn.execute(text("ALTER TABLE users ADD COLUMN account_status VARCHAR(20) DEFAULT 'active'"))
+                conn.commit()
+                logger.warning("Migration: added column users.account_status")
+            if 'is_admin' not in user_cols:
+                conn.execute(text("ALTER TABLE users ADD COLUMN is_admin BOOLEAN DEFAULT FALSE"))
+                conn.commit()
+                logger.warning("Migration: added column users.is_admin")
+                # Set admin flag for known admin emails
+                from app.models.user import ADMIN_EMAILS
+                for email in ADMIN_EMAILS:
+                    conn.execute(text("UPDATE users SET is_admin = TRUE, account_status = 'active' WHERE email = :email"), {"email": email})
+                conn.commit()
+                logger.warning("Migration: set admin flag for admin emails")
+        except Exception as e:
+            logger.warning(f"Migration users approval cols skip: {e}")
+
         # Add organization_id to deal_folders if missing
         try:
             df_cols = {c['name'] for c in inspector.get_columns('deal_folders')}
@@ -182,6 +202,9 @@ app.include_router(chat.router, prefix="/api/v1")
 app.include_router(organizations.router, prefix="/api/v1")
 app.include_router(stacking.router, prefix="/api/v1")
 app.include_router(assistant.router, prefix="/api/v1")
+app.include_router(admin.router, prefix="/api/v1")
+app.include_router(feedback.router, prefix="/api/v1")
+app.include_router(events.router, prefix="/api/v1")
 
 @app.get("/")
 def root():

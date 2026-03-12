@@ -3,6 +3,8 @@ export interface User {
   email: string;
   full_name?: string;
   is_active: boolean;
+  account_status: 'pending' | 'active' | 'suspended';
+  is_admin: boolean;
   created_at: string;
 }
 
