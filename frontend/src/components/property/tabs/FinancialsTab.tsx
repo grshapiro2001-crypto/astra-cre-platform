@@ -5,6 +5,7 @@
 import { useMemo } from 'react';
 import {
   BarChart3,
+  Info,
   Upload,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -236,37 +237,61 @@ export function FinancialsTab({
 
   const currentFinancials = getFinancials(property, financialPeriod);
 
+  // Resolve best-available financials with cross-period fallback chain.
+  // If the selected period has no NOI, fall back t12 → t3 → y1 and surface a banner.
+  const resolvedData = useMemo(() => {
+    if (currentFinancials?.noi != null) {
+      return { fin: currentFinancials, noi: currentFinancials.noi, period: financialPeriod, banner: null as string | null };
+    }
+    const chain: FinancialPeriodKey[] = ['t12', 't3', 'y1'];
+    for (const p of chain) {
+      if (p === financialPeriod) continue;
+      const fallbackFin = getFinancials(property, p);
+      if (fallbackFin?.noi != null) {
+        return {
+          fin: fallbackFin,
+          noi: fallbackFin.noi,
+          period: p,
+          banner: `${periodLabel(financialPeriod)} unavailable — displaying ${periodLabel(p)}` as string | null,
+        };
+      }
+    }
+    return { fin: currentFinancials, noi: null as number | null, period: financialPeriod, banner: null as string | null };
+  }, [property, financialPeriod, currentFinancials]);
+
   const economicOccupancy = useMemo(() => {
-    const metrics = property.calculated_metrics?.[financialPeriod];
+    const fin = resolvedData.fin;
+    const metrics = property.calculated_metrics?.[resolvedData.period];
     if (metrics?.economic_occupancy != null) {
-      const gsr = currentFinancials?.gsr ?? 0;
+      const gsr = fin?.gsr ?? 0;
       return {
         percent: metrics.economic_occupancy,
         amount: gsr > 0 ? gsr * (metrics.economic_occupancy / 100) : null,
       };
     }
-    if (!currentFinancials?.gsr) return { percent: 0, amount: null };
-    const gpr = currentFinancials.gsr - Math.abs(currentFinancials.loss_to_lease ?? 0);
+    if (!fin?.gsr) return { percent: 0, amount: null };
+    const gpr = fin.gsr - Math.abs(fin.loss_to_lease ?? 0);
     const nri = gpr
-      - Math.abs(currentFinancials.vacancy ?? 0)
-      - Math.abs(currentFinancials.concessions ?? 0)
-      - Math.abs(currentFinancials.non_revenue_units ?? 0)
-      - Math.abs(currentFinancials.bad_debt ?? 0);
+      - Math.abs(fin.vacancy ?? 0)
+      - Math.abs(fin.concessions ?? 0)
+      - Math.abs(fin.non_revenue_units ?? 0)
+      - Math.abs(fin.bad_debt ?? 0);
     return {
       percent: gpr > 0 ? (nri / gpr) * 100 : 0,
       amount: nri,
     };
-  }, [property, financialPeriod, currentFinancials]);
+  }, [property, resolvedData]);
 
   const opexPercent = useMemo(() => {
-    const metrics = property.calculated_metrics?.[financialPeriod];
+    const fin = resolvedData.fin;
+    const metrics = property.calculated_metrics?.[resolvedData.period];
     if (metrics?.opex_ratio != null) return metrics.opex_ratio;
-    if (!currentFinancials?.gsr || !currentFinancials?.total_opex) return 0;
-    const gpr = currentFinancials.gsr - Math.abs(currentFinancials.loss_to_lease ?? 0);
-    return gpr > 0 ? (currentFinancials.total_opex / gpr) * 100 : 0;
-  }, [property, financialPeriod, currentFinancials]);
+    if (!fin?.gsr || !fin?.total_opex) return 0;
+    const gpr = fin.gsr - Math.abs(fin.loss_to_lease ?? 0);
+    return gpr > 0 ? (fin.total_opex / gpr) * 100 : 0;
+  }, [property, resolvedData]);
 
-  const expenseBreakdown = useMemo(() => computeExpenseBreakdown(property, financialPeriod), [property, financialPeriod]);
+  const expenseBreakdown = useMemo(() => computeExpenseBreakdown(property, resolvedData.period), [property, resolvedData.period]);
 
   const monthlyTrend = useMemo(() => computeMonthlyEGI(property), [property]);
 
@@ -291,7 +316,9 @@ export function FinancialsTab({
     );
   }
 
-  if (!currentFinancials) return null;
+  if (!resolvedData.fin) return null;
+
+  const fin = resolvedData.fin;
 
   return (
     <div className="space-y-6">
@@ -356,19 +383,27 @@ export function FinancialsTab({
         </div>
       </div>
 
+      {/* Fallback data source banner */}
+      {resolvedData.banner && (
+        <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium border bg-primary/10 text-primary border-primary/30">
+          <Info className="w-4 h-4 shrink-0" />
+          {resolvedData.banner}
+        </div>
+      )}
+
       {/* Revenue / Expenses 2-col */}
       <div className={GLASS_CARD}>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Revenue */}
           <div>
             <h3 className="text-sm font-semibold uppercase tracking-wider mb-4 text-muted-foreground">Revenue</h3>
-            <FinancialRow label="Gross Scheduled Rent (GSR)" value={currentFinancials.gsr} totalUnits={totalUnits} viewMode={financialView} />
-            {(currentFinancials.vacancy != null || currentFinancials.concessions != null || currentFinancials.bad_debt != null || currentFinancials.non_revenue_units != null) && (
+            <FinancialRow label="Gross Scheduled Rent (GSR)" value={fin.gsr} totalUnits={totalUnits} viewMode={financialView} />
+            {(fin.vacancy != null || fin.concessions != null || fin.bad_debt != null || fin.non_revenue_units != null) && (
               <>
-                <FinancialRow label="Vacancy" value={currentFinancials.vacancy} isDeduction totalUnits={totalUnits} viewMode={financialView} />
-                <FinancialRow label="Concessions" value={currentFinancials.concessions} isDeduction totalUnits={totalUnits} viewMode={financialView} />
-                <FinancialRow label="Bad Debt" value={currentFinancials.bad_debt} isDeduction totalUnits={totalUnits} viewMode={financialView} />
-                <FinancialRow label="Non-Revenue Units" value={currentFinancials.non_revenue_units} isDeduction totalUnits={totalUnits} viewMode={financialView} />
+                <FinancialRow label="Vacancy" value={fin.vacancy} isDeduction totalUnits={totalUnits} viewMode={financialView} />
+                <FinancialRow label="Concessions" value={fin.concessions} isDeduction totalUnits={totalUnits} viewMode={financialView} />
+                <FinancialRow label="Bad Debt" value={fin.bad_debt} isDeduction totalUnits={totalUnits} viewMode={financialView} />
+                <FinancialRow label="Non-Revenue Units" value={fin.non_revenue_units} isDeduction totalUnits={totalUnits} viewMode={financialView} />
               </>
             )}
             {economicOccupancy.percent > 0 && economicOccupancy.amount != null && (
@@ -388,20 +423,20 @@ export function FinancialsTab({
             <h3 className="text-sm font-semibold uppercase tracking-wider mb-4 text-muted-foreground">Expenses &amp; NOI</h3>
             <FinancialRow
               label="Total Operating Expenses"
-              value={currentFinancials.total_opex}
+              value={fin.total_opex}
               isDeduction
               percent={opexPercent > 0 ? opexPercent : null}
               totalUnits={totalUnits}
               viewMode={financialView}
             />
-            {currentFinancials.opex_components?.management_fee != null && (
-              <FinancialRow label="Management Fee" value={currentFinancials.opex_components.management_fee} isDeduction totalUnits={totalUnits} viewMode={financialView} />
+            {fin.opex_components?.management_fee != null && (
+              <FinancialRow label="Management Fee" value={fin.opex_components.management_fee} isDeduction totalUnits={totalUnits} viewMode={financialView} />
             )}
-            {currentFinancials.opex_components?.insurance != null && (
-              <FinancialRow label="Insurance" value={currentFinancials.opex_components.insurance} isDeduction totalUnits={totalUnits} viewMode={financialView} />
+            {fin.opex_components?.insurance != null && (
+              <FinancialRow label="Insurance" value={fin.opex_components.insurance} isDeduction totalUnits={totalUnits} viewMode={financialView} />
             )}
-            {currentFinancials.opex_components?.property_taxes != null && (
-              <FinancialRow label="Property Taxes" value={currentFinancials.opex_components.property_taxes} isDeduction totalUnits={totalUnits} viewMode={financialView} />
+            {fin.opex_components?.property_taxes != null && (
+              <FinancialRow label="Property Taxes" value={fin.opex_components.property_taxes} isDeduction totalUnits={totalUnits} viewMode={financialView} />
             )}
 
             {/* NOI callout */}
@@ -409,17 +444,17 @@ export function FinancialsTab({
               <div className="flex items-center justify-between">
                 <div>
                   <p className="font-semibold text-foreground">Net Operating Income (NOI)</p>
-                  <p className="text-xs mt-0.5 text-muted-foreground">{periodDescription(financialPeriod)}</p>
+                  <p className="text-xs mt-0.5 text-muted-foreground">{periodDescription(resolvedData.period)}</p>
                 </div>
                 <div className="text-right">
                   <p className="font-display text-3xl font-bold text-primary">
                     {financialView === 'perUnit'
-                      ? fmtPerUnit(currentFinancials.noi, totalUnits)
-                      : fmtCurrency(currentFinancials.noi)}
+                      ? fmtPerUnit(resolvedData.noi, totalUnits)
+                      : fmtCurrency(resolvedData.noi)}
                   </p>
                   {financialView === 'total' && totalUnits > 0 && (
                     <p className="font-mono text-sm text-muted-foreground">
-                      {fmtPerUnit(currentFinancials.noi, totalUnits)}/unit
+                      {fmtPerUnit(resolvedData.noi, totalUnits)}/unit
                     </p>
                   )}
                 </div>
