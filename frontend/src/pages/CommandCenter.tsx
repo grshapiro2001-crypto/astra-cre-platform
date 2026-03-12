@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useAuthStore } from '@/store/authSlice';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,7 +23,18 @@ import {
   FileCode,
   TrendingUp,
   Circle,
+  Mail,
+  Shield,
+  ShieldCheck,
+  ShieldX,
+  UserCheck,
+  UserX,
+  Loader2,
+  MessageCircle,
+  Reply,
 } from 'lucide-react';
+import { adminService, type AdminUser } from '@/services/adminService';
+import { feedbackService, type FeedbackReport as FeedbackReportType } from '@/services/feedbackService';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -250,6 +261,110 @@ export function CommandCenter() {
   const [agentInput, setAgentInput] = useState('');
   const chatEndRef = useRef<HTMLDivElement>(null);
 
+  // ─── Users tab state ───
+  const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [usersError, setUsersError] = useState<string | null>(null);
+  const [updatingUserId, setUpdatingUserId] = useState<string | null>(null);
+  const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
+
+  const fetchUsers = useCallback(async () => {
+    setUsersLoading(true);
+    setUsersError(null);
+    try {
+      const data = await adminService.listUsers();
+      setAdminUsers(data.users);
+    } catch {
+      setUsersError('Failed to load users');
+    } finally {
+      setUsersLoading(false);
+    }
+  }, []);
+
+  const handleStatusChange = async (userId: string, newStatus: 'active' | 'suspended' | 'pending') => {
+    setUpdatingUserId(userId);
+    try {
+      await adminService.updateUserStatus(userId, newStatus);
+      setAdminUsers(prev =>
+        prev.map(u => u.id === userId ? { ...u, account_status: newStatus } : u)
+      );
+    } catch {
+      setUsersError('Failed to update user status');
+    } finally {
+      setUpdatingUserId(null);
+    }
+  };
+
+  const getOnboardingEmail = (targetUser: AdminUser) => {
+    return `Subject: Welcome to Talisman IO — You're In!
+
+Hey ${targetUser.full_name || targetUser.email.split('@')[0]},
+
+Great news — your Talisman IO account is now active.
+
+Here's how to get started:
+1. Log in at https://talisman-io.vercel.app
+2. Upload your first Offering Memorandum or Rent Roll
+3. Watch Talisman extract financials, score the deal, and build your stacking model
+
+You're one of our first demo users, so your feedback is incredibly valuable. Use the feedback widget (bottom-left of the app) to report bugs or suggest features.
+
+If anything feels off or you get stuck, reach out directly — I'm watching every submission.
+
+— Griffin
+CEO, Talisman IO`;
+  };
+
+  const copyOnboardingEmail = (targetUser: AdminUser) => {
+    navigator.clipboard.writeText(getOnboardingEmail(targetUser));
+    setCopiedEmail(targetUser.id);
+    setTimeout(() => setCopiedEmail(null), 2000);
+  };
+
+  // ─── Feedback tab state ───
+  const [feedbackReports, setFeedbackReports] = useState<FeedbackReportType[]>([]);
+  const [feedbackLoading, setFeedbackLoading] = useState(false);
+  const [feedbackReplyText, setFeedbackReplyText] = useState<Record<string, string>>({});
+  const [replyingTo, setReplyingTo] = useState<string | null>(null);
+
+  const fetchFeedback = useCallback(async () => {
+    setFeedbackLoading(true);
+    try {
+      const data = await feedbackService.listReports();
+      setFeedbackReports(data.reports);
+    } catch {
+      // silently fail
+    } finally {
+      setFeedbackLoading(false);
+    }
+  }, []);
+
+  const handleReply = async (reportId: string) => {
+    const msg = feedbackReplyText[reportId]?.trim();
+    if (!msg) return;
+    setReplyingTo(reportId);
+    try {
+      await feedbackService.addReply(reportId, msg);
+      setFeedbackReplyText(prev => ({ ...prev, [reportId]: '' }));
+      await fetchFeedback(); // Refresh to show new reply
+    } catch {
+      // silently fail
+    } finally {
+      setReplyingTo(null);
+    }
+  };
+
+  const handleFeedbackStatusChange = async (reportId: string, newStatus: string) => {
+    try {
+      await feedbackService.updateStatus(reportId, newStatus);
+      setFeedbackReports(prev =>
+        prev.map(r => r.id === reportId ? { ...r, status: newStatus as FeedbackReportType['status'] } : r)
+      );
+    } catch {
+      // silently fail
+    }
+  };
+
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [agentMessages]);
@@ -371,6 +486,8 @@ export function CommandCenter() {
           <TabsTrigger value="analytics" className="gap-1.5"><BarChart3 className="w-3.5 h-3.5" />Analytics</TabsTrigger>
           <TabsTrigger value="agent" className="gap-1.5"><Cpu className="w-3.5 h-3.5" />PM Agent</TabsTrigger>
           <TabsTrigger value="activity" className="gap-1.5"><Activity className="w-3.5 h-3.5" />Git Activity</TabsTrigger>
+          <TabsTrigger value="users" className="gap-1.5" onClick={() => { if (adminUsers.length === 0) fetchUsers(); }}><Users className="w-3.5 h-3.5" />Users</TabsTrigger>
+          <TabsTrigger value="feedback" className="gap-1.5" onClick={() => { if (feedbackReports.length === 0) fetchFeedback(); }}><MessageCircle className="w-3.5 h-3.5" />Feedback</TabsTrigger>
         </TabsList>
 
         {/* ────── BUGS TAB ────── */}
@@ -820,6 +937,340 @@ export function CommandCenter() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        {/* ────── USERS TAB ────── */}
+        <TabsContent value="users" className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-foreground">User Management</h2>
+              <p className="text-xs text-slate-500">Approve, suspend, and onboard demo users</p>
+            </div>
+            <Button size="sm" variant="outline" onClick={fetchUsers} disabled={usersLoading}>
+              {usersLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : null}
+              Refresh
+            </Button>
+          </div>
+
+          {usersError && (
+            <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-2">
+              {usersError}
+            </div>
+          )}
+
+          {usersLoading && adminUsers.length === 0 ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-6 h-6 animate-spin text-slate-500" />
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {/* Pending users first, then active, then suspended */}
+              {[...adminUsers]
+                .sort((a, b) => {
+                  const order = { pending: 0, active: 1, suspended: 2 };
+                  return (order[a.account_status] ?? 3) - (order[b.account_status] ?? 3);
+                })
+                .map(u => (
+                  <Card key={u.id} className={`bg-card/50 border-border/60 ${
+                    u.account_status === 'pending' ? 'border-l-4 border-l-amber-500' :
+                    u.account_status === 'suspended' ? 'border-l-4 border-l-red-500/60 opacity-60' : ''
+                  }`}>
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between gap-4 flex-wrap">
+                        {/* User info */}
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${
+                            u.account_status === 'active' ? 'bg-emerald-500/15' :
+                            u.account_status === 'pending' ? 'bg-amber-500/15' : 'bg-red-500/15'
+                          }`}>
+                            {u.account_status === 'active' ? <ShieldCheck className="w-4 h-4 text-emerald-400" /> :
+                             u.account_status === 'pending' ? <Shield className="w-4 h-4 text-amber-400" /> :
+                             <ShieldX className="w-4 h-4 text-red-400" />}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-medium text-foreground truncate">
+                                {u.full_name || u.email.split('@')[0]}
+                              </p>
+                              {u.is_admin && (
+                                <span className="text-[10px] font-mono text-primary bg-primary/10 px-1.5 py-0.5 rounded">
+                                  ADMIN
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-slate-500 truncate">{u.email}</p>
+                            <p className="text-[10px] text-slate-600">
+                              Joined {new Date(u.created_at).toLocaleDateString()}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Status badge + actions */}
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <span className={`text-[10px] font-mono px-2 py-1 rounded-full ${
+                            u.account_status === 'active' ? 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/20' :
+                            u.account_status === 'pending' ? 'text-amber-400 bg-amber-500/10 border border-amber-500/20' :
+                            'text-red-400 bg-red-500/10 border border-red-500/20'
+                          }`}>
+                            {u.account_status.toUpperCase()}
+                          </span>
+
+                          {!u.is_admin && (
+                            <>
+                              {u.account_status === 'pending' && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 text-xs gap-1 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
+                                  disabled={updatingUserId === u.id}
+                                  onClick={() => handleStatusChange(u.id, 'active')}
+                                >
+                                  {updatingUserId === u.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <UserCheck className="w-3 h-3" />}
+                                  Approve
+                                </Button>
+                              )}
+                              {u.account_status === 'active' && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 text-xs gap-1 border-red-500/30 text-red-400 hover:bg-red-500/10"
+                                  disabled={updatingUserId === u.id}
+                                  onClick={() => handleStatusChange(u.id, 'suspended')}
+                                >
+                                  {updatingUserId === u.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <UserX className="w-3 h-3" />}
+                                  Suspend
+                                </Button>
+                              )}
+                              {u.account_status === 'suspended' && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 text-xs gap-1 border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
+                                  disabled={updatingUserId === u.id}
+                                  onClick={() => handleStatusChange(u.id, 'active')}
+                                >
+                                  {updatingUserId === u.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <UserCheck className="w-3 h-3" />}
+                                  Reactivate
+                                </Button>
+                              )}
+
+                              {/* Onboarding email button — only for active users */}
+                              {u.account_status === 'active' && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 text-xs gap-1 text-slate-400 hover:text-foreground"
+                                  onClick={() => copyOnboardingEmail(u)}
+                                >
+                                  {copiedEmail === u.id ? <CheckCircle2 className="w-3 h-3 text-emerald-400" /> : <Mail className="w-3 h-3" />}
+                                  {copiedEmail === u.id ? 'Copied!' : 'Copy Welcome Email'}
+                                </Button>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+
+              {adminUsers.length === 0 && !usersLoading && (
+                <div className="text-center py-12 text-slate-500 text-sm">
+                  No users found. Click Refresh to load.
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Onboarding Email Template Preview */}
+          <Card className="bg-card/30 border-border/40">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-slate-400 flex items-center gap-2">
+                <Mail className="w-4 h-4" /> Onboarding Email Template
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <pre className="text-xs text-slate-500 whitespace-pre-wrap font-mono leading-relaxed bg-background/50 rounded-lg p-4 border border-border/30">
+{`Subject: Welcome to Talisman IO — You're In!
+
+Hey [Name],
+
+Great news — your Talisman IO account is now active.
+
+Here's how to get started:
+1. Log in at https://talisman-io.vercel.app
+2. Upload your first Offering Memorandum or Rent Roll
+3. Watch Talisman extract financials, score the deal, and build your stacking model
+
+You're one of our first demo users, so your feedback is incredibly valuable.
+Use the feedback widget (bottom-left of the app) to report bugs or suggest features.
+
+If anything feels off or you get stuck, reach out directly — I'm watching every submission.
+
+— Griffin
+CEO, Talisman IO`}
+              </pre>
+              <p className="text-[10px] text-slate-600 mt-2">
+                Click "Copy Welcome Email" on any active user to copy a personalized version.
+              </p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ────── FEEDBACK TAB ────── */}
+        <TabsContent value="feedback" className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-foreground">Feedback Reports</h2>
+              <p className="text-xs text-slate-500">Bug reports, feature requests, and user feedback</p>
+            </div>
+            <Button size="sm" variant="outline" onClick={fetchFeedback} disabled={feedbackLoading}>
+              {feedbackLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : null}
+              Refresh
+            </Button>
+          </div>
+
+          {feedbackLoading && feedbackReports.length === 0 ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-6 h-6 animate-spin text-slate-500" />
+            </div>
+          ) : feedbackReports.length === 0 ? (
+            <div className="text-center py-12 text-slate-500 text-sm">
+              No feedback reports yet. Click Refresh to load.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {feedbackReports.map(report => (
+                <Card key={report.id} className={`bg-card/50 border-border/60 ${
+                  report.severity === 'critical' ? 'border-l-4 border-l-red-500' :
+                  report.severity === 'high' ? 'border-l-4 border-l-orange-500' :
+                  report.category === 'feature' ? 'border-l-4 border-l-blue-500' : ''
+                }`}>
+                  <div className="p-4 space-y-3">
+                    {/* Header row */}
+                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                      <div className="flex items-center gap-2">
+                        <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
+                          report.category === 'bug' ? 'text-red-400 bg-red-500/10' :
+                          report.category === 'feature' ? 'text-blue-400 bg-blue-500/10' :
+                          'text-slate-400 bg-slate-500/10'
+                        }`}>
+                          {report.category.toUpperCase()}
+                        </span>
+                        {report.category === 'bug' && (
+                          <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
+                            report.severity === 'critical' ? 'text-red-400 bg-red-500/10' :
+                            report.severity === 'high' ? 'text-orange-400 bg-orange-500/10' :
+                            report.severity === 'medium' ? 'text-yellow-400 bg-yellow-500/10' :
+                            'text-slate-400 bg-slate-500/10'
+                          }`}>
+                            {report.severity.toUpperCase()}
+                          </span>
+                        )}
+                        <span className="text-xs text-slate-500">
+                          by {report.user_name || report.user_email || 'Unknown'}
+                        </span>
+                        <span className="text-[10px] text-slate-600">
+                          {new Date(report.created_at).toLocaleDateString()}
+                        </span>
+                      </div>
+
+                      {/* Status dropdown */}
+                      <select
+                        value={report.status}
+                        onChange={(e) => handleFeedbackStatusChange(report.id, e.target.value)}
+                        className={`text-[10px] font-mono px-2 py-1 rounded border bg-background cursor-pointer ${
+                          report.status === 'open' ? 'text-amber-400 border-amber-500/30' :
+                          report.status === 'in_progress' ? 'text-blue-400 border-blue-500/30' :
+                          report.status === 'resolved' ? 'text-emerald-400 border-emerald-500/30' :
+                          'text-slate-400 border-slate-500/30'
+                        }`}
+                      >
+                        <option value="open">OPEN</option>
+                        <option value="in_progress">IN PROGRESS</option>
+                        <option value="resolved">RESOLVED</option>
+                        <option value="closed">CLOSED</option>
+                      </select>
+                    </div>
+
+                    {/* Title + description */}
+                    <p className="text-sm font-medium text-foreground">{report.title}</p>
+                    {report.description && (
+                      <p className="text-xs text-slate-400 leading-relaxed">{report.description}</p>
+                    )}
+
+                    {/* Screenshot */}
+                    {report.screenshot_url && (
+                      <img
+                        src={report.screenshot_url}
+                        alt="Screenshot"
+                        className="rounded-lg border border-border/40 max-h-40 object-contain"
+                      />
+                    )}
+
+                    {/* App state context */}
+                    {(report.current_url || report.active_tab || report.viewport_size) && (
+                      <div className="flex flex-wrap gap-2">
+                        {report.current_url && (
+                          <span className="text-[10px] font-mono text-slate-600 bg-background/50 px-2 py-0.5 rounded border border-border/30">
+                            {report.current_url.replace(/https?:\/\/[^/]+/, '')}
+                          </span>
+                        )}
+                        {report.active_tab && (
+                          <span className="text-[10px] font-mono text-slate-600 bg-background/50 px-2 py-0.5 rounded border border-border/30">
+                            Tab: {report.active_tab}
+                          </span>
+                        )}
+                        {report.viewport_size && (
+                          <span className="text-[10px] font-mono text-slate-600 bg-background/50 px-2 py-0.5 rounded border border-border/30">
+                            {report.viewport_size}
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Replies */}
+                    {report.replies.length > 0 && (
+                      <div className="border-t border-border/30 pt-2 space-y-2">
+                        {report.replies.map(reply => (
+                          <div key={reply.id} className="flex gap-2 text-xs">
+                            <Reply className="w-3 h-3 text-slate-600 mt-0.5 flex-shrink-0" />
+                            <div>
+                              <span className="font-medium text-primary">{reply.user_name || reply.user_email}: </span>
+                              <span className="text-slate-400">{reply.message}</span>
+                              <span className="text-[10px] text-slate-600 ml-2">
+                                {new Date(reply.created_at).toLocaleDateString()}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Reply input */}
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Reply to this report..."
+                        value={feedbackReplyText[report.id] || ''}
+                        onChange={(e) => setFeedbackReplyText(prev => ({ ...prev, [report.id]: e.target.value }))}
+                        className="text-xs h-8"
+                        onKeyDown={(e) => e.key === 'Enter' && handleReply(report.id)}
+                      />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 px-3"
+                        disabled={!feedbackReplyText[report.id]?.trim() || replyingTo === report.id}
+                        onClick={() => handleReply(report.id)}
+                      >
+                        {replyingTo === report.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
+                      </Button>
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
         </TabsContent>
       </Tabs>
     </div>

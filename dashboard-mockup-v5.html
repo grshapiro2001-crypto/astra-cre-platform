@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Astra CRE — Portfolio Overview</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #0d0d12;
+            color: #f0f0f5;
+            overflow: hidden;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 65px;
+            background: #141420;
+            border-right: 1px solid rgba(255, 255, 255, 0.08);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 16px 0;
+            gap: 24px;
+        }
+
+        .sidebar-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 18px;
+            transition: all 0.3s ease;
+            background: transparent;
+        }
+
+        .sidebar-icon:hover {
+            background: rgba(124, 92, 252, 0.2);
+            color: #7c5cfc;
+        }
+
+        .sidebar-icon.active {
+            background: rgba(124, 92, 252, 0.3);
+            color: #7c5cfc;
+        }
+
+        /* Main content */
+        .main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, #7c5cfc, #a78bfa);
+            padding: 16px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 70px;
+            box-shadow: 0 2px 8px rgba(124, 92, 252, 0.15);
+        }
+
+        .header-left h1 {
+            font-size: 24px;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .header-right {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .user-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #fff;
+            font-size: 14px;
+        }
+
+        .notif-icon {
+            width: 32px;
+            height: 32px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+
+        .notif-icon:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        /* Content */
+        .content {
+            flex: 1;
+            padding: 24px 32px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        /* KPI Banner */
+        .kpi-banner {
+            background: linear-gradient(135deg, rgba(124, 92, 252, 0.15), rgba(167, 139, 250, 0.15));
+            border: 1px solid rgba(124, 92, 252, 0.3);
+            border-radius: 12px;
+            padding: 28px;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 32px;
+        }
+
+        .kpi-item {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .kpi-label {
+            font-size: 11px;
+            color: #8b8b9e;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+        }
+
+        .kpi-value {
+            font-size: 32px;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            background: linear-gradient(135deg, #7c5cfc, #a78bfa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .kpi-subtext {
+            font-size: 12px;
+            color: #8b8b9e;
+        }
+
+        /* Section title */
+        .section-title {
+            font-size: 14px;
+            color: #f0f0f5;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 700;
+            margin-bottom: 16px;
+        }
+
+        /* Comparison section */
+        .comparison-section {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .comparison-item {
+            background: #141420;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            padding: 16px;
+            display: grid;
+            grid-template-columns: 220px 1fr 1fr 1fr;
+            gap: 20px;
+            align-items: center;
+            transition: all 0.3s ease;
+        }
+
+        .comparison-item:hover {
+            border-color: rgba(124, 92, 252, 0.5);
+            background: rgba(124, 92, 252, 0.05);
+        }
+
+        .property-col {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .property-name {
+            font-size: 13px;
+            font-weight: 700;
+            color: #f0f0f5;
+        }
+
+        .property-meta {
+            font-size: 11px;
+            color: #8b8b9e;
+        }
+
+        .bar-chart {
+            display: flex;
+            align-items: flex-end;
+            gap: 8px;
+            height: 60px;
+        }
+
+        .bar {
+            flex: 1;
+            background: linear-gradient(135deg, #7c5cfc, #a78bfa);
+            border-radius: 4px 4px 0 0;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .bar:hover {
+            opacity: 0.8;
+            box-shadow: 0 4px 12px rgba(124, 92, 252, 0.3);
+        }
+
+        .bar-label {
+            position: absolute;
+            top: -24px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 10px;
+            color: #8b8b9e;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .metric-col {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .metric-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 11px;
+        }
+
+        .metric-label {
+            color: #8b8b9e;
+        }
+
+        .metric-value {
+            color: #7c5cfc;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+        }
+
+        /* Funnel chart */
+        .funnel-section {
+            background: #141420;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .funnel-chart {
+            height: 240px;
+            position: relative;
+        }
+
+        .funnel-stage {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .stage-bar {
+            height: 36px;
+            background: linear-gradient(135deg, #7c5cfc, #a78bfa);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            padding: 0 12px;
+            flex-shrink: 0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .stage-bar:hover {
+            opacity: 0.85;
+            box-shadow: 0 4px 12px rgba(124, 92, 252, 0.3);
+        }
+
+        .stage-percentage {
+            color: #fff;
+            font-size: 11px;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .stage-label {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .stage-name {
+            font-size: 12px;
+            color: #f0f0f5;
+            font-weight: 600;
+        }
+
+        .stage-count {
+            font-size: 11px;
+            color: #8b8b9e;
+        }
+
+        /* Scrollbars */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        /* Version badge */
+        .version-badge {
+            position: absolute;
+            top: 20px;
+            left: 85px;
+            background: rgba(124, 92, 252, 0.2);
+            border: 1px solid rgba(124, 92, 252, 0.4);
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 10px;
+            color: #7c5cfc;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-icon active" title="Dashboard">📊</div>
+            <div class="sidebar-icon" title="Library">📚</div>
+            <div class="sidebar-icon" title="Upload">⬆️</div>
+            <div class="sidebar-icon" title="Compare">⚖️</div>
+            <div class="sidebar-icon" title="Data Bank">🏦</div>
+            <div class="sidebar-icon" title="Settings">⚙️</div>
+        </div>
+
+        <div class="main">
+            <!-- Header -->
+            <div class="header">
+                <div class="header-left">
+                    <h1>Astra CRE</h1>
+                </div>
+                <div class="header-right">
+                    <div class="user-badge">
+                        <span>Griffin</span>
+                    </div>
+                    <div class="notif-icon">🔔</div>
+                </div>
+            </div>
+
+            <div class="version-badge">v5: Portfolio Overview</div>
+
+            <!-- Content -->
+            <div class="content">
+                <!-- KPI Banner -->
+                <div class="kpi-banner">
+                    <div class="kpi-item">
+                        <div class="kpi-label">Total Volume</div>
+                        <div class="kpi-value">$155M</div>
+                        <div class="kpi-subtext">3 properties</div>
+                    </div>
+                    <div class="kpi-item">
+                        <div class="kpi-label">Total Units</div>
+                        <div class="kpi-value">955</div>
+                        <div class="kpi-subtext">avg 319/property</div>
+                    </div>
+                    <div class="kpi-item">
+                        <div class="kpi-label">Avg Price/Unit</div>
+                        <div class="kpi-value">$162K</div>
+                        <div class="kpi-subtext">all properties</div>
+                    </div>
+                    <div class="kpi-item">
+                        <div class="kpi-label">Portfolio Score</div>
+                        <div class="kpi-value">76.3</div>
+                        <div class="kpi-subtext">weighted avg</div>
+                    </div>
+                </div>
+
+                <!-- Comparison Section -->
+                <div>
+                    <div class="section-title">Property Comparison</div>
+                    <div class="comparison-section">
+                        <!-- Property 1 -->
+                        <div class="comparison-item">
+                            <div class="property-col">
+                                <div class="property-name">1160 Hammond</div>
+                                <div class="property-meta">Sandy Springs, GA</div>
+                            </div>
+
+                            <div class="metric-col">
+                                <div style="font-size: 10px; color: #8b8b9e; text-transform: uppercase; letter-spacing: 0.4px; font-weight: 600; margin-bottom: 8px;">T12 NOI</div>
+                                <div class="bar-chart">
+                                    <div class="bar" style="height: 100%;">
+                                        <div class="bar-label">$4.3M</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="metric-col">
+                                <div style="font-size: 10px; color: #8b8b9e; text-transform: uppercase; letter-spacing: 0.4px; font-weight: 600; margin-bottom: 8px;">Score</div>
+                                <div class="bar-chart">
+                                    <div class="bar" style="height: 83%;">
+                                        <div class="bar-label">83</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="metric-col">
+                                <div style="font-size: 10px; color: #8b8b9e; text-transform: uppercase; letter-spacing: 0.4px; font-weight: 600; margin-bottom: 8px;">Units</div>
+                                <div class="bar-chart">
+                                    <div class="bar" style="height: 100%;">
+                                        <div class="bar-label">345</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Property 2 -->
+                        <div class="comparison-item">
+                            <div class="property-col">
+                                <div class="property-name">The Skylark</div>
+                                <div class="property-meta">Atlanta, GA</div>
+                            </div>
+
+                            <div class="metric-col">
+                                <div style="font-size: 10px; color: #8b8b9e; text-transform: uppercase; letter-spacing: 0.4px; font-weight: 600; margin-bottom: 8px;">T12 NOI</div>
+                                <div class="bar-chart">
+                                    <div class="bar" style="height: 86%;">
+                                        <div class="bar-label">$3.7M</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="metric-col">
+                                <div style="font-size: 10px; color: #8b8b9e; text-transform: uppercase; letter-spacing: 0.4px; font-weight: 600; margin-bottom: 8px;">Score</div>
+                                <div class="bar-chart">
+                                    <div class="bar" style="height: 79%;">
+                                        <div class="bar-label">79</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="metric-col">
+                                <div style="font-size: 10px; color: #8b8b9e; text-transform: uppercase; letter-spacing: 0.4px; font-weight: 600; margin-bottom: 8px;">Units</div>
+                                <div class="bar-chart">
+                                    <div class="bar" style="height: 92%;">
+                                        <div class="bar-label">319</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Property 3 -->
+                        <div class="comparison-item">
+                            <div class="property-col">
+                                <div class="property-name">Adley City Springs</div>
+                                <div class="property-meta">Sandy Springs, GA</div>
+                            </div>
+
+                            <div class="metric-col">
+                                <div style="font-size: 10px; color: #8b8b9e; text-transform: uppercase; letter-spacing: 0.4px; font-weight: 600; margin-bottom: 8px;">T12 NOI</div>
+                                <div class="bar-chart">
+                                    <div class="bar" style="height: 93%;">
+                                        <div class="bar-label">$4.0M</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="metric-col">
+                                <div style="font-size: 10px; color: #8b8b9e; text-transform: uppercase; letter-spacing: 0.4px; font-weight: 600; margin-bottom: 8px;">Score</div>
+                                <div class="bar-chart">
+                                    <div class="bar" style="height: 67%;">
+                                        <div class="bar-label">67</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="metric-col">
+                                <div style="font-size: 10px; color: #8b8b9e; text-transform: uppercase; letter-spacing: 0.4px; font-weight: 600; margin-bottom: 8px;">Units</div>
+                                <div class="bar-chart">
+                                    <div class="bar" style="height: 84%;">
+                                        <div class="bar-label">291</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pipeline Funnel -->
+                <div>
+                    <div class="section-title">Pipeline Funnel</div>
+                    <div class="funnel-section">
+                        <div class="funnel-stage">
+                            <div class="stage-bar" style="width: 100%;">
+                                <div class="stage-percentage">100%</div>
+                            </div>
+                            <div class="stage-label">
+                                <div class="stage-name">Screening</div>
+                                <div class="stage-count">2 deals</div>
+                            </div>
+                        </div>
+
+                        <div class="funnel-stage">
+                            <div class="stage-bar" style="width: 50%;">
+                                <div class="stage-percentage">50%</div>
+                            </div>
+                            <div class="stage-label">
+                                <div class="stage-name">Under Review</div>
+                                <div class="stage-count">1 deal</div>
+                            </div>
+                        </div>
+
+                        <div class="funnel-stage">
+                            <div class="stage-bar" style="width: 33%;">
+                                <div class="stage-percentage">33%</div>
+                            </div>
+                            <div class="stage-label">
+                                <div class="stage-name">LOI</div>
+                                <div class="stage-count">1 deal</div>
+                            </div>
+                        </div>
+
+                        <div class="funnel-stage">
+                            <div class="stage-bar" style="width: 33%;">
+                                <div class="stage-percentage">33%</div>
+                            </div>
+                            <div class="stage-label">
+                                <div class="stage-name">Under Contract</div>
+                                <div class="stage-count">1 deal</div>
+                            </div>
+                        </div>
+
+                        <div class="funnel-stage">
+                            <div class="stage-bar" style="width: 0%; opacity: 0.3;">
+                                <div class="stage-percentage">0%</div>
+                            </div>
+                            <div class="stage-label">
+                                <div class="stage-name">Closed</div>
+                                <div class="stage-count">0 deals</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

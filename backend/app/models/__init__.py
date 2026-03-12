@@ -6,6 +6,9 @@ from app.models.data_bank import DataBankDocument, SalesComp, PipelineProject, S
 from app.models.market_sentiment import MarketSentimentSignal
 from app.models.criteria import UserInvestmentCriteria
 from app.models.organization import Organization, OrganizationMember
+from app.models.feedback import FeedbackReport, FeedbackReply
+from app.models.event import UserEvent
+from app.models.extraction_log import ExtractionLog
 
 __all__ = [
     "User", "Property", "AnalysisLog", "PropertyUnitMix", "PropertyRentComp", "PropertyDocument", "RentRollUnit", "T12Financial",
@@ -15,4 +18,7 @@ __all__ = [
     "MarketSentimentSignal",
     "UserInvestmentCriteria",
     "Organization", "OrganizationMember",
+    "FeedbackReport", "FeedbackReply",
+    "UserEvent",
+    "ExtractionLog",
 ]

@@ -20,6 +20,7 @@ import { Landing } from './pages/Landing';
 import { OrganizationSettings } from './pages/OrganizationSettings';
 import { Welcome } from './pages/Welcome';
 import { CommandCenter } from './pages/CommandCenter';
+import { PendingApproval } from './pages/PendingApproval';
 
 function App() {
   const checkAuth = useAuthStore((state) => state.checkAuth);
@@ -74,7 +75,10 @@ function App() {
           <Route path="/login" element={<LoginForm />} />
           <Route path="/register" element={<RegisterForm />} />
 
-          {/* Protected routes */}
+          {/* Pending approval screen — accessible to authenticated but pending users */}
+          <Route path="/pending" element={<PendingApproval />} />
+
+          {/* Protected routes — requires active account */}
           <Route element={<ProtectedRoute />}>
             <Route path="/welcome" element={<Welcome />} />
             <Route element={<MainLayout />}>

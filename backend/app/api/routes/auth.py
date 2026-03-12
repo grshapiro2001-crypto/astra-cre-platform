@@ -4,7 +4,8 @@ from app.database import get_db
 from app.models.user import User
 from app.schemas.user import UserCreate, UserLogin, UserResponse, UserUpdate, Token
 from app.services.auth_service import verify_password, get_password_hash, create_access_token
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, get_current_user_any_status
+from app.models.user import ADMIN_EMAILS
 from app.config import settings
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -21,12 +22,15 @@ def register(user_data: UserCreate, db: Session = Depends(get_db)):
             detail="Email already registered"
         )
 
-    # Create new user
+    # Create new user — admin emails auto-approved, everyone else pending
     hashed_password = get_password_hash(user_data.password)
+    is_admin = user_data.email in ADMIN_EMAILS
     new_user = User(
         email=user_data.email,
         hashed_password=hashed_password,
-        full_name=user_data.full_name
+        full_name=user_data.full_name,
+        account_status="active" if is_admin else "pending",
+        is_admin=is_admin,
     )
 
     db.add(new_user)
@@ -73,8 +77,8 @@ def login(response: Response, user_credentials: UserLogin, db: Session = Depends
 
 
 @router.get("/me", response_model=UserResponse)
-def get_me(current_user: User = Depends(get_current_user)):
-    """Get current user information."""
+def get_me(current_user: User = Depends(get_current_user_any_status)):
+    """Get current user information. Works for pending users too."""
     return current_user
 
 

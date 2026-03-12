@@ -5,6 +5,8 @@ import json
 import logging
 import re
 from typing import Dict, Any, Optional, Tuple
+import hashlib
+import time
 import anthropic
 from app.config import settings
 
@@ -1134,6 +1136,20 @@ async def extract_with_claude(
             extraction_data.get('financials_by_period', {})
         )
 
+        # ── Extraction Confidence Logging ──
+        # Log every extraction attempt for AI learning pipeline
+        try:
+            _log_extraction(
+                filename=filename,
+                doc_type=extraction_data.get('document_type', doc_type),
+                confidence=extraction_data.get('confidence', confidence),
+                extraction_data=extraction_data,
+                pdf_text_length=len(pdf_text),
+                was_truncated=len(pdf_text) > max_text_length,
+            )
+        except Exception as log_err:
+            logger.warning(f"Extraction logging failed (non-fatal): {log_err}")
+
         return extraction_data
 
     except json.JSONDecodeError as e:
@@ -1142,6 +1158,69 @@ async def extract_with_claude(
         raise Exception(f"Claude API error: {str(e)}")
     except Exception as e:
         raise Exception(f"Extraction failed: {str(e)}")
+
+def _log_extraction(
+    filename: str,
+    doc_type: str,
+    confidence: str,
+    extraction_data: Dict[str, Any],
+    pdf_text_length: int,
+    was_truncated: bool,
+) -> None:
+    """
+    Log extraction results to the extraction_logs table for the AI Learning Pipeline.
+    Runs in a separate session to avoid polluting the caller's transaction.
+    """
+    from app.database import SessionLocal
+    from app.models.extraction_log import ExtractionLog
+
+    # Map confidence string to numeric score
+    confidence_map = {"high": 0.9, "medium": 0.6, "low": 0.3}
+    confidence_score = confidence_map.get(confidence, 0.5)
+
+    # Count extracted fields (non-null top-level keys, excluding metadata)
+    metadata_keys = {"document_type", "confidence", "calculated_metrics", "unit_mix", "rent_comps", "renovation"}
+    fields_extracted = sum(
+        1 for k, v in extraction_data.items()
+        if k not in metadata_keys and v is not None and v != "" and v != 0
+    )
+
+    # Expected fields by doc type
+    expected_counts = {"OM": 25, "BOV": 20, "Rent Roll": 15}
+    fields_expected = expected_counts.get(doc_type, 20)
+
+    # Document fingerprint — hash of filename + first 2000 chars for dedup
+    fingerprint_input = f"{filename}:{str(extraction_data.get('property_name', ''))}:{doc_type}"
+    doc_fingerprint = hashlib.md5(fingerprint_input.encode()).hexdigest()
+
+    # Extract broker name if available
+    broker = extraction_data.get("broker_name") or extraction_data.get("listing_broker") or None
+
+    db = SessionLocal()
+    try:
+        log = ExtractionLog(
+            filename=filename,
+            document_type=doc_type,
+            document_fingerprint=doc_fingerprint,
+            overall_confidence=confidence,
+            confidence_score=confidence_score,
+            fields_extracted=fields_extracted,
+            fields_expected=fields_expected,
+            pdf_text_length=pdf_text_length,
+            was_truncated=1 if was_truncated else 0,
+            model_used="claude-sonnet-4-5-20250929",
+            broker_name=broker,
+            extraction_data_json=json.dumps(extraction_data)[:50000],  # Cap at 50k chars
+        )
+        db.add(log)
+        db.commit()
+        logger.info(f"Extraction logged: {filename} | {doc_type} | confidence={confidence} ({confidence_score}) | {fields_extracted}/{fields_expected} fields")
+    except Exception as e:
+        db.rollback()
+        logger.warning(f"Failed to log extraction: {e}")
+    finally:
+        db.close()
+
 
 def calculate_metrics(financials_by_period: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
     """

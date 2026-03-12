@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Astra CRE — Pipeline Board</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #0d0d12;
+            color: #f0f0f5;
+            overflow: hidden;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 65px;
+            background: #141420;
+            border-right: 1px solid rgba(255, 255, 255, 0.08);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 16px 0;
+            gap: 24px;
+        }
+
+        .sidebar-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 18px;
+            transition: all 0.3s ease;
+            background: transparent;
+        }
+
+        .sidebar-icon:hover {
+            background: rgba(124, 92, 252, 0.2);
+            color: #7c5cfc;
+        }
+
+        .sidebar-icon.active {
+            background: rgba(124, 92, 252, 0.3);
+            color: #7c5cfc;
+        }
+
+        /* Main content */
+        .main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, #7c5cfc, #a78bfa);
+            padding: 16px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 70px;
+            box-shadow: 0 2px 8px rgba(124, 92, 252, 0.15);
+        }
+
+        .header-left h1 {
+            font-size: 24px;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .header-right {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .user-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #fff;
+            font-size: 14px;
+        }
+
+        .notif-icon {
+            width: 32px;
+            height: 32px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+
+        .notif-icon:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        /* Metrics Row */
+        .metrics-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            padding: 16px 32px;
+            background: #0d0d12;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .metric-mini {
+            background: #141420;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 8px;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .metric-mini-label {
+            font-size: 11px;
+            color: #8b8b9e;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+        }
+
+        .metric-mini-value {
+            font-size: 20px;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            color: #7c5cfc;
+        }
+
+        /* Kanban board */
+        .kanban-container {
+            flex: 1;
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 16px;
+            padding: 20px 32px;
+            overflow-x: auto;
+        }
+
+        .kanban-column {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            min-width: 280px;
+        }
+
+        .column-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .column-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: #f0f0f5;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .column-badge {
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 2px 8px;
+            font-size: 11px;
+            color: #8b8b9e;
+            font-weight: 600;
+        }
+
+        .column-cards {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            overflow-y: auto;
+        }
+
+        .deal-card {
+            background: #141420;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 8px;
+            padding: 12px;
+            cursor: move;
+            transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .deal-card:hover {
+            border-color: rgba(124, 92, 252, 0.5);
+            box-shadow: 0 4px 12px rgba(124, 92, 252, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .card-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: #f0f0f5;
+        }
+
+        .card-details {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 11px;
+        }
+
+        .card-noi {
+            color: #8b8b9e;
+        }
+
+        .card-score {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            font-size: 11px;
+        }
+
+        .score-high {
+            background: rgba(34, 197, 94, 0.15);
+            color: #22c55e;
+            border: 1px solid rgba(34, 197, 94, 0.3);
+        }
+
+        .score-mid {
+            background: rgba(234, 179, 8, 0.15);
+            color: #eab308;
+            border: 1px solid rgba(234, 179, 8, 0.3);
+        }
+
+        .card-units {
+            color: #7c5cfc;
+            font-weight: 600;
+        }
+
+        .card-verdict {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 10px;
+            font-weight: 600;
+            padding: 4px 8px;
+            border-radius: 4px;
+            width: fit-content;
+        }
+
+        .verdict-pass {
+            background: rgba(34, 197, 94, 0.15);
+            color: #22c55e;
+            border: 1px solid rgba(34, 197, 94, 0.2);
+        }
+
+        .verdict-review {
+            background: rgba(234, 179, 8, 0.15);
+            color: #eab308;
+            border: 1px solid rgba(234, 179, 8, 0.2);
+        }
+
+        .verdict-fail {
+            background: rgba(239, 68, 68, 0.15);
+            color: #ef4444;
+            border: 1px solid rgba(239, 68, 68, 0.2);
+        }
+
+        /* Scrollbars */
+        ::-webkit-scrollbar {
+            height: 6px;
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        /* Version badge */
+        .version-badge {
+            position: absolute;
+            top: 20px;
+            left: 85px;
+            background: rgba(124, 92, 252, 0.2);
+            border: 1px solid rgba(124, 92, 252, 0.4);
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 10px;
+            color: #7c5cfc;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-icon active" title="Dashboard">📊</div>
+            <div class="sidebar-icon" title="Library">📚</div>
+            <div class="sidebar-icon" title="Upload">⬆️</div>
+            <div class="sidebar-icon" title="Compare">⚖️</div>
+            <div class="sidebar-icon" title="Data Bank">🏦</div>
+            <div class="sidebar-icon" title="Settings">⚙️</div>
+        </div>
+
+        <div class="main">
+            <!-- Header -->
+            <div class="header">
+                <div class="header-left">
+                    <h1>Astra CRE</h1>
+                </div>
+                <div class="header-right">
+                    <div class="user-badge">
+                        <span>Griffin</span>
+                    </div>
+                    <div class="notif-icon">🔔</div>
+                </div>
+            </div>
+
+            <div class="version-badge">v2: Pipeline Board</div>
+
+            <!-- Metrics Row -->
+            <div class="metrics-row">
+                <div class="metric-mini">
+                    <div class="metric-mini-label">Total Volume</div>
+                    <div class="metric-mini-value">$155M</div>
+                </div>
+                <div class="metric-mini">
+                    <div class="metric-mini-label">Total Units</div>
+                    <div class="metric-mini-value">955</div>
+                </div>
+                <div class="metric-mini">
+                    <div class="metric-mini-label">Active Deals</div>
+                    <div class="metric-mini-value">3</div>
+                </div>
+                <div class="metric-mini">
+                    <div class="metric-mini-label">Avg Price/Unit</div>
+                    <div class="metric-mini-value">$162K</div>
+                </div>
+            </div>
+
+            <!-- Kanban Board -->
+            <div class="kanban-container">
+                <!-- Screening -->
+                <div class="kanban-column">
+                    <div class="column-header">
+                        <div class="column-title">Screening</div>
+                        <div class="column-badge">2</div>
+                    </div>
+                    <div class="column-cards">
+                        <div class="deal-card">
+                            <div class="card-title">The Skylark</div>
+                            <div class="card-details">
+                                <div class="card-noi">$3.7M NOI</div>
+                                <div class="card-score score-high">79</div>
+                            </div>
+                            <div class="card-details">
+                                <div class="card-units">319 units</div>
+                                <div class="card-verdict verdict-review">◆ REVIEW</div>
+                            </div>
+                        </div>
+
+                        <div class="deal-card">
+                            <div class="card-title">Adley City Springs</div>
+                            <div class="card-details">
+                                <div class="card-noi">$4.0M NOI</div>
+                                <div class="card-score score-mid">67</div>
+                            </div>
+                            <div class="card-details">
+                                <div class="card-units">291 units</div>
+                                <div class="card-verdict verdict-fail">✕ FAIL</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Under Review -->
+                <div class="kanban-column">
+                    <div class="column-header">
+                        <div class="column-title">Under Review</div>
+                        <div class="column-badge">0</div>
+                    </div>
+                    <div class="column-cards">
+                        <div style="color: #8b8b9e; font-size: 12px; text-align: center; margin-top: 20px;">
+                            No deals in this stage
+                        </div>
+                    </div>
+                </div>
+
+                <!-- LOI -->
+                <div class="kanban-column">
+                    <div class="column-header">
+                        <div class="column-title">LOI</div>
+                        <div class="column-badge">0</div>
+                    </div>
+                    <div class="column-cards">
+                        <div style="color: #8b8b9e; font-size: 12px; text-align: center; margin-top: 20px;">
+                            No deals in this stage
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Under Contract -->
+                <div class="kanban-column">
+                    <div class="column-header">
+                        <div class="column-title">Under Contract</div>
+                        <div class="column-badge">1</div>
+                    </div>
+                    <div class="column-cards">
+                        <div class="deal-card">
+                            <div class="card-title">1160 Hammond</div>
+                            <div class="card-details">
+                                <div class="card-noi">$4.3M NOI</div>
+                                <div class="card-score score-high">83</div>
+                            </div>
+                            <div class="card-details">
+                                <div class="card-units">345 units</div>
+                                <div class="card-verdict verdict-pass">✓ PASS</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Closed -->
+                <div class="kanban-column">
+                    <div class="column-header">
+                        <div class="column-title">Closed</div>
+                        <div class="column-badge">0</div>
+                    </div>
+                    <div class="column-cards">
+                        <div style="color: #8b8b9e; font-size: 12px; text-align: center; margin-top: 20px;">
+                            No closed deals yet
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

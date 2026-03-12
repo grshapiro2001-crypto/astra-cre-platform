@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Astra CRE — Command Center</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #0d0d12;
+            color: #f0f0f5;
+            overflow: hidden;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 65px;
+            background: #141420;
+            border-right: 1px solid rgba(255, 255, 255, 0.08);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 16px 0;
+            gap: 24px;
+        }
+
+        .sidebar-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 18px;
+            transition: all 0.3s ease;
+            background: transparent;
+        }
+
+        .sidebar-icon:hover {
+            background: rgba(124, 92, 252, 0.2);
+            color: #7c5cfc;
+        }
+
+        .sidebar-icon.active {
+            background: rgba(124, 92, 252, 0.3);
+            color: #7c5cfc;
+        }
+
+        /* Main content */
+        .main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, #7c5cfc, #a78bfa);
+            padding: 16px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 70px;
+            box-shadow: 0 2px 8px rgba(124, 92, 252, 0.15);
+        }
+
+        .header-left h1 {
+            font-size: 24px;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .header-right {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .user-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #fff;
+            font-size: 14px;
+        }
+
+        .notif-icon {
+            width: 32px;
+            height: 32px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+
+        .notif-icon:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        /* Content area */
+        .content {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 300px 1fr 320px;
+            gap: 16px;
+            padding: 20px;
+            overflow: hidden;
+        }
+
+        /* Left column: KPIs and Screening */
+        .left-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            overflow-y: auto;
+        }
+
+        .metric-card {
+            background: #141420;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .metric-label {
+            font-size: 12px;
+            color: #8b8b9e;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+        }
+
+        .metric-value {
+            font-size: 28px;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+            color: #7c5cfc;
+        }
+
+        .metric-sublabel {
+            font-size: 11px;
+            color: #8b8b9e;
+        }
+
+        .screening-section h3 {
+            font-size: 12px;
+            color: #8b8b9e;
+            text-transform: uppercase;
+            margin-bottom: 12px;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+        }
+
+        .screening-badge {
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            text-align: center;
+            margin-bottom: 8px;
+        }
+
+        .badge-pass {
+            background: rgba(34, 197, 94, 0.15);
+            color: #22c55e;
+            border: 1px solid rgba(34, 197, 94, 0.3);
+        }
+
+        .badge-review {
+            background: rgba(234, 179, 8, 0.15);
+            color: #eab308;
+            border: 1px solid rgba(234, 179, 8, 0.3);
+        }
+
+        .badge-fail {
+            background: rgba(239, 68, 68, 0.15);
+            color: #ef4444;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .badge-count {
+            font-size: 24px;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+        }
+
+        /* Center column: Deal table */
+        .center-panel {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .panel-title {
+            font-size: 14px;
+            color: #8b8b9e;
+            text-transform: uppercase;
+            margin-bottom: 12px;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+        }
+
+        .deal-table {
+            flex: 1;
+            overflow-y: auto;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            background: #141420;
+        }
+
+        .table-header {
+            display: grid;
+            grid-template-columns: 1.2fr 1fr 0.8fr 0.8fr 0.6fr;
+            gap: 12px;
+            padding: 12px 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            position: sticky;
+            top: 0;
+            background: #0d0d12;
+            font-size: 11px;
+            color: #8b8b9e;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+        }
+
+        .table-row {
+            display: grid;
+            grid-template-columns: 1.2fr 1fr 0.8fr 0.8fr 0.6fr;
+            gap: 12px;
+            padding: 12px 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .table-row:hover {
+            background: rgba(124, 92, 252, 0.1);
+        }
+
+        .table-cell {
+            font-size: 13px;
+            color: #f0f0f5;
+        }
+
+        .table-label {
+            color: #8b8b9e;
+            font-size: 11px;
+        }
+
+        .score-badge {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            font-size: 13px;
+        }
+
+        .score-high {
+            background: rgba(34, 197, 94, 0.15);
+            color: #22c55e;
+            border: 1px solid rgba(34, 197, 94, 0.3);
+        }
+
+        .score-mid {
+            background: rgba(234, 179, 8, 0.15);
+            color: #eab308;
+            border: 1px solid rgba(234, 179, 8, 0.3);
+        }
+
+        /* Right column: AI Panel */
+        .right-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            overflow: hidden;
+        }
+
+        .ai-panel {
+            background: #141420;
+            border: 1px solid rgba(124, 92, 252, 0.3);
+            border-radius: 12px;
+            padding: 16px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+
+        .ai-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .ai-icon {
+            width: 24px;
+            height: 24px;
+            background: linear-gradient(135deg, #7c5cfc, #a78bfa);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+        }
+
+        .ai-header h3 {
+            font-size: 13px;
+            color: #f0f0f5;
+            font-weight: 600;
+        }
+
+        .ai-content {
+            font-size: 13px;
+            line-height: 1.6;
+            color: #f0f0f5;
+        }
+
+        .ai-insight {
+            margin-bottom: 12px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .ai-insight:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+
+        .insight-label {
+            color: #8b8b9e;
+            font-size: 11px;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+        }
+
+        .insight-text {
+            color: #f0f0f5;
+        }
+
+        /* Scrollbars */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        /* Version badge */
+        .version-badge {
+            position: absolute;
+            top: 20px;
+            left: 85px;
+            background: rgba(124, 92, 252, 0.2);
+            border: 1px solid rgba(124, 92, 252, 0.4);
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 10px;
+            color: #7c5cfc;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-icon active" title="Dashboard">📊</div>
+            <div class="sidebar-icon" title="Library">📚</div>
+            <div class="sidebar-icon" title="Upload">⬆️</div>
+            <div class="sidebar-icon" title="Compare">⚖️</div>
+            <div class="sidebar-icon" title="Data Bank">🏦</div>
+            <div class="sidebar-icon" title="Settings">⚙️</div>
+        </div>
+
+        <div class="main">
+            <!-- Header -->
+            <div class="header">
+                <div class="header-left">
+                    <h1>Astra CRE</h1>
+                </div>
+                <div class="header-right">
+                    <div class="user-badge">
+                        <span>Griffin</span>
+                    </div>
+                    <div class="notif-icon">🔔</div>
+                </div>
+            </div>
+
+            <div class="version-badge">v1: Command Center</div>
+
+            <!-- Content -->
+            <div class="content">
+                <!-- Left Panel: KPIs -->
+                <div class="left-panel">
+                    <div class="metric-card">
+                        <div class="metric-label">Total Volume</div>
+                        <div class="metric-value">$155M</div>
+                        <div class="metric-sublabel">3 active deals</div>
+                    </div>
+
+                    <div class="metric-card">
+                        <div class="metric-label">Total Units</div>
+                        <div class="metric-value">955</div>
+                        <div class="metric-sublabel">avg 319 units</div>
+                    </div>
+
+                    <div class="metric-card">
+                        <div class="metric-label">Avg Price/Unit</div>
+                        <div class="metric-value">$162K</div>
+                        <div class="metric-sublabel">portfolio avg</div>
+                    </div>
+
+                    <div class="metric-card">
+                        <div class="metric-label">Active Deals</div>
+                        <div class="metric-value">3</div>
+                        <div class="metric-sublabel">all screening stage</div>
+                    </div>
+
+                    <div style="margin-top: 8px;">
+                        <div class="screening-section">
+                            <h3>Screening Verdict</h3>
+                            <div class="screening-badge badge-pass">
+                                <div class="badge-count">1</div>
+                                PASS
+                            </div>
+                            <div class="screening-badge badge-review">
+                                <div class="badge-count">1</div>
+                                REVIEW
+                            </div>
+                            <div class="screening-badge badge-fail">
+                                <div class="badge-count">1</div>
+                                FAIL
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Center Panel: Deal Table -->
+                <div class="center-panel">
+                    <div class="panel-title">Active Deal Pipeline</div>
+                    <div class="deal-table">
+                        <div class="table-header">
+                            <div>Property</div>
+                            <div>T12 NOI</div>
+                            <div>Score</div>
+                            <div>Units</div>
+                            <div>Verdict</div>
+                        </div>
+
+                        <div class="table-row">
+                            <div class="table-cell">1160 Hammond</div>
+                            <div class="table-cell">$4.3M</div>
+                            <div>
+                                <div class="score-badge score-high">83</div>
+                            </div>
+                            <div class="table-cell">345</div>
+                            <div>
+                                <span style="color: #22c55e; font-weight: 600;">✓ PASS</span>
+                            </div>
+                        </div>
+
+                        <div class="table-row">
+                            <div class="table-cell">The Skylark</div>
+                            <div class="table-cell">$3.7M</div>
+                            <div>
+                                <div class="score-badge score-high">79</div>
+                            </div>
+                            <div class="table-cell">319</div>
+                            <div>
+                                <span style="color: #eab308; font-weight: 600;">◆ REVIEW</span>
+                            </div>
+                        </div>
+
+                        <div class="table-row">
+                            <div class="table-cell">Adley City Springs</div>
+                            <div class="table-cell">$4.0M</div>
+                            <div>
+                                <div class="score-badge score-mid">67</div>
+                            </div>
+                            <div class="table-cell">291</div>
+                            <div>
+                                <span style="color: #ef4444; font-weight: 600;">✕ FAIL</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Panel: AI Summary -->
+                <div class="right-panel">
+                    <div class="ai-panel">
+                        <div class="ai-header">
+                            <div class="ai-icon">✨</div>
+                            <h3>AI INSIGHTS</h3>
+                        </div>
+                        <div class="ai-content">
+                            <div class="ai-insight">
+                                <div class="insight-label">Top Opportunity</div>
+                                <div class="insight-text">1160 Hammond shows strongest fundamentals with 345 units and 4.3M T12 NOI. Score of 83 indicates high acquisition priority.</div>
+                            </div>
+
+                            <div class="ai-insight">
+                                <div class="insight-label">Risk Alert</div>
+                                <div class="insight-text">Adley City Springs failed screening (score 67). Consider revisiting if market comps improve or cap rates reset.</div>
+                            </div>
+
+                            <div class="ai-insight">
+                                <div class="insight-label">Pipeline Health</div>
+                                <div class="insight-text">2 of 3 deals warrant further review. Weighted portfolio score: 76. Current volume at $155M; capacity for 2-3 more deals to target $200M.</div>
+                            </div>
+
+                            <div class="ai-insight">
+                                <div class="insight-label">Next Steps</div>
+                                <div class="insight-text">Schedule deep-dive on Skylark comps analysis. Fast-track LOI process for 1160 Hammond within 2 weeks.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

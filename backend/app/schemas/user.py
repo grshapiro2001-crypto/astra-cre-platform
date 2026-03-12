@@ -20,6 +20,8 @@ class UserResponse(BaseModel):
     email: str
     full_name: Optional[str]
     is_active: bool
+    account_status: str = "active"
+    is_admin: bool = False
     created_at: datetime
 
     class Config:

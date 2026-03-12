@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Astra CRE — Scorecard Grid</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #0d0d12;
+            color: #f0f0f5;
+            overflow: hidden;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 65px;
+            background: #141420;
+            border-right: 1px solid rgba(255, 255, 255, 0.08);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 16px 0;
+            gap: 24px;
+        }
+
+        .sidebar-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 18px;
+            transition: all 0.3s ease;
+            background: transparent;
+        }
+
+        .sidebar-icon:hover {
+            background: rgba(124, 92, 252, 0.2);
+            color: #7c5cfc;
+        }
+
+        .sidebar-icon.active {
+            background: rgba(124, 92, 252, 0.3);
+            color: #7c5cfc;
+        }
+
+        /* Main content */
+        .main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, #7c5cfc, #a78bfa);
+            padding: 16px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 70px;
+            box-shadow: 0 2px 8px rgba(124, 92, 252, 0.15);
+        }
+
+        .header-left h1 {
+            font-size: 24px;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .header-right {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .user-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #fff;
+            font-size: 14px;
+        }
+
+        .notif-icon {
+            width: 32px;
+            height: 32px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+
+        .notif-icon:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        /* Content */
+        .content {
+            flex: 1;
+            padding: 24px 32px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .panel-title {
+            font-size: 12px;
+            color: #8b8b9e;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+            margin-bottom: 16px;
+        }
+
+        /* Portfolio grid */
+        .scorecard-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+        }
+
+        .scorecard {
+            background: #141420;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .scorecard:hover {
+            border-color: rgba(124, 92, 252, 0.5);
+            box-shadow: 0 8px 24px rgba(124, 92, 252, 0.1);
+            transform: translateY(-4px);
+        }
+
+        .scorecard-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 16px;
+        }
+
+        .property-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .property-name {
+            font-size: 16px;
+            font-weight: 700;
+            color: #f0f0f5;
+        }
+
+        .property-meta {
+            font-size: 12px;
+            color: #8b8b9e;
+        }
+
+        .score-ring-container {
+            position: relative;
+            width: 80px;
+            height: 80px;
+            flex-shrink: 0;
+        }
+
+        .score-ring {
+            width: 100%;
+            height: 100%;
+        }
+
+        .score-label {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
+        }
+
+        .score-value {
+            font-size: 24px;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            color: #7c5cfc;
+        }
+
+        .score-label-text {
+            font-size: 9px;
+            color: #8b8b9e;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+        }
+
+        /* Sparkline */
+        .sparkline-section {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .sparkline-label {
+            font-size: 11px;
+            color: #8b8b9e;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+        }
+
+        .sparkline-chart {
+            height: 40px;
+        }
+
+        /* Details grid */
+        .details-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .detail-item {
+            background: rgba(124, 92, 252, 0.05);
+            border: 1px solid rgba(124, 92, 252, 0.2);
+            border-radius: 8px;
+            padding: 10px 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .detail-label {
+            font-size: 10px;
+            color: #8b8b9e;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+        }
+
+        .detail-value {
+            font-size: 14px;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            color: #7c5cfc;
+        }
+
+        /* Verdict badge */
+        .verdict-badge {
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .badge-pass {
+            background: rgba(34, 197, 94, 0.15);
+            color: #22c55e;
+            border: 1px solid rgba(34, 197, 94, 0.3);
+        }
+
+        .badge-review {
+            background: rgba(234, 179, 8, 0.15);
+            color: #eab308;
+            border: 1px solid rgba(234, 179, 8, 0.3);
+        }
+
+        .badge-fail {
+            background: rgba(239, 68, 68, 0.15);
+            color: #ef4444;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        /* Scrollbars */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        /* Version badge */
+        .version-badge {
+            position: absolute;
+            top: 20px;
+            left: 85px;
+            background: rgba(124, 92, 252, 0.2);
+            border: 1px solid rgba(124, 92, 252, 0.4);
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 10px;
+            color: #7c5cfc;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-icon active" title="Dashboard">📊</div>
+            <div class="sidebar-icon" title="Library">📚</div>
+            <div class="sidebar-icon" title="Upload">⬆️</div>
+            <div class="sidebar-icon" title="Compare">⚖️</div>
+            <div class="sidebar-icon" title="Data Bank">🏦</div>
+            <div class="sidebar-icon" title="Settings">⚙️</div>
+        </div>
+
+        <div class="main">
+            <!-- Header -->
+            <div class="header">
+                <div class="header-left">
+                    <h1>Astra CRE</h1>
+                </div>
+                <div class="header-right">
+                    <div class="user-badge">
+                        <span>Griffin</span>
+                    </div>
+                    <div class="notif-icon">🔔</div>
+                </div>
+            </div>
+
+            <div class="version-badge">v3: Scorecard Grid</div>
+
+            <!-- Content -->
+            <div class="content">
+                <div>
+                    <div class="panel-title">Portfolio Roster — Q1 2026</div>
+                    <div class="scorecard-grid">
+                        <!-- Card 1: 1160 Hammond -->
+                        <div class="scorecard">
+                            <div class="scorecard-header">
+                                <div class="property-info">
+                                    <div class="property-name">1160 Hammond</div>
+                                    <div class="property-meta">Sandy Springs, GA</div>
+                                </div>
+                                <div class="score-ring-container">
+                                    <canvas class="score-ring" id="score1"></canvas>
+                                    <div class="score-label">
+                                        <div class="score-value">83</div>
+                                        <div class="score-label-text">Score</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="sparkline-section">
+                                <div class="sparkline-label">T12 NOI Trend</div>
+                                <div class="sparkline-chart">
+                                    <canvas id="spark1"></canvas>
+                                </div>
+                            </div>
+
+                            <div class="details-grid">
+                                <div class="detail-item">
+                                    <div class="detail-label">T12 NOI</div>
+                                    <div class="detail-value">$4.3M</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">Units</div>
+                                    <div class="detail-value">345</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">Price/Unit</div>
+                                    <div class="detail-value">$157K</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">Cap Rate</div>
+                                    <div class="detail-value">6.8%</div>
+                                </div>
+                            </div>
+
+                            <div class="verdict-badge badge-pass">✓ PASS</div>
+                        </div>
+
+                        <!-- Card 2: The Skylark -->
+                        <div class="scorecard">
+                            <div class="scorecard-header">
+                                <div class="property-info">
+                                    <div class="property-name">The Skylark</div>
+                                    <div class="property-meta">Atlanta, GA</div>
+                                </div>
+                                <div class="score-ring-container">
+                                    <canvas class="score-ring" id="score2"></canvas>
+                                    <div class="score-label">
+                                        <div class="score-value">79</div>
+                                        <div class="score-label-text">Score</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="sparkline-section">
+                                <div class="sparkline-label">T12 NOI Trend</div>
+                                <div class="sparkline-chart">
+                                    <canvas id="spark2"></canvas>
+                                </div>
+                            </div>
+
+                            <div class="details-grid">
+                                <div class="detail-item">
+                                    <div class="detail-label">T12 NOI</div>
+                                    <div class="detail-value">$3.7M</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">Units</div>
+                                    <div class="detail-value">319</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">Price/Unit</div>
+                                    <div class="detail-value">$160K</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">Cap Rate</div>
+                                    <div class="detail-value">6.5%</div>
+                                </div>
+                            </div>
+
+                            <div class="verdict-badge badge-review">◆ REVIEW</div>
+                        </div>
+
+                        <!-- Card 3: Adley City Springs -->
+                        <div class="scorecard">
+                            <div class="scorecard-header">
+                                <div class="property-info">
+                                    <div class="property-name">Adley City Springs</div>
+                                    <div class="property-meta">Sandy Springs, GA</div>
+                                </div>
+                                <div class="score-ring-container">
+                                    <canvas class="score-ring" id="score3"></canvas>
+                                    <div class="score-label">
+                                        <div class="score-value">67</div>
+                                        <div class="score-label-text">Score</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="sparkline-section">
+                                <div class="sparkline-label">T12 NOI Trend</div>
+                                <div class="sparkline-chart">
+                                    <canvas id="spark3"></canvas>
+                                </div>
+                            </div>
+
+                            <div class="details-grid">
+                                <div class="detail-item">
+                                    <div class="detail-label">T12 NOI</div>
+                                    <div class="detail-value">$4.0M</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">Units</div>
+                                    <div class="detail-value">291</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">Price/Unit</div>
+                                    <div class="detail-value">$168K</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">Cap Rate</div>
+                                    <div class="detail-value">6.2%</div>
+                                </div>
+                            </div>
+
+                            <div class="verdict-badge badge-fail">✕ FAIL</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Score gauge charts
+        const scoreChartConfig = (score) => ({
+            type: 'doughnut',
+            data: {
+                datasets: [
+                    {
+                        data: [score, 100 - score],
+                        backgroundColor: [
+                            score >= 75 ? '#22c55e' : score >= 65 ? '#eab308' : '#ef4444',
+                            'rgba(255, 255, 255, 0.08)'
+                        ],
+                        borderWidth: 0
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { enabled: false }
+                }
+            }
+        });
+
+        new Chart(document.getElementById('score1'), scoreChartConfig(83));
+        new Chart(document.getElementById('score2'), scoreChartConfig(79));
+        new Chart(document.getElementById('score3'), scoreChartConfig(67));
+
+        // Sparkline charts
+        const sparklineConfig = (data) => ({
+            type: 'line',
+            data: {
+                labels: ['M-12', 'M-10', 'M-8', 'M-6', 'M-4', 'M-2', 'M-1'],
+                datasets: [{
+                    data: data,
+                    borderColor: '#7c5cfc',
+                    backgroundColor: 'rgba(124, 92, 252, 0.1)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 0,
+                    pointHoverRadius: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { enabled: false }
+                },
+                scales: {
+                    x: { display: false },
+                    y: { display: false }
+                }
+            }
+        });
+
+        new Chart(document.getElementById('spark1'), sparklineConfig([3.8, 3.9, 4.0, 4.1, 4.2, 4.25, 4.3]));
+        new Chart(document.getElementById('spark2'), sparklineConfig([3.4, 3.5, 3.55, 3.6, 3.65, 3.7, 3.7]));
+        new Chart(document.getElementById('spark3'), sparklineConfig([4.1, 4.0, 3.95, 3.9, 3.85, 4.0, 4.0]));
+    </script>
+</body>
+</html>
