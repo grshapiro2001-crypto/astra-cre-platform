@@ -172,7 +172,18 @@ export const getFinancials = (
   const nested = key === 't3' ? property.t3_financials
     : key === 't12' ? property.t12_financials
     : property.y1_financials;
-  if (nested) return nested;
+  if (nested) {
+    // Supplement a null noi with the flat field so the callout never shows "---"
+    // when the flat field has a value (e.g. t12_financials exists but noi is null
+    // while t12_noi is set from an OM extraction).
+    if (nested.noi == null) {
+      const flatNoi = key === 't3' ? property.t3_noi
+        : key === 't12' ? property.t12_noi
+        : property.y1_noi;
+      if (flatNoi != null) return { ...nested, noi: flatNoi };
+    }
+    return nested;
+  }
 
   // Fall back to flat NOI fields for OM properties
   const noi = key === 't3' ? property.t3_noi
