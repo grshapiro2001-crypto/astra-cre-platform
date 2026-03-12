@@ -11,7 +11,8 @@
  * and bidirectional sync with kanban cards.
  */
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { GoogleMap, Marker, InfoWindow, useLoadScript } from '@react-google-maps/api';
+import { GoogleMap, Marker, InfoWindow } from '@react-google-maps/api';
+import { useGoogleMapsReady } from '@/hooks/useGoogleMapsReady';
 import { MapPin, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import type { DashboardDeal } from '@/components/dashboard/DealCard';
@@ -36,8 +37,6 @@ interface DealPin {
 // ============================================================
 // Constants
 // ============================================================
-
-const LIBRARIES: ('places')[] = ['places'];
 
 const darkMapStyles: google.maps.MapTypeStyle[] = [
   { elementType: 'geometry', stylers: [{ color: '#1a1a2e' }] },
@@ -149,12 +148,7 @@ export const DashboardMap: React.FC<DashboardMapProps> = ({
 }) => {
   const navigate = useNavigate();
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
-
-  const { isLoaded, loadError } = useLoadScript({
-    googleMapsApiKey: apiKey || '',
-    version: 'weekly',
-    libraries: LIBRARIES,
-  });
+  const { isLoaded } = useGoogleMapsReady();
 
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [dealCoords, setDealCoords] = useState<Map<number, { lat: number; lng: number }>>(
@@ -298,21 +292,6 @@ export const DashboardMap: React.FC<DashboardMapProps> = ({
         <div className="flex-1 flex flex-col items-center justify-center p-8" style={placeholderHeight}>
           <MapPin className="h-8 w-8 text-muted-foreground mb-3" />
           <p className="text-muted-foreground text-sm">Add a Google Maps API key to enable the portfolio map</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (loadError) {
-    return (
-      <div className="bg-card/50 border border-border/60 rounded-2xl flex flex-col h-full">
-        <div className="px-4 py-3 border-b border-border/60 flex items-center justify-between">
-          <span className="font-mono text-2xs uppercase tracking-wider text-muted-foreground font-semibold">Portfolio Map</span>
-          <span className="font-mono text-2xs text-muted-foreground">0 locations</span>
-        </div>
-        <div className="flex-1 flex flex-col items-center justify-center p-8" style={placeholderHeight}>
-          <MapPin className="h-8 w-8 text-muted-foreground mb-3" />
-          <p className="text-muted-foreground text-sm">Unable to load Google Maps</p>
         </div>
       </div>
     );
