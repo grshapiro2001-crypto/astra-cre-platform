@@ -7,9 +7,10 @@
  * - Notifications (placeholder toggles)
  * - API & Integrations (placeholder masked key)
  */
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { toast } from 'sonner';
-import { authService } from '@/services/authService';
+import { api } from '@/services/api';
+import type { User as AuthUser } from '@/types/auth';
 import {
   User,
   Palette,
@@ -122,17 +123,18 @@ const ProfileSection = () => {
   const [email, setEmail] = useState(user?.email || '');
   const [isSaving, setIsSaving] = useState(false);
 
-  const isDirty = fullName !== (user?.full_name || '') || email !== (user?.email || '');
+  // Snapshot initial values at mount; only advances after a successful save
+  const initialValues = useRef({ fullName: user?.full_name || '', email: user?.email || '' });
+  const isDirty = fullName !== initialValues.current.fullName || email !== initialValues.current.email;
 
   const handleSave = async () => {
     if (!isDirty || isSaving) return;
     setIsSaving(true);
     try {
-      const updated = await authService.updateProfile({
-        full_name: fullName,
-        email,
-      });
-      setUser(updated);
+      const response = await api.put<AuthUser>('/auth/me', { full_name: fullName, email });
+      setUser(response.data);
+      localStorage.setItem('user', JSON.stringify(response.data));
+      initialValues.current = { fullName, email };
       toast.success('Profile updated successfully');
     } catch (err: unknown) {
       const detail = err != null && typeof err === 'object' && 'response' in err
