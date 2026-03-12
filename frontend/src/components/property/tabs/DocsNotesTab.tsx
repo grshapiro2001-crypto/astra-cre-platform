@@ -27,6 +27,7 @@ interface DocsNotesTabProps {
   property: PropertyDetail;
   newNote: string;
   setNewNote: (n: string) => void;
+  isSavingNote: boolean;
   onAddNote: () => void;
   fileInputRef: React.RefObject<HTMLInputElement>;
   isUploadingDoc: boolean;
@@ -100,6 +101,7 @@ export function DocsNotesTab({
   property,
   newNote,
   setNewNote,
+  isSavingNote,
   onAddNote,
   fileInputRef,
   isUploadingDoc,
@@ -248,10 +250,14 @@ export function DocsNotesTab({
             <div className="flex justify-end mt-2">
               <button
                 onClick={onAddNote}
-                disabled={!newNote.trim()}
+                disabled={!newNote.trim() || isSavingNote}
                 className="px-4 py-2 rounded-lg text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Add Note
+                {isSavingNote ? (
+                  <><Loader2 className="w-4 h-4 animate-spin inline mr-1" />Saving...</>
+                ) : (
+                  'Add Note'
+                )}
               </button>
             </div>
           </div>

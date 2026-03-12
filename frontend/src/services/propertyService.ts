@@ -171,7 +171,9 @@ export const propertyService = {
    * Update pipeline notes for a property (NO LLM - just updates database)
    */
   async updateNotes(propertyId: number, notes: string): Promise<PropertyDetail> {
-    const response = await api.patch(`/properties/${propertyId}/notes?notes=${encodeURIComponent(notes)}`);
+    const response = await api.patch(`/properties/${propertyId}/notes`, null, {
+      params: { notes },
+    });
     return response.data;
   },
 

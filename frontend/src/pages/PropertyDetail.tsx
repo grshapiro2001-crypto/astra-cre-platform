@@ -119,6 +119,7 @@ export const PropertyDetail = () => {
   const [savedGuidanceValue, setSavedGuidanceValue] = useState(0);
   const [showAIPanel, setShowAIPanel] = useState(false);
   const [newNote, setNewNote] = useState('');
+  const [isSavingNote, setIsSavingNote] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [followUpQuestion, setFollowUpQuestion] = useState('');
   const [followUpLoading, setFollowUpLoading] = useState(false);
@@ -670,20 +671,31 @@ export const PropertyDetail = () => {
         setRentCompTab={setRentCompTab}
         newNote={newNote}
         setNewNote={setNewNote}
+        isSavingNote={isSavingNote}
         onAddNote={async () => {
-          if (newNote.trim() && property) {
-            try {
-              const timestamp = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-              const existingNotes = property.pipeline_notes || '';
-              const updatedNotes = existingNotes ? `${existingNotes}\n\n[${timestamp}]\n${newNote.trim()}` : `[${timestamp}]\n${newNote.trim()}`;
-              await propertyService.updateNotes(property.id, updatedNotes);
-              const updated = await propertyService.getProperty(property.id);
-              setProperty(updated);
-              setNewNote('');
-              toast.success('Note saved');
-            } catch {
-              toast.error('Failed to save note');
+          if (!newNote.trim() || !property || isSavingNote) return;
+          setIsSavingNote(true);
+          try {
+            const timestamp = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+            const existingNotes = property.pipeline_notes || '';
+            const updatedNotes = existingNotes
+              ? `${existingNotes}\n\n[${timestamp}]\n${newNote.trim()}`
+              : `[${timestamp}]\n${newNote.trim()}`;
+
+            const encodedLength = encodeURIComponent(updatedNotes).length;
+            if (encodedLength > 7500) {
+              toast.error('Notes storage limit reached. Please remove old notes before adding new ones.');
+              return;
             }
+
+            const updated = await propertyService.updateNotes(property.id, updatedNotes);
+            setProperty(updated);
+            setNewNote('');
+            toast.success('Note saved');
+          } catch {
+            toast.error('Failed to save note');
+          } finally {
+            setIsSavingNote(false);
           }
         }}
         fileInputRef={fileInputRef}

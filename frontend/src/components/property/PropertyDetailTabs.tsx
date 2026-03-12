@@ -55,6 +55,7 @@ export interface PropertyDetailTabsProps {
   // Notes state
   newNote: string;
   setNewNote: (n: string) => void;
+  isSavingNote: boolean;
   onAddNote: () => void;
   // Document upload
   fileInputRef: React.RefObject<HTMLInputElement>;
@@ -161,6 +162,7 @@ export function PropertyDetailTabs(props: PropertyDetailTabsProps) {
                 property={props.property}
                 newNote={props.newNote}
                 setNewNote={props.setNewNote}
+                isSavingNote={props.isSavingNote}
                 onAddNote={props.onAddNote}
                 fileInputRef={props.fileInputRef}
                 isUploadingDoc={props.isUploadingDoc}
