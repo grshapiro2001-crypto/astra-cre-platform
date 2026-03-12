@@ -3,7 +3,7 @@
  */
 
 import { useMemo } from 'react';
-import { TrendingUp } from 'lucide-react';
+import { TrendingUp, Building2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { PropertyDetail, RentCompItem, SalesCompItem } from '@/types/property';
 import {
@@ -19,19 +19,10 @@ interface ComparablesTabProps {
   setRentCompTab: (t: string) => void;
 }
 
-// Mocked sales comps if API has none
-const MOCK_SALES_COMPS: SalesCompItem[] = [
-  { id: -1, property_name: 'Avana Perimeter', location: 'Sandy Springs, GA', year_built: 2016, units: 325, avg_rent: null, sale_date: 'Nov 2025', sale_price: 82_000_000, price_per_unit: 252_308, cap_rate: 0.0485, cap_rate_qualifier: null, buyer: null, seller: null },
-  { id: -2, property_name: 'Cortland at Phipps', location: 'Buckhead, GA', year_built: 2018, units: 420, avg_rent: null, sale_date: 'Sep 2025', sale_price: 125_000_000, price_per_unit: 297_619, cap_rate: 0.046, cap_rate_qualifier: null, buyer: null, seller: null },
-  { id: -3, property_name: 'Modera Sandy Springs', location: 'Sandy Springs, GA', year_built: 2019, units: 246, avg_rent: null, sale_date: 'Jul 2025', sale_price: 68_500_000, price_per_unit: 278_455, cap_rate: 0.051, cap_rate_qualifier: null, buyer: null, seller: null },
-  { id: -4, property_name: 'The Edison Perimeter', location: 'Dunwoody, GA', year_built: 2015, units: 349, avg_rent: null, sale_date: 'May 2025', sale_price: 94_200_000, price_per_unit: 269_914, cap_rate: 0.049, cap_rate_qualifier: null, buyer: null, seller: null },
-];
 
 export function ComparablesTab({ property, rentCompTab, setRentCompTab }: ComparablesTabProps) {
   const rentComps: RentCompItem[] = property.rent_comps ?? [];
-  const salesComps: SalesCompItem[] = (property.sales_comps?.length ?? 0) > 0
-    ? property.sales_comps!
-    : MOCK_SALES_COMPS;
+  const salesComps: SalesCompItem[] = property.sales_comps ?? [];
 
   // Rent comp tab types
   const rentCompTabs = useMemo(() => {
@@ -220,38 +211,46 @@ export function ComparablesTab({ property, rentCompTab, setRentCompTab }: Compar
 
       {/* ─── Sales Comparables ─── */}
       <h2 className="font-display text-lg font-bold text-foreground">Sales Comparables</h2>
-      <div className="border border-border/60 rounded-2xl bg-card/50 backdrop-blur-xl overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border bg-muted/50">
-                <th className="text-left px-4 py-3 font-medium text-muted-foreground">Property</th>
-                <th className="text-left px-4 py-3 font-medium text-muted-foreground">Location</th>
-                <th className="text-right px-4 py-3 font-medium text-muted-foreground">Sale Date</th>
-                <th className="text-right px-4 py-3 font-medium text-muted-foreground">Price</th>
-                <th className="text-right px-4 py-3 font-medium text-muted-foreground">$/Unit</th>
-                <th className="text-right px-4 py-3 font-medium text-muted-foreground">Cap Rate</th>
-                <th className="text-right px-4 py-3 font-medium text-muted-foreground">Units</th>
-              </tr>
-            </thead>
-            <tbody>
-              {salesComps.map((sc) => (
-                <tr key={sc.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
-                  <td className="px-4 py-3 font-medium text-foreground">{sc.property_name ?? '\u2014'}</td>
-                  <td className="px-4 py-3 text-muted-foreground">{sc.location ?? '\u2014'}</td>
-                  <td className="px-4 py-3 text-right text-muted-foreground">{sc.sale_date ?? '\u2014'}</td>
-                  <td className="px-4 py-3 text-right font-mono">{sc.sale_price != null ? fmtCurrency(sc.sale_price, true) : '\u2014'}</td>
-                  <td className="px-4 py-3 text-right font-mono">{sc.price_per_unit != null ? `$${Math.round(sc.price_per_unit).toLocaleString()}` : '\u2014'}</td>
-                  <td className="px-4 py-3 text-right font-mono">
-                    {sc.cap_rate != null ? `${(sc.cap_rate * 100).toFixed(2)}%` : '\u2014'}
-                  </td>
-                  <td className="px-4 py-3 text-right font-mono">{sc.units?.toLocaleString() ?? '\u2014'}</td>
+      {salesComps.length > 0 ? (
+        <div className="border border-border/60 rounded-2xl bg-card/50 backdrop-blur-xl overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted/50">
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Property</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Location</th>
+                  <th className="text-right px-4 py-3 font-medium text-muted-foreground">Sale Date</th>
+                  <th className="text-right px-4 py-3 font-medium text-muted-foreground">Price</th>
+                  <th className="text-right px-4 py-3 font-medium text-muted-foreground">$/Unit</th>
+                  <th className="text-right px-4 py-3 font-medium text-muted-foreground">Cap Rate</th>
+                  <th className="text-right px-4 py-3 font-medium text-muted-foreground">Units</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {salesComps.map((sc) => (
+                  <tr key={sc.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                    <td className="px-4 py-3 font-medium text-foreground">{sc.property_name ?? '\u2014'}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{sc.location ?? '\u2014'}</td>
+                    <td className="px-4 py-3 text-right text-muted-foreground">{sc.sale_date ?? '\u2014'}</td>
+                    <td className="px-4 py-3 text-right font-mono">{sc.sale_price != null ? fmtCurrency(sc.sale_price, true) : '\u2014'}</td>
+                    <td className="px-4 py-3 text-right font-mono">{sc.price_per_unit != null ? `$${Math.round(sc.price_per_unit).toLocaleString()}` : '\u2014'}</td>
+                    <td className="px-4 py-3 text-right font-mono">
+                      {sc.cap_rate != null ? `${(sc.cap_rate * 100).toFixed(2)}%` : '\u2014'}
+                    </td>
+                    <td className="px-4 py-3 text-right font-mono">{sc.units?.toLocaleString() ?? '\u2014'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="bg-card/30 border-border/40 border-dashed rounded-2xl p-8 text-center border">
+          <Building2 className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
+          <p className="text-sm font-medium text-foreground">No Sales Comps Available</p>
+          <p className="text-sm text-muted-foreground mt-1">Upload an Offering Memorandum with comparable sales to populate this section.</p>
+        </div>
+      )}
     </div>
   );
 }
