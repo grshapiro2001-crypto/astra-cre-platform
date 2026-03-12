@@ -2,7 +2,7 @@
  * OverviewTab — Score ring + timeline, stats strip, AI deal summary.
  */
 
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Building2,
   Calendar,
@@ -16,10 +16,12 @@ import {
   CheckCircle,
   Star,
   Layers,
+  RefreshCw,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { PropertyDetail } from '@/types/property';
 import type { DealScoreResult } from '@/services/scoringService';
+import { streamPropertyChat } from '@/services/chatService';
 import {
   fmtCurrency,
   fmtNumber,
@@ -138,7 +140,7 @@ function DealTimeline({ property }: { property: PropertyDetail }) {
 }
 
 // ---------------------------------------------------------------------------
-// AI Deal Summary (NEW — mocked data)
+// AI Deal Summary
 // ---------------------------------------------------------------------------
 
 interface Observation {
@@ -146,35 +148,104 @@ interface Observation {
   text: string;
 }
 
-function getAIDealSummary(property: PropertyDetail) {
-  const units = property.total_units ?? 345;
-  const year = property.year_built ?? 2014;
-  const submarket = property.submarket ?? 'Sandy Springs/Perimeter';
+const AI_SUMMARY_PROMPT = `You are a senior CRE acquisitions analyst. Based on the property data in context, produce a concise deal screening summary.
 
-  const observations: Observation[] = [
-    { type: 'upside', text: `Loss-to-lease of ${((property.average_market_rent && property.average_inplace_rent) ? (((property.average_market_rent - property.average_inplace_rent) / property.average_market_rent) * 100).toFixed(1) : '6.2')}% represents organic revenue growth opportunity through lease renewals at market rates.` },
-    { type: 'upside', text: `${year} vintage construction requires minimal near-term capital expenditure, supporting cash flow stability over a 5-year hold period.` },
-    { type: 'risk', text: `Economic occupancy below 95% suggests potential concession burn-off risk; monitor net effective rents versus face rents.` },
-    { type: 'upside', text: `${submarket} submarket shows strong employment growth and favorable supply/demand dynamics with limited new deliveries.` },
-    { type: 'concern', text: 'Operating expense ratio warrants closer examination — management fee and insurance line items appear elevated versus market benchmarks.' },
-    { type: 'risk', text: 'Debt market environment requires careful attention to rate lock timing and floating-rate exposure in the capital stack.' },
-  ];
-
-  return {
-    verdict: 'CONDITIONAL PASS' as const,
-    summary: `This ${units}-unit ${year}-vintage multifamily asset in ${submarket} presents a compelling value-add opportunity with meaningful loss-to-lease upside. The property demonstrates solid operational fundamentals with room for improvement through professional management and targeted capital improvements. Basis appears reasonable relative to replacement cost and recent comparable transactions.`,
-    observations,
-    recommendation: `Proceed with deeper due diligence, focusing on rent roll validation, expense audit, and capital needs assessment. Recommend obtaining updated T-12 financials and conducting property tour within 10 business days. Target LOI submission at or below guidance pricing pending physical inspection.`,
-  };
+Return ONLY valid JSON (no markdown fencing, no explanation) with this exact shape:
+{
+  "verdict": "<one of: STRONG PASS | CONDITIONAL PASS | WATCHLIST | DECLINE>",
+  "summary": "<2-3 sentence investment thesis>",
+  "observations": [
+    {"type": "upside", "text": "..."},
+    {"type": "risk", "text": "..."},
+    {"type": "concern", "text": "..."}
+  ],
+  "recommendation": "<2-3 sentence next-steps recommendation>"
 }
+
+Rules:
+- Include 4-6 observations with a mix of upside, risk, and concern types.
+- Be specific with numbers from the property data (occupancy, rents, NOI, vintage, submarket).
+- Keep each observation to 1-2 sentences.
+- verdict must be exactly one of the four options above.`;
 
 // ---------------------------------------------------------------------------
 // Main Component
 // ---------------------------------------------------------------------------
 
+interface AISummaryResult {
+  verdict: string;
+  summary: string;
+  observations: Observation[];
+  recommendation: string;
+}
+
 export function OverviewTab({ property, dealScore }: OverviewTabProps) {
   const [showAllObs, setShowAllObs] = useState(false);
-  const aiSummary = useMemo(() => getAIDealSummary(property), [property]);
+  const [aiSummary, setAiSummary] = useState<AISummaryResult | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
+  const fetchedPropertyIdRef = useRef<number | null>(null);
+
+  const fetchAISummary = useCallback((propertyId: number) => {
+    abortRef.current?.abort();
+
+    setAiLoading(true);
+    setAiError(false);
+    setAiSummary(null);
+
+    let accumulated = '';
+
+    const controller = streamPropertyChat(
+      {
+        message: AI_SUMMARY_PROMPT,
+        conversation_history: [],
+        property_id: propertyId,
+      },
+      (chunk) => {
+        accumulated += chunk;
+      },
+      () => {
+        try {
+          let cleaned = accumulated.trim();
+          if (cleaned.startsWith('```')) {
+            cleaned = cleaned.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
+          }
+          const parsed = JSON.parse(cleaned);
+          setAiSummary({
+            verdict: parsed.verdict ?? 'CONDITIONAL PASS',
+            summary: parsed.summary ?? '',
+            observations: Array.isArray(parsed.observations)
+              ? parsed.observations.filter(
+                  (o: { type?: string; text?: string }) =>
+                    o && typeof o.text === 'string' && ['upside', 'risk', 'concern'].includes(o.type ?? ''),
+                )
+              : [],
+            recommendation: parsed.recommendation ?? '',
+          });
+          fetchedPropertyIdRef.current = propertyId;
+        } catch {
+          setAiError(true);
+        }
+        setAiLoading(false);
+      },
+      () => {
+        setAiError(true);
+        setAiLoading(false);
+      },
+    );
+
+    abortRef.current = controller;
+  }, []);
+
+  useEffect(() => {
+    if (property.id && property.id !== fetchedPropertyIdRef.current) {
+      fetchAISummary(property.id);
+    }
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, [property.id, fetchAISummary]);
 
   const totalUnits = property.total_units ?? 0;
   const totalSF = property.total_residential_sf ?? 0;
@@ -330,53 +401,101 @@ export function OverviewTab({ property, dealScore }: OverviewTabProps) {
               </p>
             </div>
           </div>
-          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30">
-            <CheckCircle className="w-3.5 h-3.5" />
-            {aiSummary.verdict}
-          </span>
-        </div>
-
-        {/* Summary */}
-        <div className="border-l-[3px] border-primary/40 pl-4 mb-6">
-          <p className="text-sm text-foreground leading-relaxed">{aiSummary.summary}</p>
-        </div>
-
-        {/* Observations */}
-        <div className="space-y-2 mb-5">
-          {(showAllObs ? aiSummary.observations : aiSummary.observations.slice(0, 3)).map((obs, i) => {
-            const cfg = obs.type === 'upside'
-              ? { bg: 'bg-emerald-500/10', border: 'border-emerald-500/30', icon: ArrowUp, iconColor: 'text-emerald-500' }
-              : obs.type === 'risk'
-              ? { bg: 'bg-amber-500/10', border: 'border-amber-500/30', icon: AlertTriangle, iconColor: 'text-amber-500' }
-              : { bg: 'bg-red-500/10', border: 'border-red-500/30', icon: ArrowDown, iconColor: 'text-red-500' };
-            const Icon = cfg.icon;
-            return (
-              <div key={i} className={cn('flex items-start gap-3 p-3 rounded-xl border', cfg.bg, cfg.border)}>
-                <Icon className={cn('w-4 h-4 mt-0.5 shrink-0', cfg.iconColor)} />
-                <p className="text-sm text-foreground">{obs.text}</p>
-              </div>
-            );
-          })}
-        </div>
-
-        {aiSummary.observations.length > 3 && (
-          <button
-            onClick={() => setShowAllObs(!showAllObs)}
-            className="flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary/80 transition-colors mb-5"
-          >
-            <ChevronDown className={cn('w-3.5 h-3.5 transition-transform', showAllObs && 'rotate-180')} />
-            {showAllObs ? 'Show fewer' : `Show ${aiSummary.observations.length - 3} more observations`}
-          </button>
-        )}
-
-        {/* Recommendation */}
-        <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20">
-          <Star className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400 mb-1">Recommendation</p>
-            <p className="text-sm text-foreground">{aiSummary.recommendation}</p>
+          <div className="flex items-center gap-2">
+            {aiSummary && !aiLoading && (
+              <button
+                onClick={() => {
+                  fetchedPropertyIdRef.current = null;
+                  fetchAISummary(property.id);
+                }}
+                className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+                title="Regenerate summary"
+              >
+                <RefreshCw className="w-4 h-4" />
+              </button>
+            )}
+            {aiSummary && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30">
+                <CheckCircle className="w-3.5 h-3.5" />
+                {aiSummary.verdict}
+              </span>
+            )}
           </div>
         </div>
+
+        {/* Loading skeleton */}
+        {aiLoading && (
+          <div className="space-y-4 animate-pulse">
+            <div className="bg-muted rounded-xl h-4 w-3/4" />
+            <div className="bg-muted rounded-xl h-4 w-full" />
+            <div className="bg-muted rounded-xl h-4 w-2/3" />
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="bg-muted rounded-xl h-12 w-full" />
+            ))}
+            <div className="bg-muted rounded-xl h-16 w-full" />
+          </div>
+        )}
+
+        {/* Error state */}
+        {aiError && !aiSummary && !aiLoading && (
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <AlertTriangle className="w-6 h-6 text-muted-foreground mb-2" />
+            <p className="text-sm text-muted-foreground">AI summary unavailable — check back shortly</p>
+            <button
+              onClick={() => fetchAISummary(property.id)}
+              className="mt-3 flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary/80 transition-colors"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              Try again
+            </button>
+          </div>
+        )}
+
+        {/* Summary */}
+        {aiSummary && !aiLoading && (
+          <>
+            <div className="border-l-[3px] border-primary/40 pl-4 mb-6">
+              <p className="text-sm text-foreground leading-relaxed">{aiSummary.summary}</p>
+            </div>
+
+            {/* Observations */}
+            <div className="space-y-2 mb-5">
+              {(showAllObs ? aiSummary.observations : aiSummary.observations.slice(0, 3)).map((obs, i) => {
+                const cfg = obs.type === 'upside'
+                  ? { bg: 'bg-emerald-500/10', border: 'border-emerald-500/30', icon: ArrowUp, iconColor: 'text-emerald-500' }
+                  : obs.type === 'risk'
+                  ? { bg: 'bg-amber-500/10', border: 'border-amber-500/30', icon: AlertTriangle, iconColor: 'text-amber-500' }
+                  : { bg: 'bg-red-500/10', border: 'border-red-500/30', icon: ArrowDown, iconColor: 'text-red-500' };
+                const Icon = cfg.icon;
+                return (
+                  <div key={i} className={cn('flex items-start gap-3 p-3 rounded-xl border', cfg.bg, cfg.border)}>
+                    <Icon className={cn('w-4 h-4 mt-0.5 shrink-0', cfg.iconColor)} />
+                    <p className="text-sm text-foreground">{obs.text}</p>
+                  </div>
+                );
+              })}
+            </div>
+
+            {aiSummary.observations.length > 3 && (
+              <button
+                onClick={() => setShowAllObs(!showAllObs)}
+                className="flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary/80 transition-colors mb-5"
+              >
+                <ChevronDown className={cn('w-3.5 h-3.5 transition-transform', showAllObs && 'rotate-180')} />
+                {showAllObs ? 'Show fewer' : `Show ${aiSummary.observations.length - 3} more observations`}
+              </button>
+            )}
+
+            {/* Recommendation */}
+            <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20">
+              <Star className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400 mb-1">Recommendation</p>
+                <p className="text-sm text-foreground">{aiSummary.recommendation}</p>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
