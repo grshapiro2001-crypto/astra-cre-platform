@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { GoogleMap, Marker, InfoWindow, useLoadScript } from '@react-google-maps/api';
+import { GoogleMap, Marker, InfoWindow } from '@react-google-maps/api';
+import { useGoogleMapsReady } from '@/hooks/useGoogleMapsReady';
 import { MapPin } from 'lucide-react';
 import type { RentCompItem, BOVPricingTier } from '../../types/property';
 import { fmtCapRate } from '../../utils/formatUtils';
@@ -36,8 +37,6 @@ interface CompMapPin {
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
-
-const LIBRARIES: ('places')[] = ['places'];
 
 const darkMapStyles: google.maps.MapTypeStyle[] = [
   { elementType: "geometry", stylers: [{ color: "#1a1a2e" }] },
@@ -110,12 +109,7 @@ export const CompMap: React.FC<CompMapProps> = ({
   salesComps = [],
 }) => {
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-
-  const { isLoaded, loadError } = useLoadScript({
-    googleMapsApiKey: apiKey || '',
-    version: 'weekly',
-    libraries: LIBRARIES,
-  });
+  const { isLoaded } = useGoogleMapsReady();
 
   const [subjectCoords, setSubjectCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [subjectFailed, setSubjectFailed] = useState(false);
@@ -400,16 +394,6 @@ export const CompMap: React.FC<CompMapProps> = ({
         <p className="text-muted-foreground">
           Add a Google Maps API key to enable the interactive map
         </p>
-      </div>
-    );
-  }
-
-  // Script load error
-  if (loadError) {
-    return (
-      <div className="bg-card/50 border border-border/60 rounded-2xl p-8 text-center">
-        <MapPin className="mx-auto h-8 w-8 text-muted-foreground mb-3" />
-        <p className="text-muted-foreground">Unable to load Google Maps</p>
       </div>
     );
   }
