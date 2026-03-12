@@ -22,7 +22,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useAssistantStore } from '@/store/assistantStore';
 import { propertyService } from '@/services/propertyService';
-import { api } from '@/services/api';
+import { streamPropertyChat } from '@/services/chatService';
 import { scoringService } from '@/services/scoringService';
 import { normalizePercent } from '@/utils/formatUtils';
 import type { DealScoreResult } from '@/services/scoringService';
@@ -123,7 +123,7 @@ export const PropertyDetail = () => {
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [followUpQuestion, setFollowUpQuestion] = useState('');
   const [followUpLoading, setFollowUpLoading] = useState(false);
-  const [followUpResponses, setFollowUpResponses] = useState<Array<{ question: string; answer: string }>>([]);
+  const [followUpResponses, setFollowUpResponses] = useState<Array<{ question: string; answer: string; isStreaming?: boolean; isError?: boolean }>>([]);
 
   // --- Scoring state ---
   const [dealScore, setDealScore] = useState<DealScoreResult | null>(null);
@@ -147,6 +147,65 @@ export const PropertyDetail = () => {
   // --- Comparison state from uiStore ---
   const comparisonPropertyIds = useUIStore((state) => state.comparisonPropertyIds);
   const togglePropertyComparison = useUIStore((state) => state.togglePropertyComparison);
+
+  // --- Follow-up chat handler ---
+  const handleFollowUpSend = () => {
+    if (!followUpQuestion.trim() || followUpLoading || !property) return;
+    const question = followUpQuestion.trim();
+    setFollowUpLoading(true);
+    setFollowUpQuestion('');
+
+    // Append user question with empty streaming answer
+    setFollowUpResponses((prev) => [...prev, { question, answer: '', isStreaming: true }]);
+
+    // Build conversation history from prior exchanges
+    const conversationHistory = followUpResponses.flatMap((item) => [
+      { role: 'user', content: item.question },
+      { role: 'assistant', content: item.answer },
+    ]);
+
+    const message = `Regarding the property "${property.deal_name}" at ${property.property_address || 'unknown address'}: ${question}`;
+
+    let accumulated = '';
+
+    streamPropertyChat(
+      {
+        message,
+        conversation_history: conversationHistory,
+        property_id: property.id,
+      },
+      (chunk) => {
+        accumulated += chunk;
+        const text = accumulated;
+        setFollowUpResponses((prev) => {
+          const updated = [...prev];
+          updated[updated.length - 1] = { ...updated[updated.length - 1], answer: text };
+          return updated;
+        });
+      },
+      () => {
+        setFollowUpResponses((prev) => {
+          const updated = [...prev];
+          updated[updated.length - 1] = { ...updated[updated.length - 1], isStreaming: false };
+          return updated;
+        });
+        setFollowUpLoading(false);
+      },
+      (error) => {
+        setFollowUpResponses((prev) => {
+          const updated = [...prev];
+          updated[updated.length - 1] = {
+            ...updated[updated.length - 1],
+            answer: error,
+            isStreaming: false,
+            isError: true,
+          };
+          return updated;
+        });
+        setFollowUpLoading(false);
+      },
+    );
+  };
 
   // -----------------------------------------------------------------------
   // Data fetching
@@ -915,25 +974,10 @@ export const PropertyDetail = () => {
                     type="text"
                     value={followUpQuestion}
                     onChange={(e) => setFollowUpQuestion(e.target.value)}
-                    onKeyDown={async (e) => {
-                      if (e.key === 'Enter' && followUpQuestion.trim() && !followUpLoading && property) {
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
                         e.preventDefault();
-                        const question = followUpQuestion.trim();
-                        setFollowUpLoading(true);
-                        try {
-                          const response = await api.post('/chat', {
-                            message: `Regarding the property "${property.deal_name}" at ${property.property_address || 'unknown address'}: ${question}`,
-                          });
-                          setFollowUpResponses((prev) => [...prev, { question, answer: response.data.response }]);
-                          setFollowUpQuestion('');
-                        } catch (err: unknown) {
-                          const detail = err != null && typeof err === 'object' && 'response' in err
-                            ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
-                            : null;
-                          toast.error(detail || 'Failed to get AI response');
-                        } finally {
-                          setFollowUpLoading(false);
-                        }
+                        handleFollowUpSend();
                       }
                     }}
                     disabled={followUpLoading}
@@ -941,25 +985,7 @@ export const PropertyDetail = () => {
                     className="w-full px-4 py-3 pr-12 rounded-xl text-sm bg-muted border border-border text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
                   />
                   <button
-                    onClick={async () => {
-                      if (!followUpQuestion.trim() || followUpLoading || !property) return;
-                      const question = followUpQuestion.trim();
-                      setFollowUpLoading(true);
-                      try {
-                        const response = await api.post('/chat', {
-                          message: `Regarding the property "${property.deal_name}" at ${property.property_address || 'unknown address'}: ${question}`,
-                        });
-                        setFollowUpResponses((prev) => [...prev, { question, answer: response.data.response }]);
-                        setFollowUpQuestion('');
-                      } catch (err: unknown) {
-                        const detail = err != null && typeof err === 'object' && 'response' in err
-                          ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
-                          : null;
-                        toast.error(detail || 'Failed to get AI response');
-                      } finally {
-                        setFollowUpLoading(false);
-                      }
-                    }}
+                    onClick={handleFollowUpSend}
                     disabled={followUpLoading || !followUpQuestion.trim()}
                     className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
@@ -974,9 +1000,30 @@ export const PropertyDetail = () => {
                 {followUpResponses.length > 0 && (
                   <div className="mt-4 space-y-3">
                     {followUpResponses.map((item, idx) => (
-                      <div key={idx} className="p-3 rounded-xl bg-muted/50 border border-border/40">
+                      <div
+                        key={idx}
+                        className={cn(
+                          'p-3 rounded-xl border',
+                          item.isError
+                            ? 'bg-destructive/10 border-destructive/40'
+                            : 'bg-muted/50 border-border/40',
+                        )}
+                      >
                         <p className="text-xs font-semibold text-primary mb-1">Q: {item.question}</p>
-                        <p className="text-sm text-foreground whitespace-pre-wrap">{item.answer}</p>
+                        {item.isStreaming && !item.answer ? (
+                          <div className="flex items-center gap-1 py-1">
+                            <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground animate-bounce [animation-delay:0ms]" />
+                            <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground animate-bounce [animation-delay:150ms]" />
+                            <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground animate-bounce [animation-delay:300ms]" />
+                          </div>
+                        ) : (
+                          <p className={cn(
+                            'text-sm whitespace-pre-wrap',
+                            item.isError ? 'text-destructive' : 'text-foreground',
+                          )}>
+                            {item.answer}
+                          </p>
+                        )}
                       </div>
                     ))}
                   </div>
