@@ -131,17 +131,6 @@ export function PropertyDetailTabs(props: PropertyDetailTabsProps) {
             {activeTab === 'underwriting' && (
               <UnderwritingTab
                 property={props.property}
-                financialPeriod={props.financialPeriod}
-                selectedTierIdx={props.selectedTierIdx}
-                setSelectedTierIdx={props.setSelectedTierIdx}
-                capRateSlider={props.capRateSlider}
-                setCapRateSlider={props.setCapRateSlider}
-                pricingGuidance={props.pricingGuidance}
-                setPricingGuidance={props.setPricingGuidance}
-                isSavingGuidance={props.isSavingGuidance}
-                guidanceSaved={props.guidanceSaved}
-                savedGuidanceValue={props.savedGuidanceValue}
-                onSaveGuidance={props.onSaveGuidance}
               />
             )}
             {activeTab === 'unit-mix' && (

@@ -9,6 +9,7 @@ from app.models.organization import Organization, OrganizationMember
 from app.models.feedback import FeedbackReport, FeedbackReply
 from app.models.event import UserEvent
 from app.models.extraction_log import ExtractionLog
+from app.models.underwriting import UnderwritingModel
 
 __all__ = [
     "User", "Property", "AnalysisLog", "PropertyUnitMix", "PropertyRentComp", "PropertyDocument", "RentRollUnit", "T12Financial",
@@ -21,4 +22,5 @@ __all__ = [
     "FeedbackReport", "FeedbackReply",
     "UserEvent",
     "ExtractionLog",
+    "UnderwritingModel",
 ]
