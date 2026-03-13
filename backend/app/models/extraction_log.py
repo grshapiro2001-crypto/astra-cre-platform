@@ -13,7 +13,7 @@ class ExtractionLog(Base):
     __tablename__ = "extraction_logs"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()), index=True)
-    property_id = Column(String(36), ForeignKey("properties.id"), nullable=True, index=True)
+    property_id = Column(Integer, ForeignKey("properties.id"), nullable=True, index=True)
     user_id = Column(String(36), ForeignKey("users.id"), nullable=True)
 
     # Document identification
