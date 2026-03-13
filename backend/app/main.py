@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.database import engine, Base
 import app.models  # noqa: F401 — import all models so Base.metadata knows about them
-from app.api.routes import auth, upload, properties, deal_folders, scoring, data_bank, criteria, chat, organizations, stacking, assistant, admin, feedback, events
+from app.api.routes import auth, upload, properties, deal_folders, scoring, data_bank, criteria, chat, organizations, stacking, assistant, admin, feedback, events, underwriting
 
 logger = logging.getLogger(__name__)
 
@@ -205,6 +205,7 @@ app.include_router(assistant.router, prefix="/api/v1")
 app.include_router(admin.router, prefix="/api/v1")
 app.include_router(feedback.router, prefix="/api/v1")
 app.include_router(events.router, prefix="/api/v1")
+app.include_router(underwriting.router, prefix="/api/v1")
 
 @app.get("/")
 def root():
