@@ -5,7 +5,7 @@
  * Three sections:
  *   A. Summary Card (always visible, dense metrics)
  *   B. Assumption Input Panels (accordion sections)
- *   C. Detailed Output Tables (operating statement, DCF)
+ *   C. Detailed Output Tables (proforma, DCF)
  */
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
@@ -14,8 +14,8 @@ import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import type { PropertyDetail } from '@/types/property';
-import type { UWInputs, UWOutputs, ScenarioResult } from '@/types/underwriting';
+import type { PropertyDetail, FinancialPeriod } from '@/types/property';
+import type { UWInputs, UWOutputs, ScenarioResult, ScenarioInputs } from '@/types/underwriting';
 import { createDefaultInputs } from '@/types/underwriting';
 import { computeUnderwriting, saveUnderwriting, loadUnderwriting } from '@/services/underwritingService';
 import { fmtCurrency, fmtPercent } from '@/utils/formatUtils';
@@ -57,12 +57,6 @@ function parseNum(raw: string): number {
   return isNaN(n) ? 0 : n;
 }
 
-/** Format number for display in inputs */
-function displayNum(v: number, decimals = 0): string {
-  if (v === 0) return '';
-  return decimals > 0 ? v.toFixed(decimals) : v.toLocaleString('en-US');
-}
-
 // ---------------------------------------------------------------------------
 // Accordion Section Component
 // ---------------------------------------------------------------------------
@@ -92,15 +86,16 @@ function AccordionSection({
 }
 
 // ---------------------------------------------------------------------------
-// Input Field Components
+// Input Field Components (Fix 4: focus/blur formatting)
 // ---------------------------------------------------------------------------
 
-function FieldRow({ label, unit, children }: { label: string; unit?: string; children: React.ReactNode }) {
+function FieldRow({ label, unit, hint, children }: { label: string; unit?: string; hint?: string; children: React.ReactNode }) {
   return (
     <div className="flex items-center gap-3">
       <Label className="w-44 shrink-0 text-xs text-muted-foreground">{label}</Label>
       <div className="flex-1 max-w-[200px]">{children}</div>
       {unit && <span className="text-xs text-muted-foreground w-16">{unit}</span>}
+      {hint && <span className="text-xs text-muted-foreground/60 ml-1">{hint}</span>}
     </div>
   );
 }
@@ -110,42 +105,86 @@ function NumInput({
   onChange,
   placeholder,
   decimals = 0,
+  prefix,
+  readOnly,
 }: {
   value: number;
   onChange: (v: number) => void;
   placeholder?: string;
   decimals?: number;
+  prefix?: string;
+  readOnly?: boolean;
 }) {
+  const [editing, setEditing] = useState(false);
+  const [raw, setRaw] = useState('');
+
+  const formatted = useMemo(() => {
+    if (value == null || value === 0) return '';
+    const num = decimals > 0 ? value.toFixed(decimals) : value.toLocaleString('en-US');
+    return prefix ? `${prefix}${num}` : num;
+  }, [value, decimals, prefix]);
+
   return (
     <Input
       type="text"
-      value={displayNum(value, decimals)}
+      value={editing ? raw : formatted}
       placeholder={placeholder ?? '0'}
-      onChange={(e) => onChange(parseNum(e.target.value))}
-      className="h-8 text-sm font-mono"
+      readOnly={readOnly}
+      onFocus={() => {
+        if (readOnly) return;
+        setEditing(true);
+        setRaw(value ? String(value) : '');
+      }}
+      onBlur={() => {
+        if (readOnly) return;
+        setEditing(false);
+        const parsed = parseNum(raw);
+        onChange(parsed);
+      }}
+      onChange={(e) => {
+        if (editing) setRaw(e.target.value);
+      }}
+      className={cn('h-8 text-sm font-mono', readOnly && 'bg-muted/50 cursor-default')}
     />
   );
 }
 
-function PctInput({ value, onChange }: { value: number; onChange: (v: number) => void }) {
-  // Display as percentage, store as decimal
-  const display = value === 0 ? '' : (value * 100).toFixed(2);
+function PctInput({ value, onChange, readOnly }: { value: number; onChange: (v: number) => void; readOnly?: boolean }) {
+  const [editing, setEditing] = useState(false);
+  const [raw, setRaw] = useState('');
+
+  const formatted = useMemo(() => {
+    if (value === 0) return '';
+    return `${(value * 100).toFixed(2)}%`;
+  }, [value]);
+
   return (
     <Input
       type="text"
-      value={display}
+      value={editing ? raw : formatted}
       placeholder="0.00"
-      onChange={(e) => {
-        const pct = parseFloat(e.target.value.replace(/[^0-9.\-]/g, ''));
+      readOnly={readOnly}
+      onFocus={() => {
+        if (readOnly) return;
+        setEditing(true);
+        setRaw(value ? (value * 100).toFixed(2) : '');
+      }}
+      onBlur={() => {
+        if (readOnly) return;
+        setEditing(false);
+        const pct = parseFloat(raw.replace(/[^0-9.\-]/g, ''));
         onChange(isNaN(pct) ? 0 : pct / 100);
       }}
-      className="h-8 text-sm font-mono"
+      onChange={(e) => {
+        if (editing) setRaw(e.target.value);
+      }}
+      className={cn('h-8 text-sm font-mono', readOnly && 'bg-muted/50 cursor-default')}
     />
   );
 }
 
 // ---------------------------------------------------------------------------
-// Summary Card
+// Summary Card (Fix 13: show all return metrics)
 // ---------------------------------------------------------------------------
 
 function SummaryCard({
@@ -160,6 +199,8 @@ function SummaryCard({
 
   const metrics: { label: string; value: string; highlight?: boolean }[] = useMemo(() => {
     if (!vs) return [];
+    const dcf = scenario?.dcf;
+    const y1Dscr = dcf?.years?.[0]?.dscr;
     return [
       { label: 'Purchase Price', value: fmt$(vs.purchase_price, true) },
       { label: '$/Unit', value: fmt$(vs.price_per_unit) },
@@ -173,8 +214,12 @@ function SummaryCard({
       { label: 'Avg Cash-on-Cash', value: fmtPct(vs.avg_cash_on_cash) },
       { label: 'Equity Multiple', value: fmtX(vs.equity_multiple) },
       { label: 'Terminal Value', value: fmt$(vs.terminal_value, true) },
+      { label: 'Terminal $/Unit', value: fmt$(vs.terminal_value_per_unit) },
+      { label: 'DSCR', value: y1Dscr != null ? fmtX(y1Dscr) : DASH },
+      { label: 'Revenue CAGR', value: fmtPct(vs.revenue_cagr) },
+      { label: 'NOI CAGR', value: fmtPct(vs.noi_cagr) },
     ];
-  }, [vs]);
+  }, [vs, scenario]);
 
   // Proforma summary
   const proforma = outputs?.proforma;
@@ -219,53 +264,107 @@ function SummaryCard({
 }
 
 // ---------------------------------------------------------------------------
-// Operating Statement Table
+// Proforma Table (Fix 5: rename, Fix 6: trailing columns)
 // ---------------------------------------------------------------------------
 
-function OperatingStatementTable({ outputs }: { outputs: UWOutputs | null }) {
+function ProformaTable({ outputs, property }: { outputs: UWOutputs | null; property: PropertyDetail }) {
   if (!outputs) return null;
   const os = outputs.operating_statement;
   const allLines = [...os.revenue_lines, ...os.expense_lines, ...os.summary_lines];
 
+  // Determine which lines are revenue vs expense for T3 column logic
+  const revenueLabels = new Set(os.revenue_lines.map((l) => l.label));
+  const t12 = property.t12_financials;
+  const t3 = property.t3_financials;
+  const hasTrailing = !!(t12 || t3);
+
+  // Map FinancialPeriod fields to line labels for frontend-side T12/T3 population
+  function getTrailingVal(fp: FinancialPeriod | null | undefined, label: string): number | null {
+    if (!fp) return null;
+    const map: Record<string, number | null | undefined> = {
+      'Gross Scheduled Rent': fp.gsr,
+      'Gain/Loss to Lease': fp.loss_to_lease,
+      'Less: Vacancy': fp.vacancy,
+      'Less: Concessions': fp.concessions,
+      'Less: Bad Debt': fp.bad_debt,
+      'Net Rental Income': fp.net_rental_income,
+      'Utility Reimbursements': fp.utility_reimbursements,
+      'Parking/Storage Income': fp.parking_storage_income,
+      'Other Income': fp.other_income,
+      'Property Taxes': fp.real_estate_taxes,
+      'Insurance': fp.insurance_amount,
+      'Total Operating Expenses': fp.total_opex,
+      'Net Operating Income': fp.noi,
+    };
+    const v = map[label];
+    return v != null ? v : null;
+  }
+
   return (
     <div className={cn(GLASS_CARD, 'overflow-x-auto')}>
-      <h3 className="font-display text-lg font-bold text-foreground mb-4">Operating Statement</h3>
+      <h3 className="font-display text-lg font-bold text-foreground mb-4">Proforma</h3>
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-border/40">
-            <th className="text-left py-2 px-2 font-sans text-xs text-muted-foreground w-[40%]">Line Item</th>
+            <th className="text-left py-2 px-2 font-sans text-xs text-muted-foreground w-[30%]">Line Item</th>
+            {hasTrailing && (
+              <>
+                <th className="text-right py-2 px-2 font-sans text-xs text-muted-foreground">T12</th>
+                <th className="text-right py-2 px-2 font-sans text-xs text-muted-foreground whitespace-nowrap">T3 Inc / T12 Exp</th>
+              </>
+            )}
             <th className="text-right py-2 px-2 font-sans text-xs text-muted-foreground">Proforma</th>
             <th className="text-right py-2 px-2 font-sans text-xs text-muted-foreground">% Income</th>
             <th className="text-right py-2 px-2 font-sans text-xs text-muted-foreground">$/Unit</th>
           </tr>
         </thead>
         <tbody>
-          {allLines.map((line, i) => (
-            <tr
-              key={i}
-              className={cn(
-                'border-b border-border/20',
-                line.is_total && 'font-semibold bg-muted/20',
-              )}
-            >
-              <td className={cn('py-1.5 px-2', line.is_deduction && !line.is_total && 'pl-6 text-muted-foreground')}>
-                {line.label}
-              </td>
-              <td className="text-right py-1.5 px-2 font-mono text-xs">
-                {line.proforma_amount != null
-                  ? (line.is_deduction && line.proforma_amount > 0
-                    ? `(${fmtCurrency(line.proforma_amount)})`
-                    : fmtCurrency(line.proforma_amount))
-                  : DASH}
-              </td>
-              <td className="text-right py-1.5 px-2 font-mono text-xs text-muted-foreground">
-                {line.proforma_pct_income != null ? `${(line.proforma_pct_income * 100).toFixed(1)}%` : ''}
-              </td>
-              <td className="text-right py-1.5 px-2 font-mono text-xs text-muted-foreground">
-                {line.proforma_per_unit != null ? fmtCurrency(Math.round(line.proforma_per_unit)) : ''}
-              </td>
-            </tr>
-          ))}
+          {allLines.map((line, i) => {
+            const isRevenue = revenueLabels.has(line.label);
+            // T12 column: always show T12 value
+            const t12Val = line.t12_amount ?? getTrailingVal(t12, line.label);
+            // T3 Inc / T12 Exp: for revenue lines use T3, for expense lines use T12
+            const t3ColVal = isRevenue
+              ? (line.t3_amount ?? getTrailingVal(t3, line.label))
+              : (line.t12_amount ?? getTrailingVal(t12, line.label));
+
+            return (
+              <tr
+                key={i}
+                className={cn(
+                  'border-b border-border/20',
+                  line.is_total && 'font-semibold bg-muted/20',
+                )}
+              >
+                <td className={cn('py-1.5 px-2', line.is_deduction && !line.is_total && 'pl-6 text-muted-foreground')}>
+                  {line.label}
+                </td>
+                {hasTrailing && (
+                  <>
+                    <td className="text-right py-1.5 px-2 font-mono text-xs text-muted-foreground">
+                      {t12Val != null ? fmtCurrency(t12Val) : DASH}
+                    </td>
+                    <td className="text-right py-1.5 px-2 font-mono text-xs text-muted-foreground">
+                      {t3ColVal != null ? fmtCurrency(t3ColVal) : DASH}
+                    </td>
+                  </>
+                )}
+                <td className="text-right py-1.5 px-2 font-mono text-xs">
+                  {line.proforma_amount != null
+                    ? (line.is_deduction && line.proforma_amount > 0
+                      ? `(${fmtCurrency(line.proforma_amount)})`
+                      : fmtCurrency(line.proforma_amount))
+                    : DASH}
+                </td>
+                <td className="text-right py-1.5 px-2 font-mono text-xs text-muted-foreground">
+                  {line.proforma_pct_income != null ? `${(line.proforma_pct_income * 100).toFixed(1)}%` : ''}
+                </td>
+                <td className="text-right py-1.5 px-2 font-mono text-xs text-muted-foreground">
+                  {line.proforma_per_unit != null ? fmtCurrency(Math.round(line.proforma_per_unit)) : ''}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -273,7 +372,7 @@ function OperatingStatementTable({ outputs }: { outputs: UWOutputs | null }) {
 }
 
 // ---------------------------------------------------------------------------
-// DCF Table
+// DCF Table (Fix 12: full detailed rows)
 // ---------------------------------------------------------------------------
 
 function DCFTable({ outputs, activeScenario }: { outputs: UWOutputs | null; activeScenario: 'premium' | 'market' }) {
@@ -282,16 +381,34 @@ function DCFTable({ outputs, activeScenario }: { outputs: UWOutputs | null; acti
 
   const years = scenario.dcf.years;
 
-  const rows: { label: string; values: (number | null)[]; format: 'dollar' | 'pct' | 'x' }[] = [
-    { label: 'Total Income', values: years.map((y) => y.total_income), format: 'dollar' },
-    { label: 'Total Expenses', values: years.map((y) => y.total_expenses), format: 'dollar' },
-    { label: 'NOI', values: years.map((y) => y.noi), format: 'dollar' },
+  type RowDef = { label: string; values: (number | null)[]; format: 'dollar' | 'pct' | 'x'; isTotal?: boolean; isSeparator?: boolean };
+
+  const rows: RowDef[] = [
+    // Revenue section
+    { label: 'Gross Potential Rent', values: years.map((y) => y.gpr), format: 'dollar' },
+    { label: 'Less: Vacancy', values: years.map((y) => -y.vacancy), format: 'dollar' },
+    { label: 'Less: Concessions', values: years.map((y) => -y.concessions), format: 'dollar' },
+    { label: 'Less: Bad Debt', values: years.map((y) => -y.bad_debt), format: 'dollar' },
+    { label: 'Net Rental Income', values: years.map((y) => y.nri), format: 'dollar', isTotal: true },
+    { label: 'Other Income', values: years.map((y) => y.other_income), format: 'dollar' },
+    { label: 'Total Income', values: years.map((y) => y.total_income), format: 'dollar', isTotal: true },
+    // Expense section
+    { label: 'Controllable', values: years.map((y) => y.controllable_expenses), format: 'dollar' },
+    { label: 'Property Taxes', values: years.map((y) => y.property_taxes), format: 'dollar' },
+    { label: 'Insurance', values: years.map((y) => y.insurance), format: 'dollar' },
+    { label: 'Management Fee', values: years.map((y) => y.management_fee), format: 'dollar' },
+    { label: 'Total Expenses', values: years.map((y) => y.total_expenses), format: 'dollar', isTotal: true },
+    // Bottom line
+    { label: 'NOI', values: years.map((y) => y.noi), format: 'dollar', isTotal: true },
     { label: 'Reserves', values: years.map((y) => y.reserves), format: 'dollar' },
-    { label: 'Net Cash Flow', values: years.map((y) => y.ncf), format: 'dollar' },
+    { label: 'Net Cash Flow', values: years.map((y) => y.ncf), format: 'dollar', isTotal: true },
     { label: 'Debt Service', values: years.map((y) => y.debt_service), format: 'dollar' },
-    { label: 'NCF After Debt', values: years.map((y) => y.ncf_after_debt), format: 'dollar' },
+    { label: 'NCF After Debt', values: years.map((y) => y.ncf_after_debt), format: 'dollar', isTotal: true },
+    // Metrics
     { label: 'Cash-on-Cash', values: years.map((y) => y.cash_on_cash), format: 'pct' },
     { label: 'DSCR', values: years.map((y) => y.dscr), format: 'x' },
+    { label: 'Revenue Growth', values: years.map((y) => y.revenue_growth_rate), format: 'pct' },
+    { label: 'NOI Growth', values: years.map((y) => y.noi_growth_rate), format: 'pct' },
   ];
 
   function fmtCell(v: number | null, format: string): string {
@@ -327,7 +444,7 @@ function DCFTable({ outputs, activeScenario }: { outputs: UWOutputs | null; acti
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={row.label} className="border-b border-border/20">
+            <tr key={row.label} className={cn('border-b border-border/20', row.isTotal && 'font-semibold bg-muted/20')}>
               <td className="py-1.5 px-2 font-medium whitespace-nowrap sticky left-0 bg-card/50 backdrop-blur-xl">{row.label}</td>
               {row.values.map((v, i) => (
                 <td key={i} className="text-right py-1.5 px-2 font-mono whitespace-nowrap">
@@ -343,7 +460,7 @@ function DCFTable({ outputs, activeScenario }: { outputs: UWOutputs | null; acti
 }
 
 // ---------------------------------------------------------------------------
-// Growth Assumptions Table (editable)
+// Growth Assumptions Table (Fix 10: text visibility)
 // ---------------------------------------------------------------------------
 
 function GrowthTable({ inputs, onChange }: { inputs: UWInputs; onChange: (field: string, idx: number, val: number) => void }) {
@@ -375,9 +492,9 @@ function GrowthTable({ inputs, onChange }: { inputs: UWInputs; onChange: (field:
                 <td key={i} className="py-1 px-1">
                   <input
                     type="text"
-                    className="w-14 h-7 text-center text-xs font-mono rounded border border-border/40 bg-muted/30 focus:outline-none focus:ring-1 focus:ring-primary/50"
-                    value={(v * 100).toFixed(2)}
-                    onChange={(e) => {
+                    className="w-14 h-7 text-center text-xs font-mono rounded border border-border/40 bg-muted/30 text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
+                    defaultValue={(v * 100).toFixed(2)}
+                    onBlur={(e) => {
                       const pct = parseFloat(e.target.value);
                       if (!isNaN(pct)) onChange(row.field as string, i, pct / 100);
                     }}
@@ -388,6 +505,79 @@ function GrowthTable({ inputs, onChange }: { inputs: UWInputs; onChange: (field:
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Scenario Panel (Fix 11: pricing mode toggle)
+// ---------------------------------------------------------------------------
+
+function ScenarioPanel({
+  label,
+  scenario,
+  outputs,
+  scenarioKey,
+  onUpdate,
+}: {
+  label: string;
+  scenario: ScenarioInputs;
+  outputs: UWOutputs | null;
+  scenarioKey: 'premium' | 'market';
+  onUpdate: (updated: ScenarioInputs) => void;
+}) {
+  const solvedPrice = outputs?.scenarios[scenarioKey]?.valuation_summary?.purchase_price;
+  const isReadOnlyPrice = scenario.pricing_mode !== 'manual';
+  const displayPrice = isReadOnlyPrice && solvedPrice ? solvedPrice : (scenario.purchase_price || 0);
+
+  return (
+    <div className="space-y-3">
+      <h4 className="font-sans text-xs font-semibold uppercase tracking-wider text-primary">{label}</h4>
+      <FieldRow label="Pricing Mode">
+        <select
+          value={scenario.pricing_mode}
+          onChange={(e) => onUpdate({ ...scenario, pricing_mode: e.target.value as ScenarioInputs['pricing_mode'] })}
+          className="h-8 text-sm rounded-lg border border-input bg-background px-2 w-full"
+        >
+          <option value="manual">Manual Price</option>
+          <option value="direct_cap">Direct Cap</option>
+          <option value="target_irr">Target IRR</option>
+        </select>
+      </FieldRow>
+
+      {scenario.pricing_mode === 'direct_cap' && (
+        <FieldRow label="Target Cap Rate" unit="%">
+          <PctInput
+            value={scenario.target_cap_rate || 0}
+            onChange={(v) => onUpdate({ ...scenario, target_cap_rate: v })}
+          />
+        </FieldRow>
+      )}
+
+      {scenario.pricing_mode === 'target_irr' && (
+        <FieldRow label="Target Unlev IRR" unit="%">
+          <PctInput
+            value={scenario.target_unlevered_irr || 0}
+            onChange={(v) => onUpdate({ ...scenario, target_unlevered_irr: v })}
+          />
+        </FieldRow>
+      )}
+
+      <FieldRow label="Purchase Price" unit="$">
+        <NumInput
+          value={displayPrice}
+          onChange={(v) => onUpdate({ ...scenario, purchase_price: v })}
+          prefix="$"
+          readOnly={isReadOnlyPrice}
+          placeholder="0"
+        />
+      </FieldRow>
+      <FieldRow label="Terminal Cap Rate" unit="%">
+        <PctInput
+          value={scenario.terminal_cap_rate}
+          onChange={(v) => onUpdate({ ...scenario, terminal_cap_rate: v })}
+        />
+      </FieldRow>
     </div>
   );
 }
@@ -405,6 +595,21 @@ export function UnderwritingTab({ property }: UnderwritingTabProps) {
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
   const [, setLoadedModelId] = useState<number | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+
+  // T12 $/unit reference values (Fix 7)
+  const t12Ref = useMemo(() => {
+    const t12 = property.t12_financials;
+    const u = property.total_units || 1;
+    if (!t12) return {} as Record<string, string>;
+    const refs: Record<string, string> = {};
+    if (t12.real_estate_taxes != null) refs.taxes = `T12: $${Math.round(Math.abs(t12.real_estate_taxes) / u).toLocaleString()}/unit`;
+    if (t12.insurance_amount != null) refs.insurance = `T12: $${Math.round(Math.abs(t12.insurance_amount) / u).toLocaleString()}/unit`;
+    if (t12.total_opex != null) {
+      const perUnit = Math.round(Math.abs(t12.total_opex) / u);
+      refs.total_opex = `T12: $${perUnit.toLocaleString()}/unit`;
+    }
+    return refs;
+  }, [property]);
 
   // Load saved model on mount
   useEffect(() => {
@@ -517,45 +722,27 @@ export function UnderwritingTab({ property }: UnderwritingTabProps) {
 
       {/* ─── Section B: Assumption Input Panels ─── */}
       <div className="space-y-3">
-        {/* Scenario Settings */}
+        {/* Scenario Settings (Fix 11: pricing mode toggle) */}
         <AccordionSection title="Scenario Settings" defaultOpen>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-3">
-              <h4 className="font-sans text-xs font-semibold uppercase tracking-wider text-primary">Premium</h4>
-              <FieldRow label="Purchase Price" unit="$">
-                <NumInput
-                  value={inputs.premium.purchase_price}
-                  onChange={(v) => updateInputs((p) => ({ ...p, premium: { ...p.premium, purchase_price: v } }))}
-                  placeholder="0"
-                />
-              </FieldRow>
-              <FieldRow label="Terminal Cap Rate" unit="%">
-                <PctInput
-                  value={inputs.premium.terminal_cap_rate}
-                  onChange={(v) => updateInputs((p) => ({ ...p, premium: { ...p.premium, terminal_cap_rate: v } }))}
-                />
-              </FieldRow>
-            </div>
-            <div className="space-y-3">
-              <h4 className="font-sans text-xs font-semibold uppercase tracking-wider text-primary">Market</h4>
-              <FieldRow label="Purchase Price" unit="$">
-                <NumInput
-                  value={inputs.market.purchase_price}
-                  onChange={(v) => updateInputs((p) => ({ ...p, market: { ...p.market, purchase_price: v } }))}
-                  placeholder="0"
-                />
-              </FieldRow>
-              <FieldRow label="Terminal Cap Rate" unit="%">
-                <PctInput
-                  value={inputs.market.terminal_cap_rate}
-                  onChange={(v) => updateInputs((p) => ({ ...p, market: { ...p.market, terminal_cap_rate: v } }))}
-                />
-              </FieldRow>
-            </div>
+            <ScenarioPanel
+              label="Premium"
+              scenario={inputs.premium}
+              outputs={outputs}
+              scenarioKey="premium"
+              onUpdate={(s) => updateInputs((p) => ({ ...p, premium: s }))}
+            />
+            <ScenarioPanel
+              label="Market"
+              scenario={inputs.market}
+              outputs={outputs}
+              scenarioKey="market"
+              onUpdate={(s) => updateInputs((p) => ({ ...p, market: s }))}
+            />
           </div>
         </AccordionSection>
 
-        {/* Revenue Assumptions */}
+        {/* Revenue Assumptions (Fix 3: content present, add NRU Avg Rent) */}
         <AccordionSection title="Revenue Assumptions">
           <div className="space-y-3">
             <FieldRow label="Rent Basis">
@@ -591,6 +778,9 @@ export function UnderwritingTab({ property }: UnderwritingTabProps) {
             </FieldRow>
             <FieldRow label="Non-Revenue Units" unit="units">
               <NumInput value={inputs.nru_count} onChange={(v) => setField('nru_count', Math.round(v))} />
+            </FieldRow>
+            <FieldRow label="NRU Avg Rent" unit="$/mo">
+              <NumInput value={inputs.nru_avg_rent} onChange={(v) => setField('nru_avg_rent', v)} placeholder="Auto" />
             </FieldRow>
             <FieldRow label="Utility Reimb" unit="$/unit/yr">
               <NumInput value={inputs.utility_reimb_per_unit} onChange={(v) => setField('utility_reimb_per_unit', v)} />
@@ -657,28 +847,28 @@ export function UnderwritingTab({ property }: UnderwritingTabProps) {
           </div>
         </AccordionSection>
 
-        {/* Expense Assumptions */}
+        {/* Expense Assumptions (Fix 7: T12 reference values) */}
         <AccordionSection title="Expense Assumptions">
           <div className="space-y-3">
-            <FieldRow label="Utilities" unit="$/unit/yr">
+            <FieldRow label="Utilities" unit="$/unit/yr" hint={t12Ref.utilities}>
               <NumInput value={inputs.utilities_per_unit} onChange={(v) => setField('utilities_per_unit', v)} />
             </FieldRow>
-            <FieldRow label="Repairs & Maintenance" unit="$/unit/yr">
+            <FieldRow label="Repairs & Maintenance" unit="$/unit/yr" hint={t12Ref.repairs}>
               <NumInput value={inputs.repairs_per_unit} onChange={(v) => setField('repairs_per_unit', v)} />
             </FieldRow>
-            <FieldRow label="Make Ready" unit="$/unit/yr">
+            <FieldRow label="Make Ready" unit="$/unit/yr" hint={t12Ref.make_ready}>
               <NumInput value={inputs.make_ready_per_unit} onChange={(v) => setField('make_ready_per_unit', v)} />
             </FieldRow>
-            <FieldRow label="Contract Services" unit="$/unit/yr">
+            <FieldRow label="Contract Services" unit="$/unit/yr" hint={t12Ref.contract_services}>
               <NumInput value={inputs.contract_services_per_unit} onChange={(v) => setField('contract_services_per_unit', v)} />
             </FieldRow>
-            <FieldRow label="Marketing" unit="$/unit/yr">
+            <FieldRow label="Marketing" unit="$/unit/yr" hint={t12Ref.marketing}>
               <NumInput value={inputs.marketing_per_unit} onChange={(v) => setField('marketing_per_unit', v)} />
             </FieldRow>
-            <FieldRow label="G&A" unit="$/unit/yr">
+            <FieldRow label="G&A" unit="$/unit/yr" hint={t12Ref.ga}>
               <NumInput value={inputs.ga_per_unit} onChange={(v) => setField('ga_per_unit', v)} />
             </FieldRow>
-            <FieldRow label="Insurance" unit="$/unit/yr">
+            <FieldRow label="Insurance" unit="$/unit/yr" hint={t12Ref.insurance}>
               <NumInput value={inputs.insurance_per_unit} onChange={(v) => setField('insurance_per_unit', v)} />
             </FieldRow>
             <FieldRow label="Management Fee" unit="%">
@@ -700,22 +890,30 @@ export function UnderwritingTab({ property }: UnderwritingTabProps) {
                   <option value="reassessment">Model Reassessment</option>
                 </select>
               </FieldRow>
-              <FieldRow label="Current Tax Amount" unit="$/yr">
-                <NumInput value={inputs.current_tax_amount} onChange={(v) => setField('current_tax_amount', v)} />
-              </FieldRow>
+              {inputs.property_tax_mode === 'current' && (
+                <FieldRow label="Current Tax Amount" unit="$/yr" hint={t12Ref.taxes}>
+                  <NumInput value={inputs.current_tax_amount} onChange={(v) => setField('current_tax_amount', v)} prefix="$" />
+                </FieldRow>
+              )}
               {inputs.property_tax_mode === 'reassessment' && (
                 <>
+                  <FieldRow label="Current Tax Amount" unit="$/yr" hint={t12Ref.taxes}>
+                    <NumInput value={inputs.current_tax_amount} onChange={(v) => setField('current_tax_amount', v)} prefix="$" />
+                  </FieldRow>
+                  <FieldRow label="% of Purchase Assessed" unit="%">
+                    <PctInput value={inputs.pct_of_purchase_assessed} onChange={(v) => setField('pct_of_purchase_assessed', v)} />
+                  </FieldRow>
                   <FieldRow label="Assessment Ratio" unit="%">
                     <PctInput value={inputs.assessment_ratio} onChange={(v) => setField('assessment_ratio', v)} />
                   </FieldRow>
-                  <FieldRow label="Millage Rate">
-                    <NumInput value={inputs.millage_rate} onChange={(v) => setField('millage_rate', v)} decimals={4} />
+                  <FieldRow label="Millage Rate" unit="mills">
+                    <NumInput value={inputs.millage_rate} onChange={(v) => setField('millage_rate', v)} decimals={1} />
                   </FieldRow>
                 </>
               )}
             </div>
 
-            {/* Payroll Detail */}
+            {/* Payroll Detail (Fix 8: default positions) */}
             <div className="border-t border-border/30 pt-3 mt-3">
               <div className="flex items-center justify-between mb-2">
                 <Label className="text-xs text-muted-foreground font-semibold">Payroll Detail</Label>
@@ -849,10 +1047,10 @@ export function UnderwritingTab({ property }: UnderwritingTabProps) {
               {inputs.la_enabled && (
                 <div className="mt-3 space-y-3">
                   <FieldRow label="Existing Balance" unit="$">
-                    <NumInput value={inputs.la_existing_balance} onChange={(v) => setField('la_existing_balance', v)} />
+                    <NumInput value={inputs.la_existing_balance} onChange={(v) => setField('la_existing_balance', v)} prefix="$" />
                   </FieldRow>
                   <FieldRow label="Original Amount" unit="$">
-                    <NumInput value={inputs.la_original_amount} onChange={(v) => setField('la_original_amount', v)} />
+                    <NumInput value={inputs.la_original_amount} onChange={(v) => setField('la_original_amount', v)} prefix="$" />
                   </FieldRow>
                   <FieldRow label="Interest Rate" unit="%">
                     <PctInput value={inputs.la_interest_rate} onChange={(v) => setField('la_interest_rate', v)} />
@@ -871,14 +1069,14 @@ export function UnderwritingTab({ property }: UnderwritingTabProps) {
       </div>
 
       {/* ─── Section C: Output Tables ─── */}
-      <OperatingStatementTable outputs={outputs} />
+      <ProformaTable outputs={outputs} property={property} />
       <DCFTable outputs={outputs} activeScenario={activeScenario} />
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Seed Inputs from Property Data
+// Seed Inputs from Property Data (Fix 8: payroll positions)
 // ---------------------------------------------------------------------------
 
 function seedInputs(property: PropertyDetail): UWInputs {
@@ -921,19 +1119,30 @@ function seedInputs(property: PropertyDetail): UWInputs {
     }
   }
 
-  // Pre-populate default payroll positions
+  // Store trailing data for operating statement T12/T3 columns
+  if (property.t12_financials) {
+    defaults.trailing_t12 = property.t12_financials as unknown as Record<string, unknown>;
+  }
+  if (property.t3_financials) {
+    defaults.trailing_t3 = property.t3_financials as unknown as Record<string, unknown>;
+  }
+
+  // Pre-populate default payroll positions (Fix 8)
   defaults.payroll_items = [
     { position: 'Property Manager', salary: 65000, bonus: 5000, payroll_load_pct: 0.30 },
     { position: 'Assistant Manager', salary: 45000, bonus: 2000, payroll_load_pct: 0.30 },
     { position: 'Leasing Associate', salary: 38000, bonus: 3000, payroll_load_pct: 0.30 },
     { position: 'Maintenance Director', salary: 55000, bonus: 3000, payroll_load_pct: 0.30 },
-    { position: 'Maintenance Tech', salary: 42000, bonus: 0, payroll_load_pct: 0.30 },
+    { position: 'Maintenance Tech I', salary: 42000, bonus: 0, payroll_load_pct: 0.30 },
+    { position: 'Maintenance Tech II', salary: 40000, bonus: 0, payroll_load_pct: 0.30 },
     { position: 'Groundskeeper', salary: 35000, bonus: 0, payroll_load_pct: 0.30 },
   ];
 
   // Pre-populate default other income items
   defaults.other_income_items = [
+    { line_item: 'NSF Fees', description: '', fee_amount: 0, annual_income: 0 },
     { line_item: 'Application Fees', description: '', fee_amount: 0, annual_income: 0 },
+    { line_item: 'Pet Fee', description: '', fee_amount: 0, annual_income: 0 },
     { line_item: 'Pet Rent', description: '', fee_amount: 0, annual_income: 0 },
     { line_item: 'Late Fees', description: '', fee_amount: 0, annual_income: 0 },
     { line_item: 'Cable Revenue', description: '', fee_amount: 0, annual_income: 0 },

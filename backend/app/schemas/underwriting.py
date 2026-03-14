@@ -48,8 +48,11 @@ class ContractServiceItem(BaseModel):
 # ---------------------------------------------------------------------------
 
 class ScenarioInputs(BaseModel):
-    purchase_price: float = 0.0
+    pricing_mode: str = "manual"  # "manual" | "direct_cap" | "target_irr"
+    purchase_price: Optional[float] = 0.0  # Required for manual mode
     terminal_cap_rate: float = 0.0525
+    target_cap_rate: Optional[float] = None  # Required for direct_cap mode
+    target_unlevered_irr: Optional[float] = None  # Required for target_irr mode
 
 
 # ---------------------------------------------------------------------------
@@ -101,8 +104,9 @@ class UWInputs(BaseModel):
     ga_per_unit: float = 0.0
     property_tax_mode: str = "reassessment"  # "current" | "reassessment"
     current_tax_amount: float = 0.0
-    assessment_ratio: float = 0.90
-    millage_rate: float = 0.0
+    pct_of_purchase_assessed: float = 1.0  # % of purchase price used as FMV
+    assessment_ratio: float = 0.40  # GA standard: 40%
+    millage_rate: float = 40.0  # In mills (40.0 = 40 mills = $0.040 per dollar assessed)
     reassessment_year: int = 1
     insurance_per_unit: float = 0.0
     mgmt_fee_pct: float = 0.0275
@@ -274,6 +278,7 @@ class ValuationSummary(BaseModel):
 
 
 class ScenarioResult(BaseModel):
+    proforma: ProformaResult = Field(default_factory=ProformaResult)
     debt: DebtResult = Field(default_factory=DebtResult)
     dcf: DCFResult = Field(default_factory=DCFResult)
     returns: ReturnsResult = Field(default_factory=ReturnsResult)
