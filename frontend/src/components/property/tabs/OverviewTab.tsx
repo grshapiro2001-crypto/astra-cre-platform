@@ -179,6 +179,37 @@ interface AISummaryResult {
   recommendation: string;
 }
 
+const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+
+interface CachedAISummary {
+  data: AISummaryResult;
+  timestamp: number;
+}
+
+function getCachedSummary(propertyId: number): AISummaryResult | null {
+  try {
+    const raw = localStorage.getItem(`talisman_ai_summary_${propertyId}`);
+    if (!raw) return null;
+    const cached: CachedAISummary = JSON.parse(raw);
+    if (Date.now() - cached.timestamp > CACHE_TTL) {
+      localStorage.removeItem(`talisman_ai_summary_${propertyId}`);
+      return null;
+    }
+    return cached.data;
+  } catch {
+    return null;
+  }
+}
+
+function setCachedSummary(propertyId: number, data: AISummaryResult): void {
+  try {
+    const entry: CachedAISummary = { data, timestamp: Date.now() };
+    localStorage.setItem(`talisman_ai_summary_${propertyId}`, JSON.stringify(entry));
+  } catch {
+    // localStorage quota or unavailable — silently ignore
+  }
+}
+
 export function OverviewTab({ property, dealScore }: OverviewTabProps) {
   const [showAllObs, setShowAllObs] = useState(false);
   const [aiSummary, setAiSummary] = useState<AISummaryResult | null>(null);
@@ -187,7 +218,16 @@ export function OverviewTab({ property, dealScore }: OverviewTabProps) {
   const abortRef = useRef<AbortController | null>(null);
   const fetchedPropertyIdRef = useRef<number | null>(null);
 
-  const fetchAISummary = useCallback((propertyId: number) => {
+  const fetchAISummary = useCallback((propertyId: number, forceRefresh = false) => {
+    if (!forceRefresh) {
+      const cached = getCachedSummary(propertyId);
+      if (cached) {
+        setAiSummary(cached);
+        fetchedPropertyIdRef.current = propertyId;
+        return;
+      }
+    }
+
     abortRef.current?.abort();
 
     setAiLoading(true);
@@ -212,7 +252,7 @@ export function OverviewTab({ property, dealScore }: OverviewTabProps) {
             cleaned = cleaned.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
           }
           const parsed = JSON.parse(cleaned);
-          setAiSummary({
+          const result: AISummaryResult = {
             verdict: parsed.verdict ?? 'CONDITIONAL PASS',
             summary: parsed.summary ?? '',
             observations: Array.isArray(parsed.observations)
@@ -222,7 +262,9 @@ export function OverviewTab({ property, dealScore }: OverviewTabProps) {
                 )
               : [],
             recommendation: parsed.recommendation ?? '',
-          });
+          };
+          setCachedSummary(propertyId, result);
+          setAiSummary(result);
           fetchedPropertyIdRef.current = propertyId;
         } catch {
           setAiError(true);
@@ -405,8 +447,7 @@ export function OverviewTab({ property, dealScore }: OverviewTabProps) {
             {aiSummary && !aiLoading && (
               <button
                 onClick={() => {
-                  fetchedPropertyIdRef.current = null;
-                  fetchAISummary(property.id);
+                  fetchAISummary(property.id, true);
                 }}
                 className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
                 title="Regenerate summary"
