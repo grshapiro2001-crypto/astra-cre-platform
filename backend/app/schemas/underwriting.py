@@ -24,8 +24,10 @@ class UnitMixInput(BaseModel):
 class OtherIncomeItem(BaseModel):
     line_item: str = ""
     description: str = ""
+    amount_per_unit: float = 0.0  # Per-unit input ($/unit/yr or $/unit/mo)
+    input_mode: str = "per_unit_year"  # "per_unit_year" | "per_unit_month"
     fee_amount: float = 0.0
-    annual_income: float = 0.0
+    annual_income: float = 0.0  # Backward compat: used if amount_per_unit is 0
 
 
 class PayrollItem(BaseModel):
@@ -106,7 +108,7 @@ class UWInputs(BaseModel):
     current_tax_amount: float = 0.0
     pct_of_purchase_assessed: float = 1.0  # % of purchase price used as FMV
     assessment_ratio: float = 0.40  # GA standard: 40%
-    millage_rate: float = 40.0  # In mills (40.0 = 40 mills = $0.040 per dollar assessed)
+    millage_rate: float = 4.0  # Entered as percentage (4.0 = 4.0%). Engine divides by 100.
     reassessment_year: int = 1
     insurance_per_unit: float = 0.0
     mgmt_fee_pct: float = 0.0275

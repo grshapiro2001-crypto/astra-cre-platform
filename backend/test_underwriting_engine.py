@@ -145,7 +145,7 @@ def build_prose_inputs() -> UWInputs:
         property_tax_mode="current",
         current_tax_amount=460_000,
         assessment_ratio=0.90,
-        millage_rate=0.01,
+        millage_rate=4.0,  # 4.0% (not used in "current" mode)
         reassessment_year=1,
         insurance_per_unit=425,
         mgmt_fee_pct=0.0275,
@@ -400,19 +400,19 @@ class TestPropertyTaxReassessment:
     """Test scenario-dependent property tax reassessment."""
 
     def test_reassessment_formula(self):
-        """$60M purchase, 40% assessment ratio, 40 mills → tax = $960,000."""
+        """$60M purchase, 40% assessment ratio, 4.0% millage → tax = $960,000."""
         inputs = build_prose_inputs()
         inputs.property_tax_mode = "reassessment"
         inputs.pct_of_purchase_assessed = 1.0
         inputs.assessment_ratio = 0.40
-        inputs.millage_rate = 40.0  # 40 mills
+        inputs.millage_rate = 4.0  # 4.0% (engine divides by 100)
         inputs.premium.purchase_price = 60_000_000
 
         engine = UnderwritingEngine(inputs)
         outputs = engine.compute()
         # Y1 proforma property tax should be reassessed
         tax = outputs.scenarios["premium"].proforma.expenses.property_taxes
-        expected = 60_000_000 * 0.40 * (40.0 / 1000)  # = $960,000
+        expected = 60_000_000 * 0.40 * (4.0 / 100)  # = $960,000
         assert abs(tax - expected) < 1.0, f"Tax={tax:.0f}, expected {expected:.0f}"
 
     def test_reassessment_scenario_dependent(self):

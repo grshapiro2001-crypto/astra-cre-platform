@@ -193,7 +193,7 @@ class UnderwritingEngine:
         if inp.property_tax_mode == "reassessment" and purchase_price > 0:
             fmv = purchase_price * inp.pct_of_purchase_assessed
             assessed = fmv * inp.assessment_ratio
-            return assessed * (inp.millage_rate / 1000)
+            return assessed * (inp.millage_rate / 100)
         return inp.current_tax_amount
 
     # ------------------------------------------------------------------
@@ -244,7 +244,16 @@ class UnderwritingEngine:
         # Step 6: Other income
         utility_reimb = inp.utility_reimb_per_unit * inp.total_units
         parking = inp.parking_income_per_unit * inp.total_units
-        other_income = sum(item.annual_income for item in inp.other_income_items)
+        units = inp.total_units
+        other_income = 0.0
+        for item in inp.other_income_items:
+            if item.amount_per_unit > 0:
+                if item.input_mode == "per_unit_month":
+                    other_income += item.amount_per_unit * 12 * units
+                else:
+                    other_income += item.amount_per_unit * units
+            else:
+                other_income += item.annual_income  # backward compat
 
         total_income = nri + utility_reimb + parking + other_income
         monthly_collections = total_income / 12 if total_income else 0.0
@@ -473,7 +482,7 @@ class UnderwritingEngine:
         # Tax reassessment for this scenario (using millage_rate / 1000)
         if inp.property_tax_mode == "reassessment" and purchase_price > 0:
             fmv = purchase_price * inp.pct_of_purchase_assessed
-            reassessed_tax = fmv * inp.assessment_ratio * (inp.millage_rate / 1000)
+            reassessed_tax = fmv * inp.assessment_ratio * (inp.millage_rate / 100)
         else:
             reassessed_tax = inp.current_tax_amount
 

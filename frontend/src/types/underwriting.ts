@@ -19,6 +19,8 @@ export interface UnitMixInput {
 export interface OtherIncomeItem {
   line_item: string;
   description: string;
+  amount_per_unit: number;
+  input_mode: 'per_unit_year' | 'per_unit_month';
   fee_amount: number;
   annual_income: number;
 }
@@ -321,7 +323,7 @@ export function createDefaultInputs(): UWInputs {
     current_tax_amount: 0,
     pct_of_purchase_assessed: 1.0,
     assessment_ratio: 0.40,
-    millage_rate: 40.0,
+    millage_rate: 4.0,
     reassessment_year: 1,
     insurance_per_unit: 0,
     mgmt_fee_pct: 0.0275,
