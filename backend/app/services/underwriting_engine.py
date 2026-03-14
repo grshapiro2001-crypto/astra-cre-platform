@@ -37,43 +37,164 @@ class UnderwritingEngine:
         self.inputs = inputs
 
     def compute(self) -> UWOutputs:
-        """Master computation — runs the full calculation chain per Section 13."""
+        """Master computation — runs the full calculation chain.
+
+        Revenue is scenario-independent. Property tax (and therefore expenses,
+        proforma, and all downstream metrics) is scenario-dependent when
+        property_tax_mode == 'reassessment' because tax depends on purchase price.
+        """
         inp = self.inputs
 
-        # Steps 1–13: scenario-independent
+        # Step 1-6: Revenue — always scenario-independent
         revenue = self._compute_revenue()
-        expenses = self._compute_expenses(revenue)
-        proforma = self._compute_proforma(revenue, expenses)
 
-        # Steps 14–22: per scenario
+        # Steps 7-22: per scenario (tax may depend on purchase price)
         scenarios: dict[str, ScenarioResult] = {}
+        first_proforma: ProformaResult | None = None
+
         for scenario_key in ("premium", "market"):
             scenario_inputs = getattr(inp, scenario_key)
-            if scenario_inputs.purchase_price <= 0:
-                continue
-            debt = self._compute_debt(proforma, scenario_key)
-            dcf = self._compute_dcf(proforma, debt, scenario_key)
-            returns = self._compute_returns(dcf, debt, scenario_key)
 
-            cap_rates = self._compute_cap_rates(proforma, scenario_key)
+            # Resolve purchase price based on pricing mode
+            purchase_price = self._resolve_purchase_price(scenario_key, revenue)
+            if purchase_price <= 0:
+                continue
+
+            # Compute scenario-specific tax
+            scenario_tax = self._compute_scenario_tax(purchase_price)
+
+            # Compute expenses with scenario-specific tax
+            expenses = self._compute_expenses(revenue, property_tax=scenario_tax)
+            proforma = self._compute_proforma(revenue, expenses)
+
+            if first_proforma is None:
+                first_proforma = proforma
+
+            debt = self._compute_debt(proforma, scenario_key, purchase_price)
+            dcf = self._compute_dcf(proforma, debt, scenario_key, purchase_price)
+            returns = self._compute_returns(dcf, debt, scenario_key, purchase_price)
+
+            cap_rates = self._compute_cap_rates(proforma, scenario_key, purchase_price)
             val_summary = self._build_valuation_summary(
-                proforma, debt, dcf, returns, cap_rates, scenario_key
+                proforma, debt, dcf, returns, cap_rates, scenario_key, purchase_price
             )
 
             scenarios[scenario_key] = ScenarioResult(
+                proforma=proforma,
                 debt=debt,
                 dcf=dcf,
                 returns=returns,
                 valuation_summary=val_summary,
             )
 
-        operating_statement = self._build_operating_statement(proforma)
+        # Top-level proforma: use first scenario's proforma, or compute a
+        # fallback using current_tax_amount if no scenarios ran
+        if first_proforma is None:
+            fallback_expenses = self._compute_expenses(revenue, property_tax=inp.current_tax_amount)
+            first_proforma = self._compute_proforma(revenue, fallback_expenses)
+
+        operating_statement = self._build_operating_statement(first_proforma)
 
         return UWOutputs(
-            proforma=proforma,
+            proforma=first_proforma,
             scenarios=scenarios,
             operating_statement=operating_statement,
         )
+
+    # ------------------------------------------------------------------
+    # Purchase Price Resolution (pricing modes)
+    # ------------------------------------------------------------------
+
+    def _resolve_purchase_price(self, scenario_key: str, revenue: RevenueResult) -> float:
+        """Resolve purchase price based on pricing mode."""
+        inp = self.inputs
+        scenario = getattr(inp, scenario_key)
+        mode = getattr(scenario, "pricing_mode", "manual")
+
+        if mode == "manual":
+            return scenario.purchase_price or 0.0
+
+        elif mode == "direct_cap":
+            target_cap = scenario.target_cap_rate
+            if not target_cap or target_cap <= 0:
+                return 0.0
+
+            # Start with current_tax_amount to compute initial NOI
+            tax = inp.current_tax_amount
+            expenses = self._compute_expenses(revenue, property_tax=tax)
+            noi = revenue.total_income - expenses.total_expenses
+            price = noi / target_cap
+
+            # If reassessment mode, iterate to convergence (tax depends on price)
+            if inp.property_tax_mode == "reassessment":
+                for _ in range(20):
+                    tax = self._compute_scenario_tax(price)
+                    expenses = self._compute_expenses(revenue, property_tax=tax)
+                    noi = revenue.total_income - expenses.total_expenses
+                    new_price = noi / target_cap
+                    if abs(new_price - price) < 1.0:
+                        break
+                    price = new_price
+
+            return price
+
+        elif mode == "target_irr":
+            return self._solve_price_from_irr(scenario_key, revenue)
+
+        return scenario.purchase_price or 0.0
+
+    def _solve_price_from_irr(self, scenario_key: str, revenue: RevenueResult) -> float:
+        """Bisection solver: find purchase price that produces the target unlevered IRR."""
+        inp = self.inputs
+        scenario = getattr(inp, scenario_key)
+        target_irr = scenario.target_unlevered_irr
+
+        if not target_irr or target_irr <= 0:
+            return 0.0
+
+        units = inp.total_units if inp.total_units > 0 else 1
+        lo = 10_000.0 * units
+        hi = 500_000.0 * units
+
+        def compute_irr_at_price(price: float) -> Optional[float]:
+            tax = self._compute_scenario_tax(price)
+            expenses = self._compute_expenses(revenue, property_tax=tax)
+            proforma = self._compute_proforma(revenue, expenses)
+            debt = self._compute_debt(proforma, scenario_key, price)
+            dcf = self._compute_dcf(proforma, debt, scenario_key, price)
+            returns = self._compute_returns(dcf, debt, scenario_key, price)
+            return returns.unlevered_irr
+
+        # Bisection: higher price -> lower IRR (monotonically decreasing)
+        for _ in range(60):
+            mid = (lo + hi) / 2
+            irr = compute_irr_at_price(mid)
+            if irr is None:
+                hi = mid
+                continue
+            if abs(irr - target_irr) < 0.0001:
+                return mid
+            if irr > target_irr:
+                # Price too low → IRR too high → increase price
+                lo = mid
+            else:
+                # Price too high → IRR too low → decrease price
+                hi = mid
+
+        return (lo + hi) / 2
+
+    # ------------------------------------------------------------------
+    # Scenario Tax Calculation
+    # ------------------------------------------------------------------
+
+    def _compute_scenario_tax(self, purchase_price: float) -> float:
+        """Compute property tax for a given purchase price."""
+        inp = self.inputs
+        if inp.property_tax_mode == "reassessment" and purchase_price > 0:
+            fmv = purchase_price * inp.pct_of_purchase_assessed
+            assessed = fmv * inp.assessment_ratio
+            return assessed * (inp.millage_rate / 1000)
+        return inp.current_tax_amount
 
     # ------------------------------------------------------------------
     # Step 1–6: Revenue Waterfall
@@ -148,7 +269,7 @@ class UnderwritingEngine:
     # Step 7–10: Expenses
     # ------------------------------------------------------------------
 
-    def _compute_expenses(self, revenue: RevenueResult) -> ExpenseResult:
+    def _compute_expenses(self, revenue: RevenueResult, property_tax: Optional[float] = None) -> ExpenseResult:
         inp = self.inputs
         units = inp.total_units
 
@@ -173,9 +294,8 @@ class UnderwritingEngine:
         controllable = utilities + repairs + make_ready + contract_svc + marketing + payroll + ga
 
         # Non-controllable
-        # Property taxes — reassessment handled per-scenario in DCF
-        # For Y1 proforma, use current_tax_amount as baseline
-        property_taxes = inp.current_tax_amount
+        # Property taxes — use override if provided (scenario-dependent)
+        property_taxes = property_tax if property_tax is not None else inp.current_tax_amount
         insurance = inp.insurance_per_unit * units
 
         # Management fee = % of Total Income (EGI)
@@ -230,10 +350,8 @@ class UnderwritingEngine:
     # Step 14–15: Debt
     # ------------------------------------------------------------------
 
-    def _compute_debt(self, proforma: ProformaResult, scenario_key: str) -> DebtResult:
+    def _compute_debt(self, proforma: ProformaResult, scenario_key: str, purchase_price: float) -> DebtResult:
         inp = self.inputs
-        scenario = getattr(inp, scenario_key)
-        purchase_price = scenario.purchase_price
 
         if inp.la_enabled:
             return self._compute_debt_assumption(proforma)
@@ -334,16 +452,14 @@ class UnderwritingEngine:
     # ------------------------------------------------------------------
 
     def _compute_dcf(
-        self, proforma: ProformaResult, debt: DebtResult, scenario_key: str
+        self, proforma: ProformaResult, debt: DebtResult, scenario_key: str, purchase_price: float
     ) -> DCFResult:
         inp = self.inputs
-        scenario = getattr(inp, scenario_key)
         hold = inp.hold_period_years
         units = inp.total_units
 
         # Y1 base values
         y1_gpr = proforma.revenue.gpr
-        y1_nri = proforma.revenue.nri
         y1_util = proforma.revenue.utility_reimbursements
         y1_parking = proforma.revenue.parking_income
         y1_other = proforma.revenue.other_income
@@ -354,9 +470,10 @@ class UnderwritingEngine:
         y1_total_income = proforma.revenue.total_income
         y1_noi = proforma.noi
 
-        # Tax reassessment for this scenario
-        if inp.property_tax_mode == "reassessment" and scenario.purchase_price > 0:
-            reassessed_tax = scenario.purchase_price * inp.assessment_ratio * inp.millage_rate
+        # Tax reassessment for this scenario (using millage_rate / 1000)
+        if inp.property_tax_mode == "reassessment" and purchase_price > 0:
+            fmv = purchase_price * inp.pct_of_purchase_assessed
+            reassessed_tax = fmv * inp.assessment_ratio * (inp.millage_rate / 1000)
         else:
             reassessed_tax = inp.current_tax_amount
 
@@ -364,18 +481,13 @@ class UnderwritingEngine:
 
         for yr_idx in range(hold):
             yr = yr_idx + 1
-            # Clamp index to available array length
-            ri = min(yr_idx, len(inp.rental_inflation) - 1)
-            ei = min(yr_idx, len(inp.expense_inflation) - 1)
-            ti = min(yr_idx, len(inp.re_tax_inflation) - 1)
             vi = min(yr_idx, len(inp.vacancy_pct) - 1)
             ci = min(yr_idx, len(inp.concession_pct) - 1)
             bi = min(yr_idx, len(inp.bad_debt_pct) - 1)
 
-            # Cumulative rental inflation from Y1
+            # Cumulative growth factors from Y1
             rental_growth = self._cumulative_growth(inp.rental_inflation, yr_idx)
             expense_growth = self._cumulative_growth(inp.expense_inflation, yr_idx)
-            tax_growth = self._cumulative_growth(inp.re_tax_inflation, yr_idx)
 
             # Revenue
             gpr = y1_gpr * rental_growth
@@ -416,7 +528,6 @@ class UnderwritingEngine:
                     prop_tax = y1_tax * self._cumulative_growth(inp.re_tax_inflation, yr_idx)
                 elif inp.property_tax_mode == "reassessment":
                     # After reassessment, grow from reassessed base
-                    years_since = yr_idx - (inp.reassessment_year - 1)
                     prop_tax = reassessed_tax * self._cumulative_growth_from(
                         inp.re_tax_inflation, inp.reassessment_year - 1, yr_idx
                     )
@@ -498,7 +609,7 @@ class UnderwritingEngine:
     # ------------------------------------------------------------------
 
     def _compute_returns(
-        self, dcf: DCFResult, debt: DebtResult, scenario_key: str
+        self, dcf: DCFResult, debt: DebtResult, scenario_key: str, purchase_price: float
     ) -> ReturnsResult:
         inp = self.inputs
         scenario = getattr(inp, scenario_key)
@@ -508,10 +619,7 @@ class UnderwritingEngine:
 
         # Reversion (terminal year)
         exit_year = dcf.years[-1]
-        # Forward NOI = exit year NOI * (1 + next year growth)
         last_ri = min(len(dcf.years) - 1, len(inp.rental_inflation) - 1)
-        # Use average of rental and expense growth for NOI forward projection
-        # Simplified: use rental inflation for the exit year
         forward_noi = exit_year.noi * (1 + inp.rental_inflation[last_ri])
 
         terminal_cap = scenario.terminal_cap_rate
@@ -544,8 +652,7 @@ class UnderwritingEngine:
         levered_irr = self._solve_irr(lev_cfs)
 
         # Unleveraged IRR: [-Purchase Price, NOIAC1, ..., NOIACn + GSP - Sales Exp]
-        purchase = scenario.purchase_price
-        unlev_cfs = [-purchase]
+        unlev_cfs = [-purchase_price]
         for i, yr in enumerate(dcf.years):
             cf = yr.ncf  # NOI After Capital = NCF = NOI - Reserves
             if i == len(dcf.years) - 1:
@@ -577,12 +684,10 @@ class UnderwritingEngine:
     # ------------------------------------------------------------------
 
     def _compute_cap_rates(
-        self, proforma: ProformaResult, scenario_key: str
+        self, proforma: ProformaResult, scenario_key: str, purchase_price: float
     ) -> CapRates:
         scenario = getattr(self.inputs, scenario_key)
-        price = scenario.purchase_price
-
-        y1_cap = proforma.noi / price if price > 0 else None
+        y1_cap = proforma.noi / purchase_price if purchase_price > 0 else None
 
         return CapRates(
             y1_cap_rate=y1_cap,
@@ -601,10 +706,9 @@ class UnderwritingEngine:
         returns: ReturnsResult,
         cap_rates: CapRates,
         scenario_key: str,
+        purchase_price: float,
     ) -> ValuationSummary:
         inp = self.inputs
-        scenario = getattr(inp, scenario_key)
-        price = scenario.purchase_price
         units = inp.total_units
         sf = inp.total_sf
 
@@ -617,9 +721,9 @@ class UnderwritingEngine:
         y1_rent_psf = y1_market_rent / avg_sf if avg_sf > 0 else 0.0
 
         return ValuationSummary(
-            purchase_price=price,
-            price_per_unit=price / units if units > 0 else 0.0,
-            price_per_sf=price / sf if sf > 0 else 0.0,
+            purchase_price=purchase_price,
+            price_per_unit=purchase_price / units if units > 0 else 0.0,
+            price_per_sf=purchase_price / sf if sf > 0 else 0.0,
             cap_rates=cap_rates,
             y1_market_rent=y1_market_rent,
             y1_market_rent_psf=y1_rent_psf,
@@ -662,9 +766,14 @@ class UnderwritingEngine:
             t12_val: Optional[float] = None,
             t3_val: Optional[float] = None,
         ) -> OperatingStatementLine:
-            t12_ti = t12_val  # Simplified — full T12/T3 column would need trailing totals
             return OperatingStatementLine(
                 label=label,
+                t12_amount=t12_val,
+                t12_pct_income=None,
+                t12_per_unit=t12_val / units if t12_val is not None and units > 0 else None,
+                t3_amount=t3_val,
+                t3_pct_income=None,
+                t3_per_unit=t3_val / units if t3_val is not None and units > 0 else None,
                 proforma_amount=proforma_val,
                 proforma_pct_income=pct(proforma_val),
                 proforma_per_unit=pu(proforma_val),
@@ -672,18 +781,22 @@ class UnderwritingEngine:
                 is_total=is_total,
             )
 
+        # Build T12/T3 lookups from trailing data
+        t12 = inp.trailing_t12 or {}
+        t3 = inp.trailing_t3 or {}
+
         revenue_lines = [
-            line("Gross Scheduled Rent", rev.gsr),
-            line("Gain/Loss to Lease", rev.gain_loss_to_lease, is_deduction=True),
+            line("Gross Scheduled Rent", rev.gsr, t12_val=t12.get("gsr"), t3_val=t3.get("gsr")),
+            line("Gain/Loss to Lease", rev.gain_loss_to_lease, is_deduction=True, t12_val=t12.get("loss_to_lease"), t3_val=t3.get("loss_to_lease")),
             line("Gross Potential Rent", rev.gpr, is_total=True),
-            line("Less: Vacancy", rev.vacancy, is_deduction=True),
-            line("Less: Concessions", rev.concessions, is_deduction=True),
+            line("Less: Vacancy", rev.vacancy, is_deduction=True, t12_val=t12.get("vacancy"), t3_val=t3.get("vacancy")),
+            line("Less: Concessions", rev.concessions, is_deduction=True, t12_val=t12.get("concessions"), t3_val=t3.get("concessions")),
             line("Less: Non-Revenue Units", rev.nru_loss, is_deduction=True),
-            line("Less: Bad Debt", rev.bad_debt, is_deduction=True),
-            line("Net Rental Income", rev.nri, is_total=True),
-            line("Utility Reimbursements", rev.utility_reimbursements),
-            line("Parking/Storage Income", rev.parking_income),
-            line("Other Income", rev.other_income),
+            line("Less: Bad Debt", rev.bad_debt, is_deduction=True, t12_val=t12.get("bad_debt")),
+            line("Net Rental Income", rev.nri, is_total=True, t12_val=t12.get("net_rental_income"), t3_val=t3.get("net_rental_income")),
+            line("Utility Reimbursements", rev.utility_reimbursements, t12_val=t12.get("utility_reimbursements")),
+            line("Parking/Storage Income", rev.parking_income, t12_val=t12.get("parking_storage_income")),
+            line("Other Income", rev.other_income, t12_val=t12.get("other_income"), t3_val=t3.get("other_income")),
             line("Total Income", rev.total_income, is_total=True),
         ]
 
@@ -696,15 +809,15 @@ class UnderwritingEngine:
             line("Payroll Expenses", exp.payroll),
             line("General & Administrative", exp.general_admin),
             line("Controllable Expenses", exp.controllable_total, is_total=True),
-            line("Property Taxes", exp.property_taxes),
-            line("Insurance", exp.insurance),
+            line("Property Taxes", exp.property_taxes, t12_val=t12.get("real_estate_taxes")),
+            line("Insurance", exp.insurance, t12_val=t12.get("insurance_amount")),
             line("Management Fee", exp.management_fee),
             line("Non-Controllable Expenses", exp.non_controllable_total, is_total=True),
-            line("Total Operating Expenses", exp.total_expenses, is_total=True),
+            line("Total Operating Expenses", exp.total_expenses, is_total=True, t12_val=t12.get("total_opex")),
         ]
 
         summary_lines = [
-            line("Net Operating Income", proforma.noi, is_total=True),
+            line("Net Operating Income", proforma.noi, is_total=True, t12_val=t12.get("noi")),
             line("Replacement Reserves", proforma.reserves, is_deduction=True),
             line("Net Cash Flow", proforma.ncf, is_total=True),
         ]

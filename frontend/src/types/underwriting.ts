@@ -43,8 +43,11 @@ export interface ContractServiceItem {
 // ---------------------------------------------------------------------------
 
 export interface ScenarioInputs {
+  pricing_mode: 'manual' | 'direct_cap' | 'target_irr';
   purchase_price: number;
   terminal_cap_rate: number;
+  target_cap_rate?: number | null;
+  target_unlevered_irr?: number | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -81,8 +84,9 @@ export interface UWInputs {
   ga_per_unit: number;
   property_tax_mode: 'current' | 'reassessment';
   current_tax_amount: number;
+  pct_of_purchase_assessed: number;
   assessment_ratio: number;
-  millage_rate: number;
+  millage_rate: number; // In mills (40.0 = 40 mills = $0.040 per dollar assessed)
   reassessment_year: number;
   insurance_per_unit: number;
   mgmt_fee_pct: number;
@@ -244,6 +248,7 @@ export interface ValuationSummary {
 }
 
 export interface ScenarioResult {
+  proforma: ProformaResult;
   debt: DebtResult;
   dcf: DCFResult;
   returns: ReturnsResult;
@@ -292,8 +297,8 @@ export function createDefaultInputs(): UWInputs {
     unit_mix: [],
     trailing_t12: null,
     trailing_t3: null,
-    premium: { purchase_price: 0, terminal_cap_rate: 0.0525 },
-    market: { purchase_price: 0, terminal_cap_rate: 0.0550 },
+    premium: { pricing_mode: 'manual', purchase_price: 0, terminal_cap_rate: 0.0525, target_cap_rate: null, target_unlevered_irr: null },
+    market: { pricing_mode: 'manual', purchase_price: 0, terminal_cap_rate: 0.0550, target_cap_rate: null, target_unlevered_irr: null },
     rent_basis: 'market',
     retention_ratio: 0.55,
     renewal_rent_bump: 0.70,
@@ -314,8 +319,9 @@ export function createDefaultInputs(): UWInputs {
     ga_per_unit: 0,
     property_tax_mode: 'reassessment',
     current_tax_amount: 0,
-    assessment_ratio: 0.90,
-    millage_rate: 0,
+    pct_of_purchase_assessed: 1.0,
+    assessment_ratio: 0.40,
+    millage_rate: 40.0,
     reassessment_year: 1,
     insurance_per_unit: 0,
     mgmt_fee_pct: 0.0275,

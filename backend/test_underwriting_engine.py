@@ -396,5 +396,100 @@ class TestEdgeCases:
         assert outputs.proforma.revenue.gain_loss_to_lease != 0
 
 
+class TestPropertyTaxReassessment:
+    """Test scenario-dependent property tax reassessment."""
+
+    def test_reassessment_formula(self):
+        """$60M purchase, 40% assessment ratio, 40 mills → tax = $960,000."""
+        inputs = build_prose_inputs()
+        inputs.property_tax_mode = "reassessment"
+        inputs.pct_of_purchase_assessed = 1.0
+        inputs.assessment_ratio = 0.40
+        inputs.millage_rate = 40.0  # 40 mills
+        inputs.premium.purchase_price = 60_000_000
+
+        engine = UnderwritingEngine(inputs)
+        outputs = engine.compute()
+        # Y1 proforma property tax should be reassessed
+        tax = outputs.scenarios["premium"].proforma.expenses.property_taxes
+        expected = 60_000_000 * 0.40 * (40.0 / 1000)  # = $960,000
+        assert abs(tax - expected) < 1.0, f"Tax={tax:.0f}, expected {expected:.0f}"
+
+    def test_reassessment_scenario_dependent(self):
+        """Premium and Market scenarios should have different taxes when reassessment mode."""
+        inputs = build_prose_inputs()
+        inputs.property_tax_mode = "reassessment"
+        inputs.pct_of_purchase_assessed = 1.0
+        inputs.assessment_ratio = 0.40
+        inputs.millage_rate = 40.0
+        # Different purchase prices → different taxes
+        inputs.premium.purchase_price = 63_880_219
+        inputs.market.purchase_price = 60_185_002
+
+        engine = UnderwritingEngine(inputs)
+        outputs = engine.compute()
+        premium_tax = outputs.scenarios["premium"].proforma.expenses.property_taxes
+        market_tax = outputs.scenarios["market"].proforma.expenses.property_taxes
+        assert premium_tax != market_tax, "Taxes should differ between scenarios"
+        assert premium_tax > market_tax, "Premium (higher price) should have higher tax"
+
+    def test_current_mode_ignores_purchase_price(self):
+        """In 'current' mode, property tax equals current_tax_amount regardless of purchase price."""
+        inputs = build_prose_inputs()
+        inputs.property_tax_mode = "current"
+        inputs.current_tax_amount = 460_000
+        engine = UnderwritingEngine(inputs)
+        outputs = engine.compute()
+        tax = outputs.scenarios["premium"].proforma.expenses.property_taxes
+        assert abs(tax - 460_000) < 1.0
+
+
+class TestPricingModes:
+    """Test direct cap and target IRR pricing modes."""
+
+    def test_direct_cap_solves_price(self):
+        """Direct cap mode should solve for purchase price = NOI / target cap."""
+        inputs = build_prose_inputs()
+        inputs.property_tax_mode = "current"
+        inputs.premium.pricing_mode = "direct_cap"
+        inputs.premium.target_cap_rate = 0.0525
+        inputs.premium.purchase_price = 0  # Should be solved
+
+        engine = UnderwritingEngine(inputs)
+        outputs = engine.compute()
+
+        assert "premium" in outputs.scenarios
+        vs = outputs.scenarios["premium"].valuation_summary
+        # Verify Y1 cap rate ≈ target cap rate
+        cap = vs.cap_rates.y1_cap_rate
+        assert cap is not None
+        assert abs(cap - 0.0525) < 0.001, f"Cap rate={cap:.4f}, expected ~0.0525"
+
+    def test_target_irr_solves_price(self):
+        """Target IRR mode should solve for purchase price that produces the target unlevered IRR."""
+        inputs = build_prose_inputs()
+        inputs.property_tax_mode = "current"
+        inputs.premium.pricing_mode = "target_irr"
+        inputs.premium.target_unlevered_irr = 0.0875
+        inputs.premium.purchase_price = 0  # Should be solved
+
+        engine = UnderwritingEngine(inputs)
+        outputs = engine.compute()
+
+        assert "premium" in outputs.scenarios
+        irr = outputs.scenarios["premium"].returns.unlevered_irr
+        assert irr is not None
+        assert abs(irr - 0.0875) < 0.005, f"Unlevered IRR={irr:.4f}, expected ~0.0875"
+
+    def test_manual_mode_unchanged(self):
+        """Manual mode should behave exactly as before."""
+        inputs = build_prose_inputs()
+        inputs.premium.pricing_mode = "manual"
+        engine = UnderwritingEngine(inputs)
+        outputs = engine.compute()
+        vs = outputs.scenarios["premium"].valuation_summary
+        assert abs(vs.purchase_price - 63_880_219) < 1.0
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
