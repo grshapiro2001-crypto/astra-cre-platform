@@ -463,7 +463,11 @@ function DCFTable({ outputs, activeScenario }: { outputs: UWOutputs | null; acti
 // Growth Assumptions Table (Fix 10: text visibility)
 // ---------------------------------------------------------------------------
 
-function GrowthTable({ inputs, onChange }: { inputs: UWInputs; onChange: (field: string, idx: number, val: number) => void }) {
+function GrowthTable({ inputs, onChange, onSetAll }: {
+  inputs: UWInputs;
+  onChange: (field: string, idx: number, val: number) => void;
+  onSetAll: (field: string, val: number) => void;
+}) {
   const rows: { label: string; field: keyof UWInputs; values: number[] }[] = [
     { label: 'Rental Inflation', field: 'rental_inflation', values: inputs.rental_inflation },
     { label: 'Vacancy Loss', field: 'vacancy_pct', values: inputs.vacancy_pct },
@@ -482,6 +486,7 @@ function GrowthTable({ inputs, onChange }: { inputs: UWInputs; onChange: (field:
             {Array.from({ length: 8 }, (_, i) => (
               <th key={i} className="text-center py-2 px-1 text-muted-foreground">Y{i + 1}</th>
             ))}
+            <th className="text-center py-2 px-1 text-muted-foreground whitespace-nowrap">Set All</th>
           </tr>
         </thead>
         <tbody>
@@ -493,6 +498,7 @@ function GrowthTable({ inputs, onChange }: { inputs: UWInputs; onChange: (field:
                   <input
                     type="text"
                     className="w-14 h-7 text-center text-xs font-mono rounded border border-border/40 bg-muted/30 text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
+                    key={`${row.field}-${i}-${v}`}
                     defaultValue={(v * 100).toFixed(2)}
                     onBlur={(e) => {
                       const pct = parseFloat(e.target.value);
@@ -501,6 +507,23 @@ function GrowthTable({ inputs, onChange }: { inputs: UWInputs; onChange: (field:
                   />
                 </td>
               ))}
+              <td className="py-1 px-1">
+                <input
+                  type="text"
+                  className="w-14 h-7 text-center text-xs font-mono rounded border border-primary/40 bg-primary/5 text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 placeholder:text-muted-foreground/40"
+                  placeholder="—"
+                  onBlur={(e) => {
+                    const pct = parseFloat(e.target.value);
+                    if (!isNaN(pct)) {
+                      onSetAll(row.field as string, pct / 100);
+                      e.target.value = '';
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                  }}
+                />
+              </td>
             </tr>
           ))}
         </tbody>
@@ -596,18 +619,25 @@ export function UnderwritingTab({ property }: UnderwritingTabProps) {
   const [, setLoadedModelId] = useState<number | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
 
-  // T12 $/unit reference values (Fix 7)
+  // T12 $/unit reference values
   const t12Ref = useMemo(() => {
     const t12 = property.t12_financials;
     const u = property.total_units || 1;
     if (!t12) return {} as Record<string, string>;
     const refs: Record<string, string> = {};
-    if (t12.real_estate_taxes != null) refs.taxes = `T12: $${Math.round(Math.abs(t12.real_estate_taxes) / u).toLocaleString()}/unit`;
-    if (t12.insurance_amount != null) refs.insurance = `T12: $${Math.round(Math.abs(t12.insurance_amount) / u).toLocaleString()}/unit`;
-    if (t12.total_opex != null) {
-      const perUnit = Math.round(Math.abs(t12.total_opex) / u);
-      refs.total_opex = `T12: $${perUnit.toLocaleString()}/unit`;
-    }
+    const ref = (v: number | null | undefined) => v != null ? `T12: $${Math.round(Math.abs(v) / u).toLocaleString()}/unit` : undefined;
+    // Expense references
+    if (t12.real_estate_taxes != null) refs.taxes = ref(t12.real_estate_taxes)!;
+    if (t12.insurance_amount != null) refs.insurance = ref(t12.insurance_amount)!;
+    if (t12.total_opex != null) refs.total_opex = ref(t12.total_opex)!;
+    if (t12.opex_components?.controllable_expenses != null) refs.controllable = ref(t12.opex_components.controllable_expenses)!;
+    // Revenue references
+    if (t12.gsr != null) refs.gsr = `T12: $${Math.round(Math.abs(t12.gsr)).toLocaleString()}`;
+    if (t12.vacancy != null) refs.vacancy = `T12: $${Math.round(Math.abs(t12.vacancy)).toLocaleString()}`;
+    if (t12.net_rental_income != null) refs.nri = `T12: $${Math.round(Math.abs(t12.net_rental_income)).toLocaleString()}`;
+    if (t12.utility_reimbursements != null) refs.utility_reimb = ref(t12.utility_reimbursements)!;
+    if (t12.parking_storage_income != null) refs.parking = ref(t12.parking_storage_income)!;
+    if (t12.other_income != null) refs.other_income = `T12: $${Math.round(Math.abs(t12.other_income)).toLocaleString()}`;
     return refs;
   }, [property]);
 
@@ -782,10 +812,10 @@ export function UnderwritingTab({ property }: UnderwritingTabProps) {
             <FieldRow label="NRU Avg Rent" unit="$/mo">
               <NumInput value={inputs.nru_avg_rent} onChange={(v) => setField('nru_avg_rent', v)} placeholder="Auto" />
             </FieldRow>
-            <FieldRow label="Utility Reimb" unit="$/unit/yr">
+            <FieldRow label="Utility Reimb" unit="$/unit/yr" hint={t12Ref.utility_reimb}>
               <NumInput value={inputs.utility_reimb_per_unit} onChange={(v) => setField('utility_reimb_per_unit', v)} />
             </FieldRow>
-            <FieldRow label="Parking Income" unit="$/unit/yr">
+            <FieldRow label="Parking Income" unit="$/unit/yr" hint={t12Ref.parking}>
               <NumInput value={inputs.parking_income_per_unit} onChange={(v) => setField('parking_income_per_unit', v)} />
             </FieldRow>
 
@@ -802,7 +832,7 @@ export function UnderwritingTab({ property }: UnderwritingTabProps) {
                       ...p,
                       other_income_items: [
                         ...p.other_income_items,
-                        { line_item: '', description: '', fee_amount: 0, annual_income: 0 },
+                        { line_item: '', description: '', amount_per_unit: 0, input_mode: 'per_unit_year' as const, fee_amount: 0, annual_income: 0 },
                       ],
                     }))
                   }
@@ -823,15 +853,18 @@ export function UnderwritingTab({ property }: UnderwritingTabProps) {
                     }}
                   />
                   <Input
-                    className="h-7 text-xs w-28 font-mono"
-                    placeholder="Annual $"
-                    value={item.annual_income || ''}
+                    className="h-7 text-xs w-24 font-mono"
+                    placeholder="$/unit"
+                    value={item.amount_per_unit || ''}
                     onChange={(e) => {
                       const items = [...inputs.other_income_items];
-                      items[idx] = { ...items[idx], annual_income: parseNum(e.target.value) };
+                      items[idx] = { ...items[idx], amount_per_unit: parseNum(e.target.value) };
                       setField('other_income_items', items);
                     }}
                   />
+                  <span className="text-[10px] text-muted-foreground w-14 shrink-0">
+                    {item.input_mode === 'per_unit_month' ? '$/unit/mo' : '$/unit/yr'}
+                  </span>
                   <button
                     className="text-muted-foreground hover:text-destructive text-xs"
                     onClick={() => {
@@ -906,8 +939,8 @@ export function UnderwritingTab({ property }: UnderwritingTabProps) {
                   <FieldRow label="Assessment Ratio" unit="%">
                     <PctInput value={inputs.assessment_ratio} onChange={(v) => setField('assessment_ratio', v)} />
                   </FieldRow>
-                  <FieldRow label="Millage Rate" unit="mills">
-                    <NumInput value={inputs.millage_rate} onChange={(v) => setField('millage_rate', v)} decimals={1} />
+                  <FieldRow label="Millage Rate" unit="%">
+                    <NumInput value={inputs.millage_rate} onChange={(v) => setField('millage_rate', v)} decimals={2} />
                   </FieldRow>
                 </>
               )}
@@ -1001,6 +1034,12 @@ export function UnderwritingTab({ property }: UnderwritingTabProps) {
                 arr[idx] = val;
                 return { ...prev, [field]: arr };
               });
+            }}
+            onSetAll={(field, val) => {
+              updateInputs((prev) => ({
+                ...prev,
+                [field]: Array(8).fill(val),
+              }));
             }}
           />
         </AccordionSection>
@@ -1138,15 +1177,28 @@ function seedInputs(property: PropertyDetail): UWInputs {
     { position: 'Groundskeeper', salary: 35000, bonus: 0, payroll_load_pct: 0.30 },
   ];
 
-  // Pre-populate default other income items
+  // Pre-populate default other income items (per-unit basis)
+  // Early Termination default = weighted avg rent from selected basis × (1 + Y1 rental inflation)
+  let earlyTermDefault = 0;
+  if (defaults.unit_mix.length > 0) {
+    const totalMixUnits = defaults.unit_mix.reduce((s, um) => s + um.units, 0);
+    if (totalMixUnits > 0) {
+      const avgRent = defaults.unit_mix.reduce(
+        (s, um) => s + (defaults.rent_basis === 'market' ? um.market_rent : um.inplace_rent) * um.units, 0
+      ) / totalMixUnits;
+      earlyTermDefault = Math.round(avgRent * (1 + defaults.rental_inflation[0]));
+    }
+  }
+
   defaults.other_income_items = [
-    { line_item: 'NSF Fees', description: '', fee_amount: 0, annual_income: 0 },
-    { line_item: 'Application Fees', description: '', fee_amount: 0, annual_income: 0 },
-    { line_item: 'Pet Fee', description: '', fee_amount: 0, annual_income: 0 },
-    { line_item: 'Pet Rent', description: '', fee_amount: 0, annual_income: 0 },
-    { line_item: 'Late Fees', description: '', fee_amount: 0, annual_income: 0 },
-    { line_item: 'Cable Revenue', description: '', fee_amount: 0, annual_income: 0 },
-    { line_item: 'Miscellaneous', description: '', fee_amount: 0, annual_income: 0 },
+    { line_item: 'NSF Fees', description: '', amount_per_unit: 0, input_mode: 'per_unit_year', fee_amount: 0, annual_income: 0 },
+    { line_item: 'Application Fees', description: '', amount_per_unit: 0, input_mode: 'per_unit_year', fee_amount: 0, annual_income: 0 },
+    { line_item: 'Administrative Fees', description: '', amount_per_unit: 0, input_mode: 'per_unit_year', fee_amount: 0, annual_income: 0 },
+    { line_item: 'Pet Fee', description: '', amount_per_unit: 0, input_mode: 'per_unit_year', fee_amount: 0, annual_income: 0 },
+    { line_item: 'Pet Rent', description: '', amount_per_unit: 0, input_mode: 'per_unit_month', fee_amount: 0, annual_income: 0 },
+    { line_item: 'Early Termination Fees', description: '', amount_per_unit: earlyTermDefault, input_mode: 'per_unit_year', fee_amount: 0, annual_income: 0 },
+    { line_item: 'Late Fees', description: '', amount_per_unit: 0, input_mode: 'per_unit_month', fee_amount: 0, annual_income: 0 },
+    { line_item: 'Miscellaneous', description: '', amount_per_unit: 0, input_mode: 'per_unit_year', fee_amount: 0, annual_income: 0 },
   ];
 
   return defaults;
