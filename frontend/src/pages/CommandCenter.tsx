@@ -151,7 +151,7 @@ function getAgentResponse(input: string): string {
 
   if (q.includes('critical') || q.includes('urgent')) {
     const crits = BUGS.filter(b => b.severity === 'Critical' && b.status === 'Open');
-    return `⚠️ You have ${crits.length} critical bugs open:\n\n${crits.map(b => `• **${b.id}** — ${b.title}\n  File: ${b.file}`).join('\n\n')}\n\nAll 4 are UI lies — buttons that appear functional but do nothing or silently lose data. Recommended fix order: BUG-003 → BUG-004 → BUG-001/002.`;
+    return `⚠️ You have ${crits.length} critical bugs open:\n\n${crits.map(b => `• **${b.id}** — ${b.title}\n  File: ${b.file}`).join('\n\n')}\n\nRecommended: address these in severity order. All critical bugs from the original audit have been resolved.`;
   }
 
   if (q.includes('bug') && (q.includes('how many') || q.includes('count') || q.includes('total'))) {
@@ -175,7 +175,7 @@ function getAgentResponse(input: string): string {
   }
 
   if (q.includes('health') || q.includes('status') || q.includes('production')) {
-    return `💚 App Health (Mar 11, 2026):\n\n• Production: https://talisman-io-platform.vercel.app\n• Latest deploy: PR #107 — READY ✅\n• Backend: Render.com (free tier — cold starts expected)\n• TypeScript: Clean\n• All 7 core API endpoints: 200 OK\n• Deals in DB: 3 (The Skylark, Adley City Springs, 1160 Hammond)\n• Brand: Talisman IO (rebranded Mar 11 from ASTRA CRE)\n• Design: Champagne Gold (#D4A853) + Cinzel/Questrial fonts\n\n⚠️ Watch: BUG-009 — metrics fluctuate on cold start. BUG-001/002 — Google Maps API needs upgrade.`;
+    return `💚 App Health (Mar 11, 2026):\n\n• Production: https://talisman-io-platform.vercel.app\n• Latest deploy: PR #122 — READY ✅\n• Backend: Render.com (free tier — cold starts expected)\n• TypeScript: Clean\n• All 7 core API endpoints: 200 OK\n• Deals in DB: 3 (The Skylark, Adley City Springs, 1160 Hammond)\n• Brand: Talisman IO (rebranded Mar 11 from ASTRA CRE)\n• Design: Champagne Gold (#D4A853) + Cinzel/Questrial fonts\n\n⚠️ Watch: 56 console.log statements in prod build, 94 emerald color violations.`;
   }
 
   if (q.includes('stacking') || q.includes('3d') || q.includes('three')) {
@@ -183,11 +183,11 @@ function getAgentResponse(input: string): string {
   }
 
   if (q.includes('fix') && q.includes('note')) {
-    return `🔧 Fixing BUG-003 ("Add Note"):\n\n**Current behavior:** onClick calls console.log() then clears input. Data is lost.\n\n**Fix steps:**\n1. Add notes endpoint to backend: POST /api/v1/properties/{id}/notes\n2. Create PropertyNote model in DB\n3. Wire UI to call API on submit\n4. Append returned note to notes list\n\nUse the talisman-io:fix skill with prompt: "Fix BUG-003 — Add Note persistence in PropertyDetail.tsx"`;
+    return `✅ BUG-003 is resolved. The Add Note handler in PropertyDetail.tsx now calls propertyService.updateNotes() with success/error toasts. Fixed in PRs #95-110.`;
   }
 
   if (q.includes('fix') && (q.includes('follow') || q.includes('ask'))) {
-    return `🔧 Fixing BUG-004 ("Ask Follow-up"):\n\n**Current behavior:** Button has no onClick — completely inert.\n\n**Fix steps:**\n1. Wire button onClick to existing POST /api/v1/chat endpoint\n2. Pass property context (id, name, key financials) as system context\n3. Stream response into AI Insights panel (same pattern as pipeline analyst)\n\nUse the talisman-io:fix skill with prompt: "Fix BUG-004 — wire Ask Follow-up button to chat API in PropertyDetail.tsx"`;
+    return `✅ BUG-004 is resolved. The Ask Follow-up button in PropertyDetail.tsx now calls streamPropertyChat() with full SSE streaming. Fixed in PRs #95-110.`;
   }
 
   if (q.includes('cost') || q.includes('api cost') || q.includes('llm')) {
@@ -207,15 +207,15 @@ function getAgentResponse(input: string): string {
   }
 
   if (q.includes('architecture') || q.includes('stack') || q.includes('tech')) {
-    return `🏛 Architecture:\n\n**Frontend:** React 18 + TypeScript + Vite + Tailwind + shadcn/ui + Zustand\n**Backend:** FastAPI + Python + SQLAlchemy + Pydantic\n**DB:** SQLite (dev) / PostgreSQL (prod via Render)\n**AI:** Claude claude-sonnet-4-5-20250929 via Anthropic SDK\n**Deploy:** Vercel (frontend) + Render.com (backend, free tier)\n**Maps:** Google Maps API (⚠️ needs upgrade from v3.55)\n**3D:** Three.js (r128) for stacking viewer\n**PDF:** pdfplumber + ReportLab`;
+    return `🏛 Architecture:\n\n**Frontend:** React 18 + TypeScript + Vite + Tailwind + shadcn/ui + Zustand\n**Backend:** FastAPI + Python + SQLAlchemy + Pydantic\n**DB:** SQLite (dev) / PostgreSQL (prod via Render)\n**AI:** Claude claude-sonnet-4-5-20250929 via Anthropic SDK\n**Deploy:** Vercel (frontend) + Render.com (backend, free tier)\n**Maps:** Google Maps API\n**3D:** Three.js (r128) for stacking viewer\n**PDF:** pdfplumber + ReportLab`;
   }
 
   if (q.includes('hello') || q.includes('hi ') || q === 'hi' || q.includes('hey')) {
-    return `👋 Hey Griffin. I'm your Talisman PM agent.\n\nI have full context on the project: 107 PRs, 14 open bugs, current deployments, feature pipeline, and architecture. Brand is now Talisman IO with Champagne Gold design system.\n\nTry asking:\n• "What are the critical bugs?"\n• "What shipped recently?"\n• "What should we fix next?"\n• "How do I fix the Add Note bug?"\n• "What's the production health status?"`;
+    return `👋 Hey Griffin. I'm your Talisman PM agent.\n\nI have full context on the project: 122 PRs, 8 open bugs, current deployments, feature pipeline, and architecture. Brand is now Talisman IO with Champagne Gold design system.\n\nTry asking:\n• "What are the critical bugs?"\n• "What shipped recently?"\n• "What should we fix next?"\n• "How do I fix the Add Note bug?"\n• "What's the production health status?"`;
   }
 
   if (q.includes('next') && (q.includes('build') || q.includes('work') || q.includes('do'))) {
-    return `🎯 My Recommendation — What To Do Next:\n\n**Immediate (this week):**\n1. Fix BUG-001/002 (Google Maps API loaded multiple times + retire v3.55) — 30 min\n2. Fix BUG-003 (Add Note persistence in PropertyDetail) — 1 hour\n3. Fix BUG-004 (Ask Follow-up button — wire to existing chat API) — 1 hour\n4. Fix BUG-007 (NOI chart "---" fallback: T12 null → T3 → Y1) — 30 min\n\n**Short term:**\n5. Fix BUG-006 (Save Comparison — POST to /api/v1/comparisons)\n6. Fix BUG-008 (Settings Save Changes — PUT /api/v1/auth/me)\n\nAll 4 critical bugs are "UI lies" — buttons that appear functional but silently fail. Fix these before any new features for demo readiness.\n\n**New feature to consider:** BatchData MCP (auto-fetch market comps on upload) — highest impact backlog item.`;
+    return `🎯 My Recommendation — What To Do Next:\n\n**Immediate:**\n1. Clean up console.log pollution (56 instances, 30 in SaveToFolderModal alone) — 1 hour\n2. Emerald → Champagne Gold color sweep (94 violations) — 4-6 hours\n3. Bundle code splitting — main chunk is 1.79MB with no lazy loading — 3-5 hours\n\n**Short term:**\n4. Notification system (BUG-010/011) — bell handler + backend persistence\n5. API key system — replace placeholder in Settings\n\nAll original critical bugs (BUG-001 through BUG-008) are resolved. Focus is now on code quality, design consistency, and performance.`;
   }
 
   return `I understand you're asking about "${input}". I have context on Talisman's bugs, PRs, features, architecture, and deployment status.\n\nTry being more specific:\n• "What critical bugs are open?"\n• "What shipped since Feb 26?"\n• "What's the production health?"\n• "How do I fix the Add Note bug?"\n• "What's next to build?"`;
@@ -259,7 +259,7 @@ export function CommandCenter() {
   const [agentMessages, setAgentMessages] = useState<ChatMessage[]>([
     {
       role: 'assistant',
-      content: `👋 Hey Griffin. I'm your Talisman PM agent — fully briefed on 107 PRs, 14 open bugs, all deployments, and the full roadmap.\n\nRecent highlights: AI chat panel, Talisman IO rebrand, Champagne Gold design system, property detail 7-tab redesign, and TalismanCompass3D.\n\nAsk me anything about the project.`,
+      content: `👋 Hey Griffin. I'm your Talisman PM agent — fully briefed on 122 PRs, 8 open bugs, all deployments, and the full roadmap.\n\nRecent highlights: AI chat panel, Talisman IO rebrand, Champagne Gold design system, property detail 7-tab redesign, TalismanCompass3D, and Underwriting Engine V1.\n\nAsk me anything about the project.`,
       timestamp: new Date().toLocaleTimeString(),
     }
   ]);
