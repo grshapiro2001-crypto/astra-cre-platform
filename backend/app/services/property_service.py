@@ -453,7 +453,7 @@ def delete_property(
         try:
             os.remove(property_obj.raw_pdf_path)
         except Exception as e:
-            print(f"Failed to delete PDF file: {e}")
+            logger.warning("Failed to delete PDF file: %s", e)
 
     # Delete analysis logs
     db.query(AnalysisLog).filter(AnalysisLog.property_id == property_id).delete()

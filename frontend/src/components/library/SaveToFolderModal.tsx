@@ -85,14 +85,12 @@ export const SaveToFolderModal = ({
         setSelectedFolderId(folders[0].id);
       }
     } catch (err) {
-      console.error('Failed to load folders:', err);
     } finally {
       setLoadingFolders(false);
     }
   };
 
   const handleSave = async () => {
-    console.log('🔵 handleSave started', { folderOption, selectedFolderId, newFolderName });
     setIsSaving(true);
     setError(null);
 
@@ -108,7 +106,6 @@ export const SaveToFolderModal = ({
           return;
         }
 
-        console.log('🔵 Creating new folder...', newFolderName);
         // Create new folder first
         const pInfo = extractionResult.extraction_result.property_info;
         const newFolder = await dealFolderService.createFolder({
@@ -122,7 +119,6 @@ export const SaveToFolderModal = ({
         });
 
         folderId = newFolder.id;
-        console.log('✅ Folder created', folderId);
       } else {
         // Use existing folder
         if (!selectedFolderId) {
@@ -131,10 +127,8 @@ export const SaveToFolderModal = ({
           return;
         }
         folderId = selectedFolderId;
-        console.log('🔵 Using existing folder', folderId);
       }
 
-      console.log('🔵 Saving property to folder', folderId);
       // Save property to library with folder association
       const savedProperty = await propertyService.saveToLibrary(
         extractionResult,
@@ -144,23 +138,13 @@ export const SaveToFolderModal = ({
         documentSubtype || undefined
       );
 
-      console.log('✅ Property saved successfully!', savedProperty);
       // Navigate to the saved property's detail page
       navigate(`/library/${savedProperty.id}`);
     } catch (err: any) {
-      console.error('❌ Save error caught:', err);
-      console.error('Error response:', err.response);
-      console.error('Error response data:', err.response?.data);
-      console.error('Error response detail:', err.response?.data?.detail);
 
       // Check if this is a duplicate property error (409 Conflict)
       if (err.response?.status === 409 && err.response?.data?.detail?.existing_property) {
-        console.log('🟡 Duplicate detected! Showing confirmation modal');
-        console.log('Existing property:', err.response.data.detail.existing_property);
-        console.log('Folder ID for duplicate save:', folderId);
-
         if (!folderId) {
-          console.error('❌ CRITICAL: folderId is undefined in duplicate handling!');
           setError('Internal error: folder ID is missing. Please try again.');
           setIsSaving(false);
           return;
@@ -171,16 +155,10 @@ export const SaveToFolderModal = ({
         setExistingProperty(err.response.data.detail.existing_property);
         setPendingSaveFolderId(folderId);
         setIsSaving(false);
-        console.log('State updated:', {
-          duplicateDetected: true,
-          existingProperty: err.response.data.detail.existing_property,
-          pendingSaveFolderId: folderId
-        });
         return;
       }
 
       // Other errors
-      console.log('🔴 Not a duplicate error, showing generic error');
       const errorMessage = typeof err.response?.data?.detail === 'string'
         ? err.response.data.detail
         : err.response?.data?.detail?.message || 'Failed to save property. Please try again.';
@@ -190,10 +168,7 @@ export const SaveToFolderModal = ({
   };
 
   const handleReplaceExisting = async () => {
-    console.log('🔴 handleReplaceExisting called', { existingProperty, pendingSaveFolderId });
-
     if (!existingProperty || !pendingSaveFolderId) {
-      console.error('❌ Missing existingProperty or pendingSaveFolderId');
       return;
     }
 
@@ -201,12 +176,9 @@ export const SaveToFolderModal = ({
     setError(null);
 
     try {
-      console.log('🔴 Deleting existing property', existingProperty.id);
       // Delete existing property
       await propertyService.deleteProperty(existingProperty.id);
-      console.log('✅ Property deleted');
 
-      console.log('🔴 Saving new property to folder', pendingSaveFolderId);
       // Save new property to same folder
       const savedProperty = await propertyService.saveToLibrary(
         extractionResult,
@@ -216,11 +188,9 @@ export const SaveToFolderModal = ({
         documentSubtype || undefined
       );
 
-      console.log('✅ New property saved successfully!', savedProperty);
       // Navigate to the saved property's detail page
       navigate(`/library/${savedProperty.id}`);
     } catch (err: any) {
-      console.error('❌ Replace failed:', err);
       const errorMessage = err.response?.data?.detail || 'Failed to replace property. Please try again.';
       setError(errorMessage);
       setIsSaving(false);
@@ -228,10 +198,7 @@ export const SaveToFolderModal = ({
   };
 
   const handleKeepBoth = async () => {
-    console.log('🟢 handleKeepBoth called', { pendingSaveFolderId });
-
     if (!pendingSaveFolderId) {
-      console.error('❌ Missing pendingSaveFolderId');
       return;
     }
 
@@ -239,7 +206,6 @@ export const SaveToFolderModal = ({
     setError(null);
 
     try {
-      console.log('🟢 Saving with force=true to folder', pendingSaveFolderId);
       // Save with force=true to skip duplicate check
       const savedProperty = await propertyService.saveToLibrary(
         extractionResult,
@@ -250,11 +216,9 @@ export const SaveToFolderModal = ({
         true  // force=true
       );
 
-      console.log('✅ Property saved successfully (kept both)!', savedProperty);
       // Navigate to the saved property's detail page
       navigate(`/library/${savedProperty.id}`);
     } catch (err: any) {
-      console.error('❌ Keep both failed:', err);
       const errorMessage = err.response?.data?.detail || 'Failed to save property. Please try again.';
       setError(errorMessage);
       setIsSaving(false);
@@ -270,7 +234,6 @@ export const SaveToFolderModal = ({
 
   // Show duplicate confirmation modal if duplicate detected
   if (duplicateDetected && existingProperty) {
-    console.log('🟡 Rendering duplicate confirmation modal', { duplicateDetected, existingProperty });
     return (
       <Dialog open={true} onOpenChange={handleCancelDuplicate}>
         <DialogContent className="sm:max-w-2xl">

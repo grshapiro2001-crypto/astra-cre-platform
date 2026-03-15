@@ -34,8 +34,6 @@ export const DeleteFolderModal = ({
   const [error, setError] = useState<string | null>(null);
 
   const handleDelete = async () => {
-    console.log('🔴 Deleting folder:', { folderId, folderName, deleteMode, documentCount });
-
     setIsDeleting(true);
     setError(null);
 
@@ -44,13 +42,10 @@ export const DeleteFolderModal = ({
 
       await dealFolderService.deleteFolder(folderId, deleteContents);
 
-      console.log('✅ Folder deleted successfully');
-
       // Notify parent and close
       onSuccess();
       onClose();
     } catch (err: any) {
-      console.error('❌ Delete folder failed:', err);
       const errorMessage = err.response?.data?.detail || 'Failed to delete folder';
       setError(errorMessage);
     } finally {

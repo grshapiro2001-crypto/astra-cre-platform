@@ -239,7 +239,7 @@ export const CompMap: React.FC<CompMapProps> = ({
         const searchName = comp_name || location;
         const query = `${searchName} apartments${citySuffix}`;
 
-        console.log(`[CompMap] Searching: "${query}"`); const coords = await geocodePlacesAPI(query, map); console.log(`[CompMap] Result for "${searchName}":`, coords);
+        const coords = await geocodePlacesAPI(query, map);
 
         // Validate distance from subject (< 50 miles)
         if (coords) {
