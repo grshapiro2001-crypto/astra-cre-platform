@@ -2159,13 +2159,6 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
       }
     }
 
-    // Log first 10 assignments for verification
-    console.log('[StackingViewer3D] First 10 unit label assignments:');
-    allUnitMeshes.slice(0, 10).forEach((m, i) => {
-      const rr = uuidReg.get(m.uuid);
-      console.log(`  [${i}] ${m.name} → unit_number=${rr?.unit_number ?? '(unmatched)'}`);
-    });
-
     // Replace labels on every unit mesh with the matched real unit_number
     for (const mesh of allUnitMeshes) {
       const rr = uuidReg.get(mesh.uuid);
