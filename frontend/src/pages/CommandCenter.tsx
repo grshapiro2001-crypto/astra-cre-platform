@@ -66,14 +66,14 @@ interface ChatMessage {
 // ─── Static Data ─────────────────────────────────────────────────────────────
 
 const BUGS: Bug[] = [
-  { id: 'BUG-001', title: 'Google Maps API loaded multiple times', file: 'App.tsx / index.html', severity: 'Critical', status: 'Open', impact: 'Map rendering instability on every map-bearing page' },
-  { id: 'BUG-002', title: 'Google Maps using retired API v3.55', file: 'index.html script tag', severity: 'Critical', status: 'Open', impact: 'Maps could break silently — Google may deprecate at any time' },
-  { id: 'BUG-003', title: '"Add Note" silently drops data', file: 'pages/PropertyDetail.tsx ~L1466', severity: 'Critical', status: 'Open', impact: 'Users believe note saved; data lost on page reload' },
-  { id: 'BUG-004', title: '"Ask Follow-up" button inert', file: 'pages/PropertyDetail.tsx ~L1783', severity: 'Critical', status: 'Open', impact: 'Core AI feature appears present but completely non-functional' },
+  { id: 'BUG-001', title: 'Google Maps API loaded multiple times', file: 'App.tsx / index.html', severity: 'Critical', status: 'Fixed', pr: '#117', impact: 'Map rendering instability on every map-bearing page' },
+  { id: 'BUG-002', title: 'Google Maps using retired API v3.55', file: 'index.html script tag', severity: 'Critical', status: 'Fixed', pr: '#117', impact: 'Maps could break silently — Google may deprecate at any time' },
+  { id: 'BUG-003', title: '"Add Note" silently drops data', file: 'pages/PropertyDetail.tsx ~L1466', severity: 'Critical', status: 'Fixed', pr: '#95-110', impact: 'Users believe note saved; data lost on page reload' },
+  { id: 'BUG-004', title: '"Ask Follow-up" button inert', file: 'pages/PropertyDetail.tsx ~L1783', severity: 'Critical', status: 'Fixed', pr: '#95-110', impact: 'Core AI feature appears present but completely non-functional' },
   { id: 'BUG-005', title: 'Kanban moveDeal not persisted', file: 'pages/Dashboard.tsx ~L499', severity: 'High', status: 'Fixed', pr: '#61', impact: 'Pipeline board now saves to DB with org-level templates' },
-  { id: 'BUG-006', title: '"Save Comparison" closes without saving', file: 'pages/ComparisonPage.tsx ~L1886', severity: 'High', status: 'Open', impact: 'Named comparisons cannot be saved at all' },
-  { id: 'BUG-007', title: 'NOI chart shows "---" when T12 null', file: 'pages/PropertyDetail.tsx', severity: 'High', status: 'Open', impact: 'Primary financial metric invisible for properties without T12' },
-  { id: 'BUG-008', title: 'Settings "Save Changes" hardcoded disabled', file: 'pages/Settings.tsx ~L127', severity: 'High', status: 'Open', impact: 'Users cannot update name or email' },
+  { id: 'BUG-006', title: '"Save Comparison" closes without saving', file: 'pages/ComparisonPage.tsx ~L1886', severity: 'High', status: 'Fixed', pr: '#95-110', impact: 'Named comparisons cannot be saved at all' },
+  { id: 'BUG-007', title: 'NOI chart shows "---" when T12 null', file: 'pages/PropertyDetail.tsx', severity: 'High', status: 'Fixed', pr: '#95-110', impact: 'Primary financial metric invisible for properties without T12' },
+  { id: 'BUG-008', title: 'Settings "Save Changes" hardcoded disabled', file: 'pages/Settings.tsx ~L127', severity: 'High', status: 'Fixed', pr: '#95-110', impact: 'Users cannot update name or email' },
   { id: 'BUG-009', title: 'Dashboard metrics fluctuate on cold start', file: 'pages/Dashboard.tsx', severity: 'Medium', status: 'Open', impact: 'Render.com free tier cold start causes jarring metric flash (PR #41 pending)' },
   { id: 'BUG-010', title: 'Notification bell has no handler', file: 'components/layout/Header.tsx ~L151', severity: 'Medium', status: 'Open', impact: 'Purple dot implies unread notifications — clicking does nothing' },
   { id: 'BUG-011', title: 'Notification prefs only stored locally', file: 'pages/Settings.tsx', severity: 'Medium', status: 'Open', impact: 'Prefs reset on new device/browser' },
@@ -85,10 +85,10 @@ const BUGS: Bug[] = [
 ];
 
 const FEATURES: Feature[] = [
-  { id: 'F-001', title: 'Fix BUG-001/002: Google Maps', description: 'Load Maps API once at root, upgrade to v=weekly', column: 'Prioritized', effort: 'Low', impact: 'High' },
-  { id: 'F-002', title: 'Fix BUG-003: "Add Note" persistence', description: 'POST notes to /api/v1/properties/{id}/notes', column: 'Prioritized', effort: 'Low', impact: 'High' },
-  { id: 'F-003', title: 'Fix BUG-004: "Ask Follow-up" wire-up', description: 'Connect to POST /api/v1/chat, stream to AI panel', column: 'Prioritized', effort: 'Med', impact: 'High' },
-  { id: 'F-004', title: 'Fix BUG-006: Save Comparison', description: 'POST named comparison to backend, confirm to user', column: 'Prioritized', effort: 'Low', impact: 'Med' },
+  { id: 'F-001', title: 'Fix BUG-001/002: Google Maps', description: 'Load Maps API once at root, upgrade to v=weekly', column: 'Shipped', effort: 'Low', impact: 'High' },
+  { id: 'F-002', title: 'Fix BUG-003: "Add Note" persistence', description: 'POST notes to /api/v1/properties/{id}/notes', column: 'Shipped', effort: 'Low', impact: 'High' },
+  { id: 'F-003', title: 'Fix BUG-004: "Ask Follow-up" wire-up', description: 'Connect to POST /api/v1/chat, stream to AI panel', column: 'Shipped', effort: 'Med', impact: 'High' },
+  { id: 'F-004', title: 'Fix BUG-006: Save Comparison', description: 'POST named comparison to backend, confirm to user', column: 'Shipped', effort: 'Low', impact: 'Med' },
   { id: 'F-005', title: 'Merge PR #41: Cold-start Banner', description: '5s skeleton → banner while Render wakes up', column: 'Prioritized', effort: 'Low', impact: 'Med' },
   { id: 'F-006', title: 'Fix BUG-008: Settings Profile Save', description: 'Track dirty state, PUT /api/v1/auth/me on save', column: 'Backlog', effort: 'Med', impact: 'Med' },
   { id: 'F-007', title: 'Notification System (BUG-010/011)', description: 'Bell → panel, persist prefs to backend', column: 'Backlog', effort: 'High', impact: 'Med' },
@@ -115,18 +115,23 @@ const FEATURES: Feature[] = [
 const ANALYTICS = {
   properties: 3,
   folders: 4,
-  totalPRs: 107,
-  prsSinceFeb26: 60,
-  deployments: 32,
-  openBugs: 14,
-  fixedBugs: 1,
-  criticalBugs: 4,
+  totalPRs: 122,
+  prsSinceFeb26: 75,
+  deployments: 47,
+  openBugs: 8,
+  fixedBugs: 8,
+  criticalBugs: 0,
   newServices: 7,
   newComponents: 20,
   linesOfCode: '~22,000',
 };
 
 const RECENT_PRS = [
+  { id: '#122', title: 'UW Engine — millage rate fix, other income per-unit, growth table Set All, T12 refs, blur orbs removed', date: 'Mar 14', status: 'Merged' },
+  { id: '#121', title: 'AI deal summary localStorage cache with 24h TTL', date: 'Mar 13', status: 'Merged' },
+  { id: '#120', title: 'UW Engine tax calc, pricing modes, input formatting, trailing financials, output tables', date: 'Mar 13', status: 'Merged' },
+  { id: '#119', title: 'Hotfix — extraction_log.py property_id type mismatch', date: 'Mar 12', status: 'Merged' },
+  { id: '#118', title: 'UW Engine V1 — institutional proforma, DCF, and IRR analysis', date: 'Mar 12', status: 'Merged' },
   { id: '#107', title: 'Chat panel logos → TalismanCompass3D, sidebar auto-collapses on chat open', date: 'Mar 11', status: 'Merged' },
   { id: '#106', title: 'Stacking model unit colors updated from Astra purple to Talisman gold', date: 'Mar 11', status: 'Merged' },
   { id: '#105', title: 'Fix compass emissive glow at small sizes so gold reads on dark bg', date: 'Mar 11', status: 'Merged' },
