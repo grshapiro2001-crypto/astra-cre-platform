@@ -50,12 +50,6 @@ export const propertyService = {
     const pInfo = ext?.property_info;
     const financials = ext?.financials_by_period;
 
-    // Debug: log what the extraction result contains before building POST body
-    console.log('[saveToLibrary] ext keys:', ext ? Object.keys(ext) : 'ext is nullish');
-    console.log('[saveToLibrary] unit_mix:', Array.isArray(ext?.unit_mix) ? `${ext.unit_mix.length} items` : String(ext?.unit_mix));
-    console.log('[saveToLibrary] rent_comps:', Array.isArray(ext?.rent_comps) ? `${ext.rent_comps.length} items` : String(ext?.rent_comps));
-    console.log('[saveToLibrary] renovation:', ext?.renovation ? JSON.stringify(ext.renovation) : 'undefined/null');
-
     const url = force ? '/properties?force=true' : '/properties';
 
     // Build POST body — use explicit variables so we can log the exact payload
@@ -97,11 +91,8 @@ export const propertyService = {
       analysis_model: 'claude-sonnet-4-5-20250929',
     };
 
-    console.log('[saveToLibrary] POST body unit_mix:', unitMixPayload.length, 'items, rent_comps:', rentCompsPayload.length, 'items');
-
     const response = await api.post(url, postBody);
 
-    console.log('[saveToLibrary] Response unit_mix:', response.data?.unit_mix?.length ?? 0, 'rent_comps:', response.data?.rent_comps?.length ?? 0);
     return response.data;
   },
 
