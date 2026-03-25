@@ -542,7 +542,7 @@ class UnderwritingEngine:
         return factor
 
     # ------------------------------------------------------------------
-    # Stub methods — implemented in Step 3
+    # Debt Sizing
     # ------------------------------------------------------------------
 
     def _compute_debt(
@@ -551,9 +551,544 @@ class UnderwritingEngine:
         scenario_key: str,
         purchase_price: float,
     ) -> DebtResult:
-        """Placeholder — Step 3."""
-        return DebtResult()
+        """Size the loan and build a debt service schedule.
+
+        Supports:
+          - LTV-based sizing (standard)
+          - DSCR constraint (binding unless assume_max_ltv)
+          - Full I/O and amortizing periods
+          - Loan assumption mode (la_enabled)
+        """
+        inp = self.inputs
+
+        if inp.la_enabled:
+            return self._compute_debt_assumption()
+
+        # ── LTV-based loan ──
+        ltv_loan = purchase_price * inp.max_ltv
+
+        # ── DSCR-constrained loan ──
+        max_annual_ds = (
+            proforma.noi / inp.dscr_minimum if inp.dscr_minimum > 0 else float("inf")
+        )
+
+        if inp.io_period_months >= inp.loan_term_months:
+            # Full I/O: DS = loan × rate → max_loan = max_ds / rate
+            dscr_loan = (
+                max_annual_ds / inp.interest_rate
+                if inp.interest_rate > 0 else float("inf")
+            )
+        else:
+            # Amortizing: solve PV of annuity for max_ds
+            dscr_loan = self._solve_loan_from_payment(
+                max_annual_ds, inp.interest_rate, inp.amort_years
+            )
+
+        loan_amount = min(ltv_loan, dscr_loan)
+        is_dscr_constrained = dscr_loan < ltv_loan
+        actual_ltv = loan_amount / purchase_price if purchase_price > 0 else 0.0
+        equity = purchase_price - loan_amount
+
+        # ── Debt service schedule ──
+        hold = inp.hold_period_years
+        annual_ds: list[float] = []
+        principal_outstanding: list[float] = []
+
+        for yr in range(1, hold + 1):
+            ms = (yr - 1) * 12 + 1
+            me = yr * 12
+            ds = self._annual_debt_service(
+                loan_amount, inp.interest_rate,
+                inp.io_period_months, inp.amort_years, ms, me,
+            )
+            annual_ds.append(ds)
+
+            outstanding = self._outstanding_principal(
+                loan_amount, inp.interest_rate,
+                inp.io_period_months, inp.amort_years, me,
+            )
+            principal_outstanding.append(outstanding)
+
+        loan_constant = (
+            annual_ds[0] / loan_amount if loan_amount > 0 and annual_ds else 0.0
+        )
+
+        return DebtResult(
+            loan_amount=loan_amount,
+            actual_ltv=actual_ltv,
+            equity=equity,
+            is_dscr_constrained=is_dscr_constrained,
+            annual_debt_service=annual_ds,
+            principal_outstanding=principal_outstanding,
+            loan_constant=loan_constant,
+        )
+
+    def _compute_debt_assumption(self) -> DebtResult:
+        """Loan assumption mode — use existing loan parameters."""
+        inp = self.inputs
+        loan_amount = inp.la_existing_balance
+
+        hold = inp.hold_period_years
+        annual_ds: list[float] = []
+        principal_outstanding: list[float] = []
+
+        for yr in range(1, hold + 1):
+            ms = (yr - 1) * 12 + 1
+            me = yr * 12
+            ds = self._annual_debt_service(
+                inp.la_original_amount, inp.la_interest_rate,
+                inp.la_remaining_io_months, inp.la_amort_years, ms, me,
+            )
+            annual_ds.append(ds)
+
+            outstanding = self._outstanding_principal(
+                inp.la_original_amount, inp.la_interest_rate,
+                inp.la_remaining_io_months, inp.la_amort_years, me,
+            )
+            principal_outstanding.append(outstanding)
+
+        loan_constant = (
+            annual_ds[0] / loan_amount if loan_amount > 0 and annual_ds else 0.0
+        )
+
+        return DebtResult(
+            loan_amount=loan_amount,
+            actual_ltv=0.0,
+            equity=0.0,
+            is_dscr_constrained=False,
+            annual_debt_service=annual_ds,
+            principal_outstanding=principal_outstanding,
+            loan_constant=loan_constant,
+        )
+
+    # ------------------------------------------------------------------
+    # Financial math helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _pmt(rate_monthly: float, nper: int, pv: float) -> float:
+        """Standard PMT — returns positive payment amount."""
+        if rate_monthly == 0:
+            return pv / nper if nper > 0 else 0.0
+        return pv * (rate_monthly * (1 + rate_monthly) ** nper) / (
+            (1 + rate_monthly) ** nper - 1
+        )
+
+    @staticmethod
+    def _solve_loan_from_payment(
+        annual_payment: float, annual_rate: float, amort_years: int
+    ) -> float:
+        """Given max annual payment, solve for loan amount (PV of annuity)."""
+        mr = annual_rate / 12
+        nper = amort_years * 12
+        mp = annual_payment / 12
+        if mr == 0:
+            return mp * nper
+        return mp * ((1 + mr) ** nper - 1) / (mr * (1 + mr) ** nper)
+
+    def _annual_debt_service(
+        self,
+        loan_amount: float,
+        annual_rate: float,
+        io_months: int,
+        amort_years: int,
+        months_start: int,
+        months_end: int,
+    ) -> float:
+        """Compute debt service for a range of months (1-indexed)."""
+        mr = annual_rate / 12
+        total_ds = 0.0
+        for m in range(months_start, months_end + 1):
+            if m <= io_months:
+                total_ds += loan_amount * mr
+            else:
+                nper = amort_years * 12
+                total_ds += self._pmt(mr, nper, loan_amount)
+        return total_ds
+
+    def _outstanding_principal(
+        self,
+        loan_amount: float,
+        annual_rate: float,
+        io_months: int,
+        amort_years: int,
+        at_month: int,
+    ) -> float:
+        """Compute outstanding principal at a given month."""
+        if at_month <= io_months:
+            return loan_amount
+        amort_elapsed = at_month - io_months
+        mr = annual_rate / 12
+        nper = amort_years * 12
+        if mr == 0:
+            payment = loan_amount / nper if nper > 0 else 0
+            return max(0, loan_amount - payment * amort_elapsed)
+        payment = self._pmt(mr, nper, loan_amount)
+        remaining = nper - amort_elapsed
+        if remaining <= 0:
+            return 0.0
+        balance = payment * ((1 + mr) ** remaining - 1) / (mr * (1 + mr) ** remaining)
+        return max(0.0, balance)
+
+    # ------------------------------------------------------------------
+    # Returns (IRR, Cash-on-Cash, Equity Multiple)
+    # ------------------------------------------------------------------
+
+    def _compute_returns(
+        self,
+        dcf: DCFResult,
+        debt: DebtResult,
+        reversion: ReversionResult,
+        purchase_price: float,
+    ) -> ReturnsResult:
+        """Compute levered/unlevered IRR, CoC, equity multiple."""
+        if not dcf.years:
+            return ReturnsResult()
+
+        equity = debt.equity
+        gsp = reversion.gross_selling_price
+        sales_exp = reversion.sales_expenses
+        net_proceeds = reversion.net_proceeds
+
+        # Levered IRR: [−Equity, NCF_after_debt₁…ₙ₋₁, NCFₙ + net_proceeds]
+        lev_cfs = [-equity]
+        for i, yr in enumerate(dcf.years):
+            cf = yr.ncf_after_debt
+            if i == len(dcf.years) - 1:
+                cf += net_proceeds
+            lev_cfs.append(cf)
+        levered_irr = solve_irr(lev_cfs)
+
+        # Unlevered IRR: [−Price, NCF₁…ₙ₋₁, NCFₙ + GSP − sales_exp]
+        unlev_cfs = [-purchase_price]
+        for i, yr in enumerate(dcf.years):
+            cf = yr.ncf
+            if i == len(dcf.years) - 1:
+                cf += gsp - sales_exp
+            unlev_cfs.append(cf)
+        unlevered_irr = solve_irr(unlev_cfs)
+
+        # Cash-on-Cash
+        y1_coc = dcf.years[0].ncf_after_debt / equity if equity > 0 else None
+        coc_vals = [yr.ncf_after_debt / equity for yr in dcf.years if equity > 0]
+        avg_coc = sum(coc_vals) / len(coc_vals) if coc_vals else None
+
+        # Equity Multiple
+        total_ncf = sum(yr.ncf_after_debt for yr in dcf.years)
+        eq_multiple = (total_ncf + net_proceeds) / equity if equity > 0 else None
+
+        return ReturnsResult(
+            levered_irr=levered_irr,
+            unlevered_irr=unlevered_irr,
+            y1_cash_on_cash=y1_coc,
+            avg_cash_on_cash=avg_coc,
+            equity_multiple=eq_multiple,
+            reversion=reversion,
+        )
+
+    # ------------------------------------------------------------------
+    # Cap Rates
+    # ------------------------------------------------------------------
+
+    def _compute_cap_rates(
+        self, proforma: ProformaResult, scenario_key: str, purchase_price: float
+    ) -> CapRates:
+        scenario = getattr(self.inputs, scenario_key)
+        y1_cap = proforma.noi / purchase_price if purchase_price > 0 else None
+        return CapRates(
+            y1_cap_rate=y1_cap,
+            terminal_cap_rate=scenario.terminal_cap_rate,
+        )
+
+    # ------------------------------------------------------------------
+    # Valuation Summary
+    # ------------------------------------------------------------------
+
+    def _build_valuation_summary(
+        self,
+        proforma: ProformaResult,
+        debt: DebtResult,
+        dcf: DCFResult,
+        returns: ReturnsResult,
+        cap_rates: CapRates,
+        purchase_price: float,
+    ) -> ValuationSummary:
+        units = self._total_units
+        sf = self._total_sf
+        avg_sf = sf / units if units > 0 else 0
+        y1_rent_psf = self._avg_market_rent / avg_sf if avg_sf > 0 else 0.0
+
+        return ValuationSummary(
+            purchase_price=purchase_price,
+            price_per_unit=purchase_price / units if units > 0 else 0.0,
+            price_per_sf=purchase_price / sf if sf > 0 else 0.0,
+            cap_rates=cap_rates,
+            y1_market_rent=self._avg_market_rent,
+            y1_market_rent_psf=y1_rent_psf,
+            ltv=debt.actual_ltv,
+            levered_irr=returns.levered_irr,
+            unlevered_irr=returns.unlevered_irr,
+            y1_cash_on_cash=returns.y1_cash_on_cash,
+            avg_cash_on_cash=returns.avg_cash_on_cash,
+            equity_multiple=returns.equity_multiple,
+            terminal_value=returns.reversion.gross_selling_price,
+            terminal_value_per_unit=(
+                returns.reversion.gross_selling_price / units if units > 0 else 0.0
+            ),
+            revenue_cagr=dcf.revenue_cagr,
+            noi_cagr=dcf.noi_cagr,
+        )
+
+    # ------------------------------------------------------------------
+    # Operating Statement builder
+    # ------------------------------------------------------------------
+
+    def _build_operating_statement(self, proforma: ProformaResult) -> OperatingStatement:
+        inp = self.inputs
+        units = self._total_units
+        rev = proforma.revenue
+        exp = proforma.expenses
+        ti = rev.total_income
+
+        def pct(val: float) -> Optional[float]:
+            return val / ti if ti > 0 else None
+
+        def pu(val: float) -> Optional[float]:
+            return val / units if units > 0 else None
+
+        def ln(
+            label: str,
+            pf_val: float,
+            is_deduction: bool = False,
+            is_total: bool = False,
+            t12_val: Optional[float] = None,
+            t3_val: Optional[float] = None,
+        ) -> OperatingStatementLine:
+            return OperatingStatementLine(
+                label=label,
+                t12_amount=t12_val,
+                t12_pct_income=None,
+                t12_per_unit=t12_val / units if t12_val is not None and units > 0 else None,
+                t3_amount=t3_val,
+                t3_pct_income=None,
+                t3_per_unit=t3_val / units if t3_val is not None and units > 0 else None,
+                proforma_amount=pf_val,
+                proforma_pct_income=pct(pf_val),
+                proforma_per_unit=pu(pf_val),
+                is_deduction=is_deduction,
+                is_total=is_total,
+            )
+
+        t12 = inp.trailing_t12 or {}
+        t3 = inp.trailing_t3 or {}
+
+        revenue_lines = [
+            ln("Gross Scheduled Rent", rev.gsr, t12_val=t12.get("gsr"), t3_val=t3.get("gsr")),
+            ln("Gain/Loss to Lease", rev.gain_loss_to_lease, is_deduction=True, t12_val=t12.get("loss_to_lease"), t3_val=t3.get("loss_to_lease")),
+            ln("Gross Potential Rent", rev.gpr, is_total=True),
+            ln("Less: Vacancy", rev.vacancy, is_deduction=True, t12_val=t12.get("vacancy"), t3_val=t3.get("vacancy")),
+            ln("Less: Concessions", rev.concessions, is_deduction=True, t12_val=t12.get("concessions"), t3_val=t3.get("concessions")),
+            ln("Less: Non-Revenue Units", rev.nru_loss, is_deduction=True),
+            ln("Less: Bad Debt", rev.bad_debt, is_deduction=True, t12_val=t12.get("bad_debt")),
+            ln("Net Rental Income", rev.nri, is_total=True, t12_val=t12.get("net_rental_income"), t3_val=t3.get("net_rental_income")),
+            ln("Utility Reimbursements", rev.utility_reimbursements, t12_val=t12.get("utility_reimbursements")),
+            ln("Parking/Storage Income", rev.parking_income, t12_val=t12.get("parking_storage_income")),
+            ln("Other Income", rev.other_income, t12_val=t12.get("other_income"), t3_val=t3.get("other_income")),
+            ln("Total Income", rev.total_income, is_total=True),
+        ]
+
+        expense_lines = [
+            ln("Utilities", exp.utilities),
+            ln("Repairs & Maintenance", exp.repairs_maintenance),
+            ln("Apartment Make Ready", exp.make_ready),
+            ln("Contract Services", exp.contract_services),
+            ln("Marketing", exp.marketing),
+            ln("Payroll Expenses", exp.payroll),
+            ln("General & Administrative", exp.general_admin),
+            ln("Controllable Expenses", exp.controllable_total, is_total=True),
+            ln("Property Taxes", exp.property_taxes, t12_val=t12.get("real_estate_taxes")),
+            ln("Insurance", exp.insurance, t12_val=t12.get("insurance_amount")),
+            ln("Management Fee", exp.management_fee),
+            ln("Non-Controllable Expenses", exp.non_controllable_total, is_total=True),
+            ln("Total Operating Expenses", exp.total_expenses, is_total=True, t12_val=t12.get("total_opex")),
+        ]
+
+        summary_lines = [
+            ln("Net Operating Income", proforma.noi, is_total=True, t12_val=t12.get("noi")),
+            ln("Replacement Reserves", proforma.reserves, is_deduction=True),
+            ln("Net Cash Flow", proforma.ncf, is_total=True),
+        ]
+
+        return OperatingStatement(
+            revenue_lines=revenue_lines,
+            expense_lines=expense_lines,
+            summary_lines=summary_lines,
+        )
+
+    # ------------------------------------------------------------------
+    # Price Solvers
+    # ------------------------------------------------------------------
+
+    def _solve_price_from_irr(
+        self, scenario_key: str, revenue: RevenueResult
+    ) -> float:
+        """Bisection solver: find purchase price → target unlevered IRR."""
+        inp = self.inputs
+        scenario = getattr(inp, scenario_key)
+        target_irr = scenario.target_unlevered_irr
+
+        if not target_irr or target_irr <= 0:
+            return 0.0
+
+        units = self._total_units
+        lo = 10_000.0 * units
+        hi = 500_000.0 * units
+
+        def irr_at_price(price: float) -> Optional[float]:
+            expenses = self._compute_expenses(revenue, purchase_price=price)
+            proforma = self._compute_proforma(revenue, expenses)
+            debt = self._compute_debt(proforma, scenario_key, price)
+            dcf = self._compute_dcf(proforma, debt, scenario_key, price)
+            reversion = self._compute_reversion(dcf, debt, scenario_key)
+            returns = self._compute_returns(dcf, debt, reversion, price)
+            return returns.unlevered_irr
+
+        for _ in range(60):
+            mid = (lo + hi) / 2
+            irr = irr_at_price(mid)
+            if irr is None:
+                hi = mid
+                continue
+            if abs(irr - target_irr) < 0.0001:
+                return mid
+            if irr > target_irr:
+                lo = mid  # price too low → IRR too high
+            else:
+                hi = mid
+        return (lo + hi) / 2
+
+    def _solve_price_from_cap(
+        self, scenario_key: str, revenue: RevenueResult
+    ) -> float:
+        """Closed-form direct-cap pricing with tax circularity solution.
+
+        When property_tax_mode == "reassessment", tax is a function of price:
+          tax = price × pct_assessed × assessment_ratio × (millage_rate / 100)
+        Let k = pct_assessed × assessment_ratio × (millage_rate / 100).
+        Then: NOI = income − (expenses_ex_tax) − k × price
+        And:  price = NOI / cap_rate
+        Solving: price = (income − expenses_ex_tax) / (cap_rate + k)
+        """
+        inp = self.inputs
+        scenario = getattr(inp, scenario_key)
+        target_cap = scenario.target_cap_rate
+
+        if not target_cap or target_cap <= 0:
+            return 0.0
+
+        # Expenses excluding tax and mgmt fee (which depend on price/income)
+        expenses_ex_tax = self._compute_expenses(revenue, purchase_price=0.0)
+        controllable = expenses_ex_tax.controllable_total
+        insurance = expenses_ex_tax.insurance
+        mgmt_fee = expenses_ex_tax.management_fee  # based on revenue, not price
+
+        total_income = revenue.total_income
+        reserves = inp.reserves_per_unit * self._total_units
+
+        if inp.property_tax_mode == "reassessment":
+            # Closed-form: price = (income − ctrl − ins − mgmt) / (cap + k)
+            k = (
+                inp.pct_of_purchase_assessed
+                * inp.assessment_ratio
+                * (inp.millage_rate / 100)
+            )
+            numerator = total_income - controllable - insurance - mgmt_fee
+            denominator = target_cap + k
+            if denominator <= 0:
+                return 0.0
+            return numerator / denominator
+        else:
+            # No circularity: NOI is independent of price
+            tax = inp.current_tax_amount
+            noi = total_income - controllable - insurance - mgmt_fee - tax
+            return noi / target_cap if target_cap > 0 else 0.0
+
+    # ------------------------------------------------------------------
+    # Scenario Runner
+    # ------------------------------------------------------------------
+
+    def _run_scenario(
+        self, scenario_key: str, revenue: RevenueResult
+    ) -> Optional[ScenarioResult]:
+        """Run a single scenario end-to-end."""
+        inp = self.inputs
+        scenario = getattr(inp, scenario_key)
+        mode = getattr(scenario, "pricing_mode", "manual")
+
+        # ── Resolve purchase price ──
+        if mode == "manual":
+            purchase_price = scenario.purchase_price or 0.0
+        elif mode == "direct_cap":
+            purchase_price = self._solve_price_from_cap(scenario_key, revenue)
+        elif mode == "target_irr":
+            purchase_price = self._solve_price_from_irr(scenario_key, revenue)
+        else:
+            purchase_price = scenario.purchase_price or 0.0
+
+        if purchase_price <= 0:
+            return None
+
+        # ── Full calculation chain ──
+        expenses = self._compute_expenses(revenue, purchase_price=purchase_price)
+        proforma = self._compute_proforma(revenue, expenses)
+        debt = self._compute_debt(proforma, scenario_key, purchase_price)
+        dcf = self._compute_dcf(proforma, debt, scenario_key, purchase_price)
+        reversion = self._compute_reversion(dcf, debt, scenario_key)
+        returns = self._compute_returns(dcf, debt, reversion, purchase_price)
+        cap_rates = self._compute_cap_rates(proforma, scenario_key, purchase_price)
+        val_summary = self._build_valuation_summary(
+            proforma, debt, dcf, returns, cap_rates, purchase_price,
+        )
+
+        return ScenarioResult(
+            proforma=proforma,
+            debt=debt,
+            dcf=dcf,
+            returns=returns,
+            valuation_summary=val_summary,
+        )
+
+    # ------------------------------------------------------------------
+    # Master compute()
+    # ------------------------------------------------------------------
 
     def compute(self) -> UWOutputs:
-        """Placeholder — Step 3."""
-        return UWOutputs()
+        """Run both scenarios and return complete outputs."""
+        inp = self.inputs
+
+        # Revenue is scenario-independent
+        revenue = self._compute_revenue()
+
+        # Run both scenarios
+        scenarios: dict[str, ScenarioResult] = {}
+        first_proforma: Optional[ProformaResult] = None
+
+        for key in ("premium", "market"):
+            result = self._run_scenario(key, revenue)
+            if result is not None:
+                scenarios[key] = result
+                if first_proforma is None:
+                    first_proforma = result.proforma
+
+        # Fallback proforma if no scenarios ran
+        if first_proforma is None:
+            fallback_exp = self._compute_expenses(revenue, purchase_price=0.0)
+            first_proforma = self._compute_proforma(revenue, fallback_exp)
+
+        operating_statement = self._build_operating_statement(first_proforma)
+
+        return UWOutputs(
+            proforma=first_proforma,
+            scenarios=scenarios,
+            operating_statement=operating_statement,
+        )
