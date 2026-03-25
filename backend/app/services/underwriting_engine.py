@@ -248,7 +248,7 @@ class UnderwritingEngine:
         )
 
     # ------------------------------------------------------------------
-    # Stub methods — implemented in Step 2 & Step 3
+    # DCF Projection (non-flat inflation curves)
     # ------------------------------------------------------------------
 
     def _compute_dcf(
@@ -258,8 +258,169 @@ class UnderwritingEngine:
         scenario_key: str,
         purchase_price: float,
     ) -> DCFResult:
-        """Placeholder — Step 2."""
-        return DCFResult()
+        """Project cash flows over the hold period using year-by-year arrays.
+
+        V2 key differences from V1:
+          - Revenue grows at rental_inflation[year] (not a single rate)
+          - Expenses grow at expense_inflation[year]
+          - Taxes grow at re_tax_inflation[year]
+          - Mgmt fee is RECALCULATED each year as % of that year's income
+          - Deductions (vacancy, concessions, bad debt) use per-year arrays
+            applied to that year's GPI
+        """
+        inp = self.inputs
+        hold = inp.hold_period_years
+        units = self._total_units
+
+        # Y1 base values from proforma
+        y1_gpr = proforma.revenue.gpr
+        y1_util = proforma.revenue.utility_reimbursements
+        y1_parking = proforma.revenue.parking_income
+        y1_other = proforma.revenue.other_income
+        y1_controllable = proforma.expenses.controllable_total
+        y1_tax = proforma.expenses.property_taxes
+        y1_insurance = proforma.expenses.insurance
+        y1_reserves = proforma.reserves
+
+        years: list[DCFYearResult] = []
+        prev_total_income: Optional[float] = None
+        prev_noi: Optional[float] = None
+
+        for yr_idx in range(hold):
+            yr = yr_idx + 1
+
+            # ── Cumulative growth factors (year-by-year arrays) ──
+            rental_gf = self._cumulative_growth(inp.rental_inflation, yr_idx)
+            expense_gf = self._cumulative_growth(inp.expense_inflation, yr_idx)
+            tax_gf = self._cumulative_growth(inp.re_tax_inflation, yr_idx)
+
+            # ── Revenue ──
+            gpr = y1_gpr * rental_gf
+
+            # Deductions: per-year pct arrays applied to GPI
+            vi = min(yr_idx, len(inp.vacancy_pct) - 1)
+            ci = min(yr_idx, len(inp.concession_pct) - 1)
+            bi = min(yr_idx, len(inp.bad_debt_pct) - 1)
+
+            vacancy = gpr * inp.vacancy_pct[vi]
+            concessions_val = gpr * inp.concession_pct[ci]
+            bad_debt_val = gpr * inp.bad_debt_pct[bi]
+
+            # NRU loss grows with rental inflation
+            nru_avg = inp.nru_avg_rent
+            if nru_avg <= 0 and inp.unit_mix:
+                nru_avg = self._avg_market_rent
+            nru_loss = inp.nru_count * nru_avg * 12 * rental_gf
+
+            nri = gpr - vacancy - concessions_val - nru_loss - bad_debt_val
+
+            # Other income grows with rental inflation
+            util_reimb = y1_util * rental_gf
+            parking = y1_parking * rental_gf
+            other_inc = y1_other * rental_gf
+            total_income = nri + util_reimb + parking + other_inc
+
+            # ── Expenses ──
+            # Controllable: grows at expense_inflation[year]
+            controllable = y1_controllable * expense_gf
+
+            # Property taxes: grows at re_tax_inflation[year]
+            # If reassessment mode, use reassessed base from Y1 proforma
+            prop_tax = y1_tax * tax_gf
+
+            # Insurance: grows at expense_inflation[year]
+            insurance = y1_insurance * expense_gf
+
+            # Management fee: RECALCULATED each year as % of that year's income
+            mgmt_fee = total_income * inp.mgmt_fee_pct
+
+            total_expenses = controllable + prop_tax + insurance + mgmt_fee
+
+            # ── Bottom line ──
+            noi = total_income - total_expenses
+
+            # Reserves
+            if inp.reserves_inflate:
+                reserves = y1_reserves * expense_gf
+            else:
+                reserves = y1_reserves
+
+            ncf = noi - reserves
+
+            # Debt service
+            ds = (
+                debt.annual_debt_service[yr_idx]
+                if yr_idx < len(debt.annual_debt_service) else 0.0
+            )
+            ncf_after_debt = ncf - ds
+
+            # ── Per-year metrics ──
+            coc = ncf_after_debt / debt.equity if debt.equity > 0 else None
+            dscr = noi / ds if ds > 0 else None
+
+            rev_growth = None
+            if prev_total_income is not None and prev_total_income > 0:
+                rev_growth = (total_income - prev_total_income) / prev_total_income
+            elif yr == 1:
+                rev_growth = 0.0
+
+            noi_growth = None
+            if prev_noi is not None and prev_noi > 0:
+                noi_growth = (noi - prev_noi) / prev_noi
+            elif yr == 1:
+                noi_growth = 0.0
+
+            eff_rent = total_income / (units * 12) if units > 0 else 0.0
+
+            years.append(DCFYearResult(
+                year=yr,
+                gpr=gpr,
+                vacancy=vacancy,
+                concessions=concessions_val,
+                bad_debt=bad_debt_val,
+                nru_loss=nru_loss,
+                nri=nri,
+                other_income=util_reimb + parking + other_inc,
+                total_income=total_income,
+                controllable_expenses=controllable,
+                property_taxes=prop_tax,
+                insurance=insurance,
+                management_fee=mgmt_fee,
+                total_expenses=total_expenses,
+                noi=noi,
+                reserves=reserves,
+                ncf=ncf,
+                debt_service=ds,
+                ncf_after_debt=ncf_after_debt,
+                cash_on_cash=coc,
+                dscr=dscr,
+                revenue_growth_rate=rev_growth,
+                noi_growth_rate=noi_growth,
+                effective_rent=eff_rent,
+            ))
+
+            prev_total_income = total_income
+            prev_noi = noi
+
+        # CAGRs
+        rev_cagr = None
+        noi_cagr = None
+        if len(years) >= 2:
+            y1_rev = years[0].total_income
+            yn_rev = years[-1].total_income
+            y1_n = years[0].noi
+            yn_n = years[-1].noi
+            n = len(years) - 1
+            if y1_rev > 0 and yn_rev > 0:
+                rev_cagr = (yn_rev / y1_rev) ** (1 / n) - 1
+            if y1_n > 0 and yn_n > 0:
+                noi_cagr = (yn_n / y1_n) ** (1 / n) - 1
+
+        return DCFResult(years=years, revenue_cagr=rev_cagr, noi_cagr=noi_cagr)
+
+    # ------------------------------------------------------------------
+    # Terminal Value & Reversion
+    # ------------------------------------------------------------------
 
     def _compute_reversion(
         self,
@@ -267,8 +428,122 @@ class UnderwritingEngine:
         debt: DebtResult,
         scenario_key: str,
     ) -> ReversionResult:
-        """Placeholder — Step 2."""
-        return ReversionResult()
+        """Compute terminal value and net sale proceeds.
+
+        Terminal Value = Y(n+1) NOI After Capital / terminal cap rate
+        where Y(n+1) NOI After Capital is the forward year's NCF
+        (NOI minus reserves, grown one more year from the last hold year).
+        """
+        inp = self.inputs
+        scenario = getattr(inp, scenario_key)
+
+        if not dcf.years:
+            return ReversionResult()
+
+        last_year = dcf.years[-1]
+        last_yr_idx = len(dcf.years) - 1
+
+        # Forward (Y n+1) NOI: grow last year's NOI by one more year
+        # Use the next rental_inflation rate for revenue, expense_inflation
+        # for expenses, and re_tax_inflation for taxes
+        fwd_rental_gf = self._cumulative_growth(inp.rental_inflation, last_yr_idx + 1)
+        fwd_expense_gf = self._cumulative_growth(inp.expense_inflation, last_yr_idx + 1)
+        fwd_tax_gf = self._cumulative_growth(inp.re_tax_inflation, last_yr_idx + 1)
+
+        # Rebuild forward year revenue
+        y1_gpr = dcf.years[0].gpr / self._cumulative_growth(inp.rental_inflation, 0)  # = Y1 base
+        fwd_gpr = y1_gpr * fwd_rental_gf
+
+        # Forward year deduction rates: clamp to last available index
+        vi = min(last_yr_idx + 1, len(inp.vacancy_pct) - 1)
+        ci = min(last_yr_idx + 1, len(inp.concession_pct) - 1)
+        bi = min(last_yr_idx + 1, len(inp.bad_debt_pct) - 1)
+
+        fwd_vacancy = fwd_gpr * inp.vacancy_pct[vi]
+        fwd_concessions = fwd_gpr * inp.concession_pct[ci]
+        fwd_bad_debt = fwd_gpr * inp.bad_debt_pct[bi]
+
+        nru_avg = inp.nru_avg_rent
+        if nru_avg <= 0 and inp.unit_mix:
+            nru_avg = self._avg_market_rent
+        fwd_nru = inp.nru_count * nru_avg * 12 * fwd_rental_gf
+
+        fwd_nri = fwd_gpr - fwd_vacancy - fwd_concessions - fwd_nru - fwd_bad_debt
+
+        # Forward other income
+        y1_util = dcf.years[0].other_income / self._cumulative_growth(inp.rental_inflation, 0) if dcf.years else 0.0
+        fwd_other = y1_util * fwd_rental_gf if y1_util else 0.0
+        # Simpler: scale last year's other income by one more year of rental inflation
+        ri = min(last_yr_idx, len(inp.rental_inflation) - 1)
+        fwd_other = last_year.other_income * (1 + inp.rental_inflation[ri])
+
+        fwd_total_income = fwd_nri + fwd_other
+
+        # Forward expenses
+        y1_controllable = dcf.years[0].controllable_expenses
+        fwd_controllable = y1_controllable * fwd_expense_gf
+
+        y1_tax = dcf.years[0].property_taxes
+        fwd_tax = y1_tax * fwd_tax_gf
+
+        y1_insurance = dcf.years[0].insurance
+        fwd_insurance = y1_insurance * fwd_expense_gf
+
+        # Mgmt fee recalculated on forward year income
+        fwd_mgmt = fwd_total_income * inp.mgmt_fee_pct
+
+        fwd_total_expenses = fwd_controllable + fwd_tax + fwd_insurance + fwd_mgmt
+        fwd_noi = fwd_total_income - fwd_total_expenses
+
+        # Forward reserves
+        if inp.reserves_inflate:
+            fwd_reserves = (inp.reserves_per_unit * self._total_units) * fwd_expense_gf
+        else:
+            fwd_reserves = inp.reserves_per_unit * self._total_units
+
+        # Y(n+1) NOI After Capital
+        forward_noi_after_capital = fwd_noi - fwd_reserves
+
+        # Terminal value
+        terminal_cap = scenario.terminal_cap_rate
+        gsp = forward_noi_after_capital / terminal_cap if terminal_cap > 0 else 0.0
+        sales_exp = gsp * inp.sales_expense_pct
+
+        principal = (
+            debt.principal_outstanding[-1]
+            if debt.principal_outstanding
+            else debt.loan_amount
+        )
+        net_proceeds = gsp - sales_exp - principal
+
+        return ReversionResult(
+            forward_noi=forward_noi_after_capital,
+            gross_selling_price=gsp,
+            sales_expenses=sales_exp,
+            principal_outstanding=principal,
+            net_proceeds=net_proceeds,
+        )
+
+    # ------------------------------------------------------------------
+    # Growth helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _cumulative_growth(rates: list[float], year_index: int) -> float:
+        """Cumulative growth factor from Y1. year_index=0 → factor=1.0.
+
+        Uses the year-by-year array: factor = Π (1 + rates[i]) for i in 0..year_index-1.
+        Clamps to the last rate if the array is shorter than the hold period.
+        """
+        factor = 1.0
+        for i in range(year_index):
+            ri = min(i, len(rates) - 1)
+            factor *= (1 + rates[ri])
+        return factor
+
+    # ------------------------------------------------------------------
+    # Stub methods — implemented in Step 3
+    # ------------------------------------------------------------------
 
     def _compute_debt(
         self,
