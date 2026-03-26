@@ -878,7 +878,7 @@ def build_property_detail_response(property_obj: Property, db: Session) -> Prope
     t12_parsed = property_service.parse_financial_period(property_obj.t12_financials_json)
     if t12_parsed:
         t12_detail = db.query(T12Financial).filter(
-            T12Financial.property_id == property_id
+            T12Financial.property_id == property_obj.id
         ).order_by(T12Financial.id.desc()).first()
         if t12_detail:
             if t12_parsed.utilities is None and t12_detail.utilities is not None:
