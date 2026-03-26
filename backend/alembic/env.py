@@ -9,12 +9,18 @@ from alembic import context
 from app.database import Base
 from app.models import (  # noqa: F401 — Import all models so Alembic can see them
     User, Property, AnalysisLog, PropertyUnitMix, PropertyRentComp,
+    PropertyDocument, RentRollUnit, T12Financial,
     DealFolder, BOVPricingTier, BOVCapRate,
     UserScoringWeights,
     DataBankDocument, SalesComp, PipelineProject, SubmarketInventory,
     MarketSentimentSignal,
     UserInvestmentCriteria,
     Organization, OrganizationMember,
+    FeedbackReport, FeedbackReply,
+    UserEvent,
+    ExtractionLog,
+    UnderwritingModel,
+    T12LineItem,
 )
 from app.config import settings
 
