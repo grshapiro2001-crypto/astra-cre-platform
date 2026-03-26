@@ -1265,3 +1265,247 @@ Spreadsheet content:
     except Exception as e:
         logger.error("Claude AI T12 extraction failed: %s", e)
         return result  # Return the weak Tier 1 result as last resort
+
+
+# ==================== DETAILED T12 EXTRACTION (for T12 Mapper) ====================
+
+def _parse_t12_line_items_detailed(
+    ws: Worksheet,
+    month_row: int,
+    month_cols: Dict[str, int],
+    total_col: Optional[int],
+    label_col: Optional[int] = None,
+) -> List[Dict[str, Any]]:
+    """
+    Parse all T12 line items preserving row order, section headers, subtotals, and GL codes.
+
+    Returns a list of dicts (one per row), each with:
+      raw_label, gl_code, row_index, section, subsection,
+      is_subtotal, is_section_header, monthly_values, annual_total
+    """
+    MONTH_ORDER = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+    label_col_idx = label_col if label_col is not None else 0
+    items: List[Dict[str, Any]] = []
+
+    current_section = "revenue"  # default until we see an expense header
+    current_subsection: Optional[str] = None
+
+    # Patterns for detecting section boundaries
+    expense_patterns = [
+        r'^expenses?\b', r'^operating\s+expenses?\b', r'^total\s+expenses?\b',
+        r'^controllable\b', r'^property\s+operating',
+    ]
+    revenue_patterns = [
+        r'^income\b', r'^revenue\b', r'^rental\s+income', r'^total\s+income',
+    ]
+    subtotal_patterns = [
+        r'^total\b', r'^subtotal\b', r'^net\s+operating', r'^noi\b',
+        r'^effective\s+gross', r'^gross\s+potential',
+    ]
+    header_keywords = [
+        "income", "revenue", "expenses", "operating expenses",
+        "payroll & benefits", "payroll and benefits",
+        "repairs & maintenance", "repairs and maintenance",
+        "contract services", "administrative", "general & administrative",
+        "marketing & leasing", "utilities", "other income",
+        "rental income", "non-controllable", "controllable",
+    ]
+
+    for row_idx in range(month_row + 1, ws.max_row + 1):
+        row = ws[row_idx]
+
+        if label_col_idx >= len(row):
+            continue
+        cell_value = row[label_col_idx].value
+        if cell_value is None:
+            continue
+
+        raw_label = str(cell_value).strip()
+        if not raw_label or len(raw_label) < 2:
+            continue
+
+        # Extract GL code before stripping
+        gl_code = None
+        gl_match = re.match(r'^(\d{4,})\s*[\-:]?\s*', raw_label)
+        if gl_match:
+            gl_code = gl_match.group(1)
+
+        # Clean label (strip GL codes)
+        clean_label = re.sub(r'^\d{5,}\s*[\-:]?\s*', '', raw_label).strip()
+        if not clean_label:
+            clean_label = raw_label
+
+        # Get monthly values
+        monthly_values: Dict[str, float] = {}
+        for month_abbr, col_idx in month_cols.items():
+            value = _get_numeric_value(row, col_idx)
+            if value is not None:
+                monthly_values[month_abbr] = value
+
+        # Get total
+        annual_total = None
+        if total_col:
+            annual_total = _get_numeric_value(row, total_col)
+
+        # Determine if this is a section header (no numeric values, matches header keywords)
+        has_values = bool(monthly_values) or annual_total is not None
+        clean_lower = clean_label.lower().strip()
+        is_section_header = False
+        is_subtotal = False
+
+        if not has_values:
+            # Likely a section header or subsection header
+            if any(clean_lower == kw or clean_lower.startswith(kw) for kw in header_keywords):
+                is_section_header = True
+                # Update subsection tracking
+                current_subsection = clean_label
+                # Check if this switches us to expenses section
+                for pat in expense_patterns:
+                    if re.match(pat, clean_lower):
+                        current_section = "expense"
+                        current_subsection = None
+                        break
+        else:
+            # Check if subtotal
+            for pat in subtotal_patterns:
+                if re.match(pat, clean_lower):
+                    is_subtotal = True
+                    break
+
+            # Also check for section transition at "Total Income" or expense headers
+            if re.match(r'^total\s+income', clean_lower) or re.match(r'^total\s+revenue', clean_lower):
+                is_subtotal = True
+            # Check for expense section start even if values present
+            for pat in expense_patterns:
+                if re.match(pat, clean_lower):
+                    current_section = "expense"
+                    is_section_header = True
+                    break
+
+        # Compute T1/T2/T3 from monthly values
+        t1_value = None
+        t2_value = None
+        t3_value = None
+        if monthly_values:
+            # Get months in order, take the last ones
+            ordered_months = [m for m in MONTH_ORDER if m in monthly_values]
+            if ordered_months:
+                t1_value = monthly_values.get(ordered_months[-1])
+                if len(ordered_months) >= 2:
+                    t2_value = sum(monthly_values[m] for m in ordered_months[-2:])
+                if len(ordered_months) >= 3:
+                    t3_sum = sum(monthly_values[m] for m in ordered_months[-3:])
+                    t3_value = t3_sum * 4  # annualized
+
+        items.append({
+            "raw_label": clean_label,
+            "gl_code": gl_code,
+            "row_index": row_idx,
+            "section": current_section,
+            "subsection": current_subsection if not is_section_header else None,
+            "is_subtotal": is_subtotal,
+            "is_section_header": is_section_header,
+            "monthly_values": monthly_values if monthly_values else None,
+            "annual_total": annual_total,
+            "t1_value": t1_value,
+            "t2_value": t2_value,
+            "t3_value": t3_value,
+        })
+
+    return items
+
+
+def _auto_categorize_line_items(
+    items: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """
+    Auto-categorize each line item using match_line_item() and map to WDIS categories.
+    Adds mapped_category and auto_confidence to each item dict.
+    """
+    from app.schemas.t12_mapping import TAXONOMY_KEY_TO_CATEGORY
+
+    for item in items:
+        if item["is_section_header"] or item["is_subtotal"]:
+            item["mapped_category"] = None
+            item["auto_confidence"] = None
+            continue
+
+        raw = item["raw_label"]
+        cleaned = raw.strip().lower()
+        cleaned = re.sub(r'^[\d\-\.]+\s*', '', cleaned)
+        cleaned = re.sub(r'\s+', ' ', cleaned)
+
+        # Use existing fuzzy matcher
+        taxonomy_key = match_line_item(raw, T12_TAXONOMY, threshold=50)
+
+        if taxonomy_key:
+            category = TAXONOMY_KEY_TO_CATEGORY.get(taxonomy_key)
+            if category:
+                # Compute confidence from fuzzy score
+                all_keywords = []
+                for key, entry in T12_TAXONOMY.items():
+                    if key == taxonomy_key:
+                        for kw in entry["keywords"]:
+                            all_keywords.append(kw)
+                        break
+
+                best_score = 0
+                if all_keywords:
+                    match_result = process.extractOne(cleaned, all_keywords, scorer=fuzz.token_sort_ratio)
+                    if match_result:
+                        best_score = match_result[1] / 100.0  # normalize to 0-1
+
+                item["mapped_category"] = category
+                item["auto_confidence"] = round(best_score, 3)
+            else:
+                # Taxonomy key maps to a subtotal category — skip
+                item["mapped_category"] = None
+                item["auto_confidence"] = None
+        else:
+            # No match — leave unmapped
+            item["mapped_category"] = None
+            item["auto_confidence"] = None
+
+    return items
+
+
+def extract_t12_detailed(filepath: str) -> Dict[str, Any]:
+    """
+    Extended T12 extraction that preserves individual line items with row order,
+    section headers, subtotals, GL codes, and auto-categorization.
+
+    Returns the standard extract_t12() result plus a 'detailed_items' list.
+    """
+    # Run standard extraction first
+    result = extract_t12(filepath)
+
+    try:
+        wb = openpyxl.load_workbook(filepath, read_only=False, data_only=True)
+        ws = wb.worksheets[0]
+
+        month_row, month_cols, fiscal_year = _find_t12_month_headers(ws)
+        if month_row == 0:
+            wb.close()
+            result["detailed_items"] = []
+            return result
+
+        total_col = _find_total_year_column(ws, month_row)
+        layout = detect_t12_layout(ws)
+        label_col = layout.get("label_col")
+
+        # Parse detailed line items
+        items = _parse_t12_line_items_detailed(ws, month_row, month_cols, total_col, label_col)
+
+        # Auto-categorize
+        items = _auto_categorize_line_items(items)
+
+        wb.close()
+        result["detailed_items"] = items
+
+    except Exception as e:
+        logger.exception("Error in extract_t12_detailed: %s", e)
+        result["detailed_items"] = []
+
+    return result
