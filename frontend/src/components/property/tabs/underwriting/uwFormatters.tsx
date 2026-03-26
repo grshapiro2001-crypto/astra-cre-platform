@@ -235,7 +235,7 @@ export function NumericInput({
   const displayValue = focused
     ? localValue
     : value != null
-      ? String(value)
+      ? suffix ? `${value} ${suffix}` : String(value)
       : '';
 
   const handleFocus = useCallback(() => {
@@ -263,10 +263,10 @@ export function NumericInput({
         disabled={disabled}
         className={cn(
           'font-mono text-sm h-8',
-          suffix && 'pr-12',
+          suffix && focused && 'pr-12',
         )}
       />
-      {suffix && (
+      {suffix && focused && (
         <span className="absolute right-3 text-[10px] text-muted-foreground pointer-events-none">
           {suffix}
         </span>

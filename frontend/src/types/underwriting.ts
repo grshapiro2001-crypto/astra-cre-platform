@@ -282,6 +282,7 @@ export interface UWOutputs {
   proforma: ProformaResult;
   scenarios: Record<string, ScenarioResult>;
   operating_statement: OperatingStatement;
+  operating_statements?: Record<string, OperatingStatement>;
 }
 
 // ---------------------------------------------------------------------------
@@ -340,7 +341,7 @@ export function createDefaultInputs(): UWInputs {
     amort_years: 30,
     dscr_minimum: 1.25,
     sales_expense_pct: 0.015,
-    hold_period_years: 7,
+    hold_period_years: 8,
     la_enabled: false,
     la_existing_balance: 0,
     la_original_amount: 0,

@@ -864,6 +864,12 @@ class UnderwritingEngine:
             t12_val: Optional[float] = None,
             t3_val: Optional[float] = None,
         ) -> OperatingStatementLine:
+            # Normalize sign: deduction rows show positive values (the "Less:" label conveys subtraction)
+            if is_deduction:
+                if t12_val is not None:
+                    t12_val = abs(t12_val)
+                if t3_val is not None:
+                    t3_val = abs(t3_val)
             return OperatingStatementLine(
                 label=label,
                 t12_amount=t12_val,
@@ -898,17 +904,17 @@ class UnderwritingEngine:
         ]
 
         expense_lines = [
-            ln("Utilities", exp.utilities),
-            ln("Repairs & Maintenance", exp.repairs_maintenance),
-            ln("Apartment Make Ready", exp.make_ready),
-            ln("Contract Services", exp.contract_services),
-            ln("Marketing", exp.marketing),
-            ln("Payroll Expenses", exp.payroll),
-            ln("General & Administrative", exp.general_admin),
+            ln("Utilities", exp.utilities, t12_val=t12.get("utilities")),
+            ln("Repairs & Maintenance", exp.repairs_maintenance, t12_val=t12.get("repairs_maintenance")),
+            ln("Apartment Make Ready", exp.make_ready, t12_val=t12.get("turnover")),
+            ln("Contract Services", exp.contract_services, t12_val=t12.get("contract_services")),
+            ln("Marketing", exp.marketing, t12_val=t12.get("marketing")),
+            ln("Payroll Expenses", exp.payroll, t12_val=t12.get("payroll")),
+            ln("General & Administrative", exp.general_admin, t12_val=t12.get("administrative")),
             ln("Controllable Expenses", exp.controllable_total, is_total=True),
             ln("Property Taxes", exp.property_taxes, t12_val=t12.get("real_estate_taxes")),
             ln("Insurance", exp.insurance, t12_val=t12.get("insurance_amount")),
-            ln("Management Fee", exp.management_fee),
+            ln("Management Fee", exp.management_fee, t12_val=t12.get("management_fee_amount")),
             ln("Non-Controllable Expenses", exp.non_controllable_total, is_total=True),
             ln("Total Operating Expenses", exp.total_expenses, is_total=True, t12_val=t12.get("total_opex")),
         ]
@@ -1087,8 +1093,14 @@ class UnderwritingEngine:
 
         operating_statement = self._build_operating_statement(first_proforma)
 
+        # Build per-scenario operating statements for scenario toggle
+        operating_statements = {}
+        for key, result in scenarios.items():
+            operating_statements[key] = self._build_operating_statement(result.proforma)
+
         return UWOutputs(
             proforma=first_proforma,
             scenarios=scenarios,
             operating_statement=operating_statement,
+            operating_statements=operating_statements,
         )

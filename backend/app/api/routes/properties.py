@@ -874,6 +874,30 @@ def build_property_detail_response(property_obj: Property, db: Session) -> Prope
             except Exception as e:
                 logger.error("Failed to validate document item id=%s: %s", getattr(d, 'id', '?'), e)
 
+    # Augment T12 financials with expense breakdowns from T12Financial table
+    t12_parsed = property_service.parse_financial_period(property_obj.t12_financials_json)
+    if t12_parsed:
+        t12_detail = db.query(T12Financial).filter(
+            T12Financial.property_id == property_id
+        ).order_by(T12Financial.id.desc()).first()
+        if t12_detail:
+            if t12_parsed.utilities is None and t12_detail.utilities is not None:
+                t12_parsed.utilities = float(t12_detail.utilities)
+            if t12_parsed.repairs_maintenance is None and t12_detail.repairs_maintenance is not None:
+                t12_parsed.repairs_maintenance = float(t12_detail.repairs_maintenance)
+            if t12_parsed.turnover is None and t12_detail.turnover is not None:
+                t12_parsed.turnover = float(t12_detail.turnover)
+            if t12_parsed.contract_services is None and t12_detail.contract_services is not None:
+                t12_parsed.contract_services = float(t12_detail.contract_services)
+            if t12_parsed.marketing is None and t12_detail.marketing is not None:
+                t12_parsed.marketing = float(t12_detail.marketing)
+            if t12_parsed.administrative is None and t12_detail.administrative is not None:
+                t12_parsed.administrative = float(t12_detail.administrative)
+            if t12_parsed.payroll is None and t12_detail.payroll is not None:
+                t12_parsed.payroll = float(t12_detail.payroll)
+            if t12_parsed.management_fee_amount is None and t12_detail.management_fee is not None:
+                t12_parsed.management_fee_amount = float(t12_detail.management_fee)
+
     return PropertyDetail(
         id=property_obj.id,
         deal_name=property_obj.deal_name,
@@ -899,7 +923,7 @@ def build_property_detail_response(property_obj: Property, db: Session) -> Prope
         renovation_roi_pct=property_obj.renovation_roi_pct,
         renovation_duration_years=property_obj.renovation_duration_years,
         renovation_stabilized_revenue=float(property_obj.renovation_stabilized_revenue) if property_obj.renovation_stabilized_revenue else None,
-        t12_financials=property_service.parse_financial_period(property_obj.t12_financials_json),
+        t12_financials=t12_parsed,
         t3_financials=property_service.parse_financial_period(property_obj.t3_financials_json),
         y1_financials=property_service.parse_financial_period(property_obj.y1_financials_json),
         bov_pricing_tiers=bov_tiers,  # Phase 3A
@@ -1395,6 +1419,15 @@ async def upload_document_to_property(
                     "real_estate_taxes": summary.get("real_estate_taxes"),
                     "insurance_amount": summary.get("insurance"),
                     "management_fee_pct": property_obj.t12_management_fee_pct,
+                    # Individual expense breakdowns
+                    "utilities": summary.get("utilities"),
+                    "repairs_maintenance": summary.get("repairs_maintenance"),
+                    "turnover": summary.get("turnover"),
+                    "contract_services": summary.get("contract_services"),
+                    "marketing": summary.get("marketing"),
+                    "administrative": summary.get("administrative"),
+                    "payroll": summary.get("payroll"),
+                    "management_fee_amount": summary.get("management_fee"),
                 }
                 property_obj.t12_financials_json = json.dumps(t12_fin)
                 logger.info("T12 financials JSON built: noi=%s, gsr=%s, total_opex=%s",

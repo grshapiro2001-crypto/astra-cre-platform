@@ -33,6 +33,15 @@ class FinancialPeriodData(BaseModel):
     replacement_reserves: Optional[float] = None
     net_cash_flow: Optional[float] = None
     expense_ratio_pct: Optional[float] = None
+    # Individual expense category breakdowns (from T12 extraction)
+    utilities: Optional[float] = None
+    repairs_maintenance: Optional[float] = None
+    turnover: Optional[float] = None  # make_ready / apartment turnover
+    contract_services: Optional[float] = None
+    marketing: Optional[float] = None
+    administrative: Optional[float] = None  # G&A
+    payroll: Optional[float] = None
+    management_fee_amount: Optional[float] = None  # dollar amount (vs management_fee_pct which is %)
 
 
 # ==================== BOV SCHEMAS ====================

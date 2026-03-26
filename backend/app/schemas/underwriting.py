@@ -131,7 +131,7 @@ class UWInputs(BaseModel):
     amort_years: int = 30
     dscr_minimum: float = 1.25
     sales_expense_pct: float = 0.015
-    hold_period_years: int = 7
+    hold_period_years: int = 8
 
     # Debt Assumptions — Loan Assumption (Section 10.7)
     la_enabled: bool = False
@@ -320,6 +320,7 @@ class UWOutputs(BaseModel):
     proforma: ProformaResult = Field(default_factory=ProformaResult)
     scenarios: dict[str, ScenarioResult] = Field(default_factory=dict)
     operating_statement: OperatingStatement = Field(default_factory=OperatingStatement)
+    operating_statements: dict[str, OperatingStatement] = Field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------

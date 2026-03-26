@@ -74,7 +74,6 @@ function StatementRow({ line }: { line: OperatingStatementLine }) {
           isDeduction && !isTotal && 'pl-4',
         )}
       >
-        {isDeduction && !isTotal && 'Less: '}
         {line.label}
       </td>
       <td className="py-2 px-2 text-right font-mono text-xs">{fmtCell(line.t12_amount)}</td>
@@ -113,7 +112,7 @@ function SectionHeader({ label }: { label: string }) {
 export function UWProformaPage({ outputs, isComputing }: UWSubPageProps) {
   const [scenario, setScenario] = useState<'premium' | 'market'>('premium');
 
-  const os = outputs?.operating_statement;
+  const os = outputs?.operating_statements?.[scenario] ?? outputs?.operating_statement;
 
   if (!os) {
     return (
