@@ -20,6 +20,7 @@ import shutil
 from app.database import get_db, SessionLocal
 from app.models.user import User
 from app.models.property import Property, AnalysisLog, PropertyDocument, RentRollUnit, T12Financial
+from app.models.t12_line_items import T12LineItem
 from app.api.deps import get_current_user
 from app.api.routes.organizations import _get_user_org_id
 from pydantic import BaseModel
@@ -1531,6 +1532,39 @@ async def upload_document_to_property(
                     extraction_summary = fy_label + ". NOI: $" + "{:,.0f}".format(summary.get("net_operating_income", 0)) + ". T3 NOI: $" + "{:,.0f}".format(t3_noi_annual)
                 else:
                     extraction_summary = fy_label + ". NOI: $" + "{:,.0f}".format(summary.get("net_operating_income", 0))
+
+                # Save detailed T12 line items for the T12 Mapper
+                try:
+                    detailed = excel_extraction_service.extract_t12_detailed(file_path)
+                    detailed_items = detailed.get("detailed_items", [])
+                    if detailed_items:
+                        # Delete existing line items for this property (re-upload replaces)
+                        db.query(T12LineItem).filter(T12LineItem.property_id == property_id).delete()
+                        for item_data in detailed_items:
+                            mv = item_data.get("monthly_values")
+                            line_item = T12LineItem(
+                                property_id=property_id,
+                                raw_label=item_data["raw_label"],
+                                gl_code=item_data.get("gl_code"),
+                                section=item_data["section"],
+                                subsection=item_data.get("subsection"),
+                                row_index=item_data["row_index"],
+                                is_subtotal=item_data.get("is_subtotal", False),
+                                is_section_header=item_data.get("is_section_header", False),
+                                monthly_values=json.dumps(mv) if mv else None,
+                                annual_total=item_data.get("annual_total"),
+                                t1_value=item_data.get("t1_value"),
+                                t2_value=item_data.get("t2_value"),
+                                t3_value=item_data.get("t3_value"),
+                                mapped_category=item_data.get("mapped_category"),
+                                auto_confidence=item_data.get("auto_confidence"),
+                                user_confirmed=False,
+                            )
+                            db.add(line_item)
+                        property_obj.has_t12_line_items = True
+                        logger.info("Saved %d T12 line items for property %s", len(detailed_items), property_id)
+                except Exception as e:
+                    logger.warning("Failed to save T12 line items: %s", e)
 
             else:
                 # Unknown Excel document type

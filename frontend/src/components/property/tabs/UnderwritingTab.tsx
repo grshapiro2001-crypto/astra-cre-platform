@@ -7,7 +7,7 @@
  * Renders 5 sub-pages: Summary, Assumptions, Proforma, Cash Flows, Detail Schedules.
  */
 
-import { useReducer, useEffect, useRef, useCallback } from 'react';
+import { useReducer, useEffect, useRef, useCallback, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import type { PropertyDetail } from '@/types/property';
 import type { UWInputs } from '@/types/underwriting';
@@ -25,18 +25,21 @@ import { UWAssumptionsPage } from './underwriting/UWAssumptionsPage';
 import { UWProformaPage } from './underwriting/UWProformaPage';
 import { UWCashFlowsPage } from './underwriting/UWCashFlowsPage';
 import { UWDetailSchedulesPage } from './underwriting/UWDetailSchedulesPage';
+import { UWT12MappingPage } from './underwriting/UWT12MappingPage';
 
 // ---------------------------------------------------------------------------
 // Sub-tab definitions
 // ---------------------------------------------------------------------------
 
-const UW_SUB_TABS = [
+const UW_SUB_TABS_BASE: { key: string; label: string }[] = [
   { key: 'summary', label: 'Summary' },
   { key: 'assumptions', label: 'Assumptions' },
   { key: 'proforma', label: 'Proforma' },
   { key: 'cashflows', label: 'Cash Flows' },
   { key: 'details', label: 'Detail Schedules' },
-] as const;
+];
+
+const T12_MAPPING_TAB = { key: 't12mapping', label: 'T12 Mapping' };
 
 // ---------------------------------------------------------------------------
 // Reducer
@@ -258,6 +261,18 @@ export function UnderwritingTab({ property }: UnderwritingTabProps) {
   const inputVersionRef = useRef(0);
   const initialLoadDone = useRef(false);
 
+  // Build sub-tabs dynamically — include T12 Mapping if property has line items
+  const hasT12LineItems = property.has_t12_line_items || property.financial_data_source === 't12_excel';
+  const uwSubTabs = useMemo(() => {
+    if (!hasT12LineItems) return UW_SUB_TABS_BASE;
+    // Insert T12 Mapping between Assumptions and Proforma
+    const tabs = [...UW_SUB_TABS_BASE];
+    const proformaIdx = tabs.findIndex((t) => t.key === 'proforma');
+    const insertIdx = proformaIdx >= 0 ? proformaIdx : 2;
+    tabs.splice(insertIdx, 0, T12_MAPPING_TAB);
+    return tabs;
+  }, [hasT12LineItems]);
+
   // ── Load saved model or seed from property ──
   useEffect(() => {
     if (initialLoadDone.current) return;
@@ -337,7 +352,7 @@ export function UnderwritingTab({ property }: UnderwritingTabProps) {
       {/* Sub-tab bar */}
       <div className="flex items-center justify-between">
         <div className="flex items-center rounded-lg p-1 bg-muted/50">
-          {UW_SUB_TABS.map((tab) => (
+          {uwSubTabs.map((tab) => (
             <button
               key={tab.key}
               onClick={() => dispatch({ type: 'SET_ACTIVE_SUB_TAB', payload: tab.key })}
@@ -398,6 +413,15 @@ export function UnderwritingTab({ property }: UnderwritingTabProps) {
           outputs={state.outputs}
           dispatch={dispatch}
           isComputing={state.isComputing}
+        />
+      )}
+      {state.activeSubTab === 't12mapping' && hasT12LineItems && (
+        <UWT12MappingPage
+          inputs={state.inputs}
+          outputs={state.outputs}
+          dispatch={dispatch}
+          isComputing={state.isComputing}
+          property={property}
         />
       )}
       {state.activeSubTab === 'proforma' && (

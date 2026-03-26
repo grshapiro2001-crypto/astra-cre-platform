@@ -10,6 +10,7 @@ from app.models.feedback import FeedbackReport, FeedbackReply
 from app.models.event import UserEvent
 from app.models.extraction_log import ExtractionLog
 from app.models.underwriting import UnderwritingModel
+from app.models.t12_line_items import T12LineItem
 
 __all__ = [
     "User", "Property", "AnalysisLog", "PropertyUnitMix", "PropertyRentComp", "PropertyDocument", "RentRollUnit", "T12Financial",
@@ -23,4 +24,5 @@ __all__ = [
     "UserEvent",
     "ExtractionLog",
     "UnderwritingModel",
+    "T12LineItem",
 ]
