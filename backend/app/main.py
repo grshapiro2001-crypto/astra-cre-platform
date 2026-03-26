@@ -12,6 +12,62 @@ logger = logging.getLogger(__name__)
 logger.warning("Creating database tables... (tables registered: %s)", list(Base.metadata.tables.keys()))
 Base.metadata.create_all(bind=engine)
 
+# Defensive schema fix: ensure critical columns/tables exist BEFORE any queries.
+# This runs raw SQL with IF NOT EXISTS so it's safe even if Alembic already applied.
+def ensure_critical_schema():
+    """Guarantee has_t12_line_items column and t12_line_items table exist.
+
+    Uses IF NOT EXISTS so this is idempotent and safe on every startup.
+    Fixes the Render crash where Alembic migrations didn't apply correctly.
+    """
+    from sqlalchemy import text
+    with engine.connect() as conn:
+        # 1) Add has_t12_line_items to properties if missing
+        conn.execute(text(
+            "ALTER TABLE properties ADD COLUMN IF NOT EXISTS "
+            "has_t12_line_items BOOLEAN DEFAULT false"
+        ))
+        conn.commit()
+
+        # 2) Create t12_line_items table if missing
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS t12_line_items (
+                id SERIAL PRIMARY KEY,
+                property_id INTEGER NOT NULL REFERENCES properties(id),
+                raw_label VARCHAR NOT NULL,
+                gl_code VARCHAR,
+                section VARCHAR NOT NULL,
+                subsection VARCHAR,
+                row_index INTEGER NOT NULL,
+                is_subtotal BOOLEAN DEFAULT false,
+                is_section_header BOOLEAN DEFAULT false,
+                monthly_values TEXT,
+                annual_total FLOAT,
+                t1_value FLOAT,
+                t2_value FLOAT,
+                t3_value FLOAT,
+                mapped_category VARCHAR,
+                auto_confidence FLOAT,
+                user_confirmed BOOLEAN DEFAULT false,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP
+            )
+        """))
+        conn.commit()
+
+        # Index on property_id for fast lookups
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_t12_line_items_property_id "
+            "ON t12_line_items (property_id)"
+        ))
+        conn.commit()
+
+try:
+    ensure_critical_schema()
+    logger.warning("Critical schema check passed (has_t12_line_items + t12_line_items table)")
+except Exception as e:
+    logger.warning(f"Critical schema check skipped (non-fatal): {e}")
+
 # Auto-migrate: add missing columns and fix column types on existing tables
 def run_migrations():
     """Add columns and fix types that create_all can't handle on existing tables."""
@@ -42,7 +98,7 @@ def run_migrations():
             # Floor plan images — saved image paths per floor
             ("floor_plan_images_json", "TEXT"),
             # T12 line item mapping flag
-            ("has_t12_line_items", "BOOLEAN DEFAULT 0"),
+            ("has_t12_line_items", "BOOLEAN DEFAULT false"),
         ]
         for col_name, col_type in new_columns:
             if col_name not in existing_cols:
