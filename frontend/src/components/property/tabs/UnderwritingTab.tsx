@@ -175,6 +175,12 @@ function seedInputsFromProperty(property: PropertyDetail): UWInputs {
     parking_income_per_unit: perUnit(t12?.parking_storage_income),
 
     // Expense defaults from T12
+    utilities_per_unit: perUnit(t12?.utilities),
+    repairs_per_unit: perUnit(t12?.repairs_maintenance),
+    make_ready_per_unit: perUnit(t12?.turnover),
+    contract_services_per_unit: perUnit(t12?.contract_services),
+    marketing_per_unit: perUnit(t12?.marketing),
+    ga_per_unit: perUnit(t12?.administrative),
     insurance_per_unit: perUnit(t12?.insurance_amount),
 
     // Tax — seed from T12 if available
@@ -185,6 +191,18 @@ function seedInputsFromProperty(property: PropertyDetail): UWInputs {
 
     // Reserves from T12
     reserves_per_unit: perUnit(t12?.replacement_reserves) || 200,
+
+    // Default other income presets
+    other_income_items: [
+      { line_item: 'Application Fees', description: '', amount_per_unit: 0, input_mode: 'per_unit_year' as const, fee_amount: 0, annual_income: 0 },
+      { line_item: 'Administrative Fees', description: '', amount_per_unit: 0, input_mode: 'per_unit_year' as const, fee_amount: 0, annual_income: 0 },
+      { line_item: 'Pet Fee (one-time)', description: 'One-time fees annualized', amount_per_unit: 0, input_mode: 'per_unit_year' as const, fee_amount: 0, annual_income: 0 },
+      { line_item: 'Pet Rent', description: 'Monthly recurring', amount_per_unit: 0, input_mode: 'per_unit_month' as const, fee_amount: 0, annual_income: 0 },
+      { line_item: 'Late Fees', description: '', amount_per_unit: 0, input_mode: 'per_unit_month' as const, fee_amount: 0, annual_income: 0 },
+      { line_item: 'NSF Fees', description: '', amount_per_unit: 0, input_mode: 'per_unit_year' as const, fee_amount: 0, annual_income: 0 },
+      { line_item: 'Early Termination Fees', description: '', amount_per_unit: 0, input_mode: 'per_unit_year' as const, fee_amount: 0, annual_income: 0 },
+      { line_item: 'Miscellaneous', description: 'Catch-all', amount_per_unit: 0, input_mode: 'per_unit_year' as const, fee_amount: 0, annual_income: 0 },
+    ],
 
     // Default payroll positions
     payroll_items: [

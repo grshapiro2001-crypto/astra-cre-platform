@@ -126,7 +126,7 @@ function RevenueSection({ inputs, dispatch }: Pick<UWSubPageProps, 'inputs' | 'd
       {/* Vacancy / Concession / Bad Debt (Y1 values) */}
       <InputRow
         label="Vacancy"
-        t12Ref={<T12Ref value={t12Raw(t12, 'vacancy_rate_pct')} format="pct" />}
+        t12Ref={<T12Ref value={(() => { const v = t12Raw(t12, 'vacancy_rate_pct'); return v != null ? v / 100 : null; })()} format="pct" />}
       >
         <PercentInput
           value={inputs.vacancy_pct[0] ?? null}
@@ -206,7 +206,7 @@ function RevenueSection({ inputs, dispatch }: Pick<UWSubPageProps, 'inputs' | 'd
 // Section B: Expenses
 // ---------------------------------------------------------------------------
 
-function ExpenseSection({ inputs, dispatch }: Pick<UWSubPageProps, 'inputs' | 'dispatch'>) {
+function ExpenseSection({ inputs, outputs, dispatch }: Pick<UWSubPageProps, 'inputs' | 'outputs' | 'dispatch'>) {
   const t12 = inputs.trailing_t12 as Record<string, unknown> | null;
   const units = inputs.total_units || 1;
 
@@ -227,10 +227,10 @@ function ExpenseSection({ inputs, dispatch }: Pick<UWSubPageProps, 'inputs' | 'd
   const expenseRows: { label: string; field: keyof UWInputs; t12Key?: string }[] = [
     { label: 'Utilities', field: 'utilities_per_unit', t12Key: 'utilities' },
     { label: 'Repairs & Maint.', field: 'repairs_per_unit', t12Key: 'repairs_maintenance' },
-    { label: 'Make Ready', field: 'make_ready_per_unit', t12Key: 'make_ready' },
+    { label: 'Make Ready', field: 'make_ready_per_unit', t12Key: 'turnover' },
     { label: 'Contract Services', field: 'contract_services_per_unit', t12Key: 'contract_services' },
     { label: 'Marketing', field: 'marketing_per_unit', t12Key: 'marketing' },
-    { label: 'G&A', field: 'ga_per_unit', t12Key: 'general_admin' },
+    { label: 'G&A', field: 'ga_per_unit', t12Key: 'administrative' },
     { label: 'Insurance', field: 'insurance_per_unit', t12Key: 'insurance_amount' },
   ];
 
@@ -263,11 +263,21 @@ function ExpenseSection({ inputs, dispatch }: Pick<UWSubPageProps, 'inputs' | 'd
       </InputRow>
 
       {/* Management Fee */}
-      <InputRow label="Management Fee">
-        <PercentInput
-          value={inputs.mgmt_fee_pct}
-          onChange={(v) => update({ mgmt_fee_pct: v ?? 0 })}
-        />
+      <InputRow
+        label="Management Fee"
+        t12Ref={<T12Ref value={t12PerUnit(t12, 'management_fee_amount', units)} />}
+      >
+        <div className="space-y-1">
+          <PercentInput
+            value={inputs.mgmt_fee_pct}
+            onChange={(v) => update({ mgmt_fee_pct: v ?? 0 })}
+          />
+          {outputs?.proforma?.expenses?.management_fee != null && (
+            <span className="text-[10px] text-muted-foreground/70 font-mono">
+              → {formatCurrency(outputs.proforma.expenses.management_fee)} ({formatCurrency(units > 0 ? Math.round(outputs.proforma.expenses.management_fee / units) : 0)}/unit)
+            </span>
+          )}
+        </div>
       </InputRow>
 
       {/* Reserves */}
@@ -425,8 +435,8 @@ function GrowthSection({ inputs, dispatch }: Pick<UWSubPageProps, 'inputs' | 'di
                       type="text"
                       value={setAllValues[curve]}
                       onChange={(e) => handleSetAll(curve, e.target.value)}
-                      placeholder="%"
-                      className="w-16 h-8 px-2 rounded-md border border-input bg-background text-xs font-mono text-center focus:outline-none focus:ring-1 focus:ring-primary/30"
+                      placeholder="Set %"
+                      className="w-16 h-8 px-2 rounded-md border border-primary/40 bg-primary/5 text-foreground text-xs font-mono text-center focus:outline-none focus:ring-1 focus:ring-primary/30"
                     />
                   </td>
                 </tr>
@@ -612,7 +622,7 @@ export function UWAssumptionsPage({ inputs, outputs, dispatch, isComputing }: UW
       )}
 
       <RevenueSection inputs={inputs} dispatch={dispatch} />
-      <ExpenseSection inputs={inputs} dispatch={dispatch} />
+      <ExpenseSection inputs={inputs} outputs={outputs} dispatch={dispatch} />
       <TaxSection inputs={inputs} outputs={outputs} dispatch={dispatch} />
       <GrowthSection inputs={inputs} dispatch={dispatch} />
       <DebtSection inputs={inputs} dispatch={dispatch} />

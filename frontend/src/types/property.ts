@@ -33,6 +33,15 @@ export interface FinancialPeriod {
   replacement_reserves?: number | null;
   net_cash_flow?: number | null;
   expense_ratio_pct?: number | null;
+  // Individual expense category breakdowns (from T12 extraction)
+  utilities?: number | null;
+  repairs_maintenance?: number | null;
+  turnover?: number | null;  // make_ready / apartment turnover
+  contract_services?: number | null;
+  marketing?: number | null;
+  administrative?: number | null;  // G&A
+  payroll?: number | null;
+  management_fee_amount?: number | null;
 }
 
 export interface CalculatedMetrics {
