@@ -262,7 +262,7 @@ export function UnderwritingTab({ property }: UnderwritingTabProps) {
   const initialLoadDone = useRef(false);
 
   // Build sub-tabs dynamically — include T12 Mapping if property has line items
-  const hasT12LineItems = property.has_t12_line_items || property.financial_data_source === 't12_excel';
+  const hasT12LineItems = property.financial_data_source === 't12_excel';
   const uwSubTabs = useMemo(() => {
     if (!hasT12LineItems) return UW_SUB_TABS_BASE;
     // Insert T12 Mapping between Assumptions and Proforma

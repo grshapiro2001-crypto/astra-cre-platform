@@ -41,8 +41,7 @@ def run_migrations():
             ("unit_position_map_json", "TEXT"),
             # Floor plan images — saved image paths per floor
             ("floor_plan_images_json", "TEXT"),
-            # T12 line item mapping flag
-            ("has_t12_line_items", "BOOLEAN DEFAULT 0"),
+
         ]
         for col_name, col_type in new_columns:
             if col_name not in existing_cols:

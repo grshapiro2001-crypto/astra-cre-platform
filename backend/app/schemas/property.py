@@ -300,7 +300,6 @@ class PropertyDetail(BaseModel):
     # Financial data source tracking
     financial_data_source: Optional[str] = None
     financial_data_updated_at: Optional[datetime] = None
-    has_t12_line_items: bool = False
 
     # Documents (Phase 1: Excel Integration)
     documents: List["PropertyDocumentResponse"] = []

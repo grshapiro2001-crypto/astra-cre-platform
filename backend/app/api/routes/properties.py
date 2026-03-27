@@ -1561,7 +1561,6 @@ async def upload_document_to_property(
                                 user_confirmed=False,
                             )
                             db.add(line_item)
-                        property_obj.has_t12_line_items = True
                         logger.info("Saved %d T12 line items for property %s", len(detailed_items), property_id)
                 except Exception as e:
                     logger.warning("Failed to save T12 line items: %s", e)

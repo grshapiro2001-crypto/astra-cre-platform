@@ -403,7 +403,6 @@ export interface PropertyDetail {
   stacking_layout_json?: string | null;
   unit_position_map_json?: string | null;
   floor_plan_images_json?: string | null;
-  has_t12_line_items?: boolean;
 }
 
 /** Property list item for library views */
