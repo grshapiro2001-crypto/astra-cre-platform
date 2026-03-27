@@ -21,6 +21,12 @@ import { OrganizationSettings } from './pages/OrganizationSettings';
 import { Welcome } from './pages/Welcome';
 import { CommandCenter } from './pages/CommandCenter';
 import { PendingApproval } from './pages/PendingApproval';
+import { TermsOfService } from './pages/TermsOfService';
+import { PrivacyPolicy } from './pages/PrivacyPolicy';
+import { CookiePolicy } from './pages/CookiePolicy';
+import { SecurityPage } from './pages/Security';
+import { About } from './pages/About';
+import { Pricing } from './pages/Pricing';
 
 function App() {
   const checkAuth = useAuthStore((state) => state.checkAuth);
@@ -97,6 +103,14 @@ function App() {
 
           {/* Public landing page */}
           <Route path="/" element={<Landing />} />
+
+          {/* Public pages — legal, about, pricing */}
+          <Route path="/terms" element={<TermsOfService />} />
+          <Route path="/privacy" element={<PrivacyPolicy />} />
+          <Route path="/cookies" element={<CookiePolicy />} />
+          <Route path="/security" element={<SecurityPage />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/pricing" element={<Pricing />} />
 
           {/* Catch all - redirect to dashboard */}
           <Route path="*" element={<Navigate to="/dashboard" replace />} />

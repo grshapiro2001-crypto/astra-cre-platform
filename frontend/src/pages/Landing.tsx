@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, FormEvent } from 'react';
 import { motion, AnimatePresence, useInView, useMotionValue, useSpring } from 'framer-motion';
+import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import TalismanCompass3D from '@/components/TalismanCompass3D';
 
@@ -105,10 +106,25 @@ const FEATURE_TABS: FeatureTab[] = [
     ],
   },
 ];
-const FOOTER_LINKS = {
-  Product: ['Deal Scoring', 'Document AI', 'Market Intel', 'Portfolio', 'Integrations', 'API'],
-  Company: ['About', 'Blog', 'Careers', 'Press', 'Contact'],
-  Legal: ['Privacy', 'Terms', 'Security', 'Cookie Policy'],
+
+const FOOTER_LINKS: Record<string, { label: string; href: string }[]> = {
+  Product: [
+    { label: 'Deal Scoring', href: '#features' },
+    { label: 'Document AI', href: '#features' },
+    { label: 'Market Intel', href: '#features' },
+    { label: 'Portfolio', href: '#features' },
+    { label: 'Pricing', href: '/pricing' },
+  ],
+  Company: [
+    { label: 'About', href: '/about' },
+    { label: 'Contact', href: 'mailto:griffin@talisman.io' },
+  ],
+  Legal: [
+    { label: 'Privacy', href: '/privacy' },
+    { label: 'Terms', href: '/terms' },
+    { label: 'Security', href: '/security' },
+    { label: 'Cookie Policy', href: '/cookies' },
+  ],
 };
 
 // ─────────────────────────────────────────────────────────────────
@@ -138,7 +154,7 @@ function AuroraCanvas() {
       r: 0.25 + Math.random() * 0.2,
       dx: (Math.random() - 0.5) * 0.00015,
       dy: (Math.random() - 0.5) * 0.00015,
-      hue: 240 + i * 30,
+      hue: 30 + i * 12, // Gold/amber hues (30-78) instead of purple
     }));
 
     const draw = () => {
@@ -147,7 +163,7 @@ function AuroraCanvas() {
       const h = canvas.height;
 
       ctx.clearRect(0, 0, w, h);
-      ctx.fillStyle = 'hsl(263,30%,5%)';
+      ctx.fillStyle = 'hsl(220,40%,5%)';
       ctx.fillRect(0, 0, w, h);
 
       orbs.forEach((o) => {
@@ -326,7 +342,8 @@ function FeatureTabs() {
       initial={{ opacity: 0, y: 40 }}
       animate={inView ? { opacity: 1, y: 0 } : {}}
       transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-      className="py-24 px-4 max-w-6xl mx-auto"
+      id="features"
+      className="py-24 px-4 max-w-6xl mx-auto scroll-mt-20"
     >
       <div className="text-center mb-14">
         <span className="text-xs font-mono uppercase tracking-widest text-primary px-3 py-1 rounded-full border border-primary/30 bg-primary/10">
@@ -430,8 +447,121 @@ function FeatureTabs() {
 }
 
 // ─────────────────────────────────────────────────────────────────
+// Waitlist CTA
+// ─────────────────────────────────────────────────────────────────
+function WaitlistCTA() {
+  const [email, setEmail] = useState('');
+  const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [errorMsg, setErrorMsg] = useState('');
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!email.trim()) return;
+
+    setStatus('loading');
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/v1/waitlist`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim() }),
+      });
+
+      if (res.ok) {
+        setStatus('success');
+      } else {
+        const data = await res.json().catch(() => ({}));
+        if (res.status === 409) {
+          setStatus('success');
+        } else {
+          setErrorMsg(data.detail || 'Something went wrong. Try again.');
+          setStatus('error');
+        }
+      }
+    } catch {
+      setErrorMsg('Could not connect. Try again later.');
+      setStatus('error');
+    }
+  };
+
+  return (
+    <section className="relative py-28 px-4 overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-background to-background" />
+      <div className="relative z-10 max-w-3xl mx-auto text-center">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.96 }}
+          whileInView={{ opacity: 1, scale: 1 }}
+          viewport={{ once: true, margin: '-80px' }}
+          transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <h2 className="font-display text-4xl md:text-5xl font-bold text-foreground mb-5">
+            Ready to underwrite at the speed of AI?
+          </h2>
+          <p className="text-muted-foreground text-lg mb-10">
+            Join the waitlist for early access. No credit card required.
+          </p>
+
+          {status === 'success' ? (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="inline-flex items-center gap-3 bg-green-500/10 border border-green-500/30 text-green-400 px-8 py-4 rounded-xl text-lg font-semibold"
+            >
+              <span className="text-2xl">✓</span>
+              You&apos;re on the list!
+            </motion.div>
+          ) : (
+            <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row items-center justify-center gap-3 max-w-lg mx-auto">
+              <input
+                type="email"
+                required
+                placeholder="you@yourfirm.com"
+                value={email}
+                onChange={(e) => { setEmail(e.target.value); setStatus('idle'); }}
+                className="w-full sm:flex-1 bg-card/60 border border-border/60 rounded-xl px-5 py-4 text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/60 backdrop-blur-sm"
+              />
+              <button
+                type="submit"
+                disabled={status === 'loading'}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-primary text-primary-foreground px-8 py-4 rounded-xl text-base font-semibold hover:bg-primary/90 transition-all hover:scale-105 shadow-xl shadow-primary/25 disabled:opacity-50 disabled:hover:scale-100"
+              >
+                {status === 'loading' ? (
+                  <span className="w-5 h-5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+                ) : (
+                  <>Request access <span aria-hidden>→</span></>
+                )}
+              </button>
+            </form>
+          )}
+          {status === 'error' && (
+            <p className="text-red-400 text-sm mt-3">{errorMsg}</p>
+          )}
+        </motion.div>
+      </div>
+    </section>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
 // Footer
 // ─────────────────────────────────────────────────────────────────
+function FooterLink({ href, children }: { href: string; children: React.ReactNode }) {
+  const isExternal = href.startsWith('http') || href.startsWith('mailto:');
+  const isAnchor = href.startsWith('#');
+
+  if (isExternal || isAnchor) {
+    return (
+      <a href={href} className="text-sm text-muted-foreground hover:text-foreground transition-colors" {...(isExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {})}>
+        {children}
+      </a>
+    );
+  }
+  return (
+    <Link to={href} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+      {children}
+    </Link>
+  );
+}
+
 function Footer() {
   return (
     <footer className="border-t border-border/40 bg-background/80 backdrop-blur-sm mt-24">
@@ -447,15 +577,14 @@ function Footer() {
               The all-in-one multifamily investment platform. AI-native underwriting for the modern CRE firm.
             </p>
             <div className="flex gap-3 mt-5">
-              {['𝕏', 'in', '⬡'].map((icon, i) => (
-                <a
-                  key={i}
-                  href="#"
-                  className="w-8 h-8 rounded-lg border border-border/60 flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors text-xs"
-                >
-                  {icon}
-                </a>
-              ))}
+              <a
+                href="https://www.linkedin.com/in/griffinshapiro/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-8 h-8 rounded-lg border border-border/60 flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors text-xs"
+              >
+                in
+              </a>
             </div>
           </div>
 
@@ -465,10 +594,8 @@ function Footer() {
               <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-4">{group}</p>
               <ul className="space-y-2.5">
                 {links.map((link) => (
-                  <li key={link}>
-                    <a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                      {link}
-                    </a>
+                  <li key={link.label}>
+                    <FooterLink href={link.href}>{link.label}</FooterLink>
                   </li>
                 ))}
               </ul>
@@ -477,8 +604,8 @@ function Footer() {
         </div>
 
         <div className="flex flex-col md:flex-row justify-between items-center gap-4 pt-8 border-t border-border/40 text-xs text-muted-foreground">
-          <p>© 2026 Talisman IO, Inc. All rights reserved.</p>
-          <p className="font-mono">v2.4.1 · Built on Vercel · Powered by OpenAI</p>
+          <p>&copy; 2026 Talisman IO. All rights reserved.</p>
+          <p className="font-mono">Built on Vercel &middot; Powered by Anthropic Claude</p>
         </div>
       </div>
     </footer>
@@ -530,9 +657,9 @@ export function Landing() {
           </span>
 
           <div className="hidden md:flex items-center gap-7 text-sm text-muted-foreground">
-            {['Product', 'Market Intel', 'Pricing', 'Docs', 'Blog'].map((item) => (
-              <a key={item} href="#" className="hover:text-foreground transition-colors">{item}</a>
-            ))}
+            <a href="#features" className="hover:text-foreground transition-colors">Product</a>
+            <a href="#features" className="hover:text-foreground transition-colors">Market Intel</a>
+            <Link to="/pricing" className="hover:text-foreground transition-colors">Pricing</Link>
           </div>
 
           <div className="flex items-center gap-3">
@@ -552,7 +679,7 @@ export function Landing() {
       {/* ── Hero ─────────────────────────────────────────────── */}
       <section className="relative min-h-screen flex flex-col items-center justify-center text-center pt-16 overflow-hidden">
         {/* Aurora background */}
-        <div className="absolute inset-0 bg-[hsl(263,30%,5%)]">
+        <div className="absolute inset-0 bg-[hsl(220,40%,5%)]">
           <AuroraCanvas />
         </div>
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-background" />
@@ -617,8 +744,8 @@ export function Landing() {
               href="#demo"
               className="w-full sm:w-auto inline-flex items-center justify-center gap-2 border border-white/20 text-white/80 px-8 py-4 rounded-xl text-base font-medium hover:border-white/40 hover:text-white transition-all backdrop-blur-sm"
             >
-              Watch demo
-              <span aria-hidden>▶</span>
+              See it in action
+              <span aria-hidden>↓</span>
             </a>
           </motion.div>
 
@@ -656,10 +783,10 @@ export function Landing() {
       {/* ── Stats Bar ───────────────────────────────────────── */}
       <section className="py-20 px-4 max-w-5xl mx-auto">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-10 divide-x divide-border/40">
-          <StatCounter value={12400} label="Deals analyzed" suffix="+" />
-          <StatCounter value={4} label="Avg. underwriting time (min)" />
-          <StatCounter value={150} label="MSAs covered" suffix="+" />
-          <StatCounter value={97} label="Extraction accuracy" suffix="%" />
+          <StatCounter value={500} label="Deals analyzed" suffix="+" />
+          <StatCounter value={2} label="Avg. extraction time (min)" prefix="<" />
+          <StatCounter value={30} label="MSAs covered" suffix="+" />
+          <StatCounter value={95} label="Extraction accuracy" suffix="%" />
         </div>
       </section>
 
@@ -689,32 +816,8 @@ export function Landing() {
       {/* ── Feature Tabs ────────────────────────────────────── */}
       <FeatureTabs />
 
-      {/* ── CTA Band ────────────────────────────────────────── */}
-      <section className="relative py-28 px-4 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-background to-background" />
-        <div className="relative z-10 max-w-3xl mx-auto text-center">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.96 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true, margin: '-80px' }}
-            transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-          >
-            <h2 className="font-display text-4xl md:text-5xl font-bold text-foreground mb-5">
-              Ready to underwrite at the speed of AI?
-            </h2>
-            <p className="text-muted-foreground text-lg mb-10">
-              Join 400+ investment firms already using Talisman. Free trial, no credit card required.
-            </p>
-            <a
-              href="/register"
-              className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-10 py-4 rounded-xl text-lg font-semibold hover:bg-primary/90 transition-all hover:scale-105 shadow-xl shadow-primary/25"
-            >
-              Start your free trial
-              <span aria-hidden>→</span>
-            </a>
-          </motion.div>
-        </div>
-      </section>
+      {/* ── CTA / Waitlist Band ────────────────────────────── */}
+      <WaitlistCTA />
 
       {/* ── Footer ──────────────────────────────────────────── */}
       <Footer />
