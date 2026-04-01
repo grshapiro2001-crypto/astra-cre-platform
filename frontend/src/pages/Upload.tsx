@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Upload as UploadIcon, Sparkles, CheckCircle2, FileText, ArrowRight, Loader2, RotateCcw } from 'lucide-react';
+import { Upload as UploadIcon, Sparkles, CheckCircle2, FileText, FileSpreadsheet, ArrowRight, Loader2, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 import { PDFUploader } from '../components/upload/PDFUploader';
+import { ExcelUploader } from '../components/upload/ExcelUploader';
 import { propertyService } from '../services/propertyService';
 import { dealFolderService } from '../services/dealFolderService';
 import { cn } from '@/lib/utils';
@@ -14,7 +15,7 @@ const SAVE_TIMEOUT_MS = 30_000; // 30 seconds
 // How-It-Works Steps
 // ============================================================
 
-const STEPS = [
+const PDF_STEPS = [
   {
     icon: UploadIcon,
     title: 'Upload PDF',
@@ -32,9 +33,29 @@ const STEPS = [
   },
 ];
 
-const HowItWorks = () => (
+const EXCEL_STEPS = [
+  {
+    icon: FileSpreadsheet,
+    title: 'Upload Excel',
+    description: 'Drop your T12 or Rent Roll',
+  },
+  {
+    icon: Sparkles,
+    title: 'AI Extracts',
+    description: 'Data is parsed and categorized',
+  },
+  {
+    icon: CheckCircle2,
+    title: 'Review & Analyze',
+    description: 'Property created with financials',
+  },
+];
+
+type StepDef = { icon: React.ElementType; title: string; description: string };
+
+const HowItWorks = ({ steps }: { steps: StepDef[] }) => (
   <div className="flex items-start justify-center gap-8 py-8">
-    {STEPS.map((step) => (
+    {steps.map((step) => (
       <div key={step.title} className="flex flex-col items-center text-center w-44">
         <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-3">
           <step.icon className="w-5 h-5 text-primary" />
@@ -136,8 +157,11 @@ const RecentUploads = ({
 // Upload Page
 // ============================================================
 
+type UploadTab = 'pdf' | 'excel';
+
 export const Upload = () => {
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState<UploadTab>('pdf');
   const [recentProperties, setRecentProperties] = useState<PropertyListItem[]>([]);
   const [recentLoading, setRecentLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -304,6 +328,10 @@ export const Upload = () => {
     );
   }
 
+  const handleExcelSuccess = (propertyId: number) => {
+    navigate(`/library/${propertyId}`);
+  };
+
   return (
     <div className="max-w-5xl mx-auto space-y-10">
       {/* Header */}
@@ -312,12 +340,42 @@ export const Upload = () => {
           Upload Property Document
         </h1>
         <p className="text-sm mt-1 text-muted-foreground">
-          Upload an Offering Memorandum or BOV for AI-powered extraction
+          {activeTab === 'pdf'
+            ? 'Upload an Offering Memorandum or BOV for AI-powered extraction'
+            : 'Upload a T12 or Rent Roll to create a new property analysis'}
         </p>
       </div>
 
-      {/* Save Error with Retry */}
-      {saveError && (
+      {/* Tab Switcher */}
+      <div className="max-w-2xl mx-auto flex items-center justify-center gap-2">
+        <button
+          onClick={() => setActiveTab('pdf')}
+          className={cn(
+            'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200',
+            activeTab === 'pdf'
+              ? 'bg-primary/10 text-primary border border-primary/30'
+              : 'text-muted-foreground hover:text-foreground border border-transparent'
+          )}
+        >
+          <FileText className="w-4 h-4" />
+          PDF Analysis
+        </button>
+        <button
+          onClick={() => setActiveTab('excel')}
+          className={cn(
+            'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200',
+            activeTab === 'excel'
+              ? 'bg-primary/10 text-primary border border-primary/30'
+              : 'text-muted-foreground hover:text-foreground border border-transparent'
+          )}
+        >
+          <FileSpreadsheet className="w-4 h-4" />
+          Excel Analysis
+        </button>
+      </div>
+
+      {/* Save Error with Retry (PDF tab only) */}
+      {activeTab === 'pdf' && saveError && (
         <div className="max-w-2xl mx-auto bg-destructive/10 border border-destructive/20 p-4 rounded-xl flex items-center justify-between gap-4">
           <p className="text-sm text-destructive">{saveError}</p>
           {lastUploadData && (
@@ -338,12 +396,16 @@ export const Upload = () => {
         <div className="absolute -top-20 left-1/2 -translate-x-1/2 w-72 h-72 bg-primary/5 rounded-full blur-3xl pointer-events-none dark:bg-primary/10" />
 
         <div className="relative bg-card shadow-lg shadow-primary/5 rounded-2xl border border-border p-8">
-          <PDFUploader onUploadComplete={handleUploadComplete} />
+          {activeTab === 'pdf' ? (
+            <PDFUploader onUploadComplete={handleUploadComplete} />
+          ) : (
+            <ExcelUploader onSuccess={handleExcelSuccess} />
+          )}
         </div>
       </div>
 
       {/* How It Works */}
-      <HowItWorks />
+      <HowItWorks steps={activeTab === 'pdf' ? PDF_STEPS : EXCEL_STEPS} />
 
       {/* Recent Uploads */}
       <div className="max-w-2xl mx-auto">

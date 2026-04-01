@@ -212,4 +212,49 @@ export const propertyService = {
     link.remove();
     window.URL.revokeObjectURL(url);
   },
+
+  // ==================== EXCEL ANALYSIS UPLOAD ====================
+
+  /**
+   * Upload Excel files (T12 and/or Rent Roll) to create a new property analysis.
+   * Creates property + deal folder in one step.
+   */
+  async uploadExcelAnalysis(
+    files: File[],
+    propertyInfo: {
+      property_name: string;
+      property_address: string;
+      total_units?: number;
+      submarket?: string;
+      metro?: string;
+    }
+  ): Promise<{
+    success: boolean;
+    property_id: number;
+    deal_folder_id: number;
+    documents_processed: Array<{
+      filename: string;
+      doc_category: string;
+      extraction_status: string;
+    }>;
+    extracted_summary: {
+      t12_noi?: number;
+      total_units?: number;
+      avg_in_place_rent?: number;
+      physical_occupancy?: number;
+    };
+  }> {
+    const formData = new FormData();
+    files.forEach(file => formData.append('files', file));
+    formData.append('property_name', propertyInfo.property_name);
+    formData.append('property_address', propertyInfo.property_address);
+    if (propertyInfo.total_units) formData.append('total_units', String(propertyInfo.total_units));
+    if (propertyInfo.submarket) formData.append('submarket', propertyInfo.submarket);
+    if (propertyInfo.metro) formData.append('metro', propertyInfo.metro);
+
+    const response = await api.post('/upload/excel-analysis', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
 };

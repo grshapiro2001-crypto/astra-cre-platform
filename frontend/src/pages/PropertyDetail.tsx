@@ -521,7 +521,15 @@ export const PropertyDetail = () => {
 
               {property.document_type && (
                 <span className="bg-primary/20 text-primary text-[9px] px-2 py-0.5 rounded tracking-wide uppercase font-semibold">
-                  {property.document_type}
+                  {property.document_type === 'EXCEL'
+                    ? property.t12_noi != null && property.rr_total_units
+                      ? 'T12 + RR'
+                      : property.t12_noi != null
+                        ? 'T12'
+                        : property.rr_total_units
+                          ? 'Rent Roll'
+                          : 'Excel'
+                    : property.document_type}
                 </span>
               )}
 
