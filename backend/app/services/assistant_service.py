@@ -531,7 +531,13 @@ def chat_with_tools(
         response = client.messages.create(
             model="claude-sonnet-4-5-20250929",
             max_tokens=4096,
-            system=SYSTEM_PROMPT,
+            system=[
+                {
+                    "type": "text",
+                    "text": SYSTEM_PROMPT,
+                    "cache_control": {"type": "ephemeral"}
+                }
+            ],
             messages=messages,
             tools=all_tools,
         )
@@ -558,10 +564,21 @@ def chat_with_tools(
             messages.append({"role": "user", "content": tool_results})
             continue  # Loop back for Claude to process results
 
-        # Final response — yield text from content blocks
+        # Final response — yield text in small chunks for smooth streaming
         for block in response.content:
             if hasattr(block, 'text'):
-                yield block.text
+                text = block.text
+                # Chunk by words to avoid breaking mid-word
+                words = text.split(' ')
+                chunk = ''
+                for word in words:
+                    chunk += (' ' if chunk else '') + word
+                    # Yield every ~4-6 words for smooth rendering
+                    if len(chunk) >= 30:
+                        yield chunk
+                        chunk = ''
+                if chunk:  # Yield remaining text
+                    yield chunk
         break
     else:
         yield "I hit the maximum number of tool calls. Please try a simpler question."

@@ -1,3 +1,4 @@
+import asyncio
 import json
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
@@ -14,7 +15,7 @@ router = APIRouter(prefix="/assistant", tags=["Assistant"])
 
 
 @router.post("/chat")
-def assistant_chat(
+async def assistant_chat(
     request: ChatRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -26,7 +27,7 @@ def assistant_chat(
             detail="User does not belong to an organization.",
         )
 
-    def event_stream():
+    async def event_stream():
         try:
             for chunk in chat_with_tools(
                 message=request.message,
@@ -38,6 +39,7 @@ def assistant_chat(
             ):
                 payload = json.dumps({"type": "text_delta", "content": chunk})
                 yield f"data: {payload}\n\n"
+                await asyncio.sleep(0.02)  # 20ms between chunks for smooth rendering
 
             done = json.dumps({"type": "done", "content": ""})
             yield f"data: {done}\n\n"
