@@ -7,6 +7,7 @@ interface AssistantState {
   _prevSidebarCollapsed: boolean | null;
   messages: ChatMessage[];
   isLoading: boolean;
+  isThinking: boolean;
   scopedPropertyId: number | null;
   scopedFolderId: number | null;
 
@@ -16,6 +17,7 @@ interface AssistantState {
   updateLastAssistant: (content: string) => void;
   finalizeLastAssistant: () => void;
   setLoading: (loading: boolean) => void;
+  setThinking: (thinking: boolean) => void;
   setScopedProperty: (id: number | null) => void;
   setScopedFolder: (id: number | null) => void;
   clearMessages: () => void;
@@ -26,6 +28,7 @@ export const useAssistantStore = create<AssistantState>((set) => ({
   _prevSidebarCollapsed: null,
   messages: [],
   isLoading: false,
+  isThinking: false,
   scopedPropertyId: null,
   scopedFolderId: null,
 
@@ -88,6 +91,7 @@ export const useAssistantStore = create<AssistantState>((set) => ({
     }),
 
   setLoading: (loading) => set({ isLoading: loading }),
+  setThinking: (thinking) => set({ isThinking: thinking }),
   setScopedProperty: (id) => set({ scopedPropertyId: id }),
   setScopedFolder: (id) => set({ scopedFolderId: id }),
   clearMessages: () => set({ messages: [] }),

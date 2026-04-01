@@ -20,6 +20,7 @@ export const AssistantPanel = () => {
     isOpen,
     messages,
     isLoading,
+    isThinking,
     scopedPropertyId,
     scopedFolderId,
     setOpen,
@@ -27,6 +28,7 @@ export const AssistantPanel = () => {
     updateLastAssistant,
     finalizeLastAssistant,
     setLoading,
+    setThinking,
     clearMessages,
   } = useAssistantStore();
 
@@ -35,7 +37,7 @@ export const AssistantPanel = () => {
   // Auto-scroll to bottom on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages, isThinking]);
 
   const handleSend = useCallback(
     (text: string) => {
@@ -47,21 +49,13 @@ export const AssistantPanel = () => {
         timestamp: new Date(),
       });
 
-      // Add empty assistant placeholder
-      addMessage({
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        content: '',
-        timestamp: new Date(),
-        isStreaming: true,
-      });
-
       setLoading(true);
+      setThinking(true);
 
       // Build request
       const conversationHistory = useAssistantStore
         .getState()
-        .messages.filter((m) => m.content) // exclude the empty placeholder
+        .messages.filter((m) => m.content)
         .map((m) => ({ role: m.role, content: m.content }));
 
       const request: ChatRequest = {
@@ -72,22 +66,48 @@ export const AssistantPanel = () => {
       };
 
       let accumulated = '';
+      let placeholderAdded = false;
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 45000);
+
+      const addPlaceholder = () => {
+        if (!placeholderAdded) {
+          placeholderAdded = true;
+          addMessage({
+            id: crypto.randomUUID(),
+            role: 'assistant',
+            content: '',
+            timestamp: new Date(),
+            isStreaming: true,
+          });
+        }
+      };
 
       streamChat(
         request,
         (chunk) => {
+          clearTimeout(timeout);
+          setThinking(false);
+          addPlaceholder();
           accumulated += chunk;
           updateLastAssistant(accumulated);
         },
         () => {
-          finalizeLastAssistant();
+          clearTimeout(timeout);
+          setThinking(false);
+          if (placeholderAdded) finalizeLastAssistant();
           setLoading(false);
         },
         (error) => {
-          updateLastAssistant(accumulated ? accumulated + '\n\nError: ' + error : 'Error: ' + error);
+          clearTimeout(timeout);
+          setThinking(false);
+          addPlaceholder();
+          updateLastAssistant(accumulated ? accumulated + '\n\nError: ' + error : error);
           finalizeLastAssistant();
           setLoading(false);
         },
+        controller.signal,
       );
     },
     [
@@ -95,6 +115,7 @@ export const AssistantPanel = () => {
       updateLastAssistant,
       finalizeLastAssistant,
       setLoading,
+      setThinking,
       scopedPropertyId,
       scopedFolderId,
     ],
@@ -147,7 +168,7 @@ export const AssistantPanel = () => {
 
           {/* Messages */}
           <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
-            {messages.length === 0 ? (
+            {messages.length === 0 && !isThinking ? (
               <div className="flex h-full flex-col items-center justify-center text-center">
                 <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
                   <TalismanCompass3D size={32} spin={true} speed={1.0} />
@@ -171,7 +192,25 @@ export const AssistantPanel = () => {
                 </div>
               </div>
             ) : (
-              messages.map((msg) => <ChatMessage key={msg.id} message={msg} />)
+              <>
+                {messages.map((msg) => <ChatMessage key={msg.id} message={msg} />)}
+                {isThinking && (
+                  <motion.div
+                    className="flex gap-3"
+                    animate={{ opacity: [0.5, 1, 0.5] }}
+                    transition={{ duration: 2, repeat: Infinity }}
+                  >
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full">
+                      <TalismanCompass3D size={24} spin={true} speed={1.0} />
+                    </div>
+                    <div className="flex items-center rounded-2xl rounded-bl-md border border-border/60 bg-card px-4 py-2.5">
+                      <span className="text-sm text-muted-foreground font-sans">
+                        Analyzing…
+                      </span>
+                    </div>
+                  </motion.div>
+                )}
+              </>
             )}
             <div ref={messagesEndRef} />
           </div>
