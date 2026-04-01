@@ -8,7 +8,7 @@ from app.models.user import User
 from app.api.deps import get_current_user
 from app.api.routes.organizations import _get_user_org_id
 from app.schemas.assistant import ChatRequest
-from app.services.assistant_service import stream_chat_response
+from app.services.assistant_service import chat_with_tools
 
 router = APIRouter(prefix="/assistant", tags=["Assistant"])
 
@@ -28,13 +28,13 @@ def assistant_chat(
 
     def event_stream():
         try:
-            for chunk in stream_chat_response(
+            for chunk in chat_with_tools(
                 message=request.message,
-                conversation_history=request.conversation_history,
+                conversation_history=[m.model_dump() for m in request.conversation_history],
                 db=db,
                 org_id=org_id,
                 property_id=request.property_id,
-                deal_folder_id=request.deal_folder_id,
+                user_id=str(current_user.id),
             ):
                 payload = json.dumps({"type": "text_delta", "content": chunk})
                 yield f"data: {payload}\n\n"
