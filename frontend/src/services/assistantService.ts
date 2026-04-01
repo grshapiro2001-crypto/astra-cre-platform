@@ -7,6 +7,7 @@ export async function streamChat(
   onChunk: (text: string) => void,
   onDone: () => void,
   onError: (error: string) => void,
+  signal?: AbortSignal,
 ): Promise<void> {
   const token = localStorage.getItem('access_token');
 
@@ -18,6 +19,7 @@ export async function streamChat(
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       body: JSON.stringify(request),
+      signal,
     });
 
     if (!response.ok) {
@@ -73,6 +75,10 @@ export async function streamChat(
     // Stream ended without explicit done signal
     onDone();
   } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      onError('The analysis took too long. Please try a simpler question.');
+      return;
+    }
     onError(err instanceof Error ? err.message : 'Network error');
   }
 }
