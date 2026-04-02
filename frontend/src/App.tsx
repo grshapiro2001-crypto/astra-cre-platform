@@ -16,7 +16,7 @@ import { ComparisonPage } from './pages/ComparisonPage';
 import { Settings } from './pages/Settings';
 import { DataBankPage } from './pages/DataBankPage';
 import { OnboardingWizard } from './components/onboarding/OnboardingWizard';
-import { Landing } from './pages/Landing';
+import Landing from './pages/Landing';
 import { OrganizationSettings } from './pages/OrganizationSettings';
 import { Welcome } from './pages/Welcome';
 import { CommandCenter } from './pages/CommandCenter';

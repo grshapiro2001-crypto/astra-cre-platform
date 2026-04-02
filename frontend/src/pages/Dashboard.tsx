@@ -25,7 +25,7 @@ import { propertyService } from '@/services/propertyService';
 import { scoringService } from '@/services/scoringService';
 import { criteriaService } from '@/services/criteriaService';
 import type { PropertyListItem, ScreeningSummaryItem, BOVPricingTier } from '@/types/property';
-import { DashboardMap } from '@/components/dashboard/DashboardMap';
+import { DashboardCalendar } from '@/components/dashboard/DashboardCalendar';
 import type { DashboardDeal } from '@/components/dashboard/DealCard';
 import { KanbanBoard } from '@/components/dashboard/KanbanBoard';
 import { ChatBar } from '@/components/dashboard/ChatBar';
@@ -293,6 +293,7 @@ export const Dashboard = () => {
           noi,
           capRate,
           stage: stageMap[p.id],
+          uploadDate: p.upload_date,
         };
       })
       .sort((a, b) => (b.dealScore ?? -1) - (a.dealScore ?? -1));
@@ -333,11 +334,6 @@ export const Dashboard = () => {
     setSelectedDealId(dealId);
   }, []);
 
-  const handlePinClick = useCallback((dealId: number) => {
-    setSelectedDealId(dealId);
-    const el = document.getElementById(`deal-card-${dealId}`);
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }, []);
 
   const handleStageChange = useCallback((dealId: number, newStageId: string) => {
     // Optimistic UI update
@@ -576,7 +572,7 @@ export const Dashboard = () => {
                   </motion.div>
                 </div>
 
-                {/* Right Column — Map (5/12, full height) */}
+                {/* Right Column — Calendar (5/12, full height) */}
                 <motion.div
                   className="lg:col-span-5 self-stretch"
                   initial={{ opacity: 0, y: 12 }}
@@ -584,11 +580,7 @@ export const Dashboard = () => {
                   transition={{ duration: 0.4, delay: 0.15 }}
                   style={{ minHeight: '500px' }}
                 >
-                  <DashboardMap
-                    deals={deals}
-                    selectedDealId={selectedDealId}
-                    onPinClick={handlePinClick}
-                  />
+                  <DashboardCalendar deals={deals} />
                 </motion.div>
               </div>
 

@@ -62,8 +62,8 @@ export const Sidebar = () => {
     <aside
       className={cn(
         'fixed top-0 left-0 z-40 h-screen flex flex-col',
-        'bg-gradient-to-b from-amber-950 via-yellow-950 to-amber-950',
-        'border-r border-white/5 transition-all duration-300',
+        'bg-[#0c0c0f]',
+        'border-r border-white/[0.04] transition-all duration-300',
         'hidden lg:flex',
         sidebarCollapsed ? 'w-[72px]' : 'w-64'
       )}
@@ -80,7 +80,7 @@ export const Sidebar = () => {
           {!sidebarCollapsed && (
             <h1 className="text-lg font-bold font-display tracking-tight">
               <span className="text-white">Talisman</span>
-              <span className="text-amber-300/70 ml-1 font-normal text-xs">IO</span>
+              <span className="text-zinc-500 ml-1 font-normal text-xs">IO</span>
             </h1>
           )}
         </div>
@@ -116,7 +116,7 @@ export const Sidebar = () => {
                     : 'px-3 py-2.5',
                   isActive
                     ? 'bg-white/10 text-white shadow-sm border border-white/10'
-                    : 'text-amber-200/70 hover:bg-white/5 hover:text-white'
+                    : 'text-zinc-500 hover:bg-white/5 hover:text-zinc-200'
                 )
               }
               title={sidebarCollapsed ? item.name : undefined}
@@ -132,8 +132,8 @@ export const Sidebar = () => {
           <>
             {!sidebarCollapsed && (
               <div className="flex items-center gap-2 px-3 mt-4 mb-1">
-                <div className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                <span className="text-amber-400/60 text-[10px] font-medium uppercase tracking-widest">
+                <div className="w-1.5 h-1.5 rounded-full bg-zinc-500" />
+                <span className="text-zinc-600 text-[10px] font-medium uppercase tracking-widest">
                   Admin
                 </span>
               </div>
@@ -148,8 +148,8 @@ export const Sidebar = () => {
                     ? 'justify-center px-0 py-2.5 mx-auto w-11 h-11'
                     : 'px-3 py-2.5',
                   isActive
-                    ? 'bg-amber-500/20 text-amber-300 shadow-sm border border-amber-500/20'
-                    : 'text-amber-300/60 hover:bg-amber-500/10 hover:text-amber-200'
+                    ? 'bg-white/10 text-white shadow-sm border border-white/10'
+                    : 'text-zinc-500 hover:bg-white/5 hover:text-zinc-200'
                 )
               }
               title={sidebarCollapsed ? 'Command Center' : undefined}
@@ -180,7 +180,7 @@ export const Sidebar = () => {
           <div className="flex justify-between items-baseline">
             <div className="text-right">
               <span className="text-white text-lg font-bold font-mono">{dealCount ?? '\u2014'}</span>
-              <p className="text-amber-300/50 text-[10px] mt-0.5">Active Deals</p>
+              <p className="text-zinc-600 text-[10px] mt-0.5">Active Deals</p>
             </div>
           </div>
         </div>
@@ -198,7 +198,7 @@ export const Sidebar = () => {
           size="sm"
           onClick={toggleTheme}
           className={cn(
-            'text-amber-200/70 hover:text-white hover:bg-white/5',
+            'text-zinc-500 hover:text-zinc-200 hover:bg-white/5',
             sidebarCollapsed ? 'w-11 h-11 p-0' : 'w-full justify-start gap-3 px-3'
           )}
           title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
@@ -229,7 +229,7 @@ export const Sidebar = () => {
             sidebarCollapsed ? 'justify-center' : 'px-3 py-2'
           )}
         >
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500 to-yellow-600 flex items-center justify-center shrink-0">
+          <div className="w-8 h-8 rounded-full bg-white/10 border border-white/10 flex items-center justify-center shrink-0">
             <span className="text-white text-xs font-bold">{initials}</span>
           </div>
           {!sidebarCollapsed && (
@@ -237,7 +237,7 @@ export const Sidebar = () => {
               <p className="text-white text-sm font-medium truncate">
                 {user?.full_name || 'User'}
               </p>
-              <p className="text-amber-300/50 text-[11px] truncate">
+              <p className="text-zinc-600 text-[11px] truncate">
                 {user?.email || ''}
               </p>
             </div>
@@ -257,7 +257,7 @@ export const Sidebar = () => {
           size="sm"
           onClick={toggleSidebar}
           className={cn(
-            'text-amber-200/70 hover:text-white hover:bg-white/5',
+            'text-zinc-500 hover:text-zinc-200 hover:bg-white/5',
             sidebarCollapsed ? 'w-11 h-11 p-0' : 'w-full justify-start gap-3 px-3'
           )}
           title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
@@ -300,14 +300,14 @@ export const MobileSidebar = () => {
       />
 
       {/* Sidebar */}
-      <aside className="absolute top-0 left-0 h-full w-64 flex flex-col bg-gradient-to-b from-amber-950 via-yellow-950 to-amber-950 border-r border-white/5 shadow-2xl">
+      <aside className="absolute top-0 left-0 h-full w-64 flex flex-col bg-[#0c0c0f] border-r border-white/[0.04] shadow-2xl">
         {/* Logo */}
         <div className="flex items-center h-16 px-5 border-b border-white/5">
           <div className="flex items-center gap-2.5">
             <TalismanCompass3D size={36} spin={true} speed={1.0} />
             <h1 className="text-lg font-bold font-display tracking-tight">
               <span className="text-white">Talisman</span>
-              <span className="text-amber-300/70 ml-1 font-normal text-xs">IO</span>
+              <span className="text-zinc-500 ml-1 font-normal text-xs">IO</span>
             </h1>
           </div>
         </div>
@@ -333,7 +333,7 @@ export const MobileSidebar = () => {
                     'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200',
                     isActive
                       ? 'bg-white/10 text-white shadow-sm border border-white/10'
-                      : 'text-amber-200/70 hover:bg-white/5 hover:text-white'
+                      : 'text-zinc-500 hover:bg-white/5 hover:text-zinc-200'
                   )
                 }
               >
@@ -347,8 +347,8 @@ export const MobileSidebar = () => {
           {user && ADMIN_EMAILS.includes(user.email) && (
             <>
               <div className="flex items-center gap-2 px-3 mt-4 mb-1">
-                <div className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                <span className="text-amber-400/60 text-[10px] font-medium uppercase tracking-widest">
+                <div className="w-1.5 h-1.5 rounded-full bg-zinc-500" />
+                <span className="text-zinc-600 text-[10px] font-medium uppercase tracking-widest">
                   Admin
                 </span>
               </div>
@@ -359,8 +359,8 @@ export const MobileSidebar = () => {
                   cn(
                     'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200',
                     isActive
-                      ? 'bg-amber-500/20 text-amber-300 shadow-sm border border-amber-500/20'
-                      : 'text-amber-300/60 hover:bg-amber-500/10 hover:text-amber-200'
+                      ? 'bg-white/10 text-white shadow-sm border border-white/10'
+                      : 'text-zinc-500 hover:bg-white/5 hover:text-zinc-200'
                   )
                 }
               >
@@ -377,7 +377,7 @@ export const MobileSidebar = () => {
             variant="ghost"
             size="sm"
             onClick={toggleTheme}
-            className="w-full justify-start gap-3 px-3 text-amber-200/70 hover:text-white hover:bg-white/5"
+            className="w-full justify-start gap-3 px-3 text-zinc-500 hover:text-zinc-200 hover:bg-white/5"
           >
             {theme === 'dark' ? (
               <Sun className="w-4 h-4 shrink-0" />
@@ -393,14 +393,14 @@ export const MobileSidebar = () => {
         {/* User */}
         <div className="px-3 pb-4 border-t border-white/5 pt-3">
           <div className="flex items-center gap-3 px-3 py-2">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500 to-yellow-600 flex items-center justify-center shrink-0">
+            <div className="w-8 h-8 rounded-full bg-white/10 border border-white/10 flex items-center justify-center shrink-0">
               <span className="text-white text-xs font-bold">{initials}</span>
             </div>
             <div className="overflow-hidden">
               <p className="text-white text-sm font-medium truncate">
                 {user?.full_name || 'User'}
               </p>
-              <p className="text-amber-300/50 text-[11px] truncate">
+              <p className="text-zinc-600 text-[11px] truncate">
                 {user?.email || ''}
               </p>
             </div>

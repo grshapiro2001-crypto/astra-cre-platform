@@ -52,9 +52,10 @@ const formatDollarCompact = (num: number): string => {
 };
 
 const SCORE_COLORS = {
-  high: '#10B981',
-  medium: '#F59E0B',
-  low: '#EF4444',
+  excellent: '#ffffff',
+  high: '#d4d4d8',
+  good: '#a1a1aa',
+  low: '#71717a',
 } as const;
 
 // ============================================================
@@ -66,7 +67,7 @@ const ScoreRing: React.FC<{ score: number; size?: number }> = ({ score, size = 3
   const circumference = 2 * Math.PI * radius;
   const pct = Math.min(100, Math.max(0, score)) / 100;
   const offset = circumference * (1 - pct);
-  const color = score >= 80 ? SCORE_COLORS.high : score >= 60 ? SCORE_COLORS.medium : SCORE_COLORS.low;
+  const color = score >= 90 ? SCORE_COLORS.excellent : score >= 80 ? SCORE_COLORS.high : score >= 70 ? SCORE_COLORS.good : SCORE_COLORS.low;
 
   return (
     <svg width={size} height={size} className="shrink-0">
@@ -83,7 +84,7 @@ const ScoreRing: React.FC<{ score: number; size?: number }> = ({ score, size = 3
         strokeLinecap="round"
         transform={`rotate(-90 ${size / 2} ${size / 2})`}
       />
-      <text x={size / 2} y={size / 2} textAnchor="middle" dominantBaseline="central" fill={color} fontSize={size * 0.32} fontWeight="bold" fontFamily="JetBrains Mono, monospace">
+      <text x={size / 2} y={size / 2} textAnchor="middle" dominantBaseline="central" fill={color} fontSize={size * 0.32} fontWeight="bold" fontFamily="Inter, system-ui, sans-serif">
         {Math.round(score)}
       </text>
     </svg>

@@ -28,6 +28,7 @@ export interface DashboardDeal {
   noi?: number | null;
   capRate?: number | null;
   stage?: string;
+  uploadDate?: string;
 }
 
 // ============================================================
@@ -42,15 +43,17 @@ const formatDealValue = (value: number | null): string => {
 };
 
 const getScoreColor = (score: number): string => {
-  if (score >= 75) return 'text-green-400';
-  if (score >= 65) return 'text-yellow-400';
-  return 'text-red-400';
+  if (score >= 90) return 'text-white';
+  if (score >= 80) return 'text-zinc-300';
+  if (score >= 70) return 'text-zinc-400';
+  return 'text-zinc-600';
 };
 
 const getScoreBg = (score: number): string => {
-  if (score >= 75) return 'bg-green-500/10';
-  if (score >= 65) return 'bg-yellow-500/10';
-  return 'bg-red-500/10';
+  if (score >= 90) return 'bg-white/10';
+  if (score >= 80) return 'bg-zinc-300/10';
+  if (score >= 70) return 'bg-zinc-400/10';
+  return 'bg-zinc-600/10';
 };
 
 // ============================================================

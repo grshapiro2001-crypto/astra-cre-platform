@@ -27,6 +27,7 @@
     "@tanstack/react-table": "^8.11.3",
     "@types/three": "^0.183.1",
     "axios": "^1.6.5",
+    "date-fns": "^4.1.0",
     "framer-motion": "^12.33.0",
     "html2canvas": "^1.4.1",
     "lucide-react": "^0.562.0",

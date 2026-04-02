@@ -24,25 +24,27 @@ import { DealScoreBadge } from './DealScoreBadge';
 // ---------------------------------------------------------------------------
 
 function getScoreColor(score: number): string {
-  if (score >= 70) return 'text-green-400';
-  if (score >= 40) return 'text-yellow-400';
-  return 'text-red-400';
+  if (score >= 90) return 'text-white';
+  if (score >= 80) return 'text-zinc-300';
+  if (score >= 70) return 'text-zinc-400';
+  return 'text-zinc-600';
 }
 
 function getBarColor(score: number): string {
-  if (score >= 70) return 'bg-green-400';
-  if (score >= 40) return 'bg-yellow-400';
-  return 'bg-red-400';
+  if (score >= 90) return 'bg-white';
+  if (score >= 80) return 'bg-zinc-300';
+  if (score >= 70) return 'bg-zinc-400';
+  return 'bg-zinc-600';
 }
 
 function getConfidenceBadge(confidence: string): { label: string; className: string } {
   switch (confidence) {
     case 'high':
-      return { label: 'High Confidence', className: 'bg-green-500/10 text-green-400' };
+      return { label: 'High Confidence', className: 'bg-white/10 text-white' };
     case 'medium':
-      return { label: 'Medium Confidence', className: 'bg-yellow-500/10 text-yellow-400' };
+      return { label: 'Medium Confidence', className: 'bg-zinc-400/10 text-zinc-400' };
     default:
-      return { label: 'Low Confidence', className: 'bg-red-500/10 text-red-400' };
+      return { label: 'Low Confidence', className: 'bg-zinc-600/10 text-zinc-600' };
   }
 }
 
@@ -69,25 +71,25 @@ const LAYER_CONFIG = [
     key: 'property_fundamentals',
     label: 'Layer 1: Property Fundamentals',
     icon: Building2,
-    color: 'text-blue-400',
-    borderColor: 'border-blue-500/20',
-    bgColor: 'bg-blue-500/5',
+    color: 'text-white',
+    borderColor: 'border-white/10',
+    bgColor: 'bg-white/[0.03]',
   },
   {
     key: 'market_intelligence',
     label: 'Layer 2: Market Intelligence',
     icon: Brain,
-    color: 'text-amber-400',
-    borderColor: 'border-amber-500/20',
-    bgColor: 'bg-amber-500/5',
+    color: 'text-zinc-300',
+    borderColor: 'border-zinc-500/20',
+    bgColor: 'bg-zinc-500/[0.03]',
   },
   {
     key: 'deal_comp_analysis',
     label: 'Layer 3: Deal Comp Analysis',
     icon: BarChart3,
-    color: 'text-emerald-400',
-    borderColor: 'border-emerald-500/20',
-    bgColor: 'bg-emerald-500/5',
+    color: 'text-zinc-400',
+    borderColor: 'border-zinc-600/20',
+    bgColor: 'bg-zinc-600/[0.03]',
   },
 ];
 
@@ -313,11 +315,11 @@ export function DealScoreModal({
 
             {/* Warnings */}
             {scoreData.warnings.length > 0 && (
-              <div className="px-6 py-3 bg-yellow-500/5 border-b border-yellow-500/10">
+              <div className="px-6 py-3 bg-zinc-500/5 border-b border-zinc-500/10">
                 {scoreData.warnings.map((w, i) => (
                   <div key={i} className="flex items-start gap-2 py-1">
-                    <AlertTriangle className="w-3.5 h-3.5 text-yellow-400 shrink-0 mt-0.5" />
-                    <span className="text-xs text-yellow-300/80">{w}</span>
+                    <AlertTriangle className="w-3.5 h-3.5 text-zinc-400 shrink-0 mt-0.5" />
+                    <span className="text-xs text-zinc-400">{w}</span>
                   </div>
                 ))}
               </div>

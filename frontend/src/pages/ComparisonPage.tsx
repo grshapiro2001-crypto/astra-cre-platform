@@ -258,10 +258,10 @@ function getPropertyMetric(
 }
 
 function getScoreHex(score: number): string {
-  if (score >= 80) return '#10b981';
-  if (score >= 60) return '#D4AF37';
-  if (score >= 40) return '#f59e0b';
-  return '#f43f5e';
+  if (score >= 90) return '#ffffff';
+  if (score >= 80) return '#d4d4d8';
+  if (score >= 70) return '#a1a1aa';
+  return '#71717a';
 }
 
 function getScoreColorClass(score: number): string {
@@ -369,7 +369,7 @@ function isBestEconomicOccupancy(
 // Constants
 // ============================================================
 
-const PROPERTY_COLORS = ['#D4AF37', '#10b981', '#f59e0b', '#f43f5e', '#0ea5e9'];
+const PROPERTY_COLORS = ['#ffffff', '#d4d4d8', '#a1a1aa', '#71717a', '#52525b'];
 
 const METRIC_DEFS: Record<CompMetricKey, MetricDef> = {
   going_in_cap: {
@@ -984,7 +984,7 @@ function RadarChart({ properties, metrics, scoresByProperty }: RadarChartProps) 
             dominantBaseline="central"
             fill="hsl(var(--muted-foreground))"
             fontSize="10"
-            fontFamily="'JetBrains Mono', monospace"
+            fontFamily="'Inter', system-ui, sans-serif"
           >
             {def.label}
           </text>
