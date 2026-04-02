@@ -15,7 +15,7 @@ window.addEventListener('error', (event) => {
         <div style="text-align:center;max-width:400px;padding:2rem;">
           <h2 style="margin-bottom:0.5rem;">Something went wrong</h2>
           <p style="color:#999;margin-bottom:1.5rem;">An unexpected error occurred. Please refresh the page.</p>
-          <button onclick="window.location.reload()" style="padding:0.5rem 1.5rem;border-radius:8px;border:none;background:#D4AF37;color:white;font-weight:600;cursor:pointer;">
+          <button onclick="window.location.reload()" style="padding:0.5rem 1.5rem;border-radius:8px;border:none;background:#ffffff;color:#060608;font-weight:600;cursor:pointer;">
             Refresh Page
           </button>
         </div>

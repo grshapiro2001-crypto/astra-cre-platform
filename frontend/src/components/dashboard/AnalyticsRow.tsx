@@ -31,9 +31,10 @@ const formatDollarCompact = (num: number): string => {
 };
 
 const SCORE_COLORS = {
-  high: '#10B981',
-  medium: '#F59E0B',
-  low: '#EF4444',
+  excellent: '#ffffff',
+  high: '#d4d4d8',
+  good: '#a1a1aa',
+  low: '#71717a',
 } as const;
 
 // ============================================================
@@ -208,7 +209,7 @@ const ScoreDistribution: React.FC<{ deals: DashboardDeal[] }> = ({ deals }) => {
       const bucket = Number(bucketStr);
       ids.forEach((id, idx) => {
         const deal = scored.find((d) => d.id === id)!;
-        const color = deal.score >= 80 ? SCORE_COLORS.high : deal.score >= 60 ? SCORE_COLORS.medium : SCORE_COLORS.low;
+        const color = deal.score >= 90 ? SCORE_COLORS.excellent : deal.score >= 80 ? SCORE_COLORS.high : deal.score >= 70 ? SCORE_COLORS.good : SCORE_COLORS.low;
         positions.push({
           id,
           x: (bucket / 100) * 100,
@@ -244,12 +245,12 @@ const ScoreDistribution: React.FC<{ deals: DashboardDeal[] }> = ({ deals }) => {
           <p className="text-2xs text-muted-foreground">Strong (80+)</p>
         </div>
         <div className="text-center">
-          <p className="font-display text-lg font-bold" style={{ color: SCORE_COLORS.medium }}>{review}</p>
-          <p className="text-2xs text-muted-foreground">Review (60-79)</p>
+          <p className="font-display text-lg font-bold" style={{ color: SCORE_COLORS.good }}>{review}</p>
+          <p className="text-2xs text-muted-foreground">Review (70-79)</p>
         </div>
         <div className="text-center">
           <p className="font-display text-lg font-bold" style={{ color: SCORE_COLORS.low }}>{weak}</p>
-          <p className="text-2xs text-muted-foreground">Weak (&lt;60)</p>
+          <p className="text-2xs text-muted-foreground">Weak (&lt;70)</p>
         </div>
       </div>
 
@@ -265,9 +266,10 @@ const ScoreDistribution: React.FC<{ deals: DashboardDeal[] }> = ({ deals }) => {
 
           {/* Zone backgrounds */}
           <div className="absolute inset-0 flex">
-            <div className="flex-[60] bg-red-500/3" />
-            <div className="flex-[20] bg-yellow-500/3" />
-            <div className="flex-[20] bg-green-500/3" />
+            <div className="flex-[70] bg-zinc-700/5" />
+            <div className="flex-[10] bg-zinc-500/5" />
+            <div className="flex-[10] bg-zinc-300/5" />
+            <div className="flex-[10] bg-white/5" />
           </div>
 
           {/* Dots */}

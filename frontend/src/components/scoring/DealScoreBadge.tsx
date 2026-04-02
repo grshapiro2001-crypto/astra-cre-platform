@@ -27,15 +27,17 @@ const SIZES: Record<string, SizeConfig> = {
 };
 
 function getScoreColor(score: number): string {
-  if (score >= 70) return 'text-green-400';
-  if (score >= 40) return 'text-yellow-400';
-  return 'text-red-400';
+  if (score >= 90) return 'text-white';
+  if (score >= 80) return 'text-zinc-300';
+  if (score >= 70) return 'text-zinc-400';
+  return 'text-zinc-600';
 }
 
 function getScoreStroke(score: number): string {
-  if (score >= 70) return '#4ade80';
-  if (score >= 40) return '#facc15';
-  return '#f87171';
+  if (score >= 90) return '#ffffff';
+  if (score >= 80) return '#d4d4d8';
+  if (score >= 70) return '#a1a1aa';
+  return '#71717a';
 }
 
 // ---------------------------------------------------------------------------

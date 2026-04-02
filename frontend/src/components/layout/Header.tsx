@@ -166,7 +166,7 @@ export const Header = () => {
                 dropdownOpen && 'bg-muted'
               )}
             >
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500 to-yellow-600 flex items-center justify-center shrink-0">
+              <div className="w-8 h-8 rounded-full bg-white/10 border border-white/10 flex items-center justify-center shrink-0">
                 <span className="text-white text-xs font-bold">{initials}</span>
               </div>
               <span className="text-sm font-medium text-foreground hidden sm:block">

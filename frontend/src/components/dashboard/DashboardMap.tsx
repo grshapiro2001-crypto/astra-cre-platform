@@ -64,10 +64,11 @@ const darkMapStyles: google.maps.MapTypeStyle[] = [
 const containerStyle = { width: '100%', height: '100%' };
 
 const SCORE_COLORS = {
-  high: '#10B981',
-  medium: '#F59E0B',
-  low: '#EF4444',
-  none: '#F59E0B',
+  excellent: '#ffffff',
+  high: '#d4d4d8',
+  good: '#a1a1aa',
+  low: '#71717a',
+  none: '#71717a',
 } as const;
 
 // ============================================================
@@ -76,8 +77,9 @@ const SCORE_COLORS = {
 
 const getScoreColor = (score: number | null): string => {
   if (score == null) return SCORE_COLORS.none;
+  if (score >= 90) return SCORE_COLORS.excellent;
   if (score >= 80) return SCORE_COLORS.high;
-  if (score >= 60) return SCORE_COLORS.medium;
+  if (score >= 70) return SCORE_COLORS.good;
   return SCORE_COLORS.low;
 };
 
@@ -113,7 +115,7 @@ const ScoreRing: React.FC<{ score: number; size?: number }> = ({ score, size = 3
   const circumference = 2 * Math.PI * radius;
   const pct = Math.min(100, Math.max(0, score)) / 100;
   const offset = circumference * (1 - pct);
-  const color = score >= 80 ? SCORE_COLORS.high : score >= 60 ? SCORE_COLORS.medium : SCORE_COLORS.low;
+  const color = score >= 90 ? SCORE_COLORS.excellent : score >= 80 ? SCORE_COLORS.high : score >= 70 ? SCORE_COLORS.good : SCORE_COLORS.low;
 
   return (
     <svg width={size} height={size} className="shrink-0">
@@ -130,7 +132,7 @@ const ScoreRing: React.FC<{ score: number; size?: number }> = ({ score, size = 3
         strokeLinecap="round"
         transform={`rotate(-90 ${size / 2} ${size / 2})`}
       />
-      <text x={size / 2} y={size / 2} textAnchor="middle" dominantBaseline="central" fill={color} fontSize={size * 0.32} fontWeight="bold" fontFamily="JetBrains Mono, monospace">
+      <text x={size / 2} y={size / 2} textAnchor="middle" dominantBaseline="central" fill={color} fontSize={size * 0.32} fontWeight="bold" fontFamily="Inter, system-ui, sans-serif">
         {Math.round(score)}
       </text>
     </svg>
@@ -382,16 +384,20 @@ export const DashboardMap: React.FC<DashboardMapProps> = ({
         {/* Score legend overlay */}
         <div className="absolute bottom-3 left-3 flex items-center gap-3 px-3 py-1.5 rounded-lg bg-black/60 backdrop-blur-sm text-xs text-white/80">
           <div className="flex items-center gap-1.5">
+            <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: SCORE_COLORS.excellent }} />
+            <span>90+</span>
+          </div>
+          <div className="flex items-center gap-1.5">
             <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: SCORE_COLORS.high }} />
             <span>80+</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: SCORE_COLORS.medium }} />
-            <span>60-79</span>
+            <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: SCORE_COLORS.good }} />
+            <span>70-79</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: SCORE_COLORS.low }} />
-            <span>&lt;60</span>
+            <span>&lt;70</span>
           </div>
         </div>
       </div>

@@ -63,6 +63,13 @@ export default {
           foreground: "hsl(var(--sidebar-foreground))",
           muted: "hsl(var(--sidebar-muted))",
         },
+        bg: '#060608',
+        surface: {
+          DEFAULT: '#0c0c0f',
+          raised: '#121215',
+          elevated: '#1a1a1e',
+        },
+        ivory: '#eeecea',
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -70,9 +77,9 @@ export default {
         sm: "calc(var(--radius) - 4px)",
       },
       fontFamily: {
-        sans: ['Questrial', 'sans-serif'],
-        display: ['Cinzel', 'serif'],
-        mono: ['JetBrains Mono', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
+        sans: ['Inter', 'system-ui', 'sans-serif'],
+        display: ['Inter', 'system-ui', 'sans-serif'],
+        mono: ['Inter', 'system-ui', 'sans-serif'],
       },
       fontSize: {
         "2xs": ["0.625rem", { lineHeight: "0.875rem" }],

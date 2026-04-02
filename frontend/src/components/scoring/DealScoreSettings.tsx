@@ -64,21 +64,21 @@ const PRESET_CARDS: PresetConfig[] = [
     name: 'Cash Flow',
     description: 'Prioritize stable, income-producing properties',
     icon: DollarSign,
-    color: 'text-emerald-400',
+    color: 'text-white',
   },
   {
     key: 'core',
     name: 'Core',
     description: 'Low-risk, stabilized assets in prime locations',
     icon: Shield,
-    color: 'text-blue-400',
+    color: 'text-zinc-300',
   },
   {
     key: 'opportunistic',
     name: 'Opportunistic',
     description: 'High-risk, high-return distressed & development deals',
     icon: Zap,
-    color: 'text-amber-400',
+    color: 'text-zinc-400',
   },
 ];
 
@@ -321,9 +321,10 @@ function LivePreview({
   const dashOffset = circumference - (circumference * score) / 100;
 
   function getColor(s: number) {
-    if (s >= 70) return { text: 'text-green-400', stroke: '#4ade80' };
-    if (s >= 40) return { text: 'text-yellow-400', stroke: '#facc15' };
-    return { text: 'text-red-400', stroke: '#f87171' };
+    if (s >= 90) return { text: 'text-white', stroke: '#ffffff' };
+    if (s >= 80) return { text: 'text-zinc-300', stroke: '#d4d4d8' };
+    if (s >= 70) return { text: 'text-zinc-400', stroke: '#a1a1aa' };
+    return { text: 'text-zinc-600', stroke: '#71717a' };
   }
 
   const color = getColor(score);

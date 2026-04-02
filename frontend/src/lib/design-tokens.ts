@@ -56,7 +56,7 @@ export const tokens = {
   typography: {
     fontFamily: {
       sans: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-      mono: "'JetBrains Mono', Menlo, Monaco, Consolas, monospace",
+      mono: "'Inter', system-ui, sans-serif",
     },
     fontSize: {
       "2xs": "0.625rem",   // 10px
