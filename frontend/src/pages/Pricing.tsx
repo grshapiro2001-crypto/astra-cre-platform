@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { motion, useInView } from 'framer-motion';
 import { useRef } from 'react';
 import { cn } from '@/lib/utils';
-import TalismanCompass3D from '@/components/TalismanCompass3D';
+import { TalismanLogo } from '@/components/ui/TalismanLogo';
 
 interface PricingTier {
   name: string;
@@ -124,7 +124,7 @@ export function Pricing() {
       <nav className="fixed top-0 inset-x-0 z-50 h-16 flex items-center px-6 border-b border-border/30 bg-background/70 backdrop-blur-xl">
         <div className="flex items-center justify-between w-full max-w-7xl mx-auto">
           <Link to="/" className="flex items-center gap-2">
-            <TalismanCompass3D size={28} spin={false} />
+            <TalismanLogo size={24} />
             <span className="font-display text-xl font-bold tracking-tight text-foreground">Talisman</span>
           </Link>
           <div className="flex items-center gap-3">
