@@ -1,4 +1,4 @@
-import TalismanCompass3D from '@/components/TalismanCompass3D';
+import { TalismanLogo } from '@/components/ui/TalismanLogo';
 import { useAssistantStore } from '@/store/assistantStore';
 
 export const AssistantToggle = () => {
@@ -7,19 +7,10 @@ export const AssistantToggle = () => {
   return (
     <button
       onClick={togglePanel}
-      style={{
-        position: 'fixed',
-        bottom: 24,
-        right: 24,
-        zIndex: 50,
-        background: 'transparent',
-        border: 'none',
-        cursor: 'pointer',
-        padding: 0,
-      }}
+      className="fixed bottom-6 right-6 z-50 p-2.5 rounded-full bg-white/[0.04] border border-white/[0.06] hover:bg-white/[0.08] hover:border-white/[0.10] transition-all shadow-lg hover:shadow-xl"
       aria-label="Toggle Talisman Assistant"
     >
-      <TalismanCompass3D size={48} spin={true} speed={1.25} />
+      <TalismanLogo size={28} />
     </button>
   );
 };

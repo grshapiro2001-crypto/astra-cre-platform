@@ -8,9 +8,10 @@
  * 4. Main Grid — Left: Kanban + Analytics | Right: Calendar
  * 5. Analytics Row — Donut + Submarket Bars + Score Distribution
  */
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Users, X, Building2, ArrowRight, Search } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { Plus, Users, X, Building2, ArrowRight } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAuthStore } from '@/store/authSlice';
 import { useAssistantStore } from '@/store/assistantStore';
@@ -29,7 +30,7 @@ import type { PropertyListItem, ScreeningSummaryItem, BOVPricingTier } from '@/t
 import { DashboardCalendar } from '@/components/dashboard/DashboardCalendar';
 import type { DashboardDeal } from '@/components/dashboard/DealCard';
 import { KanbanBoard } from '@/components/dashboard/KanbanBoard';
-// ChatBar replaced by PromptBar inline component
+import { PromptInputBox } from '@/components/ui/ai-prompt-box';
 import { PresetDropdown, PIPELINE_PRESETS, STORAGE_KEY } from '@/components/dashboard/PresetDropdown';
 import { AnalyticsRow } from '@/components/dashboard/AnalyticsRow';
 
@@ -197,43 +198,149 @@ const ScoreGauge: React.FC<{ score: number }> = ({ score }) => {
   );
 };
 
-/** AI Prompt Bar */
-const PromptBar: React.FC<{ onSuggestionClick?: (q: string) => void }> = ({ onSuggestionClick }) => {
-  const suggestions = ["What's my best deal?", "Summarize pipeline", "Compare submarkets", "Deals needing attention"];
-  const setAssistantOpen = useAssistantStore((s) => s.setOpen);
+// ────────────────────────────────────────────────────────
+// Inline Chat — expands from PromptInputBox on first message
+// ────────────────────────────────────────────────────────
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setAssistantOpen(true);
-  };
+interface InlineChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  isStreaming?: boolean;
+}
 
+const InlineChat: React.FC = () => {
+  const [messages, setMessages] = useState<InlineChatMessage[]>([]);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, []);
+
+  useEffect(() => { scrollToBottom(); }, [messages, scrollToBottom]);
+
+  const handleSend = useCallback(async (message: string) => {
+    if (!message.trim()) return;
+
+    // Expand on first message
+    if (!isExpanded) setIsExpanded(true);
+
+    const userMsg: InlineChatMessage = { id: `u-${Date.now()}`, role: 'user', content: message };
+    const assistantMsg: InlineChatMessage = { id: `a-${Date.now()}`, role: 'assistant', content: '', isStreaming: true };
+
+    setMessages(prev => [...prev, userMsg, assistantMsg]);
+    setIsLoading(true);
+
+    // Build conversation history for API
+    const history = [...messages, userMsg].map(m => ({ role: m.role, content: m.content }));
+
+    let accumulated = '';
+    try {
+      const { streamChat } = await import('@/services/assistantService');
+      await streamChat(
+        { message, conversation_history: history },
+        (chunk) => {
+          accumulated += chunk;
+          setMessages(prev =>
+            prev.map(m => m.id === assistantMsg.id ? { ...m, content: accumulated } : m)
+          );
+        },
+        () => {
+          setMessages(prev =>
+            prev.map(m => m.id === assistantMsg.id ? { ...m, isStreaming: false } : m)
+          );
+          setIsLoading(false);
+        },
+        (error) => {
+          setMessages(prev =>
+            prev.map(m => m.id === assistantMsg.id ? { ...m, content: `Error: ${error}`, isStreaming: false } : m)
+          );
+          setIsLoading(false);
+        },
+      );
+    } catch {
+      setMessages(prev =>
+        prev.map(m => m.id === assistantMsg.id ? { ...m, content: 'Failed to connect to assistant.', isStreaming: false } : m)
+      );
+      setIsLoading(false);
+    }
+  }, [isExpanded, messages]);
+
+  const handleCollapse = useCallback(() => {
+    setIsExpanded(false);
+  }, []);
+
+  const handleClear = useCallback(() => {
+    setMessages([]);
+    setIsExpanded(false);
+  }, []);
+
+  // Collapsed state — just the prompt input box
+  if (!isExpanded) {
+    return <PromptInputBox onSend={handleSend} isLoading={isLoading} />;
+  }
+
+  // Expanded chat view
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="flex items-center gap-3 px-5 py-3 liquid-glass"
+    <motion.div
+      ref={containerRef}
+      initial={{ height: 80 }}
+      animate={{ height: 'auto' }}
+      transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+      className="liquid-glass overflow-hidden flex flex-col"
+      style={{ maxHeight: '60vh', minHeight: 300 }}
     >
-      <div className="w-8 h-8 rounded-full flex items-center justify-center bg-white/[0.06] shrink-0">
-        <Search className="w-3.5 h-3.5 text-zinc-400" />
-      </div>
-      <input
-        type="text"
-        placeholder="Ask Talisman about deals, markets, or your portfolio..."
-        className="flex-1 bg-transparent border-none outline-none text-sm text-foreground placeholder:text-zinc-600"
-        onFocus={() => setAssistantOpen(true)}
-      />
-      <div className="flex gap-2 shrink-0 hidden md:flex">
-        {suggestions.map((q) => (
-          <button
-            key={q}
-            type="button"
-            onClick={() => { onSuggestionClick?.(q); setAssistantOpen(true); }}
-            className="text-[11px] text-zinc-500 bg-white/[0.04] border border-white/[0.04] rounded-full px-3 py-1.5 hover:text-zinc-300 hover:border-white/[0.08] transition-all whitespace-nowrap"
-          >
-            {q}
+      {/* Chat header */}
+      <div className="flex items-center justify-between px-5 py-3 border-b border-white/[0.04] shrink-0">
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          <span className="text-xs font-semibold text-foreground">Talisman AI</span>
+          <span className="text-[10px] text-zinc-600">{messages.filter(m => m.role === 'user').length} messages</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <button onClick={handleClear} className="text-[10px] text-zinc-600 hover:text-zinc-300 px-2 py-1 rounded transition-colors">Clear</button>
+          <button onClick={handleCollapse} className="p-1.5 rounded-lg text-zinc-600 hover:text-zinc-300 hover:bg-white/[0.04] transition-all">
+            <X className="w-3.5 h-3.5" />
           </button>
-        ))}
+        </div>
       </div>
-    </form>
+
+      {/* Messages area */}
+      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 scrollbar-hide" style={{ scrollbarWidth: 'none' }}>
+        {messages.map(msg => (
+          <div key={msg.id} className={cn('flex gap-3', msg.role === 'user' && 'flex-row-reverse')}>
+            {/* Avatar */}
+            <div className={cn(
+              'w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-[10px] font-bold',
+              msg.role === 'user' ? 'bg-white/[0.08] text-zinc-300' : 'bg-emerald-400/[0.12] text-emerald-400'
+            )}>
+              {msg.role === 'user' ? 'U' : 'T'}
+            </div>
+            {/* Bubble */}
+            <div className={cn(
+              'max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed',
+              msg.role === 'user'
+                ? 'bg-white/[0.06] text-foreground rounded-tr-md'
+                : 'bg-white/[0.03] text-zinc-300 border border-white/[0.04] rounded-tl-md'
+            )}>
+              <span className="whitespace-pre-wrap">{msg.content}</span>
+              {msg.isStreaming && (
+                <span className="ml-1 inline-block w-1.5 h-4 rounded-full bg-emerald-400/60 animate-pulse" />
+              )}
+            </div>
+          </div>
+        ))}
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Input at bottom */}
+      <div className="shrink-0 border-t border-white/[0.04] p-3">
+        <PromptInputBox onSend={handleSend} isLoading={isLoading} className="shadow-none border-white/[0.04]" />
+      </div>
+    </motion.div>
   );
 };
 
@@ -846,7 +953,7 @@ export const Dashboard = () => {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, delay: 0.12 }}
               >
-                <PromptBar />
+                <InlineChat />
               </motion.div>
 
               {/* ============== MAIN GRID: Left + Right Sidebar ============== */}

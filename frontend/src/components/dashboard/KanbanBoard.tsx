@@ -458,7 +458,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                       overStageId === stage.id ? 'border border-primary/50' : '',
                       mounted ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-5',
                     )}
-                    style={{ flex: '0 0 210px', transitionDelay: `${200 + idx * 80}ms` }}
+                    style={{ flex: '1 1 0', minWidth: 160, transitionDelay: `${200 + idx * 80}ms` }}
                   >
                     <div className="flex items-center justify-between px-3 py-2.5 rounded-xl" style={{ background: `${stage.color}0F`, borderBottom: `2px solid ${stage.color}4D` }}>
                       <div className="flex items-center gap-2">
