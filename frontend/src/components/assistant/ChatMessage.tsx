@@ -1,5 +1,5 @@
 import { User } from 'lucide-react';
-import TalismanCompass3D from '@/components/TalismanCompass3D';
+import { TalismanLogo } from '@/components/ui/TalismanLogo';
 import { cn } from '@/lib/utils';
 import type { ChatMessage as ChatMessageType } from '@/types/assistant';
 
@@ -21,7 +21,7 @@ export const ChatMessage = ({ message }: ChatMessageProps) => {
         {isUser ? (
           <User className="h-4 w-4 text-muted-foreground" />
         ) : (
-          <TalismanCompass3D size={24} spin={false} speed={0} />
+          <TalismanLogo size={20} />
         )}
       </div>
 
