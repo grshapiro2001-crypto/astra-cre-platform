@@ -6,8 +6,6 @@
  * Double click → navigates to PropertyDetail
  */
 import { cn } from '@/lib/utils';
-import { Award } from 'lucide-react';
-import { StreetViewImage } from '@/components/property/StreetViewImage';
 
 // ============================================================
 // Shared type used by Dashboard, DealCard, and DashboardMap
@@ -42,18 +40,17 @@ const formatDealValue = (value: number | null): string => {
   return `$${value}`;
 };
 
-const getScoreColor = (score: number): string => {
-  if (score >= 90) return 'text-white';
-  if (score >= 80) return 'text-zinc-300';
-  if (score >= 70) return 'text-zinc-400';
-  return 'text-zinc-600';
+const getScoreStroke = (score: number): string => {
+  if (score >= 80) return '#34d399';
+  if (score >= 65) return '#a1a1aa';
+  return '#f87171';
 };
 
-const getScoreBg = (score: number): string => {
-  if (score >= 90) return 'bg-white/10';
-  if (score >= 80) return 'bg-zinc-300/10';
-  if (score >= 70) return 'bg-zinc-400/10';
-  return 'bg-zinc-600/10';
+const formatNoi = (noi: number | null | undefined): string => {
+  if (!noi) return '\u2014';
+  if (noi >= 1_000_000) return `$${(noi / 1_000_000).toFixed(1)}M`;
+  if (noi >= 1_000) return `$${(noi / 1_000).toFixed(0)}K`;
+  return `$${noi}`;
 };
 
 // ============================================================
@@ -68,82 +65,91 @@ interface DealCardProps {
 }
 
 export const DealCard = ({ deal, isSelected, onClick, onDoubleClick }: DealCardProps) => {
+  const scoreColor = deal.dealScore != null ? getScoreStroke(deal.dealScore) : '#71717a';
+  const scorePct = deal.dealScore != null ? Math.min(100, Math.max(0, deal.dealScore)) / 100 : 0;
+  const scoreCirc = 2 * Math.PI * 12;
+
   return (
     <div
       id={`deal-card-${deal.id}`}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
       className={cn(
-        'rounded-xl border bg-card transition-all duration-200 cursor-pointer hover:shadow-md overflow-hidden',
+        'rounded-[14px] border transition-all duration-300 cursor-pointer overflow-hidden',
+        'bg-black/50 backdrop-blur-2xl',
         isSelected
-          ? 'border-l-4 border-l-primary border-t-border border-r-border border-b-border shadow-md'
-          : 'border-border hover:border-border/80',
+          ? 'border-white/[0.12] shadow-[0_0_24px_rgba(255,255,255,0.05)]'
+          : 'border-white/[0.04] hover:border-white/[0.10] hover:shadow-[0_0_24px_rgba(255,255,255,0.03)] hover:-translate-y-px',
       )}
     >
-      {deal.address && (
-        <StreetViewImage
-          address={deal.address}
-          lat={deal.latitude}
-          lng={deal.longitude}
-          width={400}
-          height={150}
-          className="w-full h-20 object-cover"
-          hideOnError={true}
-        />
-      )}
-      <div className="p-3">
-      <div className="flex items-start justify-between mb-2">
-        <div className="min-w-0 flex-1">
-          <p className="font-semibold text-sm text-foreground truncate">
-            {deal.name || 'Untitled Property'}
-          </p>
-          <p className="text-xs text-muted-foreground truncate">
-            {deal.submarket || '\u2014'}
-          </p>
-        </div>
-        {deal.documentType && (
-          <span className="text-[10px] font-mono font-bold px-2 py-1 rounded-lg bg-primary/10 text-primary shrink-0 ml-2">
-            {deal.documentType}
-          </span>
-        )}
-      </div>
-
-      <div className="flex items-center justify-between text-xs">
-        <span className="text-muted-foreground">
-          {deal.units > 0 ? `${deal.units} units` : '\u2014'}
-        </span>
-        <span
-          className={cn(
-            'font-display font-semibold',
-            deal.dealValue
-              ? 'text-emerald-600 dark:text-emerald-400'
-              : 'text-muted-foreground',
+      <div className="p-[14px_16px]">
+        {/* Name + Score Ring */}
+        <div className="flex items-start justify-between mb-1.5">
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold text-[13px] text-foreground truncate leading-tight">
+              {deal.name || 'Untitled Property'}
+            </p>
+          </div>
+          {deal.dealScore != null && deal.dealScore > 0 && (
+            <svg width="30" height="30" viewBox="0 0 30 30" className="shrink-0 ml-2">
+              <circle cx="15" cy="15" r="12" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="2.5" />
+              <circle
+                cx="15" cy="15" r="12" fill="none" stroke={scoreColor} strokeWidth="2.5"
+                strokeDasharray={`${scorePct * scoreCirc} ${scoreCirc}`}
+                strokeLinecap="round" transform="rotate(-90 15 15)"
+              />
+              <text x="15" y="15.5" textAnchor="middle" dominantBaseline="central"
+                fill={scoreColor} fontSize="8.5" fontWeight="800" fontFamily="Inter">
+                {Math.round(deal.dealScore)}
+              </text>
+            </svg>
           )}
-        >
-          {formatDealValue(deal.dealValue)}
-        </span>
-      </div>
+        </div>
 
-      {deal.dealScore != null && deal.dealScore > 0 && (
-        <div className="flex items-center gap-2 mt-2">
-          <div
-            className={cn(
-              'flex items-center gap-1 px-2 py-1 rounded-lg',
-              getScoreBg(deal.dealScore),
+        {/* Submarket + Units */}
+        <p className="text-[10px] text-zinc-500 mb-2">
+          {deal.submarket || '\u2014'}{deal.units > 0 ? <>&ensp;&middot;&ensp;{deal.units} units</> : ''}
+        </p>
+
+        {/* Price + NOI + Cap */}
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-extrabold text-foreground">
+            {formatDealValue(deal.dealValue)}
+          </span>
+          <div className="flex gap-3">
+            {deal.noi != null && deal.noi > 0 && (
+              <div className="text-right">
+                <div className="text-[8px] text-zinc-600 uppercase tracking-wider">NOI</div>
+                <div className="text-[11px] text-zinc-400 font-semibold">{formatNoi(deal.noi)}</div>
+              </div>
             )}
-          >
-            <Award className="w-3 h-3" />
-            <span
-              className={cn(
-                'text-xs font-display font-bold',
-                getScoreColor(deal.dealScore),
-              )}
-            >
-              {Math.round(deal.dealScore)}
-            </span>
+            {deal.capRate != null && deal.capRate > 0 && (
+              <div className="text-right">
+                <div className="text-[8px] text-zinc-600 uppercase tracking-wider">Cap</div>
+                <div className="text-[11px] text-zinc-400 font-semibold">{deal.capRate.toFixed(2)}%</div>
+              </div>
+            )}
           </div>
         </div>
-      )}
+
+        {/* Badges */}
+        <div className="flex items-center gap-2 mt-2">
+          {deal.documentType && (
+            <span className={cn(
+              'text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded',
+              deal.documentType === 'BOV'
+                ? 'bg-blue-400/[0.08] text-blue-400'
+                : 'bg-white/[0.06] text-zinc-400'
+            )}>
+              {deal.documentType}
+            </span>
+          )}
+          {deal.propertyType && (
+            <span className="text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-white/[0.06] text-zinc-500">
+              {deal.propertyType}
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );

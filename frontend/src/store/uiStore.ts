@@ -10,9 +10,16 @@ interface UIState {
   setSidebarCollapsed: (collapsed: boolean) => void;
   toggleSidebar: () => void;
 
+  sidebarHidden: boolean;
+  setSidebarHidden: (hidden: boolean) => void;
+  toggleSidebarHidden: () => void;
+
   mobileSidebarOpen: boolean;
   setMobileSidebarOpen: (open: boolean) => void;
   toggleMobileSidebar: () => void;
+
+  feedbackOpen: boolean;
+  setFeedbackOpen: (open: boolean) => void;
 
   comparisonPropertyIds: number[];
   setComparisonPropertyIds: (ids: number[]) => void;
@@ -49,9 +56,16 @@ export const useUIStore = create<UIState>()(
       setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
       toggleSidebar: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
 
+      sidebarHidden: false,
+      setSidebarHidden: (hidden) => set({ sidebarHidden: hidden }),
+      toggleSidebarHidden: () => set((state) => ({ sidebarHidden: !state.sidebarHidden })),
+
       mobileSidebarOpen: false,
       setMobileSidebarOpen: (open) => set({ mobileSidebarOpen: open }),
       toggleMobileSidebar: () => set((state) => ({ mobileSidebarOpen: !state.mobileSidebarOpen })),
+
+      feedbackOpen: false,
+      setFeedbackOpen: (open) => set({ feedbackOpen: open }),
 
       comparisonPropertyIds: [],
       setComparisonPropertyIds: (ids) => set({ comparisonPropertyIds: ids }),
