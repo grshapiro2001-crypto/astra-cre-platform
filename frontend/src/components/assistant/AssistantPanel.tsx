@@ -201,7 +201,7 @@ export const AssistantPanel = () => {
                     transition={{ duration: 2, repeat: Infinity }}
                   >
                     <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full">
-                      <TalismanCompass3D size={24} spin={true} speed={1.0} />
+                      <TalismanLogo size={20} />
                     </div>
                     <div className="flex items-center rounded-2xl rounded-bl-md border border-border/60 bg-card px-4 py-2.5">
                       <span className="text-sm text-muted-foreground font-sans">

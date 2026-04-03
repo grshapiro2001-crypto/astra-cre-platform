@@ -1,5 +1,5 @@
 import { useAuthStore } from '@/store/authSlice';
-import TalismanCompass3D from '@/components/TalismanCompass3D';
+import { TalismanLogo } from '@/components/ui/TalismanLogo';
 import { Button } from '@/components/ui/button';
 import { LogOut, Clock } from 'lucide-react';
 
@@ -12,7 +12,7 @@ export const PendingApproval = () => {
       <div className="max-w-md w-full mx-4 text-center">
         {/* Compass */}
         <div className="flex justify-center mb-8">
-          <TalismanCompass3D size={80} spin={true} speed={0.5} />
+          <TalismanLogo size={64} />
         </div>
 
         {/* Status badge */}
