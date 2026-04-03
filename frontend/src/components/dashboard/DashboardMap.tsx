@@ -64,10 +64,10 @@ const darkMapStyles: google.maps.MapTypeStyle[] = [
 const containerStyle = { width: '100%', height: '100%' };
 
 const SCORE_COLORS = {
-  excellent: '#ffffff',
-  high: '#d4d4d8',
+  excellent: '#34d399',
+  high: '#34d399',
   good: '#a1a1aa',
-  low: '#71717a',
+  low: '#f87171',
   none: '#71717a',
 } as const;
 

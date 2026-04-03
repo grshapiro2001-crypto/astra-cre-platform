@@ -9,6 +9,7 @@ import {
   Settings,
   User,
   ChevronDown,
+  MessageSquare,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/authSlice';
 import { useUIStore } from '@/store/uiStore';
@@ -146,8 +147,17 @@ export const Header = () => {
           </div>
         </div>
 
-        {/* Right: Notification + User */}
-        <div className="flex items-center gap-2">
+        {/* Right: Feedback + Notification + User */}
+        <div className="flex items-center gap-1">
+          {/* Feedback */}
+          <button
+            onClick={() => useUIStore.getState().setFeedbackOpen(true)}
+            title="Send feedback"
+            className="relative p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          >
+            <MessageSquare className="w-4.5 h-4.5" />
+          </button>
+
           {/* Notification bell */}
           <button
             title="Notifications coming soon"

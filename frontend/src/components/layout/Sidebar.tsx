@@ -36,8 +36,8 @@ const navItems = [
   { name: 'Settings', path: '/settings', icon: Settings },
 ];
 
-export const Sidebar = () => {
-  const { theme, toggleTheme, sidebarCollapsed, toggleSidebar } = useUIStore();
+export const Sidebar = ({ className }: { className?: string }) => {
+  const { theme, toggleTheme, sidebarCollapsed, toggleSidebar, setSidebarHidden } = useUIStore();
   const user = useAuthStore((s) => s.user);
   const [dealCount, setDealCount] = useState<number | null>(null);
   const [userOrg, setUserOrg] = useState<Organization | null>(null);
@@ -61,11 +61,12 @@ export const Sidebar = () => {
   return (
     <aside
       className={cn(
-        'fixed top-0 left-0 z-40 h-screen flex flex-col',
+        'fixed top-0 left-0 z-40 h-screen max-h-screen flex flex-col overflow-hidden',
         'bg-[#0c0c0f]',
         'border-r border-white/[0.04] transition-all duration-300',
         'hidden lg:flex',
-        sidebarCollapsed ? 'w-[72px]' : 'w-64'
+        sidebarCollapsed ? 'w-[72px]' : 'w-64',
+        className
       )}
     >
       {/* Logo */}
@@ -87,7 +88,7 @@ export const Sidebar = () => {
       </div>
 
       {/* Nav Items */}
-      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+      <nav className="flex-1 min-h-0 px-3 py-4 space-y-1 overflow-y-auto scrollbar-hide" style={{ scrollbarWidth: 'none' }}>
         <div
           className={cn(
             'flex items-center gap-2 mb-3',
@@ -161,6 +162,8 @@ export const Sidebar = () => {
         )}
       </nav>
 
+      {/* ── Bottom pinned section ── */}
+      <div className="shrink-0 mt-auto">
       {/* Org Pill */}
       {userOrg && !sidebarCollapsed && (
         <div className="px-4 mx-3 mb-2">
@@ -245,11 +248,11 @@ export const Sidebar = () => {
         </div>
       </div>
 
-      {/* Collapse Toggle */}
+      {/* Collapse / Hide Toggles */}
       <div
         className={cn(
-          'px-3 pb-3',
-          sidebarCollapsed ? 'flex justify-center' : ''
+          'px-3 pb-3 flex gap-1',
+          sidebarCollapsed ? 'justify-center' : ''
         )}
       >
         <Button
@@ -258,7 +261,7 @@ export const Sidebar = () => {
           onClick={toggleSidebar}
           className={cn(
             'text-zinc-500 hover:text-zinc-200 hover:bg-white/5',
-            sidebarCollapsed ? 'w-11 h-11 p-0' : 'w-full justify-start gap-3 px-3'
+            sidebarCollapsed ? 'w-11 h-11 p-0' : 'flex-1 justify-start gap-3 px-3'
           )}
           title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
@@ -269,7 +272,19 @@ export const Sidebar = () => {
           )}
           {!sidebarCollapsed && <span className="text-sm">Collapse</span>}
         </Button>
+        {!sidebarCollapsed && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setSidebarHidden(true)}
+            className="text-zinc-600 hover:text-zinc-300 hover:bg-white/5 w-9 h-9 p-0"
+            title="Hide sidebar"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12" /></svg>
+          </Button>
+        )}
       </div>
+      </div>{/* end bottom pinned section */}
     </aside>
   );
 };

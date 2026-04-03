@@ -17,6 +17,7 @@ import {
   endOfMonth,
   eachDayOfInterval,
   isSameDay,
+  isSameMonth,
   isToday,
   getDate,
   differenceInDays,
@@ -209,17 +210,21 @@ export function GlassCalendar({
   const [formOpen, setFormOpen] = React.useState(false);
   const stripRef = React.useRef<HTMLDivElement>(null);
 
-  // Compute visible days
-  const days = React.useMemo(() => {
-    if (view === 'weekly') {
-      const start = startOfWeek(selectedDate, { weekStartsOn: 0 });
-      const end = endOfWeek(selectedDate, { weekStartsOn: 0 });
-      return eachDayOfInterval({ start, end });
-    }
-    const start = startOfMonth(currentMonth);
-    const end = endOfMonth(currentMonth);
+  // Weekly days
+  const weekDays = React.useMemo(() => {
+    const start = startOfWeek(selectedDate, { weekStartsOn: 0 });
+    const end = endOfWeek(selectedDate, { weekStartsOn: 0 });
     return eachDayOfInterval({ start, end });
-  }, [currentMonth, selectedDate, view]);
+  }, [selectedDate]);
+
+  // Monthly grid (includes leading/trailing days)
+  const monthGrid = React.useMemo(() => {
+    const monthStart = startOfMonth(currentMonth);
+    const monthEnd = endOfMonth(currentMonth);
+    const gridStart = startOfWeek(monthStart, { weekStartsOn: 0 });
+    const gridEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
+    return eachDayOfInterval({ start: gridStart, end: gridEnd });
+  }, [currentMonth]);
 
   // Events for selected date
   const selectedDateStr = format(selectedDate, 'yyyy-MM-dd');
@@ -241,6 +246,12 @@ export function GlassCalendar({
     return set;
   }, [events]);
 
+  // Count events for a date
+  const countEvents = React.useCallback((day: Date) => {
+    const ds = format(day, 'yyyy-MM-dd');
+    return events.filter(e => e.date === ds).length;
+  }, [events]);
+
   // Scroll selected date into view
   React.useEffect(() => {
     if (stripRef.current && view === 'monthly') {
@@ -258,7 +269,7 @@ export function GlassCalendar({
     <div
       className={cn(
         'rounded-2xl overflow-hidden h-full flex flex-col',
-        'bg-card/50 backdrop-blur-xl border border-border/60',
+        'liquid-glass',
         className
       )}
     >
@@ -325,75 +336,122 @@ export function GlassCalendar({
         </div>
       </div>
 
-      {/* ── Date Strip ── */}
-      <div className="px-5 pb-4">
-        <div ref={stripRef} className="overflow-x-auto scrollbar-hide -mx-1 px-1">
-          <div className="flex gap-1">
-            {days.map((day) => {
-              const dateStr = format(day, 'yyyy-MM-dd');
-              const selected = isSameDay(day, selectedDate);
-              const today = isToday(day);
-              const hasEvents = eventDates.has(dateStr);
-
-              return (
-                <button
-                  key={dateStr}
-                  data-selected={selected}
-                  onClick={() => {
-                    setSelectedDate(day);
-                    if (view === 'monthly') setCurrentMonth(day);
-                  }}
-                  className={cn(
-                    'flex flex-col items-center justify-center w-10 h-14 rounded-xl shrink-0 transition-all duration-200',
-                    selected
-                      ? 'bg-white text-[#060608]'
-                      : today
-                        ? 'ring-1 ring-white/20 text-foreground hover:bg-white/[0.04]'
-                        : 'text-zinc-500 hover:bg-white/[0.04]'
-                  )}
-                >
-                  <span className="text-[9px] font-bold uppercase">
-                    {format(day, 'EEE').charAt(0)}
-                  </span>
-                  <span className={cn('text-sm font-semibold', selected && 'font-bold')}>
-                    {getDate(day)}
-                  </span>
-                  {hasEvents && !selected && (
-                    <span className="w-1 h-1 rounded-full bg-zinc-400 mt-0.5" />
-                  )}
-                  {hasEvents && selected && (
-                    <span className="w-1 h-1 rounded-full bg-[#060608] mt-0.5" />
-                  )}
-                  {!hasEvents && <span className="w-1 h-1 mt-0.5" />}
-                </button>
-              );
-            })}
+      {/* ── Calendar Body ── */}
+      {view === 'weekly' ? (
+        <>
+          {/* Weekly strip */}
+          <div className="px-5 pb-4">
+            <div ref={stripRef} className="overflow-x-auto scrollbar-hide -mx-1 px-1">
+              <div className="flex gap-1">
+                {weekDays.map((day) => {
+                  const dateStr = format(day, 'yyyy-MM-dd');
+                  const selected = isSameDay(day, selectedDate);
+                  const today = isToday(day);
+                  const hasEvents = eventDates.has(dateStr);
+                  return (
+                    <button
+                      key={dateStr}
+                      data-selected={selected}
+                      onClick={() => setSelectedDate(day)}
+                      className={cn(
+                        'flex flex-col items-center justify-center w-10 h-14 rounded-xl shrink-0 transition-all duration-200',
+                        selected
+                          ? 'bg-white text-[#060608]'
+                          : today
+                            ? 'ring-1 ring-white/20 text-foreground hover:bg-white/[0.04]'
+                            : 'text-zinc-500 hover:bg-white/[0.04]'
+                      )}
+                    >
+                      <span className="text-[9px] font-bold uppercase">{format(day, 'EEE').charAt(0)}</span>
+                      <span className={cn('text-sm font-semibold', selected && 'font-bold')}>{getDate(day)}</span>
+                      {hasEvents && !selected && <span className="w-1 h-1 rounded-full bg-zinc-400 mt-0.5" />}
+                      {hasEvents && selected && <span className="w-1 h-1 rounded-full bg-[#060608] mt-0.5" />}
+                      {!hasEvents && <span className="w-1 h-1 mt-0.5" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
-
-      {/* ── Divider ── */}
-      <div className="h-px bg-white/[0.04] mx-5" />
-
-      {/* ── Event List ── */}
-      <div className="flex-1 overflow-y-auto px-5 py-3 space-y-2 scrollbar-hide">
-        {dayEvents.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-center py-8">
-            <Clock className="w-6 h-6 text-zinc-700 mb-2" />
-            <p className="text-sm text-zinc-600">No events on {format(selectedDate, 'MMM d')}</p>
-            <button
-              onClick={() => setFormOpen(true)}
-              className="mt-2 text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors"
-            >
-              + Add an event
-            </button>
+          <div className="h-px bg-white/[0.04] mx-5" />
+          {/* Weekly event cards */}
+          <div className="flex-1 overflow-y-auto px-5 py-3 space-y-2 scrollbar-hide">
+            {dayEvents.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-center py-8">
+                <Clock className="w-6 h-6 text-zinc-700 mb-2" />
+                <p className="text-sm text-zinc-600">No events on {format(selectedDate, 'MMM d')}</p>
+                <button onClick={() => setFormOpen(true)} className="mt-2 text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors">+ Add an event</button>
+              </div>
+            ) : (
+              dayEvents.map((event) => (
+                <EventCard key={event.id} event={event} onRemove={onRemoveEvent} />
+              ))
+            )}
           </div>
-        ) : (
-          dayEvents.map((event) => (
-            <EventCard key={event.id} event={event} onRemove={onRemoveEvent} />
-          ))
-        )}
-      </div>
+        </>
+      ) : (
+        <>
+          {/* Monthly grid */}
+          <div className="px-5 pb-3">
+            <div className="grid grid-cols-7 gap-px">
+              {/* Day headers */}
+              {['S','M','T','W','T','F','S'].map((d, i) => (
+                <div key={i} className="text-center text-[9px] font-bold text-zinc-600 uppercase py-1">{d}</div>
+              ))}
+              {/* Date cells */}
+              {monthGrid.map((day) => {
+                const dateStr = format(day, 'yyyy-MM-dd');
+                const selected = isSameDay(day, selectedDate);
+                const today = isToday(day);
+                const outside = !isSameMonth(day, currentMonth);
+                const evCount = countEvents(day);
+                return (
+                  <button
+                    key={dateStr}
+                    onClick={() => { setSelectedDate(day); setCurrentMonth(day); }}
+                    className={cn(
+                      'flex flex-col items-center justify-center py-1.5 rounded-lg transition-all duration-150 min-h-[38px]',
+                      selected ? 'bg-white' : 'hover:bg-white/[0.04]',
+                      today && !selected && 'ring-1 ring-white/15',
+                      outside && 'opacity-25',
+                    )}
+                  >
+                    <span className={cn(
+                      'text-[12px] font-semibold leading-none',
+                      selected ? 'text-[#060608] font-bold' : today ? 'text-foreground' : 'text-zinc-400',
+                    )}>
+                      {getDate(day)}
+                    </span>
+                    <div className="flex gap-0.5 mt-1 min-h-[5px]">
+                      {Array.from({ length: Math.min(evCount, 3) }).map((_, i) => (
+                        <span key={i} className={cn('w-1 h-1 rounded-full', selected ? 'bg-[#060608]' : 'bg-zinc-500')} />
+                      ))}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <div className="h-px bg-white/[0.04] mx-5" />
+          {/* Monthly compact event list */}
+          <div className="flex-1 overflow-y-auto px-5 py-3 scrollbar-hide" style={{ maxHeight: 160 }}>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] font-semibold text-zinc-500">{format(selectedDate, 'EEE, MMM d')}</span>
+              <span className="text-[10px] text-zinc-600">{dayEvents.length > 0 ? `${dayEvents.length} event${dayEvents.length > 1 ? 's' : ''}` : 'No events'}</span>
+            </div>
+            {dayEvents.map((ev) => (
+              <div key={ev.id} className="flex items-center gap-2.5 py-1.5 px-1 rounded-lg hover:bg-white/[0.03] transition-all">
+                <div className={cn('w-[3px] h-[3px] rounded-full shrink-0', ev.type === 'milestone' ? 'bg-white' : 'bg-zinc-600')} />
+                <span className="text-[11px] text-foreground font-medium truncate flex-1">{ev.title}</span>
+                {ev.category && ev.category !== 'custom' && ev.category !== 'deal_added' && (
+                  <span className="text-[7px] font-mono uppercase tracking-widest text-zinc-600 shrink-0">{CATEGORY_LABELS[ev.category]}</span>
+                )}
+                <UrgencyBadge date={ev.date} />
+              </div>
+            ))}
+          </div>
+        </>
+      )}
 
       {/* ── Footer ── */}
       <div className="px-5 pb-4 pt-2 border-t border-white/[0.04]">

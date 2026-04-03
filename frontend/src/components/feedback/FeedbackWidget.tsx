@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
+import { useUIStore } from '@/store/uiStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
@@ -38,6 +39,16 @@ const SEVERITY_OPTIONS: { value: Severity; label: string; color: string }[] = [
 export function FeedbackWidget() {
   const location = useLocation();
   const [view, setView] = useState<WidgetView>('closed');
+
+  // Listen for external trigger from header button
+  const feedbackOpen = useUIStore((s) => s.feedbackOpen);
+  const setFeedbackOpen = useUIStore((s) => s.setFeedbackOpen);
+  useEffect(() => {
+    if (feedbackOpen && view === 'closed') {
+      setView('form');
+      setFeedbackOpen(false);
+    }
+  }, [feedbackOpen, view, setFeedbackOpen]);
   const [category, setCategory] = useState<Category>('bug');
   const [severity, setSeverity] = useState<Severity>('medium');
   const [title, setTitle] = useState('');
@@ -158,16 +169,7 @@ export function FeedbackWidget() {
   }, [view]);
 
   if (view === 'closed') {
-    return (
-      <button
-        onClick={() => setView('form')}
-        className="fixed bottom-6 left-6 z-50 flex items-center gap-2 px-4 py-2.5 rounded-full bg-primary/90 text-white text-sm font-medium shadow-lg shadow-primary/20 hover:bg-primary transition-all hover:scale-105"
-        title="Send Feedback"
-      >
-        <MessageCircle className="w-4 h-4" />
-        Feedback
-      </button>
-    );
+    return null; // Triggered from header button
   }
 
   if (view === 'success') {

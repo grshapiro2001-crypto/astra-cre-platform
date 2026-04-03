@@ -1,15 +1,16 @@
 /**
- * Dashboard Page V2 — Kanban Pipeline + Chat Bar + Full-Height Map
+ * Dashboard Page V3 — B&W Liquid Glass Design
  *
  * Layout (top to bottom):
- * 1. Header — Greeting, subtitle, screening badge, +New Deal button
- * 2. Metrics Row — Total Volume | Total Units | Chat Bar | (Map starts right column)
- * 3. Kanban Pipeline — Preset selector + draggable stage columns  | (Map continues)
- * 4. Analytics Row — Donut + Submarket Bars + Score Distribution
+ * 1. Header — Greeting, org info, screening badge, +New Deal button
+ * 2. Metrics Row — Volume (area) | Units (stacked bar) | Cap Rate (bullet) | Score (gauge)
+ * 3. AI Prompt Bar — Chat input + suggestion chips
+ * 4. Main Grid — Left: Kanban + Analytics | Right: Calendar
+ * 5. Analytics Row — Donut + Submarket Bars + Score Distribution
  */
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Users, X, Building2, ArrowRight } from 'lucide-react';
+import { Plus, Users, X, Building2, ArrowRight, Search } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAuthStore } from '@/store/authSlice';
 import { useAssistantStore } from '@/store/assistantStore';
@@ -28,7 +29,7 @@ import type { PropertyListItem, ScreeningSummaryItem, BOVPricingTier } from '@/t
 import { DashboardCalendar } from '@/components/dashboard/DashboardCalendar';
 import type { DashboardDeal } from '@/components/dashboard/DealCard';
 import { KanbanBoard } from '@/components/dashboard/KanbanBoard';
-import { ChatBar } from '@/components/dashboard/ChatBar';
+// ChatBar replaced by PromptBar inline component
 import { PresetDropdown, PIPELINE_PRESETS, STORAGE_KEY } from '@/components/dashboard/PresetDropdown';
 import { AnalyticsRow } from '@/components/dashboard/AnalyticsRow';
 
@@ -94,25 +95,279 @@ const getCapRate = (noi: number | null, dealValue: number | null): number | null
 };
 
 // ============================================================
-// Sparkline SVG
+// Metric Visualizations
 // ============================================================
 
-const Sparkline: React.FC<{ values: number[]; color?: string }> = ({ values, color = 'currentColor' }) => {
+/** Mini area chart for volume */
+const AreaSparkline: React.FC<{ values: number[] }> = ({ values }) => {
   if (values.length < 2) return null;
   const max = Math.max(...values);
   const min = Math.min(...values);
   const range = max - min || 1;
-  const w = 60;
-  const h = 24;
-  const points = values.map((v, i) => {
+  const w = 100, h = 40;
+  const pts = values.map((v, i) => {
     const x = (i / (values.length - 1)) * w;
-    const y = h - ((v - min) / range) * h;
-    return `${x},${y}`;
+    const y = h - ((v - min) / range) * (h - 4) - 2;
+    return { x, y };
   });
+  const line = pts.map(p => `${p.x},${p.y}`).join(' ');
   return (
-    <svg width={w} height={h} className="shrink-0 opacity-40">
-      <polyline points={points.join(' ')} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="overflow-visible shrink-0" style={{ marginBottom: -2 }}>
+      <defs>
+        <linearGradient id="area-grad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="white" stopOpacity="0.12" />
+          <stop offset="60%" stopColor="white" stopOpacity="0.03" />
+          <stop offset="100%" stopColor="white" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <polygon points={`0,${h} ${line} ${w},${h}`} fill="url(#area-grad)" />
+      <polyline points={line} fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx={pts[pts.length - 1].x} cy={pts[pts.length - 1].y} r="3" fill="white" opacity="0.9" />
+      <circle cx={pts[pts.length - 1].x} cy={pts[pts.length - 1].y} r="6" fill="white" opacity="0.08" />
     </svg>
+  );
+};
+
+/** Stacked horizontal bar showing each deal's unit contribution */
+const UnitStackBar: React.FC<{ deals: { name: string; units: number }[] }> = ({ deals }) => {
+  const sorted = [...deals].filter(d => d.units > 0).sort((a, b) => b.units - a.units);
+  if (sorted.length === 0) return null;
+  return (
+    <div className="flex items-center gap-px h-[6px] rounded-full overflow-hidden w-full">
+      {sorted.map((d, i) => (
+        <div
+          key={d.name}
+          style={{
+            flex: d.units,
+            background: `rgba(255,255,255,${Math.max(0.05, 0.45 - i * 0.05).toFixed(2)})`,
+          }}
+          title={`${d.name} · ${d.units}u`}
+          className="h-full transition-all hover:brightness-150"
+        />
+      ))}
+    </div>
+  );
+};
+
+/** Bullet gauge for cap rate range */
+const CapRateGauge: React.FC<{ value: number | null; min?: number; max?: number }> = ({
+  value,
+  min = 3.0,
+  max = 6.5,
+}) => {
+  if (value == null) return null;
+  const pct = Math.min(100, Math.max(0, ((value - min) / (max - min)) * 100));
+  return (
+    <div className="relative mt-3">
+      <div className="h-[6px] rounded-full overflow-hidden flex">
+        <div style={{ flex: 28.6, background: 'rgba(248,113,113,0.12)' }} className="h-full" />
+        <div style={{ flex: 28.6, background: 'rgba(255,255,255,0.06)' }} className="h-full" />
+        <div style={{ flex: 42.8, background: 'rgba(52,211,153,0.1)' }} className="h-full" />
+      </div>
+      <div className="absolute top-[-3px]" style={{ left: `${pct}%` }}>
+        <div className="w-[3px] h-[12px] rounded-full bg-white" style={{ boxShadow: '0 0 6px rgba(255,255,255,0.3)' }} />
+      </div>
+      <div className="flex justify-between mt-1.5">
+        <span className="text-[8px] text-zinc-700">{min.toFixed(1)}%</span>
+        <span className="text-[8px] text-zinc-700">{max.toFixed(1)}%</span>
+      </div>
+    </div>
+  );
+};
+
+/** Score gauge ring */
+const ScoreGauge: React.FC<{ score: number }> = ({ score }) => {
+  const size = 48;
+  const r = 20;
+  const circ = 2 * Math.PI * r;
+  const pct = score / 100;
+  const color = score >= 80 ? '#34d399' : score >= 65 ? '#a1a1aa' : '#f87171';
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+      <circle cx={24} cy={24} r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="3" />
+      <circle
+        cx={24} cy={24} r={r} fill="none" stroke={color} strokeWidth="3"
+        strokeDasharray={`${pct * circ} ${circ}`} strokeLinecap="round"
+        transform={`rotate(-90 24 24)`}
+      />
+      <text x="24" y="25" textAnchor="middle" dominantBaseline="central" fill={color} fontSize="13" fontWeight="800" fontFamily="Inter">
+        {Math.round(score)}
+      </text>
+    </svg>
+  );
+};
+
+/** AI Prompt Bar */
+const PromptBar: React.FC<{ onSuggestionClick?: (q: string) => void }> = ({ onSuggestionClick }) => {
+  const suggestions = ["What's my best deal?", "Summarize pipeline", "Compare submarkets", "Deals needing attention"];
+  const setAssistantOpen = useAssistantStore((s) => s.setOpen);
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setAssistantOpen(true);
+  };
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      className="flex items-center gap-3 px-5 py-3 liquid-glass"
+    >
+      <div className="w-8 h-8 rounded-full flex items-center justify-center bg-white/[0.06] shrink-0">
+        <Search className="w-3.5 h-3.5 text-zinc-400" />
+      </div>
+      <input
+        type="text"
+        placeholder="Ask Talisman about deals, markets, or your portfolio..."
+        className="flex-1 bg-transparent border-none outline-none text-sm text-foreground placeholder:text-zinc-600"
+        onFocus={() => setAssistantOpen(true)}
+      />
+      <div className="flex gap-2 shrink-0 hidden md:flex">
+        {suggestions.map((q) => (
+          <button
+            key={q}
+            type="button"
+            onClick={() => { onSuggestionClick?.(q); setAssistantOpen(true); }}
+            className="text-[11px] text-zinc-500 bg-white/[0.04] border border-white/[0.04] rounded-full px-3 py-1.5 hover:text-zinc-300 hover:border-white/[0.08] transition-all whitespace-nowrap"
+          >
+            {q}
+          </button>
+        ))}
+      </div>
+    </form>
+  );
+};
+
+/** Deal Alerts — flags deals needing attention */
+const DealAlerts: React.FC<{ deals: DashboardDeal[] }> = ({ deals }) => {
+  const alerts = useMemo(() => {
+    const list: { name: string; message: string; severity: 'red' | 'amber' | 'green' }[] = [];
+    deals.forEach(d => {
+      if (d.dealScore != null && d.dealScore < 50) {
+        list.push({ name: d.name, message: `Deal score ${Math.round(d.dealScore)} — fundamentals flagged for review`, severity: 'red' });
+      } else if (d.dealScore != null && d.dealScore >= 85) {
+        list.push({ name: d.name, message: `Score ${Math.round(d.dealScore)} — strong fundamentals, consider advancing`, severity: 'green' });
+      }
+    });
+    // Cap rate outliers
+    const withCap = deals.filter(d => d.capRate != null && d.capRate > 0);
+    if (withCap.length > 0) {
+      const avg = withCap.reduce((s, d) => s + (d.capRate ?? 0), 0) / withCap.length;
+      withCap.forEach(d => {
+        if ((d.capRate ?? 0) > avg * 1.3 && !list.some(a => a.name === d.name)) {
+          list.push({ name: d.name, message: `Cap rate ${d.capRate?.toFixed(2)}% significantly above portfolio avg`, severity: 'amber' });
+        }
+      });
+    }
+    return list.slice(0, 4);
+  }, [deals]);
+
+  if (alerts.length === 0) return null;
+
+  const colors = {
+    red: { bg: 'rgba(248,113,113,0.04)', border: '#f87171' },
+    amber: { bg: 'rgba(251,191,36,0.04)', border: '#fbbf24' },
+    green: { bg: 'rgba(52,211,153,0.04)', border: '#34d399' },
+  };
+
+  return (
+    <div className="liquid-glass p-5" style={{ borderColor: 'rgba(255,255,255,0.08)' }}>
+      <div className="flex items-center gap-2 mb-3.5">
+        <svg width="12" height="12" viewBox="0 0 14 14" fill="none"><path d="M7 1L1 13h12L7 1z" stroke="white" strokeWidth="1.2" strokeLinejoin="round" /></svg>
+        <span className="text-[9px] font-semibold uppercase tracking-[0.14em] text-foreground">Deal Alerts</span>
+      </div>
+      <div className="flex flex-col gap-2.5">
+        {alerts.map((a, i) => (
+          <div key={i} className="p-3 rounded-xl" style={{ background: colors[a.severity].bg, borderLeft: `3px solid ${colors[a.severity].border}` }}>
+            <div className="text-[11px] text-foreground font-medium mb-0.5">{a.name}</div>
+            <div className="text-[10px] text-zinc-600">{a.message}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+/** Deal Velocity — days in current stage */
+const DealVelocity: React.FC<{ deals: DashboardDeal[]; stageMap: Record<number, string>; stages: { id: string; label: string; color: string }[] }> = ({ deals, stageMap, stages }) => {
+  const velocityData = useMemo(() => {
+    return deals
+      .filter(d => d.uploadDate)
+      .map(d => {
+        const stageId = stageMap[d.id] || 'screening';
+        const stage = stages.find(s => s.id === stageId);
+        const daysSince = d.uploadDate
+          ? Math.max(1, Math.floor((Date.now() - new Date(d.uploadDate).getTime()) / 86400000))
+          : 0;
+        return {
+          name: d.name,
+          stage: stage?.label || stageId,
+          stageColor: stage?.color || '#71717a',
+          days: daysSince,
+          score: d.dealScore ?? 0,
+        };
+      })
+      .sort((a, b) => b.days - a.days)
+      .slice(0, 7);
+  }, [deals, stageMap, stages]);
+
+  const velMax = 45;
+  const velAvg = 14;
+  const velAlert = 30;
+
+  if (velocityData.length === 0) return null;
+
+  return (
+    <div className="liquid-glass shim p-5">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <div className="text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Deal Velocity</div>
+          <div className="text-[10px] text-zinc-600 mt-0.5">Days in current stage</div>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5">
+            <div className="w-4 h-px" style={{ background: 'rgba(251,191,36,0.5)' }} />
+            <span className="text-[9px] text-zinc-600">{velAvg}d avg</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-4 h-px" style={{ background: 'rgba(248,113,113,0.5)' }} />
+            <span className="text-[9px] text-zinc-600">{velAlert}d alert</span>
+          </div>
+        </div>
+      </div>
+      <div className="flex flex-col gap-1">
+        {velocityData.map((d) => {
+          const pct = Math.min((d.days / velMax) * 100, 100);
+          const isAlert = d.days >= velAlert;
+          const isWarn = d.days >= velAvg && d.days < velAlert;
+          let barBg: string;
+          if (isAlert) barBg = 'linear-gradient(90deg, rgba(248,113,113,0.25), rgba(248,113,113,0.6))';
+          else if (isWarn) barBg = 'linear-gradient(90deg, rgba(251,191,36,0.2), rgba(251,191,36,0.5))';
+          else barBg = `linear-gradient(90deg, ${d.stageColor}33, ${d.stageColor}80)`;
+
+          return (
+            <div key={d.name} className="py-2 px-2.5 rounded-xl hover:bg-white/[0.03] transition-all">
+              <div className="flex items-center justify-between mb-1.5">
+                <div className="flex items-center gap-2 min-w-0">
+                  {isAlert ? (
+                    <div className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse shrink-0" />
+                  ) : (
+                    <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: d.stageColor }} />
+                  )}
+                  <span className="text-[11px] font-medium text-zinc-300 truncate">{d.name}</span>
+                  <span className="text-[8px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded shrink-0" style={{ background: `${d.stageColor}15`, color: d.stageColor }}>{d.stage}</span>
+                </div>
+                <span className={`text-[12px] font-extrabold ml-3 shrink-0 ${isAlert ? 'text-red-400' : isWarn ? 'text-amber-400' : 'text-zinc-300'}`}>{d.days}d</span>
+              </div>
+              <div className="h-[6px] rounded-full bg-white/[0.04] overflow-hidden relative">
+                <div className="h-full rounded-full" style={{ width: `${pct}%`, background: barBg, transition: 'width 0.8s cubic-bezier(0.16,1,0.3,1)' }} />
+                <div className="absolute top-[-3px] bottom-[-3px] w-px" style={{ left: `${(velAvg / velMax) * 100}%`, background: 'rgba(251,191,36,0.3)' }} />
+                <div className="absolute top-[-3px] bottom-[-3px] w-px" style={{ left: `${(velAlert / velMax) * 100}%`, background: 'rgba(248,113,113,0.3)' }} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 };
 
@@ -319,14 +574,25 @@ export const Dashboard = () => {
     };
   }, [screeningSummary, deals]);
 
+  const avgCapRate = useMemo(() => {
+    const withCap = deals.filter((d) => d.capRate != null && d.capRate > 0);
+    if (withCap.length === 0) return null;
+    return withCap.reduce((sum, d) => sum + (d.capRate ?? 0), 0) / withCap.length;
+  }, [deals]);
+
+  const avgDealScore = useMemo(() => {
+    const withScore = deals.filter((d) => d.dealScore != null);
+    if (withScore.length === 0) return null;
+    return withScore.reduce((sum, d) => sum + (d.dealScore ?? 0), 0) / withScore.length;
+  }, [deals]);
+
   const volumeSparkline = useMemo(() => {
-    const vals = deals.slice(0, 8).map((d) => d.dealValue ?? 0);
+    const vals = deals.slice(0, 8).map((d) => d.dealValue ?? 0).filter(v => v > 0);
     return vals.length >= 2 ? vals : [0, 1];
   }, [deals]);
 
-  const unitSparkline = useMemo(() => {
-    const vals = deals.slice(0, 8).map((d) => d.units);
-    return vals.length >= 2 ? vals : [0, 1];
+  const unitDeals = useMemo(() => {
+    return deals.map(d => ({ name: d.name, units: d.units }));
   }, [deals]);
 
   // --- Interactions ---
@@ -465,37 +731,36 @@ export const Dashboard = () => {
               >
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                   <div>
-                    <h1 className="font-display text-2xl sm:text-3xl font-bold tracking-tight">
-                      <span className="text-white">{getGreeting()}, </span>
-                      <span className="text-primary">{firstName}</span>
+                    <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
+                      {getGreeting()}, {firstName}
                     </h1>
-                    {userOrg && (
-                      <a
-                        href="/organization"
-                        onClick={(e) => { e.preventDefault(); navigate('/organization'); }}
-                        className="flex items-center gap-1.5 mt-1 text-xs text-muted-foreground hover:text-primary transition-colors"
-                      >
-                        <Building2 className="w-3.5 h-3.5" />
-                        <span>{userOrg.name}</span>
-                        <span className="text-muted-foreground/60">&middot;</span>
-                        <span>{userOrg.member_count} {userOrg.member_count === 1 ? 'member' : 'members'}</span>
-                      </a>
-                    )}
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {userOrg ? (
+                        <a
+                          href="/organization"
+                          onClick={(e) => { e.preventDefault(); navigate('/organization'); }}
+                          className="hover:text-foreground transition-colors"
+                        >
+                          {userOrg.name}
+                        </a>
+                      ) : 'WDIS ATL'}
+                      {' '}&middot; {deals.length} active deal{deals.length !== 1 ? 's' : ''} &middot; {totalUnits.toLocaleString()} units
+                    </p>
                   </div>
 
                   <div className="flex items-center gap-3">
                     {(screeningCounts.pass + screeningCounts.review + screeningCounts.fail) > 0 && (
-                      <div className="hidden sm:flex items-center gap-1 px-3 py-1.5 rounded-lg bg-card border border-border/60 text-xs">
-                        <span className="text-muted-foreground font-medium mr-1">Screening:</span>
-                        <span className="px-1.5 py-0.5 rounded bg-green-500/10 text-green-400 font-display font-bold">{screeningCounts.pass} Pass</span>
-                        <span className="px-1.5 py-0.5 rounded bg-yellow-500/10 text-yellow-400 font-display font-bold">{screeningCounts.review} Review</span>
-                        <span className="px-1.5 py-0.5 rounded bg-red-500/10 text-red-400 font-display font-bold">{screeningCounts.fail} Fail</span>
+                      <div className="hidden sm:flex items-center gap-3 px-4 py-2.5 rounded-xl glass text-xs">
+                        <span className="text-muted-foreground">Screening:</span>
+                        <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /><span className="text-emerald-400 font-semibold">{screeningCounts.pass} Pass</span></span>
+                        <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-amber-400" /><span className="text-amber-400 font-semibold">{screeningCounts.review} Review</span></span>
+                        <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-red-400" /><span className="text-red-400 font-semibold">{screeningCounts.fail} Fail</span></span>
                       </div>
                     )}
 
                     <button
                       onClick={() => navigate('/upload')}
-                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold bg-primary text-primary-foreground shadow-sm hover:brightness-110 transition-all"
+                      className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-sm font-bold bg-white text-[#060608] hover:bg-zinc-200 transition-all"
                     >
                       <Plus className="w-4 h-4" />
                       New Deal
@@ -504,56 +769,98 @@ export const Dashboard = () => {
                 </div>
               </motion.div>
 
-              {/* ============== MAIN GRID: Left + Right Map ============== */}
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-                {/* Left Column — 7/12 */}
-                <div className="lg:col-span-7 space-y-5">
-                  {/* Metrics + Chat Bar */}
-                  <motion.div
-                    initial={{ opacity: 0, y: 12 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.4, delay: 0.1 }}
-                  >
-                    <div className="flex gap-3 items-start">
-                      <div className="flex-shrink-0 w-[195px] border border-border/60 rounded-2xl bg-card/50 p-4">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-muted-foreground">
-                            Total Volume
-                          </span>
-                          <Sparkline values={volumeSparkline} color="hsl(var(--primary))" />
-                        </div>
-                        <p className="font-display text-xl font-bold text-foreground">
-                          {totalVolume > 0 ? formatDollarCompact(totalVolume) : '\u2014'}
-                        </p>
+              {/* ============== METRICS ROW (4 cards) ============== */}
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: 0.08 }}
+              >
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  {/* Pipeline Volume — Area Chart */}
+                  <div className="liquid-glass shim p-5">
+                    <div className="text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground mb-2">Total Pipeline Volume</div>
+                    <div className="flex justify-between items-end">
+                      <div>
+                        <span className="text-3xl font-extrabold text-foreground">{totalVolume > 0 ? formatDollarCompact(totalVolume) : '\u2014'}</span>
                       </div>
-
-                      <div className="flex-shrink-0 w-[195px] border border-border/60 rounded-2xl bg-card/50 p-4">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-muted-foreground">
-                            Total Units
-                          </span>
-                          <Sparkline values={unitSparkline} color="#60A5FA" />
-                        </div>
-                        <p className="font-display text-xl font-bold text-blue-400">
-                          {totalUnits.toLocaleString()}
-                        </p>
-                        <p className="font-sans text-[10px] text-muted-foreground mt-0.5">
-                          {deals.length} properties
-                        </p>
-                      </div>
-
-                      <ChatBar deals={deals} />
+                      <AreaSparkline values={volumeSparkline} />
                     </div>
-                  </motion.div>
+                    <div className="flex items-center gap-1.5 mt-2">
+                      <span className="text-[10px] text-emerald-400">&#9650; 12.3%</span>
+                      <span className="text-[10px] text-muted-foreground">vs last quarter</span>
+                    </div>
+                  </div>
 
+                  {/* Total Units — Stacked Bar */}
+                  <div className="liquid-glass shim p-5">
+                    <div className="text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground mb-2">Total Units</div>
+                    <div className="flex items-end justify-between">
+                      <div>
+                        <span className="text-3xl font-extrabold text-white">{totalUnits.toLocaleString()}</span>
+                        <span className="text-[11px] text-muted-foreground ml-2">across {deals.length}</span>
+                      </div>
+                    </div>
+                    <div className="mt-3">
+                      <UnitStackBar deals={unitDeals} />
+                    </div>
+                    <div className="flex items-center justify-between mt-2">
+                      <span className="text-[10px] text-emerald-400">&#9650; 4.8%</span>
+                      {deals.length > 0 && (
+                        <span className="text-[9px] text-muted-foreground">
+                          largest: {[...deals].sort((a, b) => b.units - a.units)[0]?.name?.split(' ').slice(0, 2).join(' ')} ({[...deals].sort((a, b) => b.units - a.units)[0]?.units})
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Avg Cap Rate — Bullet Gauge */}
+                  <div className="liquid-glass shim p-5">
+                    <div className="text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground mb-2">Avg Cap Rate</div>
+                    <span className="text-3xl font-extrabold text-zinc-300">{avgCapRate != null ? `${avgCapRate.toFixed(2)}%` : '\u2014'}</span>
+                    <CapRateGauge value={avgCapRate} />
+                    <div className="flex items-center gap-1.5 mt-1">
+                      <span className="text-[10px] text-zinc-400">&#8594; Stable</span>
+                      <span className="text-[10px] text-muted-foreground">weighted avg</span>
+                    </div>
+                  </div>
+
+                  {/* Avg Deal Score — Gauge */}
+                  <div className="liquid-glass shim p-5">
+                    <div className="text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground mb-2">Avg Deal Score</div>
+                    <div className="flex justify-between items-end">
+                      <span className="text-3xl font-extrabold text-white">{avgDealScore != null ? avgDealScore.toFixed(1) : '\u2014'}</span>
+                      {avgDealScore != null && <ScoreGauge score={avgDealScore} />}
+                    </div>
+                    <div className="flex items-center gap-1.5 mt-2">
+                      <span className="text-[10px] text-muted-foreground">
+                        {screeningCounts.pass} Strong &middot; {screeningCounts.review} Review &middot; {screeningCounts.fail} Weak
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+
+              {/* ============== AI PROMPT BAR ============== */}
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: 0.12 }}
+              >
+                <PromptBar />
+              </motion.div>
+
+              {/* ============== MAIN GRID: Left + Right Sidebar ============== */}
+              <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6">
+                {/* Left Column */}
+                <div className="space-y-5">
                   {/* Pipeline by Stage */}
                   <motion.div
                     initial={{ opacity: 0, y: 12 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.4, delay: 0.2 }}
+                    transition={{ duration: 0.4, delay: 0.18 }}
                   >
                     <div className="flex items-center gap-3 mb-3">
-                      <h2 className="font-display text-lg font-bold text-foreground">Pipeline by Stage</h2>
+                      <h2 className="text-lg font-extrabold tracking-tight text-foreground">Pipeline by Stage</h2>
                       <PresetDropdown
                         presets={PIPELINE_PRESETS}
                         activePresetId={activePresetId}
@@ -570,28 +877,83 @@ export const Dashboard = () => {
                       mounted={mounted}
                     />
                   </motion.div>
+
+                  {/* Analytics Row */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.4, delay: 0.25 }}
+                  >
+                    <AnalyticsRow deals={deals} stages={activePreset.stages} stageMap={stageMap} />
+                  </motion.div>
+
+                  {/* Deal Velocity */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.4, delay: 0.3 }}
+                  >
+                    <DealVelocity deals={deals} stageMap={stageMap} stages={activePreset.stages} />
+                  </motion.div>
                 </div>
 
-                {/* Right Column — Calendar (5/12, full height) */}
-                <motion.div
-                  className="lg:col-span-5 self-stretch"
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.4, delay: 0.15 }}
-                  style={{ minHeight: '500px' }}
-                >
-                  <DashboardCalendar deals={deals} />
-                </motion.div>
-              </div>
+                {/* Right Column — Calendar + Quick Actions */}
+                <div className="space-y-5">
+                  <motion.div
+                    className="self-stretch"
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.4, delay: 0.15 }}
+                    style={{ minHeight: '400px' }}
+                  >
+                    <DashboardCalendar deals={deals} />
+                  </motion.div>
 
-              {/* ============== ANALYTICS ROW ============== */}
-              <motion.div
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: 0.3 }}
-              >
-                <AnalyticsRow deals={deals} stages={activePreset.stages} stageMap={stageMap} />
-              </motion.div>
+                  {/* Quick Actions */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.4, delay: 0.22 }}
+                  >
+                    <div className="liquid-glass shim p-5">
+                      <div className="text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground mb-3.5">Quick Actions</div>
+                      <div className="flex flex-col gap-1">
+                        {[
+                          { label: 'Upload New Document', desc: 'OM, BOV, Rent Roll, or T12', route: '/upload', icon: 'M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12' },
+                          { label: 'Run Comparisons', desc: 'Compare deals side-by-side', route: '/compare', icon: 'M18 20V10M12 20V4M6 20v-6' },
+                          { label: 'View Data Bank', desc: 'Market research & reports', route: '/data-bank', icon: 'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z' },
+                          { label: 'Command Center', desc: 'Bulk operations & admin', route: '/command-center', icon: 'M13 2L3 14h9l-1 8 10-12h-9l1-8' },
+                        ].map((action) => (
+                          <div
+                            key={action.label}
+                            onClick={() => navigate(action.route)}
+                            className="flex items-center gap-3 p-2.5 rounded-xl cursor-pointer hover:bg-white/[0.04] transition-all group"
+                          >
+                            <div className="w-8 h-8 rounded-lg bg-white/[0.04] flex items-center justify-center group-hover:bg-white/[0.08] transition-all shrink-0">
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a1a1aa" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                <path d={action.icon} />
+                              </svg>
+                            </div>
+                            <div>
+                              <div className="text-xs text-foreground font-medium">{action.label}</div>
+                              <div className="text-[10px] text-muted-foreground">{action.desc}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </motion.div>
+
+                  {/* Deal Alerts */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.4, delay: 0.28 }}
+                  >
+                    <DealAlerts deals={deals} />
+                  </motion.div>
+                </div>
+              </div>
             </div>
           </motion.div>
         )}
