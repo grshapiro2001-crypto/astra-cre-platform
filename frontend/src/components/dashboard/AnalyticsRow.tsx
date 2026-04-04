@@ -6,6 +6,7 @@
  * 3. Score Distribution (Dot plot)
  */
 import React, { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { DonutChart } from '@/components/ui/donut-chart';
@@ -140,122 +141,204 @@ const PipelineDonut: React.FC<{ deals: DashboardDeal[]; stages: PipelineStage[];
 };
 
 // ============================================================
-// 2. By Submarket — Horizontal Bars (Volume $)
+// 2. By Location — Color-coded Horizontal Bars
 // ============================================================
 
+const SUBMARKET_COLORS = [
+  { base: '#3B82F6', muted: 'rgba(59,130,246,0.35)', dim: 'rgba(59,130,246,0.10)', glow: 'rgba(59,130,246,0.08)' },
+  { base: '#8B5CF6', muted: 'rgba(139,92,246,0.35)', dim: 'rgba(139,92,246,0.10)', glow: 'rgba(139,92,246,0.08)' },
+  { base: '#F59E0B', muted: 'rgba(245,158,11,0.35)', dim: 'rgba(245,158,11,0.10)', glow: 'rgba(245,158,11,0.08)' },
+  { base: '#22C55E', muted: 'rgba(34,197,94,0.35)',  dim: 'rgba(34,197,94,0.10)',  glow: 'rgba(34,197,94,0.08)' },
+  { base: '#EC4899', muted: 'rgba(236,72,153,0.35)', dim: 'rgba(236,72,153,0.10)', glow: 'rgba(236,72,153,0.08)' },
+] as const;
+
 const SubmarketBars: React.FC<{ deals: DashboardDeal[] }> = ({ deals }) => {
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+
   const submarketData = useMemo(() => {
-    const bySubmarket: Record<string, number> = {};
+    const bySubmarket: Record<string, { volume: number; count: number }> = {};
     deals.forEach((d) => {
       const sm = d.submarket || 'Unknown';
-      bySubmarket[sm] = (bySubmarket[sm] || 0) + (d.dealValue ?? 0);
+      if (!bySubmarket[sm]) bySubmarket[sm] = { volume: 0, count: 0 };
+      bySubmarket[sm].volume += d.dealValue ?? 0;
+      bySubmarket[sm].count++;
     });
     return Object.entries(bySubmarket)
-      .sort((a, b) => b[1] - a[1])
+      .map(([name, data]) => ({ name, ...data }))
+      .sort((a, b) => b.volume - a.volume)
       .slice(0, 6);
   }, [deals]);
 
-  const maxVolume = submarketData.length > 0 ? submarketData[0][1] : 1;
+  const maxVolume = submarketData.length > 0 ? submarketData[0].volume : 1;
+  const totalVolume = submarketData.reduce((sum, d) => sum + d.volume, 0);
 
   return (
-    <div className="liquid-glass shim p-5">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-muted-foreground">
-          By Submarket
-        </h3>
-        <span className="font-sans text-[10px] font-normal uppercase tracking-[0.14em] text-muted-foreground/50">Volume $</span>
+    <div className="liquid-glass shim p-5 flex flex-col">
+      <div className="flex items-center justify-between mb-5">
+        <h3 className="text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">By Location</h3>
+        <span className="text-[9px] font-medium uppercase tracking-[0.14em] text-muted-foreground/40">
+          {totalVolume > 0 ? formatDollarCompact(totalVolume) : 'Volume $'}
+        </span>
       </div>
-      <div className="space-y-2.5">
+      <div className="flex flex-col gap-3 flex-1">
         {submarketData.length === 0 ? (
           <p className="text-xs text-muted-foreground">No submarket data</p>
         ) : (
-          submarketData.map(([name, volume]) => (
-            <div key={name}>
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-xs text-foreground truncate max-w-[60%]">{name}</span>
-                <span className="font-display text-2xs text-muted-foreground">{formatDollarCompact(volume)}</span>
-              </div>
-              <div className="h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-white/30 to-white/70"
-                  style={{ width: `${Math.max(4, (volume / maxVolume) * 100)}%` }}
-                />
-              </div>
-            </div>
-          ))
+          submarketData.map((entry, i) => {
+            const color = SUBMARKET_COLORS[i % SUBMARKET_COLORS.length];
+            const pct = totalVolume > 0 ? (entry.volume / totalVolume) * 100 : 0;
+            const barWidth = Math.max(3, (entry.volume / maxVolume) * 100);
+            const isHovered = hoveredIdx === i;
+            const isDimmed = hoveredIdx !== null && hoveredIdx !== i;
+            return (
+              <motion.div
+                key={entry.name}
+                initial={{ opacity: 0, x: -12 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.5, delay: i * 0.06, ease: [0.22, 1, 0.36, 1] }}
+                className={cn('group rounded-lg px-2.5 py-2 -mx-1 transition-all duration-300 cursor-default', isHovered && 'bg-white/[0.03]')}
+                style={{ opacity: isDimmed ? 0.35 : 1, transition: 'opacity 0.3s ease, background-color 0.3s ease' }}
+                onMouseEnter={() => setHoveredIdx(i)}
+                onMouseLeave={() => setHoveredIdx(null)}
+              >
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="w-1.5 h-1.5 rounded-full shrink-0 transition-transform duration-300"
+                      style={{ backgroundColor: color.base, opacity: 0.7, transform: isHovered ? 'scale(1.4)' : 'scale(1)', boxShadow: isHovered ? `0 0 6px ${color.glow}` : 'none' }} />
+                    <span className="text-[11px] font-medium text-foreground truncate">{entry.name}</span>
+                  </div>
+                  <AnimatePresence mode="wait">
+                    {isHovered ? (
+                      <motion.span key="pct" initial={{ opacity: 0, x: 4 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -4 }}
+                        transition={{ duration: 0.15 }} className="text-[10px] font-semibold tabular-nums" style={{ color: color.base }}>
+                        {pct.toFixed(1)}%
+                      </motion.span>
+                    ) : (
+                      <motion.span key="vol" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                        transition={{ duration: 0.15 }} className="text-[10px] text-zinc-500 tabular-nums">
+                        {formatDollarCompact(entry.volume)}
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
+                </div>
+                <div className="h-[6px] rounded-full overflow-hidden" style={{ backgroundColor: color.dim }}>
+                  <motion.div className="h-full rounded-full"
+                    initial={{ width: 0 }}
+                    animate={{ width: `${barWidth}%` }}
+                    transition={{ duration: 0.8, delay: 0.1 + i * 0.06, ease: [0.22, 1, 0.36, 1] }}
+                    style={{
+                      background: isHovered ? `linear-gradient(90deg, ${color.muted} 0%, ${color.base} 100%)` : `linear-gradient(90deg, ${color.dim} 0%, ${color.muted} 100%)`,
+                      boxShadow: isHovered ? `0 0 12px ${color.glow}` : 'none',
+                      transition: 'background 0.3s ease, box-shadow 0.3s ease',
+                    }} />
+                </div>
+              </motion.div>
+            );
+          })
         )}
+      </div>
+      <div className="flex items-center justify-between pt-3 mt-auto border-t border-white/[0.04]">
+        <AnimatePresence mode="wait">
+          {hoveredIdx !== null && submarketData[hoveredIdx] ? (
+            <motion.div key={`hover-${hoveredIdx}`} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.18 }} className="flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: SUBMARKET_COLORS[hoveredIdx % SUBMARKET_COLORS.length].base, opacity: 0.7 }} />
+              <span className="text-[10px] font-semibold text-foreground">{submarketData[hoveredIdx].name}</span>
+              <span className="text-[10px] text-zinc-500 tabular-nums">{formatDollarCompact(submarketData[hoveredIdx].volume)}</span>
+            </motion.div>
+          ) : (
+            <motion.div key="idle" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              transition={{ duration: 0.18 }} className="flex items-center justify-between w-full">
+              <span className="text-[10px] text-zinc-600">{submarketData.length} submarkets</span>
+              <span className="text-[10px] text-zinc-600 tabular-nums">{deals.length} deals</span>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );
 };
 
 // ============================================================
-// 3. Score Distribution — Dot Plot
+// 3. Score Distribution — Dot Plot (click navigates to deal)
 // ============================================================
 
+/** Deterministic jitter to de-overlap dots */
+const jitter = (id: number, axis: 'x' | 'y'): number => {
+  const seed = id * 2654435761;
+  const offset = axis === 'x' ? 0 : 13;
+  const hash = ((seed + offset) >>> 0) % 1000;
+  return ((hash / 1000) - 0.5) * 2;
+};
+
 const ScoreDistribution: React.FC<{ deals: DashboardDeal[] }> = ({ deals }) => {
+  const navigate = useNavigate();
   const [hoveredIdx, setHoveredIdx] = React.useState<number | null>(null);
 
   const scored = useMemo(
     () => deals.filter((d) => d.dealScore != null && d.units > 0).map((d) => ({
       id: d.id, name: d.name, score: d.dealScore!, units: d.units,
-      price: d.dealValue, capRate: d.capRate,
     })),
     [deals],
   );
 
   const maxUnits = Math.max(1, ...scored.map(d => d.units));
-
-  // SVG dimensions
-  const vbW = 340, vbH = 200;
-  const pad = { top: 12, right: 20, bottom: 36, left: 38 };
+  const vbW = 340, vbH = 220;
+  const pad = { top: 28, right: 20, bottom: 36, left: 38 };
   const plotW = vbW - pad.left - pad.right;
   const plotH = vbH - pad.top - pad.bottom;
   const zoneX = (s: number) => pad.left + (s / 100) * plotW;
-
   const hovered = hoveredIdx != null ? scored[hoveredIdx] : null;
+  const avgScore = scored.length > 0 ? Math.round(scored.reduce((s, d) => s + d.score, 0) / scored.length) : null;
 
   return (
-    <div className="liquid-glass shim p-5 pb-3">
-      <h3 className="font-sans text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground mb-3">
-        Score Distribution
-      </h3>
+    <div className="liquid-glass shim p-5 pb-3 overflow-visible [&::after]:rounded-[20px]">
+      <span className="text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground mb-3 block">Score Distribution</span>
 
-      <div style={{ width: '100%', height: 0, paddingBottom: '58%', position: 'relative' }}>
-        <svg
-          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
-          viewBox={`0 0 ${vbW} ${vbH}`}
-          preserveAspectRatio="xMidYMid meet"
-        >
+      <div className="w-full" style={{ aspectRatio: '340 / 220' }}>
+        <svg className="w-full h-full block" viewBox={`0 0 ${vbW} ${vbH}`} preserveAspectRatio="xMidYMid meet">
+          {/* Zone fills */}
+          <rect x={pad.left} y={pad.top} width={zoneX(65) - pad.left} height={plotH} fill="rgba(255,255,255,0.0)" />
+          <rect x={zoneX(65)} y={pad.top} width={zoneX(80) - zoneX(65)} height={plotH} fill="rgba(255,255,255,0.006)" />
+          <rect x={zoneX(80)} y={pad.top} width={pad.left + plotW - zoneX(80)} height={plotH} fill="rgba(255,255,255,0.012)" />
+
           {/* Plot bg */}
-          <rect x={pad.left} y={pad.top} width={plotW} height={plotH} fill="rgba(255,255,255,0.008)" rx="4" />
+          <rect x={pad.left} y={pad.top} width={plotW} height={plotH} fill="rgba(255,255,255,0.012)" rx="3" />
 
-          {/* Zone dividers */}
+          {/* Zone dividers + labels */}
           <line x1={zoneX(65)} y1={pad.top} x2={zoneX(65)} y2={pad.top + plotH} stroke="rgba(255,255,255,0.04)" strokeWidth="0.5" strokeDasharray="2 3" />
           <line x1={zoneX(80)} y1={pad.top} x2={zoneX(80)} y2={pad.top + plotH} stroke="rgba(255,255,255,0.04)" strokeWidth="0.5" strokeDasharray="2 3" />
+          <text x={zoneX(65) + 3} y={pad.top + 8} fill="rgba(255,255,255,0.10)" fontSize="5.5" fontFamily="Inter">65</text>
+          <text x={zoneX(80) + 3} y={pad.top + 8} fill="rgba(255,255,255,0.10)" fontSize="5.5" fontFamily="Inter">80</text>
 
-          {/* Grid lines */}
-          {[100, 200, 300, 400].map(u => {
-            const y = pad.top + plotH - (u / (maxUnits * 1.1)) * plotH;
-            return y >= pad.top + 4 ? (
-              <g key={u}>
-                <line x1={pad.left} y1={y} x2={pad.left + plotW} y2={y} stroke="rgba(255,255,255,0.025)" strokeWidth="0.5" />
-                <text x={pad.left - 8} y={y + 3} textAnchor="end" fill="rgba(255,255,255,0.18)" fontSize="7.5" fontFamily="Inter">{u}</text>
-              </g>
-            ) : null;
-          })}
+          {/* Dynamic Y-axis grid */}
+          {(() => {
+            const niceMax = maxUnits * 1.1;
+            const step = niceMax <= 100 ? 25 : niceMax <= 500 ? 100 : niceMax <= 2000 ? 500 : 1000;
+            const ticks: number[] = [];
+            for (let v = step; v < niceMax; v += step) ticks.push(v);
+            return ticks.map(u => {
+              const y = pad.top + plotH - (u / niceMax) * plotH;
+              return y >= pad.top + 6 ? (
+                <g key={u}>
+                  <line x1={pad.left} y1={y} x2={pad.left + plotW} y2={y} stroke="rgba(255,255,255,0.025)" strokeWidth="0.5" />
+                  <text x={pad.left - 6} y={y + 2.5} textAnchor="end" fill="rgba(255,255,255,0.16)" fontSize="6.5" fontFamily="Inter" fontWeight="400">{u}</text>
+                </g>
+              ) : null;
+            });
+          })()}
 
           {/* X-axis ticks */}
           {[0, 20, 40, 60, 80, 100].map(s => (
             <g key={s}>
-              <line x1={zoneX(s)} y1={pad.top + plotH} x2={zoneX(s)} y2={pad.top + plotH + 4} stroke="rgba(255,255,255,0.06)" strokeWidth="0.5" />
-              <text x={zoneX(s)} y={pad.top + plotH + 16} textAnchor="middle" fill="rgba(255,255,255,0.18)" fontSize="7.5" fontFamily="Inter">{s}</text>
+              <line x1={zoneX(s)} y1={pad.top + plotH} x2={zoneX(s)} y2={pad.top + plotH + 3} stroke="rgba(255,255,255,0.06)" strokeWidth="0.5" />
+              <text x={zoneX(s)} y={pad.top + plotH + 14} textAnchor="middle" fill="rgba(255,255,255,0.18)" fontSize="6.5" fontFamily="Inter">{s}</text>
             </g>
           ))}
 
           {/* Axis labels */}
-          <text x={pad.left + plotW / 2} y={vbH - 2} textAnchor="middle" fill="rgba(255,255,255,0.12)" fontSize="7" fontFamily="Inter" fontWeight="500" letterSpacing="0.1em">SCORE</text>
-          <text x="6" y={pad.top + plotH / 2} textAnchor="middle" fill="rgba(255,255,255,0.12)" fontSize="7" fontFamily="Inter" fontWeight="500" letterSpacing="0.1em" transform={`rotate(-90, 6, ${pad.top + plotH / 2})`}>UNITS</text>
+          <text x={pad.left + plotW / 2} y={vbH - 2} textAnchor="middle" fill="rgba(255,255,255,0.10)" fontSize="6" fontFamily="Inter" fontWeight="500" letterSpacing="0.1em">SCORE</text>
+          <text x="6" y={pad.top + plotH / 2} textAnchor="middle" fill="rgba(255,255,255,0.10)" fontSize="6" fontFamily="Inter" fontWeight="500" letterSpacing="0.1em" transform={`rotate(-90, 6, ${pad.top + plotH / 2})`}>UNITS</text>
 
           {/* Axes */}
           <line x1={pad.left} y1={pad.top + plotH} x2={pad.left + plotW} y2={pad.top + plotH} stroke="rgba(255,255,255,0.06)" strokeWidth="0.5" />
@@ -263,29 +346,37 @@ const ScoreDistribution: React.FC<{ deals: DashboardDeal[] }> = ({ deals }) => {
 
           {/* Data dots */}
           {scored.map((d, i) => {
-            const cx = pad.left + (d.score / 100) * plotW;
-            const cy = pad.top + plotH - (d.units / (maxUnits * 1.1)) * plotH;
+            const niceMax = maxUnits * 1.1;
+            const cx = pad.left + (d.score / 100) * plotW + jitter(d.id, 'x') * 6;
+            const cy = pad.top + plotH - (d.units / niceMax) * plotH + jitter(d.id, 'y') * 6;
             const isHovered = hoveredIdx === i;
             const isDimmed = hoveredIdx != null && hoveredIdx !== i;
+
+            const ttW = 110, ttH = 32, ttGap = 8;
+            const rawTtX = cx - ttW / 2;
+            const ttX = Math.max(pad.left + 2, Math.min(rawTtX, pad.left + plotW - ttW - 2));
+            const flipBelow = cy - ttH - ttGap < pad.top;
+            const ttY = flipBelow ? cy + ttGap + 2 : cy - ttH - ttGap;
+
             return (
-              <g
-                key={d.id}
+              <g key={d.id}
                 onMouseEnter={() => setHoveredIdx(i)}
                 onMouseLeave={() => setHoveredIdx(null)}
-                style={{ cursor: 'pointer', opacity: isDimmed ? 0.15 : 1, transition: 'opacity 0.3s' }}
-              >
-                <circle cx={cx} cy={cy} r="14" fill="transparent" />
-                <circle
-                  cx={cx} cy={cy} r={isHovered ? 6 : 4.5}
-                  fill="white" fillOpacity={isHovered ? 0.6 : 0.28}
-                  style={{ transition: 'all 0.25s cubic-bezier(0.16,1,0.3,1)', filter: isHovered ? 'drop-shadow(0 0 6px rgba(255,255,255,0.25))' : 'none' }}
-                />
+                onClick={() => navigate(`/library/${d.id}`)}
+                style={{ cursor: 'pointer', opacity: isDimmed ? 0.08 : 1, transition: 'opacity 0.3s' }}>
+                <circle cx={cx} cy={cy} r="12" fill="transparent" />
+                <circle cx={cx} cy={cy} r={isHovered ? 5.5 : 3.5} fill="white"
+                  fillOpacity={isHovered ? 0.7 : 0.22}
+                  style={{ transition: 'r 0.2s cubic-bezier(0.22,1,0.36,1), fill-opacity 0.2s ease-out, filter 0.2s ease-out',
+                    filter: isHovered ? 'drop-shadow(0 0 4px rgba(255,255,255,0.18))' : 'none' }} />
                 {isHovered && (
-                  <g>
-                    <rect x={cx - 50} y={cy - 38} width={100} height={30} rx={8} fill="rgba(12,12,15,0.94)" stroke="rgba(255,255,255,0.06)" strokeWidth="0.5" />
-                    <text x={cx} y={cy - 26} textAnchor="middle" fill="#eeecea" fontSize="8.5" fontWeight="600" fontFamily="Inter">{d.name}</text>
-                    <text x={cx} y={cy - 15} textAnchor="middle" fill="rgba(255,255,255,0.35)" fontSize="7" fontFamily="Inter">
-                      {d.score} score · {d.units}u{d.capRate ? ` · ${d.capRate.toFixed(2)}%` : ''}
+                  <g style={{ pointerEvents: 'none' }}>
+                    <rect x={ttX} y={ttY} width={ttW} height={ttH} rx={6} fill="rgba(8,8,11,0.96)" stroke="rgba(255,255,255,0.08)" strokeWidth="0.5" />
+                    <text x={ttX + ttW / 2} y={ttY + 13} textAnchor="middle" fill="#eeecea" fontSize="8.5" fontWeight="600" fontFamily="Inter">
+                      {d.name.length > 20 ? d.name.slice(0, 19) + '\u2026' : d.name}
+                    </text>
+                    <text x={ttX + ttW / 2} y={ttY + 24} textAnchor="middle" fill="rgba(255,255,255,0.35)" fontSize="6.5" fontFamily="Inter">
+                      Score {d.score}
                     </text>
                   </g>
                 )}
@@ -296,14 +387,22 @@ const ScoreDistribution: React.FC<{ deals: DashboardDeal[] }> = ({ deals }) => {
       </div>
 
       {/* Detail bar */}
-      <div className="flex items-center px-1 pt-2 min-h-[24px]">
-        <span className="text-[10px] text-zinc-600 transition-all duration-200">
+      <div className="flex items-center justify-between px-1 pt-2 min-h-[24px] border-t border-white/[0.04]">
+        <AnimatePresence mode="wait">
           {hovered ? (
-            <><span className="text-foreground font-semibold">{hovered.name}</span> · <span className="text-zinc-400">{hovered.score}</span> · {hovered.units}u{hovered.price ? ` · ${formatDollarCompact(hovered.price)}` : ''}</>
+            <motion.div key={hovered.id} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.18, ease: 'easeOut' }} className="flex items-center gap-2">
+              <span className="text-[10px] font-semibold text-foreground">{hovered.name}</span>
+              <span className="text-[10px] text-zinc-500 tabular-nums">Score {hovered.score}</span>
+            </motion.div>
           ) : (
-            scored.length > 0 ? '' : 'No scored deals'
+            <motion.div key="idle" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              transition={{ duration: 0.18 }} className="flex items-center justify-between w-full">
+              <span className="text-[10px] text-zinc-600">{scored.length > 0 ? `${scored.length} deals scored` : 'No scored deals'}</span>
+              {avgScore != null && <span className="text-[10px] text-zinc-600 tabular-nums">avg {avgScore}</span>}
+            </motion.div>
           )}
-        </span>
+        </AnimatePresence>
       </div>
     </div>
   );
