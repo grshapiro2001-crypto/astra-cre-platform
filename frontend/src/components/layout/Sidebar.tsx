@@ -7,8 +7,6 @@ import {
   Database,
   BarChart3,
   Settings,
-  Sun,
-  Moon,
   ChevronsLeft,
   ChevronsRight,
   Users,
@@ -37,7 +35,7 @@ const navItems = [
 ];
 
 export const Sidebar = ({ className }: { className?: string }) => {
-  const { theme, toggleTheme, sidebarCollapsed, toggleSidebar, setSidebarHidden } = useUIStore();
+  const { sidebarCollapsed, toggleSidebar, setSidebarHidden } = useUIStore();
   const user = useAuthStore((s) => s.user);
   const [dealCount, setDealCount] = useState<number | null>(null);
   const [userOrg, setUserOrg] = useState<Organization | null>(null);
@@ -189,35 +187,6 @@ export const Sidebar = ({ className }: { className?: string }) => {
         </div>
       )}
 
-      {/* Theme Toggle */}
-      <div
-        className={cn(
-          'px-3 pb-2',
-          sidebarCollapsed ? 'flex justify-center' : ''
-        )}
-      >
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={toggleTheme}
-          className={cn(
-            'text-zinc-500 hover:text-zinc-200 hover:bg-white/5',
-            sidebarCollapsed ? 'w-11 h-11 p-0' : 'w-full justify-start gap-3 px-3'
-          )}
-          title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-        >
-          {theme === 'dark' ? (
-            <Sun className="w-4 h-4 shrink-0" />
-          ) : (
-            <Moon className="w-4 h-4 shrink-0" />
-          )}
-          {!sidebarCollapsed && (
-            <span className="text-sm">
-              {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
-            </span>
-          )}
-        </Button>
-      </div>
 
       {/* User Section */}
       <div
@@ -291,8 +260,7 @@ export const Sidebar = ({ className }: { className?: string }) => {
 
 /** Mobile sidebar overlay */
 export const MobileSidebar = () => {
-  const { mobileSidebarOpen, setMobileSidebarOpen, theme, toggleTheme } =
-    useUIStore();
+  const { mobileSidebarOpen, setMobileSidebarOpen } = useUIStore();
   const user = useAuthStore((s) => s.user);
 
   const initials = user?.full_name
@@ -385,25 +353,6 @@ export const MobileSidebar = () => {
             </>
           )}
         </nav>
-
-        {/* Theme Toggle */}
-        <div className="px-3 pb-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={toggleTheme}
-            className="w-full justify-start gap-3 px-3 text-zinc-500 hover:text-zinc-200 hover:bg-white/5"
-          >
-            {theme === 'dark' ? (
-              <Sun className="w-4 h-4 shrink-0" />
-            ) : (
-              <Moon className="w-4 h-4 shrink-0" />
-            )}
-            <span className="text-sm">
-              {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
-            </span>
-          </Button>
-        </div>
 
         {/* User */}
         <div className="px-3 pb-4 border-t border-white/5 pt-3">
