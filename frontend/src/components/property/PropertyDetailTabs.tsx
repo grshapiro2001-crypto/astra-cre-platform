@@ -76,7 +76,7 @@ export function PropertyDetailTabs(props: PropertyDetailTabsProps) {
   return (
     <div>
       {/* ─── Tab Bar ─── */}
-      <div className="sticky top-[calc(4rem+73px)] z-10 bg-background/90 backdrop-blur-xl border-b border-border/60">
+      <div className="sticky top-[calc(4rem+73px)] z-10 bg-background/90 backdrop-blur-xl border-b border-white/[0.04]">
         <div className="max-w-6xl mx-auto px-6 lg:px-8">
           <nav className="overflow-x-auto whitespace-nowrap -mb-px" role="tablist">
             <div className="flex" style={{ gap: 28 }}>
@@ -89,7 +89,7 @@ export function PropertyDetailTabs(props: PropertyDetailTabsProps) {
                   className={cn(
                     'py-3 font-sans text-[13px] font-normal tracking-wide border-b-2 transition-colors whitespace-nowrap',
                     activeTab === tab.key
-                      ? 'text-primary border-primary'
+                      ? 'text-white border-white'
                       : 'text-muted-foreground border-transparent hover:text-foreground',
                   )}
                 >

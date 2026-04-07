@@ -28,38 +28,38 @@ const TalismanCompass3D = ({ size = 500, spin = true, speed = 1.0 }: TalismanCom
     camera.position.set(0, 0, 8);
 
     // ═══════════════════════════════════════
-    // MATERIALS — Champagne Bright Gold
+    // MATERIALS — Silver Metallic
     // ═══════════════════════════════════════
 
     const gunmetalBright = new THREE.MeshPhysicalMaterial({
-      color: 0xd4af37, metalness: 0.95, roughness: 0.2,
+      color: 0xC0C0C0, metalness: 0.95, roughness: 0.2,
       clearcoat: 0.85, clearcoatRoughness: 0.08,
       transparent: true, opacity: 0.85, side: THREE.DoubleSide,
     });
 
     const gunmetalDark = new THREE.MeshPhysicalMaterial({
-      color: 0x8a7025, metalness: 0.96, roughness: 0.28,
+      color: 0x888888, metalness: 0.96, roughness: 0.28,
       clearcoat: 0.5, clearcoatRoughness: 0.15,
       transparent: true, opacity: 0.8, side: THREE.DoubleSide,
     });
 
     const gunmetalMid = new THREE.MeshPhysicalMaterial({
-      color: 0xb89530, metalness: 0.94, roughness: 0.22,
+      color: 0xA0A0A0, metalness: 0.94, roughness: 0.22,
       clearcoat: 0.7, clearcoatRoughness: 0.1,
       transparent: true, opacity: 0.82, side: THREE.DoubleSide,
     });
 
     const ringMat = new THREE.MeshPhysicalMaterial({
-      color: 0xa08830, metalness: 0.96, roughness: 0.2,
+      color: 0x999999, metalness: 0.96, roughness: 0.2,
       clearcoat: 0.6, clearcoatRoughness: 0.1,
       transparent: true, opacity: 0.88, side: THREE.DoubleSide,
     });
 
     // At small sizes, PBR reflections don't register — add emissive self-glow
-    // so the compass reads as gold instead of a dark blob
+    // so the compass reads as silver instead of a dark blob
     const emissiveBoost = size <= 64 ? 0.35 : size <= 120 ? 0.15 : 0.0;
     if (emissiveBoost > 0) {
-      const emissiveColor = new THREE.Color(0xd4af37);
+      const emissiveColor = new THREE.Color(0xC0C0C0);
       [gunmetalBright, gunmetalDark, gunmetalMid, ringMat].forEach(mat => {
         mat.emissive = emissiveColor;
         mat.emissiveIntensity = emissiveBoost;
@@ -188,20 +188,20 @@ const TalismanCompass3D = ({ size = 500, spin = true, speed = 1.0 }: TalismanCom
     compassGroup.add(hub2);
 
     // ═══════════════════════════════════════
-    // LIGHTING — warm gold tint
+    // LIGHTING — cool silver tint
     // ═══════════════════════════════════════
 
-    scene.add(new THREE.AmbientLight(0x504838, 0.8));
+    scene.add(new THREE.AmbientLight(0x484850, 0.8));
 
-    const keyLight = new THREE.PointLight(0xffeebb, 1.2, 20);
+    const keyLight = new THREE.PointLight(0xeeeeff, 1.2, 20);
     keyLight.position.set(3, 4, 6);
     scene.add(keyLight);
 
-    const fillLight = new THREE.PointLight(0xbb9955, 0.7, 18);
+    const fillLight = new THREE.PointLight(0xaaaacc, 0.7, 18);
     fillLight.position.set(-4, 1, 4);
     scene.add(fillLight);
 
-    const rimLight = new THREE.PointLight(0xcc9933, 0.5, 15);
+    const rimLight = new THREE.PointLight(0xbbbbdd, 0.5, 15);
     rimLight.position.set(0, -3, 5);
     scene.add(rimLight);
 

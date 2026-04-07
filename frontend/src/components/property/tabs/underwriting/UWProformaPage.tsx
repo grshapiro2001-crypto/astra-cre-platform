@@ -23,7 +23,7 @@ function ScenarioToggle({
   onChange: (s: 'premium' | 'market') => void;
 }) {
   return (
-    <div className="flex items-center rounded-lg p-1 bg-muted/50">
+    <div className="flex items-center rounded-lg p-1 bg-white/[0.04]">
       {(['premium', 'market'] as const).map((s) => (
         <button
           key={s}
@@ -31,7 +31,7 @@ function ScenarioToggle({
           className={cn(
             'px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
             active === s
-              ? 'bg-accent text-primary'
+              ? 'bg-white/[0.08] text-white'
               : 'text-muted-foreground hover:text-foreground',
           )}
         >
@@ -63,8 +63,8 @@ function StatementRow({ line }: { line: OperatingStatementLine }) {
   return (
     <tr
       className={cn(
-        'border-b border-border/20',
-        isTotal && 'border-t border-border/40 bg-muted/20 font-semibold',
+        'border-b border-white/[0.04]',
+        isTotal && 'border-t border-white/10 bg-white/[0.03] font-semibold',
       )}
     >
       <td
@@ -130,7 +130,7 @@ export function UWProformaPage({ outputs, isComputing }: UWSubPageProps) {
         <ScenarioToggle active={scenario} onChange={setScenario} />
         {isComputing && (
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+            <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
             Updating...
           </div>
         )}
@@ -139,7 +139,7 @@ export function UWProformaPage({ outputs, isComputing }: UWSubPageProps) {
       <div className={cn(GLASS_CARD, 'overflow-x-auto')}>
         <table className="w-full">
           <thead>
-            <tr className="border-b border-border/60">
+            <tr className="border-b border-white/[0.04]">
               <th className="text-left py-2 text-xs text-muted-foreground font-normal w-48">
                 Line Item
               </th>

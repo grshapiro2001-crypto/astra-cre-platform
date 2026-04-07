@@ -122,7 +122,7 @@ function ScenarioCard({
       {/* Cap Rates */}
       <div className="space-y-1">
         <h4 className={SECTION_LABEL}>Cap Rates</h4>
-        <div className="border-t border-border/40">
+        <div className="border-t border-white/10">
           <MetricRow label="Y1 Cap Rate" value={formatPct(vs?.cap_rates?.y1_cap_rate)} />
           <MetricRow label="Terminal Cap" value={formatPct(vs?.cap_rates?.terminal_cap_rate)} />
         </div>
@@ -131,7 +131,7 @@ function ScenarioCard({
       {/* Return Metrics */}
       <div className="space-y-1">
         <h4 className={SECTION_LABEL}>Returns</h4>
-        <div className="border-t border-border/40">
+        <div className="border-t border-white/10">
           <MetricRow label="Leveraged IRR" value={formatPct(returns?.levered_irr)} />
           <MetricRow label="Unlevered IRR" value={formatPct(returns?.unlevered_irr)} />
           <MetricRow label="Y1 Cash-on-Cash" value={formatPct(returns?.y1_cash_on_cash)} />
@@ -143,7 +143,7 @@ function ScenarioCard({
       {/* Debt */}
       <div className="space-y-1">
         <h4 className={SECTION_LABEL}>Debt</h4>
-        <div className="border-t border-border/40">
+        <div className="border-t border-white/10">
           <MetricRow label="LTV" value={formatPct(vs?.ltv)} />
           <MetricRow label="Loan Amount" value={formatCurrency(debt?.loan_amount)} />
           <MetricRow label="Equity" value={formatCurrency(debt?.equity)} />
@@ -164,7 +164,7 @@ function ScenarioCard({
       {/* Terminal Value */}
       <div className="space-y-1">
         <h4 className={SECTION_LABEL}>Reversion</h4>
-        <div className="border-t border-border/40">
+        <div className="border-t border-white/10">
           <MetricRow
             label="Terminal Value"
             value={formatCurrency(returns?.reversion?.gross_selling_price)}
@@ -179,7 +179,7 @@ function ScenarioCard({
       {/* CAGRs */}
       <div className="space-y-1">
         <h4 className={SECTION_LABEL}>Growth</h4>
-        <div className="border-t border-border/40">
+        <div className="border-t border-white/10">
           <MetricRow label="Revenue CAGR" value={formatPct(vs?.revenue_cagr)} />
           <MetricRow label="NOI CAGR" value={formatPct(vs?.noi_cagr)} />
         </div>
@@ -209,7 +209,7 @@ export function UWSummaryPage({ inputs, outputs, dispatch, isComputing }: UWSubP
       {/* Computing indicator */}
       {isComputing && (
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+          <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
           Computing...
         </div>
       )}
@@ -217,7 +217,7 @@ export function UWSummaryPage({ inputs, outputs, dispatch, isComputing }: UWSubP
       {/* Pricing Mode Selector */}
       <div className="flex items-center gap-2">
         <span className={cn(SECTION_LABEL, 'mr-2')}>Pricing Mode</span>
-        <div className="flex items-center rounded-lg p-1 bg-muted/50">
+        <div className="flex items-center rounded-lg p-1 bg-white/[0.04]">
           {(['target_irr', 'direct_cap', 'manual'] as const).map((mode) => (
             <button
               key={mode}
@@ -225,7 +225,7 @@ export function UWSummaryPage({ inputs, outputs, dispatch, isComputing }: UWSubP
               className={cn(
                 'px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
                 pricingMode === mode
-                  ? 'bg-accent text-primary'
+                  ? 'bg-white/[0.08] text-white'
                   : 'text-muted-foreground hover:text-foreground',
               )}
             >

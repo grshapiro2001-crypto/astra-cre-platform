@@ -340,7 +340,7 @@ export function UnderwritingTab({ property }: UnderwritingTabProps) {
   if (state.isLoading) {
     return (
       <div className={cn(GLASS_CARD, 'text-center py-16')}>
-        <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+        <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto mb-3" />
         <p className="text-sm text-muted-foreground">Loading underwriting model...</p>
       </div>
     );
@@ -351,7 +351,7 @@ export function UnderwritingTab({ property }: UnderwritingTabProps) {
     <div className="space-y-4">
       {/* Sub-tab bar */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center rounded-lg p-1 bg-muted/50">
+        <div className="flex items-center rounded-lg p-1 bg-white/[0.04]">
           {uwSubTabs.map((tab) => (
             <button
               key={tab.key}
@@ -359,7 +359,7 @@ export function UnderwritingTab({ property }: UnderwritingTabProps) {
               className={cn(
                 'px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
                 state.activeSubTab === tab.key
-                  ? 'bg-accent text-primary'
+                  ? 'bg-white/[0.08] text-white'
                   : 'text-muted-foreground hover:text-foreground',
               )}
             >
@@ -389,8 +389,8 @@ export function UnderwritingTab({ property }: UnderwritingTabProps) {
             className={cn(
               'px-4 py-1.5 rounded-lg text-xs font-medium transition-colors border',
               state.hasUnsavedChanges
-                ? 'border-primary text-primary hover:bg-primary/10'
-                : 'border-border text-muted-foreground cursor-not-allowed',
+                ? 'border-white/20 text-white hover:bg-white/[0.04]'
+                : 'border-white/[0.04] text-muted-foreground cursor-not-allowed',
             )}
           >
             Save

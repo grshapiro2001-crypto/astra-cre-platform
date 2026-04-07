@@ -780,7 +780,7 @@ function applyFilterToScene(
         color = statusToColor(ud.status);
         break;
       case 'floor_level':
-        color = lerpColor(0x5C4A1E, 0xD4AF37, (ud.floor - 1) / Math.max(stats.maxFloor - 1, 1));
+        color = lerpColor(0x444444, 0xCCCCCC, (ud.floor - 1) / Math.max(stats.maxFloor - 1, 1));
         break;
       case 'expirations':
         color = getExpirationColor(ud.rentRollUnit?.lease_end, refDate);
@@ -792,7 +792,7 @@ function applyFilterToScene(
         color = getRentGradientColor(ud.rentRollUnit?.market_rent, stats.minMarketRent, stats.maxMarketRent, 0x1E3A5F, 0xF59E0B);
         break;
       case 'contract_rents':
-        color = getRentGradientColor(ud.rentRollUnit?.in_place_rent, stats.minContractRent, stats.maxContractRent, 0x1E3A5F, 0xD4AF37);
+        color = getRentGradientColor(ud.rentRollUnit?.in_place_rent, stats.minContractRent, stats.maxContractRent, 0x1E3A5F, 0xCCCCCC);
         break;
       default:
         color = statusToColor(ud.status);
@@ -1677,7 +1677,7 @@ function createBuildingLabel(text: string, position: THREE.Vector3): THREE.Sprit
   ctx.fillStyle = 'rgba(0, 0, 0, 0)';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.font = 'bold 28px sans-serif';
-  ctx.fillStyle = '#D4AF37';
+  ctx.fillStyle = '#CCCCCC';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(text, canvas.width / 2, canvas.height / 2);
@@ -1926,7 +1926,7 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
     keyLight.shadow.camera.bottom = -100;
     scene.add(keyLight);
 
-    const fillLight = new THREE.DirectionalLight(0xD4AF37, 0.3);
+    const fillLight = new THREE.DirectionalLight(0xCCCCCC, 0.3);
     fillLight.position.set(-40, 40, -20);
     scene.add(fillLight);
 
@@ -2729,7 +2729,7 @@ export function StackingViewer3D({ layout, rentRollUnits, onUnitClick, activeFil
       const rrId = ud.rentRollUnit?.id;
 
       if (selectedIds.size > 0 && rrId && selectedIds.has(rrId)) {
-        mat.emissive.set(0xD4AF37);
+        mat.emissive.set(0xCCCCCC);
         mat.emissiveIntensity = 1.0;
         mat.clearcoat = 1.0;
         mat.needsUpdate = true;

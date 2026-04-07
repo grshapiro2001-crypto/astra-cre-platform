@@ -165,7 +165,7 @@ export function UWT12MappingPage({ property, dispatch }: UWT12MappingPageProps) 
   if (isLoading) {
     return (
       <div className={cn(GLASS_CARD, 'text-center py-16')}>
-        <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+        <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto mb-3" />
         <p className="text-sm text-muted-foreground">Loading T12 line items...</p>
       </div>
     );
@@ -208,7 +208,7 @@ export function UWT12MappingPage({ property, dispatch }: UWT12MappingPageProps) 
             disabled={isApplying}
             className={cn(
               'px-4 py-1.5 rounded-lg text-xs font-medium transition-colors',
-              'bg-amber-500/90 text-white hover:bg-amber-500',
+              'bg-zinc-500/90 text-white hover:bg-zinc-500',
               isApplying && 'opacity-50 cursor-not-allowed',
             )}
           >
@@ -221,7 +221,7 @@ export function UWT12MappingPage({ property, dispatch }: UWT12MappingPageProps) 
       <div className={cn(GLASS_CARD, 'p-0 overflow-hidden')}>
         <div className="max-h-[600px] overflow-y-auto">
           <table className="w-full text-xs">
-            <thead className="sticky top-0 bg-card/90 backdrop-blur-sm z-10 border-b border-border/40">
+            <thead className="sticky top-0 bg-[#0c0c0f]/90 backdrop-blur-sm z-10 border-b border-white/10">
               <tr>
                 <th className="text-left pl-4 py-2 font-medium text-muted-foreground w-6"></th>
                 <th className="text-left py-2 font-medium text-muted-foreground">Line Item</th>
@@ -272,8 +272,8 @@ interface LineItemRowProps {
 function LineItemRow({ item, categories, isExpanded, onToggleExpand, onCategoryChange }: LineItemRowProps) {
   if (item.is_section_header) {
     return (
-      <tr className="border-t border-border/30">
-        <td colSpan={5} className="pl-4 py-2 font-semibold text-foreground bg-muted/30 text-xs uppercase tracking-wide">
+      <tr className="border-t border-white/[0.06]">
+        <td colSpan={5} className="pl-4 py-2 font-semibold text-foreground bg-white/[0.03] text-xs uppercase tracking-wide">
           {item.raw_label}
         </td>
       </tr>
@@ -282,7 +282,7 @@ function LineItemRow({ item, categories, isExpanded, onToggleExpand, onCategoryC
 
   if (item.is_subtotal) {
     return (
-      <tr className="border-t border-border/20 bg-muted/10">
+      <tr className="border-t border-white/[0.04] bg-white/[0.02]">
         <td className="w-6"></td>
         <td className="py-1.5 text-muted-foreground font-medium">{item.raw_label}</td>
         <td className="text-right pr-4 font-mono text-muted-foreground">
@@ -311,7 +311,7 @@ function LineItemRow({ item, categories, isExpanded, onToggleExpand, onCategoryC
 
   return (
     <>
-      <tr className={cn('border-t border-border/10 hover:bg-muted/20 border-l-2', borderColor)}>
+      <tr className={cn('border-t border-white/[0.02] hover:bg-white/[0.03] border-l-2', borderColor)}>
         {/* Expand toggle */}
         <td className="w-6 text-center">
           {hasMonthly && (
@@ -342,7 +342,7 @@ function LineItemRow({ item, categories, isExpanded, onToggleExpand, onCategoryC
             onChange={(e) => onCategoryChange(e.target.value)}
             className={cn(
               'w-full text-xs px-2 py-1 rounded border bg-background text-foreground',
-              'border-border/50 focus:border-primary focus:ring-1 focus:ring-primary/30 outline-none',
+              'border-white/[0.04] focus:border-white/20 focus:ring-1 focus:ring-white/20 outline-none',
               !item.mapped_category && 'text-muted-foreground',
             )}
           >
@@ -357,7 +357,7 @@ function LineItemRow({ item, categories, isExpanded, onToggleExpand, onCategoryC
       </tr>
       {/* Expandable monthly detail */}
       {isExpanded && hasMonthly && (
-        <tr className="border-t border-border/5">
+        <tr className="border-t border-white/[0.02]">
           <td></td>
           <td colSpan={4} className="py-1 px-2">
             <div className="flex gap-1 text-[10px] font-mono text-muted-foreground overflow-x-auto">
@@ -402,12 +402,12 @@ function CategorySummaryPanel({ summary, totalUnits, revenueCategories, expenseC
 
   return (
     <div className={cn(GLASS_CARD, 'p-0 overflow-hidden')}>
-      <div className="px-4 py-2 border-b border-border/40">
+      <div className="px-4 py-2 border-b border-white/10">
         <h4 className="text-xs font-semibold text-foreground uppercase tracking-wide">Category Summary</h4>
       </div>
       <table className="w-full text-xs">
         <thead>
-          <tr className="border-b border-border/30">
+          <tr className="border-b border-white/[0.06]">
             <th className="text-left pl-4 py-1.5 font-medium text-muted-foreground">Category</th>
             <th className="text-right pr-4 py-1.5 font-medium text-muted-foreground w-28">T12 Total</th>
             <th className="text-right pr-4 py-1.5 font-medium text-muted-foreground w-28">T3 Ann.</th>
@@ -430,7 +430,7 @@ function CategorySummaryPanel({ summary, totalUnits, revenueCategories, expenseC
                   <SummaryRow key={cat} label={cat} annual={t.annual} t3={t.t3} perUnit={t.per_unit} count={t.item_count} />
                 );
               })}
-              <tr className="border-t border-border/30 font-medium">
+              <tr className="border-t border-white/[0.06] font-medium">
                 <td className="pl-4 py-1">Total Revenue</td>
                 <td className="text-right pr-4 font-mono">{formatCurrency(summary.totalRev)}</td>
                 <td className="text-right pr-4 font-mono text-muted-foreground">—</td>
@@ -453,7 +453,7 @@ function CategorySummaryPanel({ summary, totalUnits, revenueCategories, expenseC
                   <SummaryRow key={cat} label={cat} annual={t.annual} t3={t.t3} perUnit={t.per_unit} count={t.item_count} />
                 );
               })}
-              <tr className="border-t border-border/30 font-medium">
+              <tr className="border-t border-white/[0.06] font-medium">
                 <td className="pl-4 py-1">Total Expenses</td>
                 <td className="text-right pr-4 font-mono">{formatCurrency(summary.totalExp)}</td>
                 <td className="text-right pr-4 font-mono text-muted-foreground">—</td>
@@ -463,7 +463,7 @@ function CategorySummaryPanel({ summary, totalUnits, revenueCategories, expenseC
             </>
           )}
           {/* NOI */}
-          <tr className="border-t-2 border-border/60 font-semibold bg-muted/20">
+          <tr className="border-t-2 border-white/[0.04] font-semibold bg-white/[0.03]">
             <td className="pl-4 py-1.5">NOI</td>
             <td className={cn('text-right pr-4 font-mono', summary.noi < 0 ? 'text-red-400' : 'text-emerald-500')}>
               {formatCurrency(summary.noi)}
@@ -494,7 +494,7 @@ function SummaryRow({
   count: number;
 }) {
   return (
-    <tr className="border-t border-border/10 hover:bg-muted/10">
+    <tr className="border-t border-white/[0.02] hover:bg-white/[0.02]">
       <td className="pl-6 py-1 text-foreground">{label}</td>
       <td className="text-right pr-4 font-mono tabular-nums">{formatCurrency(annual)}</td>
       <td className="text-right pr-4 font-mono tabular-nums text-muted-foreground">{formatCurrency(t3)}</td>

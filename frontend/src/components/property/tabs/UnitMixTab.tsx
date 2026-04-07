@@ -231,15 +231,15 @@ export function UnitMixTab({ property }: UnitMixTabProps) {
               onClick={() => setBedroomFilter(bedroomFilter === g.beds ? null : g.beds)}
               className={cn(
                 GLASS_CARD,
-                'text-left transition-all hover:border-primary/40',
-                bedroomFilter === g.beds && 'border-primary ring-1 ring-primary/30',
+                'text-left transition-all hover:border-white/10',
+                bedroomFilter === g.beds && 'border-white/20 ring-1 ring-white/10',
               )}
             >
               <h4 className="font-display text-lg font-semibold text-foreground mb-1">{g.label}</h4>
               <p className="text-sm text-muted-foreground">
                 {g.unitCount} units · {g.pctOfTotal.toFixed(0)}% of total
               </p>
-              <p className="font-display text-xl font-bold text-primary mt-2">
+              <p className="font-display text-xl font-bold text-white mt-2">
                 {fmtCurrency(g.avgRent)}
               </p>
               <p className="text-xs text-muted-foreground">avg rent</p>
@@ -261,11 +261,11 @@ export function UnitMixTab({ property }: UnitMixTabProps) {
         </button>
 
         {filteredUnitMix.length > 0 ? (unitMixOpen ? (
-          <div className="border border-border/60 rounded-2xl bg-card/50 backdrop-blur-xl overflow-hidden">
+          <div className="liquid-glass overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-border bg-muted/50">
+                  <tr className="border-b border-white/[0.04] bg-white/[0.03]">
                     <th className="px-4 py-3 text-left font-semibold text-muted-foreground">Floorplan</th>
                     <th className="px-4 py-3 text-left font-semibold text-muted-foreground">Type</th>
                     <th className="px-4 py-3 text-right font-semibold text-muted-foreground">Units</th>
@@ -278,7 +278,7 @@ export function UnitMixTab({ property }: UnitMixTabProps) {
                 </thead>
                 <tbody>
                   {filteredUnitMix.map((u, idx) => (
-                    <tr key={u.id ?? idx} className="border-b border-border last:border-0 hover:bg-accent/50 transition-colors">
+                    <tr key={u.id ?? idx} className="border-b border-white/[0.04] last:border-0 hover:bg-white/[0.03] transition-colors">
                       <td className="px-4 py-3 font-medium text-foreground">{u.floorplan_name ?? '\u2014'}</td>
                       <td className="px-4 py-3 text-muted-foreground">{u.unit_type ?? '\u2014'}</td>
                       <td className="px-4 py-3 text-right font-mono text-foreground">{u.num_units ?? '\u2014'}</td>
@@ -294,7 +294,7 @@ export function UnitMixTab({ property }: UnitMixTabProps) {
                 </tbody>
                 {unitMixSummary && bedroomFilter == null && (
                   <tfoot>
-                    <tr className="border-t-2 border-primary bg-accent/30">
+                    <tr className="border-t-2 border-white/20 bg-white/[0.04]">
                       <td className="px-4 py-3 font-semibold text-foreground" colSpan={2}>Total / Weighted Avg</td>
                       <td className="px-4 py-3 text-right font-mono font-semibold text-foreground">{unitMixSummary.totalUnits}</td>
                       <td className="px-4 py-3 text-right font-mono font-semibold text-foreground">{unitMixSummary.avgSF.toLocaleString()}</td>
@@ -309,11 +309,11 @@ export function UnitMixTab({ property }: UnitMixTabProps) {
             </div>
           </div>
         ) : (
-          <div className="border border-border rounded-2xl bg-card p-4 text-center">
+          <div className="glass rounded-2xl p-4 text-center">
             <p className="text-sm text-muted-foreground">{filteredUnitMix.length} floorplans · Click to expand</p>
           </div>
         )) : (
-          <div className="bg-card/30 border-border/40 border-dashed rounded-2xl p-8 text-center border">
+          <div className="glass border-dashed rounded-2xl p-8 text-center border border-white/[0.04]">
             <Building2 className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
             <p className="text-muted-foreground text-sm">Unit mix details will appear after document analysis</p>
           </div>

@@ -52,9 +52,9 @@ function FinancialRow({
     <div
       className={cn(
         'flex items-center justify-between py-3',
-        isTotal && 'border-t-2 border-primary mt-2',
-        !isTotal && 'border-b border-border',
-        isHighlight && 'bg-accent px-3 -mx-3 rounded-lg',
+        isTotal && 'border-t-2 border-white/20 mt-2',
+        !isTotal && 'border-b border-white/[0.04]',
+        isHighlight && 'bg-white/[0.04] px-3 -mx-3 rounded-lg',
       )}
     >
       <span
@@ -301,12 +301,12 @@ export function FinancialsTab({
     return (
       <div className="space-y-6">
         <h2 className="font-display text-lg font-bold text-foreground">Operating Financials</h2>
-        <div className="bg-card/30 border-border/40 border-dashed rounded-2xl p-8 text-center border">
+        <div className="glass border-dashed rounded-2xl p-8 text-center border border-white/[0.04]">
           <BarChart3 className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
           <p className="text-muted-foreground text-sm">Financial data will populate when you upload an OM or BOV</p>
           <button
             onClick={() => navigate('/upload')}
-            className="mt-4 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium border border-primary text-primary hover:bg-primary/10 transition-colors"
+            className="mt-4 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium border border-white/10 text-white hover:bg-white/[0.04] transition-colors"
           >
             <Upload className="w-4 h-4" />
             Upload Document
@@ -345,7 +345,7 @@ export function FinancialsTab({
                 className={cn(
                   'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
                   financialPeriod === p
-                    ? 'bg-accent text-primary'
+                    ? 'bg-white/[0.08] text-white'
                     : 'text-muted-foreground hover:text-foreground',
                 )}
               >
@@ -361,7 +361,7 @@ export function FinancialsTab({
                 className={cn(
                   'px-3 py-2 rounded-lg text-sm font-medium transition-colors',
                   financialView === 'total'
-                    ? 'bg-accent text-primary'
+                    ? 'bg-white/[0.08] text-white'
                     : 'text-muted-foreground hover:text-foreground',
                 )}
               >
@@ -372,7 +372,7 @@ export function FinancialsTab({
                 className={cn(
                   'px-3 py-2 rounded-lg text-sm font-medium transition-colors',
                   financialView === 'perUnit'
-                    ? 'bg-accent text-primary'
+                    ? 'bg-white/[0.08] text-white'
                     : 'text-muted-foreground hover:text-foreground',
                 )}
               >
@@ -385,7 +385,7 @@ export function FinancialsTab({
 
       {/* Fallback data source banner */}
       {resolvedData.banner && (
-        <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium border bg-primary/10 text-primary border-primary/30">
+        <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium border bg-white/5 text-zinc-300 border-white/10">
           <Info className="w-4 h-4 shrink-0" />
           {resolvedData.banner}
         </div>
@@ -440,14 +440,14 @@ export function FinancialsTab({
             )}
 
             {/* NOI callout */}
-            <div className="mt-6 p-5 rounded-xl bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/20">
+            <div className="mt-6 p-5 rounded-xl bg-gradient-to-r from-white/[0.06] to-white/[0.02] border border-white/10">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="font-semibold text-foreground">Net Operating Income (NOI)</p>
                   <p className="text-xs mt-0.5 text-muted-foreground">{periodDescription(resolvedData.period)}</p>
                 </div>
                 <div className="text-right">
-                  <p className="font-display text-3xl font-bold text-primary">
+                  <p className="font-display text-3xl font-bold text-white">
                     {financialView === 'perUnit'
                       ? fmtPerUnit(resolvedData.noi, totalUnits)
                       : fmtCurrency(resolvedData.noi)}
@@ -487,7 +487,7 @@ export function FinancialsTab({
                 </div>
                 <div className="h-1.5 rounded-full bg-border/40 overflow-hidden">
                   <div
-                    className="h-full rounded-full bg-primary/50 transition-all duration-500"
+                    className="h-full rounded-full bg-white/50 transition-all duration-500"
                     style={{ width: `${Math.min(cat.pctOfTotal, 100)}%` }}
                   />
                 </div>

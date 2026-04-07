@@ -99,24 +99,24 @@ export const periodDescription = (key: FinancialPeriodKey): string => {
 export const docBadgeClass = (docType: string): string => {
   const d = docType.toUpperCase();
   if (d === 'BOV')
-    return 'bg-blue-500/10 text-blue-600 dark:text-blue-400';
+    return 'bg-blue-500/10 text-blue-400';
   if (d === 'OM')
-    return 'bg-primary/10 text-primary dark:text-primary';
-  return 'bg-muted text-muted-foreground';
+    return 'bg-white/5 text-zinc-300';
+  return 'bg-white/5 text-zinc-400';
 };
 
 export const docCategoryBadge = (category: string): { label: string; className: string } => {
   switch (category.toLowerCase()) {
     case 'om':
-      return { label: 'OM', className: 'bg-red-500/20 text-red-400' };
+      return { label: 'OM', className: 'bg-red-500/10 text-red-400' };
     case 'bov':
-      return { label: 'BOV', className: 'bg-blue-500/20 text-blue-400' };
+      return { label: 'BOV', className: 'bg-blue-500/10 text-blue-400' };
     case 'rent_roll':
-      return { label: 'Rent Roll', className: 'bg-primary/20 text-primary' };
+      return { label: 'Rent Roll', className: 'bg-white/5 text-zinc-300' };
     case 't12':
-      return { label: 'T-12', className: 'bg-amber-500/20 text-amber-400' };
+      return { label: 'T-12', className: 'bg-white/10 text-zinc-300' };
     default:
-      return { label: category || 'Other', className: 'bg-gray-500/20 text-gray-400' };
+      return { label: category || 'Other', className: 'bg-white/5 text-zinc-400' };
   }
 };
 
@@ -133,13 +133,13 @@ export const financialSourceBadge = (source: string | null | undefined): { label
   if (!source) return null;
   switch (source) {
     case 't12_excel':
-      return { label: 'T-12 Excel', className: 'bg-primary/20 text-primary' };
+      return { label: 'T-12 Excel', className: 'bg-white/5 text-zinc-300' };
     case 'rent_roll_excel':
-      return { label: 'Rent Roll Excel', className: 'bg-primary/20 text-primary' };
+      return { label: 'Rent Roll Excel', className: 'bg-white/5 text-zinc-300' };
     case 'om':
-      return { label: 'From OM', className: 'bg-gray-500/20 text-gray-400' };
+      return { label: 'From OM', className: 'bg-white/5 text-zinc-400' };
     case 'bov':
-      return { label: 'From BOV', className: 'bg-gray-500/20 text-gray-400' };
+      return { label: 'From BOV', className: 'bg-white/5 text-zinc-400' };
     default:
       return null;
   }
@@ -195,13 +195,13 @@ export const getFinancials = (
 };
 
 // Glass card style
-export const GLASS_CARD = 'bg-card/50 backdrop-blur-xl border border-border/60 rounded-2xl p-7';
+export const GLASS_CARD = 'liquid-glass p-7';
 
 // Section header label style
 export const SECTION_LABEL = 'font-sans text-[11px] uppercase tracking-[0.18em] text-muted-foreground';
 
 // Stat box style
-export const STAT_BOX = 'bg-muted/50 rounded-[10px] p-5 border border-border/40';
+export const STAT_BOX = 'glass rounded-[10px] p-5';
 
 /**
  * Deterministic pseudo-random number generator (mulberry32).

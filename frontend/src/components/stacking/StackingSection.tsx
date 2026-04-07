@@ -298,13 +298,13 @@ export function StackingSection({ property }: StackingSectionProps) {
     switch (activeFilter) {
       case 'occupancy':
         return { type: 'categorical', items: [
-          { color: '#D4AF37', label: 'Occupied' },
+          { color: '#CCCCCC', label: 'Occupied' },
           { color: '#F43F5E', label: 'Vacant' },
           { color: '#555550', label: 'No Data' },
         ] };
       case 'floor_level': {
         const maxFloor = layout?.buildings.reduce((m, b) => Math.max(m, b.num_floors), 1) ?? 1;
-        return { type: 'gradient', minColor: '#5C4A1E', maxColor: '#D4AF37', minLabel: 'Floor 1', maxLabel: `Floor ${maxFloor}` };
+        return { type: 'gradient', minColor: '#444444', maxColor: '#CCCCCC', minLabel: 'Floor 1', maxLabel: `Floor ${maxFloor}` };
       }
       case 'expirations':
         return { type: 'categorical', items: [
@@ -312,7 +312,7 @@ export function StackingSection({ property }: StackingSectionProps) {
           { color: '#F97316', label: '31–90 days' },
           { color: '#EAB308', label: '91–180 days' },
           { color: '#22C55E', label: '181–365 days' },
-          { color: '#D4AF37', label: '365+ days' },
+          { color: '#CCCCCC', label: '365+ days' },
           { color: '#555550', label: 'No data' },
         ] };
       case 'loss_to_lease':
@@ -338,11 +338,11 @@ export function StackingSection({ property }: StackingSectionProps) {
           if (u.in_place_rent != null) { min = Math.min(min, u.in_place_rent); max = Math.max(max, u.in_place_rent); }
         }
         if (min === Infinity) { min = 0; max = 0; }
-        return { type: 'gradient', minColor: '#1E3A5F', maxColor: '#D4AF37', minLabel: `$${min.toLocaleString()}`, maxLabel: `$${max.toLocaleString()}` };
+        return { type: 'gradient', minColor: '#1E3A5F', maxColor: '#CCCCCC', minLabel: `$${min.toLocaleString()}`, maxLabel: `$${max.toLocaleString()}` };
       }
       default:
         return { type: 'categorical', items: [
-          { color: '#D4AF37', label: 'Occupied' },
+          { color: '#CCCCCC', label: 'Occupied' },
           { color: '#F43F5E', label: 'Vacant' },
           { color: '#555550', label: 'No Data' },
         ] };

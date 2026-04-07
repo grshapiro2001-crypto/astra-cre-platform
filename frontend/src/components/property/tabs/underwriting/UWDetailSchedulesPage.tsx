@@ -80,7 +80,7 @@ function OtherIncomeSection({
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
           <thead>
-            <tr className="border-b border-border/40">
+            <tr className="border-b border-white/10">
               <th className="text-left py-2 text-muted-foreground font-normal w-40">Line Item</th>
               <th className="text-left py-2 text-muted-foreground font-normal w-32">Description</th>
               <th className="text-right py-2 text-muted-foreground font-normal w-24">Amount</th>
@@ -96,7 +96,7 @@ function OtherIncomeSection({
                   ? item.amount_per_unit * 12 * totalUnits
                   : item.amount_per_unit * totalUnits;
               return (
-                <tr key={i} className="border-b border-border/20">
+                <tr key={i} className="border-b border-white/[0.04]">
                   <td className="py-1.5">
                     <Input
                       value={item.line_item}
@@ -150,7 +150,7 @@ function OtherIncomeSection({
         </table>
       </div>
 
-      <div className="flex items-center justify-between pt-2 border-t border-border/40">
+      <div className="flex items-center justify-between pt-2 border-t border-white/10">
         <button
           onClick={addItem}
           className="text-xs text-primary hover:text-primary/80 font-medium"
@@ -224,7 +224,7 @@ function PayrollSection({
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
           <thead>
-            <tr className="border-b border-border/40">
+            <tr className="border-b border-white/10">
               <th className="text-left py-2 text-muted-foreground font-normal w-40">Position</th>
               <th className="text-right py-2 text-muted-foreground font-normal w-24">Salary</th>
               <th className="text-right py-2 text-muted-foreground font-normal w-20">Bonus</th>
@@ -238,7 +238,7 @@ function PayrollSection({
             {items.map((item, i) => {
               const itemTotal = (item.salary + item.bonus) * (1 + item.payroll_load_pct);
               return (
-                <tr key={i} className="border-b border-border/20">
+                <tr key={i} className="border-b border-white/[0.04]">
                   <td className="py-1.5">
                     <Input
                       value={item.position}
@@ -284,7 +284,7 @@ function PayrollSection({
         </table>
       </div>
 
-      <div className="flex items-center justify-between pt-2 border-t border-border/40">
+      <div className="flex items-center justify-between pt-2 border-t border-white/10">
         <button
           onClick={addItem}
           className="text-xs text-primary hover:text-primary/80 font-medium"
@@ -363,7 +363,7 @@ function ContractServicesSection({
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="border-b border-border/40">
+                <tr className="border-b border-white/10">
                   <th className="text-left py-2 text-muted-foreground font-normal w-40">Service</th>
                   <th className="text-right py-2 text-muted-foreground font-normal w-24">Monthly</th>
                   <th className="text-right py-2 text-muted-foreground font-normal w-24">Annual</th>
@@ -372,7 +372,7 @@ function ContractServicesSection({
               </thead>
               <tbody>
                 {items.map((item, i) => (
-                  <tr key={i} className="border-b border-border/20">
+                  <tr key={i} className="border-b border-white/[0.04]">
                     <td className="py-1.5">
                       <Input
                         value={item.service}
@@ -404,7 +404,7 @@ function ContractServicesSection({
             </table>
           </div>
 
-          <div className="flex items-center justify-between pt-2 border-t border-border/40">
+          <div className="flex items-center justify-between pt-2 border-t border-white/10">
             <button onClick={addItem} className="text-xs text-primary hover:text-primary/80 font-medium">
               + Add Service
             </button>
@@ -451,7 +451,7 @@ function TaxCalculatorSection({
           const annualTax = taxableValue * (millageRate / 100);
 
           return (
-            <div key={key} className="bg-muted/30 rounded-xl p-4 space-y-2">
+            <div key={key} className="bg-white/[0.03] rounded-xl p-4 space-y-2">
               <h4 className={cn(SECTION_LABEL, 'mb-2')}>{label}</h4>
               <div className="space-y-1 text-xs">
                 <div className="flex justify-between">
@@ -470,7 +470,7 @@ function TaxCalculatorSection({
                   <span className="text-muted-foreground">× Millage Rate ({millageRate.toFixed(2)}%)</span>
                   <span className="font-mono">{formatCurrency(annualTax)}</span>
                 </div>
-                <div className="flex justify-between pt-2 border-t border-border/40 font-semibold">
+                <div className="flex justify-between pt-2 border-t border-white/10 font-semibold">
                   <span>Annual Tax</span>
                   <span className="font-mono">{formatCurrency(annualTax)}</span>
                 </div>
@@ -494,7 +494,7 @@ export function UWDetailSchedulesPage({ inputs, outputs, dispatch, isComputing }
     <div className="space-y-6">
       {isComputing && (
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+          <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
           Computing...
         </div>
       )}

@@ -83,11 +83,11 @@ function defaultFormat(v: number): string {
 
 function barColorClass(highlight?: BarDatum['highlight']): string {
   switch (highlight) {
-    case 'primary': return 'bg-primary';
-    case 'accent': return 'bg-primary/60';
-    case 'warning': return 'bg-amber-400';
-    case 'dim': return 'bg-primary/30';
-    default: return 'bg-primary/40';
+    case 'primary': return 'bg-white';
+    case 'accent': return 'bg-white/60';
+    case 'warning': return 'bg-zinc-400';
+    case 'dim': return 'bg-white/30';
+    default: return 'bg-white/40';
   }
 }
 
@@ -105,7 +105,7 @@ export function AutoFitBarChart({
   const axisRange = axis.max - axis.min || 1;
 
   return (
-    <div className="bg-card/50 backdrop-blur-xl border border-border/60 rounded-2xl p-7">
+    <div className="liquid-glass p-7">
       {/* Header */}
       {(title || subtitle) && (
         <div className="mb-5">
@@ -138,14 +138,14 @@ export function AutoFitBarChart({
         </div>
 
         {/* Bars area */}
-        <div className="flex-1 relative border-l border-border/40">
+        <div className="flex-1 relative border-l border-white/10">
           {/* Grid lines */}
           {axis.ticks.map((tick) => {
             const pct = ((tick - axis.min) / axisRange) * 100;
             return (
               <div
                 key={tick}
-                className="absolute w-full border-t border-border/30"
+                className="absolute w-full border-t border-white/[0.06]"
                 style={{ bottom: `${pct}%` }}
               />
             );
@@ -174,7 +174,7 @@ export function AutoFitBarChart({
       </div>
 
       {/* X-axis labels */}
-      <div className="flex ml-[52px] border-t border-border/40 pt-2">
+      <div className="flex ml-[52px] border-t border-white/10 pt-2">
         {data.map((d, i) => (
           <div key={i} className="flex-1 text-center">
             <span className="text-[10px] font-sans text-muted-foreground">{d.label}</span>

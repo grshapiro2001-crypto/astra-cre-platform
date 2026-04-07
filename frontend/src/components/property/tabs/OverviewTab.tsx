@@ -50,7 +50,7 @@ function ScoreRing({ score }: { score: number }) {
   return (
     <div className="relative w-[140px] h-[140px] shrink-0">
       <svg viewBox="0 0 120 120" className="w-full h-full -rotate-90">
-        <circle cx="60" cy="60" r={r} fill="none" stroke="currentColor" strokeWidth="8" className="text-border/40" />
+        <circle cx="60" cy="60" r={r} fill="none" stroke="currentColor" strokeWidth="8" className="text-white/10" />
         <circle
           cx="60" cy="60" r={r} fill="none"
           stroke={color}
@@ -81,7 +81,7 @@ function ScoreBar({ label, score }: { label: string; score: number }) {
         <span className="text-xs text-muted-foreground">{label}</span>
         <span className="text-xs font-mono font-semibold text-foreground">{Math.round(score)}</span>
       </div>
-      <div className="h-1.5 rounded-full bg-border/40 overflow-hidden">
+      <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
         <div
           className={cn('h-full rounded-full transition-all duration-500', color)}
           style={{ width: `${Math.min(score, 100)}%` }}
@@ -117,17 +117,17 @@ function DealTimeline({ property }: { property: PropertyDetail }) {
           <div key={i} className="flex items-center gap-3">
             <div className={cn(
               'w-3 h-3 rounded-full shrink-0 border-2',
-              isDone ? 'bg-primary border-primary' :
-              isActive ? 'bg-transparent border-primary animate-pulse' :
-              'bg-transparent border-border',
+              isDone ? 'bg-white border-white' :
+              isActive ? 'bg-transparent border-white animate-pulse' :
+              'bg-transparent border-white/10',
             )} />
             {i < stages.length - 1 && (
-              <div className="absolute ml-[5px] mt-6 w-0.5 h-4" style={{ background: isDone ? 'hsl(var(--primary))' : 'hsl(var(--border))' }} />
+              <div className="absolute ml-[5px] mt-6 w-0.5 h-4" style={{ background: isDone ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.1)' }} />
             )}
             <span className={cn(
               'text-sm',
               isDone ? 'text-foreground font-medium' :
-              isActive ? 'text-primary font-medium' :
+              isActive ? 'text-white font-medium' :
               'text-muted-foreground',
             )}>
               {stage.label}
@@ -449,14 +449,14 @@ export function OverviewTab({ property, dealScore }: OverviewTabProps) {
                 onClick={() => {
                   fetchAISummary(property.id, true);
                 }}
-                className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+                className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/[0.04] transition-colors"
                 title="Regenerate summary"
               >
                 <RefreshCw className="w-4 h-4" />
               </button>
             )}
             {aiSummary && (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border bg-white/5 text-zinc-300 border-white/10">
                 <CheckCircle className="w-3.5 h-3.5" />
                 {aiSummary.verdict}
               </span>
@@ -495,7 +495,7 @@ export function OverviewTab({ property, dealScore }: OverviewTabProps) {
         {/* Summary */}
         {aiSummary && !aiLoading && (
           <>
-            <div className="border-l-[3px] border-primary/40 pl-4 mb-6">
+            <div className="border-l-[3px] border-white/20 pl-4 mb-6">
               <p className="text-sm text-foreground leading-relaxed">{aiSummary.summary}</p>
             </div>
 
@@ -505,7 +505,7 @@ export function OverviewTab({ property, dealScore }: OverviewTabProps) {
                 const cfg = obs.type === 'upside'
                   ? { bg: 'bg-emerald-500/10', border: 'border-emerald-500/30', icon: ArrowUp, iconColor: 'text-emerald-500' }
                   : obs.type === 'risk'
-                  ? { bg: 'bg-amber-500/10', border: 'border-amber-500/30', icon: AlertTriangle, iconColor: 'text-amber-500' }
+                  ? { bg: 'bg-zinc-500/10', border: 'border-zinc-500/30', icon: AlertTriangle, iconColor: 'text-zinc-400' }
                   : { bg: 'bg-red-500/10', border: 'border-red-500/30', icon: ArrowDown, iconColor: 'text-red-500' };
                 const Icon = cfg.icon;
                 return (
@@ -520,7 +520,7 @@ export function OverviewTab({ property, dealScore }: OverviewTabProps) {
             {aiSummary.observations.length > 3 && (
               <button
                 onClick={() => setShowAllObs(!showAllObs)}
-                className="flex items-center gap-1.5 text-xs font-medium text-primary hover:text-primary/80 transition-colors mb-5"
+                className="flex items-center gap-1.5 text-xs font-medium text-white hover:text-white/80 transition-colors mb-5"
               >
                 <ChevronDown className={cn('w-3.5 h-3.5 transition-transform', showAllObs && 'rotate-180')} />
                 {showAllObs ? 'Show fewer' : `Show ${aiSummary.observations.length - 3} more observations`}
@@ -528,10 +528,10 @@ export function OverviewTab({ property, dealScore }: OverviewTabProps) {
             )}
 
             {/* Recommendation */}
-            <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20">
-              <Star className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+            <div className="flex items-start gap-3 p-4 rounded-xl bg-white/5 border border-white/10">
+              <Star className="w-4 h-4 text-zinc-300 mt-0.5 shrink-0" />
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400 mb-1">Recommendation</p>
+                <p className="text-xs font-semibold uppercase tracking-wider text-zinc-300 mb-1">Recommendation</p>
                 <p className="text-sm text-foreground">{aiSummary.recommendation}</p>
               </div>
             </div>

@@ -115,11 +115,11 @@ export function DocsNotesTab({
     <div className="space-y-6">
       {/* ─── AI Insights CTA ─── */}
       <div
-        className="border border-border/60 rounded-2xl bg-card/50 backdrop-blur-xl p-6 cursor-pointer hover:border-primary/30 transition-colors"
+        className="liquid-glass p-6 cursor-pointer hover:border-white/10 transition-colors"
         onClick={onOpenAIPanel}
       >
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-primary shrink-0">
+          <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-white shrink-0">
             <Sparkles className="w-6 h-6 text-primary-foreground" />
           </div>
           <div className="flex-1">
@@ -147,7 +147,7 @@ export function DocsNotesTab({
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={isUploadingDoc}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-white text-black hover:bg-white/90 transition-colors disabled:opacity-50"
             >
               {isUploadingDoc ? (
                 <><Loader2 className="w-4 h-4 animate-spin" />Extracting...</>
@@ -162,7 +162,7 @@ export function DocsNotesTab({
           <div className={`mb-4 p-3 rounded-xl text-sm border ${
             uploadMessage.isError
               ? 'bg-red-500/10 text-red-400 border-red-500/20'
-              : 'bg-primary/10 text-primary border-primary/20'
+              : 'bg-white/5 text-zinc-300 border-white/10'
           }`}>
             {uploadMessage.text}
           </div>
@@ -245,13 +245,13 @@ export function DocsNotesTab({
               onChange={(e) => setNewNote(e.target.value)}
               placeholder="Add a note about this property..."
               rows={3}
-              className="w-full px-4 py-3 rounded-xl text-sm bg-muted border border-border text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-ring resize-none"
+              className="w-full px-4 py-3 rounded-xl text-sm glass border border-white/[0.04] text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-white/20 resize-none"
             />
             <div className="flex justify-end mt-2">
               <button
                 onClick={onAddNote}
                 disabled={!newNote.trim() || isSavingNote}
-                className="px-4 py-2 rounded-lg text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 rounded-lg text-sm font-medium bg-white text-black hover:bg-white/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSavingNote ? (
                   <><Loader2 className="w-4 h-4 animate-spin inline mr-1" />Saving...</>
@@ -264,7 +264,7 @@ export function DocsNotesTab({
           {property.pipeline_notes ? (
             <div className="space-y-3 mt-4">
               {property.pipeline_notes.split('\n\n').map((note, idx) => (
-                <div key={idx} className="p-3 rounded-lg bg-muted/50 border border-border/40">
+                <div key={idx} className="p-3 rounded-lg glass border border-white/[0.04]">
                   <p className="text-sm text-foreground whitespace-pre-wrap">{note}</p>
                 </div>
               ))}
@@ -285,7 +285,7 @@ export function DocsNotesTab({
           <div className={GLASS_CARD}>
             <div className="relative">
               {/* Vertical line */}
-              <div className="absolute left-[15px] top-2 bottom-2 w-0.5 bg-border/60" />
+              <div className="absolute left-[15px] top-2 bottom-2 w-0.5 bg-white/10" />
 
               <div className="space-y-5">
                 {activityLog.map((entry, i) => {
