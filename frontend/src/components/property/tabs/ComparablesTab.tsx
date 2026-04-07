@@ -78,17 +78,17 @@ export function ComparablesTab({ property, rentCompTab, setRentCompTab }: Compar
       {/* ─── Rent Comparables ─── */}
       <h2 className="font-display text-lg font-bold text-foreground">Rent Comparables</h2>
       {rentComps.length > 0 ? (
-        <div className="border border-border/60 rounded-2xl bg-card/50 backdrop-blur-xl overflow-hidden">
+        <div className="liquid-glass overflow-hidden">
           {rentCompTabs.length > 1 && (
             <div className="px-4 pt-4">
-              <div className="flex items-center rounded-xl p-1 bg-muted w-fit">
+              <div className="flex items-center rounded-xl p-1 bg-white/[0.04] w-fit">
                 {rentCompTabs.map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setRentCompTab(tab)}
                     className={cn(
                       'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
-                      rentCompTab === tab ? 'bg-accent text-primary' : 'text-muted-foreground hover:text-foreground',
+                      rentCompTab === tab ? 'bg-white/[0.08] text-white' : 'text-muted-foreground hover:text-foreground',
                     )}
                   >
                     {tab}
@@ -100,7 +100,7 @@ export function ComparablesTab({ property, rentCompTab, setRentCompTab }: Compar
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-border bg-muted/50">
+                <tr className="border-b border-white/[0.04] bg-white/[0.03]">
                   <th className="px-4 py-3 text-left font-semibold text-muted-foreground">Property</th>
                   <th className="px-4 py-3 text-left font-semibold text-muted-foreground">Location</th>
                   <th className="px-4 py-3 text-right font-semibold text-muted-foreground">Units</th>
@@ -111,19 +111,19 @@ export function ComparablesTab({ property, rentCompTab, setRentCompTab }: Compar
               </thead>
               <tbody>
                 {/* Subject property row */}
-                <tr className="border-b border-primary/30 bg-primary/5">
+                <tr className="border-b border-white/10 bg-white/[0.04]">
                   <td className="px-4 py-3 font-medium text-foreground">
                     {property.deal_name}
-                    <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-primary/20 text-primary">SUBJECT</span>
+                    <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-white/10 text-white">SUBJECT</span>
                   </td>
                   <td className="px-4 py-3 text-muted-foreground">{property.property_address ?? '\u2014'}</td>
                   <td className="px-4 py-3 text-right font-mono text-foreground">{property.total_units ?? '\u2014'}</td>
                   <td className="px-4 py-3 text-right font-mono text-foreground">{property.rr_avg_sqft != null ? Math.round(property.rr_avg_sqft).toLocaleString() : '\u2014'}</td>
-                  <td className="px-4 py-3 text-right font-mono text-primary font-semibold">{subjectRent != null ? fmtCurrency(subjectRent) : '\u2014'}</td>
+                  <td className="px-4 py-3 text-right font-mono text-white font-semibold">{subjectRent != null ? fmtCurrency(subjectRent) : '\u2014'}</td>
                   <td className="px-4 py-3 text-right font-mono text-foreground">\u2014</td>
                 </tr>
                 {filteredRentComps.map((c, idx) => (
-                  <tr key={c.id ?? idx} className="border-b border-border last:border-0 hover:bg-accent/50 transition-colors">
+                  <tr key={c.id ?? idx} className="border-b border-white/[0.04] last:border-0 hover:bg-white/[0.03] transition-colors">
                     <td className="px-4 py-3 font-medium text-foreground">
                       {c.comp_name || 'Unknown'}
                       {c.is_new_construction && (
@@ -142,7 +142,7 @@ export function ComparablesTab({ property, rentCompTab, setRentCompTab }: Compar
           </div>
         </div>
       ) : (
-        <div className="bg-card/30 border-border/40 border-dashed rounded-2xl p-8 text-center border">
+        <div className="glass border-dashed rounded-2xl p-8 text-center border border-white/[0.04]">
           <TrendingUp className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
           <p className="text-muted-foreground text-sm">Rent comparables will appear after document analysis</p>
         </div>
@@ -212,11 +212,11 @@ export function ComparablesTab({ property, rentCompTab, setRentCompTab }: Compar
       {/* ─── Sales Comparables ─── */}
       <h2 className="font-display text-lg font-bold text-foreground">Sales Comparables</h2>
       {salesComps.length > 0 ? (
-        <div className="border border-border/60 rounded-2xl bg-card/50 backdrop-blur-xl overflow-hidden">
+        <div className="liquid-glass overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-border bg-muted/50">
+                <tr className="border-b border-white/[0.04] bg-white/[0.03]">
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground">Property</th>
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground">Location</th>
                   <th className="text-right px-4 py-3 font-medium text-muted-foreground">Sale Date</th>
@@ -228,7 +228,7 @@ export function ComparablesTab({ property, rentCompTab, setRentCompTab }: Compar
               </thead>
               <tbody>
                 {salesComps.map((sc) => (
-                  <tr key={sc.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                  <tr key={sc.id} className="border-b border-white/[0.04] hover:bg-white/[0.03] transition-colors">
                     <td className="px-4 py-3 font-medium text-foreground">{sc.property_name ?? '\u2014'}</td>
                     <td className="px-4 py-3 text-muted-foreground">{sc.location ?? '\u2014'}</td>
                     <td className="px-4 py-3 text-right text-muted-foreground">{sc.sale_date ?? '\u2014'}</td>
@@ -245,7 +245,7 @@ export function ComparablesTab({ property, rentCompTab, setRentCompTab }: Compar
           </div>
         </div>
       ) : (
-        <div className="bg-card/30 border-border/40 border-dashed rounded-2xl p-8 text-center border">
+        <div className="glass border-dashed rounded-2xl p-8 text-center border border-white/[0.04]">
           <Building2 className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
           <p className="text-sm font-medium text-foreground">No Sales Comps Available</p>
           <p className="text-sm text-muted-foreground mt-1">Upload an Offering Memorandum with comparable sales to populate this section.</p>

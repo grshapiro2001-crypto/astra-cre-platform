@@ -105,7 +105,7 @@ function RevenueSection({ inputs, dispatch }: Pick<UWSubPageProps, 'inputs' | 'd
       {/* Rent Basis */}
       <div className="flex items-center gap-3 py-2">
         <span className="text-xs text-muted-foreground w-40 shrink-0">Rent Basis</span>
-        <div className="flex items-center rounded-lg p-1 bg-muted/50">
+        <div className="flex items-center rounded-lg p-1 bg-white/[0.04]">
           {(['market', 'inplace'] as const).map((basis) => (
             <button
               key={basis}
@@ -113,7 +113,7 @@ function RevenueSection({ inputs, dispatch }: Pick<UWSubPageProps, 'inputs' | 'd
               className={cn(
                 'px-3 py-1 rounded-md text-xs font-medium transition-colors',
                 inputs.rent_basis === basis
-                  ? 'bg-accent text-primary'
+                  ? 'bg-white/[0.08] text-white'
                   : 'text-muted-foreground hover:text-foreground',
               )}
             >
@@ -332,7 +332,7 @@ function TaxSection({ inputs, outputs, dispatch }: Pick<UWSubPageProps, 'inputs'
       </InputRow>
 
       {/* Computed tax output */}
-      <div className="flex gap-6 pt-2 border-t border-border/40">
+      <div className="flex gap-6 pt-2 border-t border-white/10">
         <div className="space-y-0.5">
           <span className={SECTION_LABEL}>Projected Y1 Tax (Prem.)</span>
           <p className="font-mono text-sm text-foreground">{formatCurrency(premiumTax)}</p>
@@ -404,7 +404,7 @@ function GrowthSection({ inputs, dispatch }: Pick<UWSubPageProps, 'inputs' | 'di
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
           <thead>
-            <tr className="border-b border-border/40">
+            <tr className="border-b border-white/10">
               <th className="text-left py-2 text-muted-foreground font-normal w-36">Assumption</th>
               {Array.from({ length: 8 }, (_, i) => (
                 <th key={i} className="text-center py-2 text-muted-foreground font-normal w-16">
@@ -418,7 +418,7 @@ function GrowthSection({ inputs, dispatch }: Pick<UWSubPageProps, 'inputs' | 'di
             {GROWTH_ROWS.map(({ label, curve }) => {
               const values = inputs[curve] as number[];
               return (
-                <tr key={curve} className="border-b border-border/20">
+                <tr key={curve} className="border-b border-white/[0.04]">
                   <td className="py-1.5 text-muted-foreground">{label}</td>
                   {values.slice(0, 8).map((v, i) => (
                     <td key={i} className="py-1.5 px-0.5">
@@ -436,7 +436,7 @@ function GrowthSection({ inputs, dispatch }: Pick<UWSubPageProps, 'inputs' | 'di
                       value={setAllValues[curve]}
                       onChange={(e) => handleSetAll(curve, e.target.value)}
                       placeholder="Set %"
-                      className="w-16 h-8 px-2 rounded-md border border-primary/40 bg-primary/5 text-foreground text-xs font-mono text-center focus:outline-none focus:ring-1 focus:ring-primary/30"
+                      className="w-16 h-8 px-2 rounded-md border border-white/10 bg-white/[0.03] text-foreground text-xs font-mono text-center focus:outline-none focus:ring-1 focus:ring-white/20"
                     />
                   </td>
                 </tr>
@@ -551,7 +551,7 @@ function LoanAssumptionSection({ inputs, dispatch }: Pick<UWSubPageProps, 'input
           onClick={() => update({ la_enabled: !inputs.la_enabled })}
           className={cn(
             'w-10 h-5 rounded-full transition-colors relative',
-            inputs.la_enabled ? 'bg-primary' : 'bg-muted',
+            inputs.la_enabled ? 'bg-white' : 'bg-white/10',
           )}
         >
           <span
@@ -616,7 +616,7 @@ export function UWAssumptionsPage({ inputs, outputs, dispatch, isComputing }: UW
     <div className="space-y-6">
       {isComputing && (
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+          <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
           Computing...
         </div>
       )}

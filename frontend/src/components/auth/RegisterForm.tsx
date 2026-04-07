@@ -39,8 +39,8 @@ export const RegisterForm = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-950 via-slate-950 to-amber-950 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full bg-white/95 backdrop-blur-md rounded-xl shadow-2xl border border-amber-200/20 p-8">
+    <div className="min-h-screen flex items-center justify-center bg-[#060608] py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full bg-white/[0.03] backdrop-blur-md rounded-xl shadow-2xl border border-white/[0.04] p-8">
         <div className="text-center mb-6">
           <div className="flex justify-center mb-4">
             <div className="w-14 h-14 rounded-xl bg-primary flex items-center justify-center shadow-lg">
@@ -49,10 +49,10 @@ export const RegisterForm = () => {
               </svg>
             </div>
           </div>
-          <h2 className="text-2xl font-bold text-gray-900">
+          <h2 className="text-2xl font-bold text-white">
             Create your <span className="text-primary">account</span>
           </h2>
-          <p className="mt-2 text-sm text-gray-500">
+          <p className="mt-2 text-sm text-white/50">
             Or{' '}
             <Link to="/login" className="font-medium text-primary hover:text-primary/80 transition-colors">
               sign in to existing account
@@ -69,21 +69,21 @@ export const RegisterForm = () => {
 
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="fullName" className="text-gray-700 font-medium">Full Name (Optional)</Label>
+              <Label htmlFor="fullName" className="text-white/70 font-medium">Full Name (Optional)</Label>
               <Input
                 id="fullName"
                 name="fullName"
                 type="text"
                 autoComplete="name"
                 placeholder="John Doe"
-                className="border-amber-200/50 focus:border-primary focus:ring-primary/20"
+                className="border-white/10 focus:border-white/20 focus:ring-white/10"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-gray-700 font-medium">Email address *</Label>
+              <Label htmlFor="email" className="text-white/70 font-medium">Email address *</Label>
               <Input
                 id="email"
                 name="email"
@@ -91,14 +91,14 @@ export const RegisterForm = () => {
                 autoComplete="email"
                 required
                 placeholder="you@example.com"
-                className="border-amber-200/50 focus:border-primary focus:ring-primary/20"
+                className="border-white/10 focus:border-white/20 focus:ring-white/10"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password" className="text-gray-700 font-medium">Password *</Label>
+              <Label htmlFor="password" className="text-white/70 font-medium">Password *</Label>
               <Input
                 id="password"
                 name="password"
@@ -106,14 +106,14 @@ export const RegisterForm = () => {
                 autoComplete="new-password"
                 required
                 placeholder="At least 8 characters"
-                className="border-amber-200/50 focus:border-primary focus:ring-primary/20"
+                className="border-white/10 focus:border-white/20 focus:ring-white/10"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="confirmPassword" className="text-gray-700 font-medium">Confirm Password *</Label>
+              <Label htmlFor="confirmPassword" className="text-white/70 font-medium">Confirm Password *</Label>
               <Input
                 id="confirmPassword"
                 name="confirmPassword"
@@ -121,7 +121,7 @@ export const RegisterForm = () => {
                 autoComplete="new-password"
                 required
                 placeholder="Confirm your password"
-                className="border-amber-200/50 focus:border-primary focus:ring-primary/20"
+                className="border-white/10 focus:border-white/20 focus:ring-white/10"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
               />

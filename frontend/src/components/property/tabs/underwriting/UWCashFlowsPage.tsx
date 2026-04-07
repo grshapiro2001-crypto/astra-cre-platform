@@ -22,7 +22,7 @@ function ScenarioToggle({
   onChange: (s: 'premium' | 'market') => void;
 }) {
   return (
-    <div className="flex items-center rounded-lg p-1 bg-muted/50">
+    <div className="flex items-center rounded-lg p-1 bg-white/[0.04]">
       {(['premium', 'market'] as const).map((s) => (
         <button
           key={s}
@@ -30,7 +30,7 @@ function ScenarioToggle({
           className={cn(
             'px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
             active === s
-              ? 'bg-accent text-primary'
+              ? 'bg-white/[0.08] text-white'
               : 'text-muted-foreground hover:text-foreground',
           )}
         >
@@ -126,14 +126,14 @@ export function UWCashFlowsPage({ outputs, isComputing }: UWSubPageProps) {
       <tr
         key={row.label}
         className={cn(
-          'border-b border-border/20',
-          row.bold && 'bg-muted/20',
-          row.separator && 'border-t border-border/40',
+          'border-b border-white/[0.04]',
+          row.bold && 'bg-white/[0.03]',
+          row.separator && 'border-t border-white/10',
         )}
       >
         <td
           className={cn(
-            'py-2 pr-4 text-xs whitespace-nowrap sticky left-0 bg-card/50 backdrop-blur-sm',
+            'py-2 pr-4 text-xs whitespace-nowrap sticky left-0 bg-[#0c0c0f]/80 backdrop-blur-sm',
             row.bold ? 'font-semibold text-foreground' : 'text-muted-foreground',
           )}
         >
@@ -161,7 +161,7 @@ export function UWCashFlowsPage({ outputs, isComputing }: UWSubPageProps) {
 
   const renderSectionHeader = (label: string) => (
     <tr key={`hdr-${label}`}>
-      <td colSpan={years.length + 1} className="pt-4 pb-1 sticky left-0 bg-card/50 backdrop-blur-sm">
+      <td colSpan={years.length + 1} className="pt-4 pb-1 sticky left-0 bg-[#0c0c0f]/80 backdrop-blur-sm">
         <span className={SECTION_LABEL}>{label}</span>
       </td>
     </tr>
@@ -173,7 +173,7 @@ export function UWCashFlowsPage({ outputs, isComputing }: UWSubPageProps) {
         <ScenarioToggle active={scenario} onChange={setScenario} />
         {isComputing && (
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+            <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
             Updating...
           </div>
         )}
@@ -182,8 +182,8 @@ export function UWCashFlowsPage({ outputs, isComputing }: UWSubPageProps) {
       <div className={cn(GLASS_CARD, 'overflow-x-auto')}>
         <table className="w-full">
           <thead>
-            <tr className="border-b border-border/60">
-              <th className="text-left py-2 text-xs text-muted-foreground font-normal sticky left-0 bg-card/50 backdrop-blur-sm w-44">
+            <tr className="border-b border-white/[0.04]">
+              <th className="text-left py-2 text-xs text-muted-foreground font-normal sticky left-0 bg-[#0c0c0f]/80 backdrop-blur-sm w-44">
                 Line Item
               </th>
               {years.map((yr) => (
@@ -213,8 +213,8 @@ export function UWCashFlowsPage({ outputs, isComputing }: UWSubPageProps) {
             {reversion && (
               <>
                 {renderSectionHeader('Reversion')}
-                <tr className="border-b border-border/20">
-                  <td className="py-2 pr-4 text-xs text-muted-foreground sticky left-0 bg-card/50">
+                <tr className="border-b border-white/[0.04]">
+                  <td className="py-2 pr-4 text-xs text-muted-foreground sticky left-0 bg-[#0c0c0f]/80">
                     Gross Selling Price
                   </td>
                   {years.map((yr, i) => (
@@ -223,8 +223,8 @@ export function UWCashFlowsPage({ outputs, isComputing }: UWSubPageProps) {
                     </td>
                   ))}
                 </tr>
-                <tr className="border-b border-border/20">
-                  <td className="py-2 pr-4 text-xs text-muted-foreground sticky left-0 bg-card/50">
+                <tr className="border-b border-white/[0.04]">
+                  <td className="py-2 pr-4 text-xs text-muted-foreground sticky left-0 bg-[#0c0c0f]/80">
                     Less: Transaction Costs
                   </td>
                   {years.map((yr, i) => (
@@ -233,8 +233,8 @@ export function UWCashFlowsPage({ outputs, isComputing }: UWSubPageProps) {
                     </td>
                   ))}
                 </tr>
-                <tr className="border-b border-border/20">
-                  <td className="py-2 pr-4 text-xs text-muted-foreground sticky left-0 bg-card/50">
+                <tr className="border-b border-white/[0.04]">
+                  <td className="py-2 pr-4 text-xs text-muted-foreground sticky left-0 bg-[#0c0c0f]/80">
                     Less: Principal Outstanding
                   </td>
                   {years.map((yr, i) => (
@@ -243,8 +243,8 @@ export function UWCashFlowsPage({ outputs, isComputing }: UWSubPageProps) {
                     </td>
                   ))}
                 </tr>
-                <tr className="border-b border-border/20 bg-muted/20">
-                  <td className="py-2 pr-4 text-xs font-semibold text-foreground sticky left-0 bg-card/50">
+                <tr className="border-b border-white/[0.04] bg-white/[0.03]">
+                  <td className="py-2 pr-4 text-xs font-semibold text-foreground sticky left-0 bg-[#0c0c0f]/80">
                     Net Sales Proceeds
                   </td>
                   {years.map((yr, i) => (
@@ -260,48 +260,48 @@ export function UWCashFlowsPage({ outputs, isComputing }: UWSubPageProps) {
             {scenarioResult && (
               <>
                 {renderSectionHeader('Summary')}
-                <tr className="border-b border-border/20">
-                  <td className="py-2 pr-4 text-xs text-muted-foreground sticky left-0 bg-card/50">
+                <tr className="border-b border-white/[0.04]">
+                  <td className="py-2 pr-4 text-xs text-muted-foreground sticky left-0 bg-[#0c0c0f]/80">
                     Revenue CAGR
                   </td>
                   <td colSpan={years.length} className="py-2 px-2 text-right font-mono text-xs">
                     {formatPct(scenarioResult.dcf.revenue_cagr)}
                   </td>
                 </tr>
-                <tr className="border-b border-border/20">
-                  <td className="py-2 pr-4 text-xs text-muted-foreground sticky left-0 bg-card/50">
+                <tr className="border-b border-white/[0.04]">
+                  <td className="py-2 pr-4 text-xs text-muted-foreground sticky left-0 bg-[#0c0c0f]/80">
                     NOI CAGR
                   </td>
                   <td colSpan={years.length} className="py-2 px-2 text-right font-mono text-xs">
                     {formatPct(scenarioResult.dcf.noi_cagr)}
                   </td>
                 </tr>
-                <tr className="border-b border-border/20">
-                  <td className="py-2 pr-4 text-xs text-muted-foreground sticky left-0 bg-card/50">
+                <tr className="border-b border-white/[0.04]">
+                  <td className="py-2 pr-4 text-xs text-muted-foreground sticky left-0 bg-[#0c0c0f]/80">
                     Unlevered IRR
                   </td>
                   <td colSpan={years.length} className="py-2 px-2 text-right font-mono text-xs">
                     {formatPct(scenarioResult.returns.unlevered_irr)}
                   </td>
                 </tr>
-                <tr className="border-b border-border/20">
-                  <td className="py-2 pr-4 text-xs text-muted-foreground sticky left-0 bg-card/50">
+                <tr className="border-b border-white/[0.04]">
+                  <td className="py-2 pr-4 text-xs text-muted-foreground sticky left-0 bg-[#0c0c0f]/80">
                     Leveraged IRR
                   </td>
                   <td colSpan={years.length} className="py-2 px-2 text-right font-mono text-xs">
                     {formatPct(scenarioResult.returns.levered_irr)}
                   </td>
                 </tr>
-                <tr className="border-b border-border/20">
-                  <td className="py-2 pr-4 text-xs text-muted-foreground sticky left-0 bg-card/50">
+                <tr className="border-b border-white/[0.04]">
+                  <td className="py-2 pr-4 text-xs text-muted-foreground sticky left-0 bg-[#0c0c0f]/80">
                     Avg Cash-on-Cash
                   </td>
                   <td colSpan={years.length} className="py-2 px-2 text-right font-mono text-xs">
                     {formatPct(scenarioResult.returns.avg_cash_on_cash)}
                   </td>
                 </tr>
-                <tr className="border-b border-border/20">
-                  <td className="py-2 pr-4 text-xs text-muted-foreground sticky left-0 bg-card/50">
+                <tr className="border-b border-white/[0.04]">
+                  <td className="py-2 pr-4 text-xs text-muted-foreground sticky left-0 bg-[#0c0c0f]/80">
                     Equity Multiple
                   </td>
                   <td colSpan={years.length} className="py-2 px-2 text-right font-mono text-xs">

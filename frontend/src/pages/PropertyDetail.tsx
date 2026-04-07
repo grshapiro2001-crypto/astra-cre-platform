@@ -482,7 +482,7 @@ export const PropertyDetail = () => {
               </p>
               <button
                 onClick={() => navigate('/library')}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-white text-black hover:bg-white/90 transition-colors"
               >
                 <ArrowLeft className="w-4 h-4" />
                 Back to Library
@@ -496,7 +496,7 @@ export const PropertyDetail = () => {
       {/* ================================================================= */}
       {/* HEADER                                                              */}
       {/* ================================================================= */}
-      <div className="sticky top-16 z-20 bg-background/90 backdrop-blur-xl border-b border-border">
+      <div className="sticky top-16 z-20 bg-background/90 backdrop-blur-xl border-b border-white/[0.04]">
         <div className="max-w-6xl mx-auto px-6 lg:px-8 py-3">
           {/* Row 1 — Property Identity + Actions */}
           <div className="flex items-center justify-between mb-3">
@@ -504,7 +504,7 @@ export const PropertyDetail = () => {
             <div className="flex items-center gap-3.5">
               <button
                 onClick={() => navigate(-1)}
-                className="w-9 h-9 flex items-center justify-center rounded-lg bg-muted/50 border border-border/60 hover:bg-accent transition-colors"
+                className="w-9 h-9 flex items-center justify-center rounded-lg glass border border-white/[0.04] hover:border-white/10 transition-colors"
               >
                 <ArrowLeft className="w-4 h-4 text-muted-foreground" />
               </button>
@@ -520,7 +520,7 @@ export const PropertyDetail = () => {
               />
 
               {property.document_type && (
-                <span className="bg-primary/20 text-primary text-[9px] px-2 py-0.5 rounded tracking-wide uppercase font-semibold">
+                <span className="bg-white/10 text-zinc-300 text-[9px] px-2 py-0.5 rounded tracking-wide uppercase font-semibold">
                   {property.document_type === 'EXCEL'
                     ? property.t12_noi != null && property.rr_total_units
                       ? 'T12 + RR'
@@ -553,7 +553,7 @@ export const PropertyDetail = () => {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setShowAIPanel(true)}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[11px] font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shadow-[0_0_12px_rgba(234,179,8,0.15)]"
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[11px] font-semibold bg-white text-black hover:bg-white/90 transition-colors shadow-[0_0_12px_rgba(255,255,255,0.06)]"
               >
                 <Sparkles className="w-3.5 h-3.5" />
                 AI Analysis
@@ -581,8 +581,8 @@ export const PropertyDetail = () => {
                 className={cn(
                   "flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[11px] font-medium border transition-colors",
                   property && comparisonPropertyIds.includes(property.id)
-                    ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20 hover:bg-amber-500/20"
-                    : "bg-muted/50 text-foreground border-border/60 hover:bg-accent"
+                    ? "bg-white/10 text-white border-white/20 hover:bg-white/15"
+                    : "glass text-foreground border border-white/[0.04] hover:border-white/10"
                 )}
               >
                 <BarChart3 className="w-3.5 h-3.5" />
@@ -603,7 +603,7 @@ export const PropertyDetail = () => {
                   }
                 }}
                 disabled={isExporting}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[11px] font-medium bg-muted/50 text-foreground border border-border/60 hover:bg-accent transition-colors disabled:opacity-50"
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[11px] font-medium glass text-foreground border border-white/[0.04] hover:border-white/10 transition-colors disabled:opacity-50"
               >
                 {isExporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileDown className="w-3.5 h-3.5" />}
                 Export Summary
@@ -612,7 +612,7 @@ export const PropertyDetail = () => {
               <button
                 onClick={() => !isReanalyzing && setShowReanalyzeDialog(true)}
                 disabled={isReanalyzing}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[11px] font-medium bg-muted/50 text-foreground border border-border/60 hover:bg-accent transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[11px] font-medium glass text-foreground border border-white/[0.04] hover:border-white/10 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {isReanalyzing ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -626,7 +626,7 @@ export const PropertyDetail = () => {
               <div className="relative">
                 <button
                   onClick={() => setShowMoreMenu(!showMoreMenu)}
-                  className="w-9 h-9 flex items-center justify-center rounded-lg bg-muted/50 border border-border/60 text-muted-foreground hover:bg-accent transition-colors"
+                  className="w-9 h-9 flex items-center justify-center rounded-lg glass border border-white/[0.04] text-muted-foreground hover:border-white/10 transition-colors"
                 >
                   <MoreVertical className="w-4 h-4" />
                 </button>
@@ -636,7 +636,7 @@ export const PropertyDetail = () => {
                       className="fixed inset-0 z-40"
                       onClick={() => setShowMoreMenu(false)}
                     />
-                    <div className="absolute right-0 top-full mt-2 w-44 rounded-xl bg-card border border-border shadow-lg z-50 overflow-hidden animate-fade-in">
+                    <div className="absolute right-0 top-full mt-2 w-44 rounded-xl glass border border-white/[0.04] shadow-lg z-50 overflow-hidden animate-fade-in">
                       <button
                         onClick={() => {
                           setShowMoreMenu(false);
@@ -790,13 +790,13 @@ export const PropertyDetail = () => {
 
           {/* Panel */}
           <div
-            className="relative h-full w-full max-w-lg overflow-y-auto bg-card border-l border-border animate-fade-in"
+            className="relative h-full w-full max-w-lg overflow-y-auto bg-[#0c0c0f] border-l border-white/[0.04] animate-fade-in"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Panel header */}
-            <div className="sticky top-0 px-6 py-4 flex items-center justify-between bg-card border-b border-border z-10">
+            <div className="sticky top-0 px-6 py-4 flex items-center justify-between bg-[#0c0c0f] border-b border-white/[0.04] z-10">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-primary">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-white">
                   <Sparkles className="w-5 h-5 text-primary-foreground" />
                 </div>
                 <div>
@@ -819,8 +819,8 @@ export const PropertyDetail = () => {
             {/* Panel content */}
             <div className="p-6 space-y-6">
               {/* Back-of-napkin summary */}
-              <div className="p-4 rounded-xl bg-accent border border-primary/20">
-                <h4 className="font-semibold mb-2 text-primary">
+              <div className="p-4 rounded-xl glass border border-white/[0.04]">
+                <h4 className="font-semibold mb-2 text-white">
                   Back-of-Napkin Summary
                 </h4>
                 <p className="text-sm leading-relaxed text-foreground">
@@ -945,7 +945,7 @@ export const PropertyDetail = () => {
                   {economicOccupancy.percent > 0 &&
                     economicOccupancy.percent < 90 && (
                       <div className="flex gap-3 p-3 rounded-xl bg-muted">
-                        <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                        <AlertTriangle className="w-5 h-5 text-zinc-400 shrink-0 mt-0.5" />
                         <p className="text-sm text-muted-foreground">
                           Economic occupancy at{' '}
                           {economicOccupancy.percent.toFixed(1)}% is below the
@@ -990,12 +990,12 @@ export const PropertyDetail = () => {
                     }}
                     disabled={followUpLoading}
                     placeholder="E.g., What's the rent growth assumption in the Y1 proforma?"
-                    className="w-full px-4 py-3 pr-12 rounded-xl text-sm bg-muted border border-border text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+                    className="w-full px-4 py-3 pr-12 rounded-xl text-sm glass border border-white/[0.04] text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-white/20 disabled:opacity-50"
                   />
                   <button
                     onClick={handleFollowUpSend}
                     disabled={followUpLoading || !followUpQuestion.trim()}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg bg-white text-black hover:bg-white/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {followUpLoading ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -1014,10 +1014,10 @@ export const PropertyDetail = () => {
                           'p-3 rounded-xl border',
                           item.isError
                             ? 'bg-destructive/10 border-destructive/40'
-                            : 'bg-muted/50 border-border/40',
+                            : 'glass border-white/[0.04]',
                         )}
                       >
-                        <p className="text-xs font-semibold text-primary mb-1">Q: {item.question}</p>
+                        <p className="text-xs font-semibold text-white mb-1">Q: {item.question}</p>
                         {item.isStreaming && !item.answer ? (
                           <div className="flex items-center gap-1 py-1">
                             <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground animate-bounce [animation-delay:0ms]" />
@@ -1061,13 +1061,13 @@ export const PropertyDetail = () => {
           <DialogFooter>
             <button
               onClick={() => setShowReanalyzeDialog(false)}
-              className="px-4 py-2 rounded-lg text-sm font-medium border border-border text-foreground hover:bg-accent transition-colors"
+              className="px-4 py-2 rounded-lg text-sm font-medium border border-white/10 text-foreground hover:bg-white/[0.04] transition-colors"
             >
               Cancel
             </button>
             <button
               onClick={handleReanalyze}
-              className="px-4 py-2 rounded-lg text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors flex items-center gap-2"
+              className="px-4 py-2 rounded-lg text-sm font-medium bg-white text-black hover:bg-white/90 transition-colors flex items-center gap-2"
             >
               Re-analyze
             </button>
