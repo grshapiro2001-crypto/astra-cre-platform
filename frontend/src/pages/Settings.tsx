@@ -237,7 +237,11 @@ const AppearanceSection = () => {
             variant="outline"
             size="sm"
             onClick={() => {
-              localStorage.removeItem('talisman_onboarding_complete');
+              try {
+                localStorage.removeItem('talisman_onboarding_complete');
+              } catch (err) {
+                console.error('Failed to clear onboarding state:', err);
+              }
               window.location.reload();
             }}
           >
