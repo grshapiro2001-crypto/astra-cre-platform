@@ -989,6 +989,7 @@ export const Library = () => {
                   {/* Deal Score */}
                   <div
                     className="flex justify-center"
+                    style={{ opacity: scores[property.id] ? 1 : 0.5, cursor: scores[property.id] ? 'pointer' : 'default' }}
                     onClick={(e) => {
                       e.stopPropagation();
                       if (scores[property.id]) {

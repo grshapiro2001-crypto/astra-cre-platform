@@ -139,6 +139,9 @@ export const PropertyDetail = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
+  // Fix BUG-007: Track polling interval for cleanup on unmount
+  const pollingIntervalRef = useRef<number | null>(null);
+
   // --- Document upload state ---
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploadingDoc, setIsUploadingDoc] = useState(false);
@@ -256,6 +259,15 @@ export const PropertyDetail = () => {
     fetchScore();
   }, [id]);
 
+  // Clean up polling interval on unmount (BUG-007)
+  useEffect(() => {
+    return () => {
+      if (pollingIntervalRef.current !== null) {
+        window.clearInterval(pollingIntervalRef.current);
+      }
+    };
+  }, []);
+
   // -----------------------------------------------------------------------
   // Actions
   // -----------------------------------------------------------------------
@@ -275,12 +287,13 @@ export const PropertyDetail = () => {
       const poll = async () => {
         const MAX_POLLS = 60; // up to ~5 minutes (60 × 5 s)
         let attempts = 0;
-        const interval = window.setInterval(async () => {
+        pollingIntervalRef.current = window.setInterval(async () => {
           attempts++;
           try {
             const status = await propertyService.getAnalysisStatus(parseInt(id));
             if (status.analysis_status === 'completed' || status.analysis_status === 'failed') {
-              window.clearInterval(interval);
+              window.clearInterval(pollingIntervalRef.current!);
+              pollingIntervalRef.current = null;
               setIsReanalyzing(false);
               if (status.analysis_status === 'completed') {
                 // Fetch full property now that extraction is done
@@ -295,7 +308,8 @@ export const PropertyDetail = () => {
             // Polling errors are transient — keep trying until MAX_POLLS
           }
           if (attempts >= MAX_POLLS) {
-            window.clearInterval(interval);
+            window.clearInterval(pollingIntervalRef.current!);
+            pollingIntervalRef.current = null;
             setIsReanalyzing(false);
             setProperty((prev) => prev ? { ...prev, analysis_status: 'failed' } : prev);
             alert('Re-analysis timed out. The extraction may still be running — refresh the page in a moment.');
@@ -774,8 +788,7 @@ export const PropertyDetail = () => {
         setProperty={setProperty}
       />
 
-      {/* NOTE: All section content has been moved to tab components. Dead code removed. */}
-      {false && <div />}
+
 
       {/* =================================================================== */}
       {/* AI ANALYSIS SLIDE-OUT PANEL                                          */}

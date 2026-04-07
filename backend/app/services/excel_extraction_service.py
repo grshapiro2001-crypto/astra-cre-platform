@@ -14,6 +14,7 @@ import openpyxl
 from openpyxl.worksheet.worksheet import Worksheet
 from rapidfuzz import fuzz, process
 
+from app.config import settings
 from app.services.t12_taxonomy import T12_TAXONOMY, TAXONOMY_TO_SUMMARY_FIELD
 
 logger = logging.getLogger(__name__)
@@ -1212,7 +1213,11 @@ async def extract_t12_with_ai_fallback(filepath: str) -> dict:
 
         sheet_text = _worksheet_to_text(filepath)
 
-        client = anthropic.Anthropic()
+        client = anthropic.Anthropic(
+            api_key=settings.ANTHROPIC_API_KEY,
+            base_url="https://api.anthropic.com",
+            timeout=120.0,
+        )
         response = client.messages.create(
             model="claude-sonnet-4-5-20250929",
             max_tokens=4096,

@@ -568,7 +568,7 @@ export const Dashboard = () => {
       setStageMap(initialStageMap);
       try { localStorage.setItem(DEAL_STAGES_KEY, JSON.stringify(initialStageMap)); } catch { /* noop */ }
 
-      criteriaService.getScreeningSummary().then(setScreeningSummary).catch(() => {});
+      criteriaService.getScreeningSummary().then(setScreeningSummary).catch((err) => { console.error('Failed to load screening summary:', err); });
 
       if (props.length > 0) {
         scoringService
@@ -580,7 +580,7 @@ export const Dashboard = () => {
             });
             setScoresMap(map);
           })
-          .catch(() => {});
+          .catch((err) => { console.error('Failed to load deal scores:', err); });
       }
 
       if (props.length > 0) {
