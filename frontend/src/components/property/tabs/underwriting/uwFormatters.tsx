@@ -275,6 +275,23 @@ export function NumericInput({
   );
 }
 
+/** Format a number with accounting-convention negative display: ($187,983) */
+export function formatCurrencyAccounting(v: number | null | undefined): string {
+  if (v == null) return '—';
+  if (v < 0) return `(${formatCurrency(Math.abs(v))})`;
+  return formatCurrency(v);
+}
+
+/** Strip formatting and parse raw number from user input. */
+export function parseRawNumber(s: string): number | null {
+  // Handle accounting negatives: (123) → -123
+  const cleaned = s.replace(/[()]/g, (m) => (m === '(' ? '-' : ''));
+  const stripped = cleaned.replace(/[^0-9.\-]/g, '');
+  if (stripped === '' || stripped === '-') return null;
+  const n = Number(stripped);
+  return isNaN(n) ? null : n;
+}
+
 // ---------------------------------------------------------------------------
 // T12 Reference label (small muted text showing trailing actual)
 // ---------------------------------------------------------------------------

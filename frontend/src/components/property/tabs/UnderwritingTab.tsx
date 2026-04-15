@@ -133,6 +133,46 @@ function uwReducer(state: UWState, action: UWAction): UWState {
         hasUnsavedChanges: false,
       };
 
+    case 'SET_OVERRIDE': {
+      const prevOverrides = state.inputs.overrides || {};
+      const scenarioOverrides = { ...(prevOverrides[action.scenario] || {}) };
+      scenarioOverrides[action.key] = action.value;
+      return {
+        ...state,
+        inputs: {
+          ...state.inputs,
+          overrides: { ...prevOverrides, [action.scenario]: scenarioOverrides },
+        },
+        hasUnsavedChanges: true,
+      };
+    }
+
+    case 'REMOVE_OVERRIDE': {
+      const prevOv = state.inputs.overrides || {};
+      const scenOv = { ...(prevOv[action.scenario] || {}) };
+      delete scenOv[action.key];
+      return {
+        ...state,
+        inputs: {
+          ...state.inputs,
+          overrides: { ...prevOv, [action.scenario]: scenOv },
+        },
+        hasUnsavedChanges: true,
+      };
+    }
+
+    case 'CLEAR_OVERRIDES': {
+      const prevAll = state.inputs.overrides || {};
+      return {
+        ...state,
+        inputs: {
+          ...state.inputs,
+          overrides: { ...prevAll, [action.scenario]: {} },
+        },
+        hasUnsavedChanges: true,
+      };
+    }
+
     default:
       return state;
   }

@@ -251,6 +251,18 @@ class UnderwritingEngine:
     # DCF Projection (non-flat inflation curves)
     # ------------------------------------------------------------------
 
+    def _compute_custom_line_items(
+        self, items: list, yr_idx: int,
+    ) -> float:
+        """Sum custom line item values for a given year index."""
+        total = 0.0
+        for item in items:
+            if yr_idx + 1 < item.start_year:
+                continue
+            years_active = yr_idx + 1 - item.start_year
+            total += item.base_value * (1 + item.growth_rate) ** years_active
+        return total
+
     def _compute_dcf(
         self,
         proforma: ProformaResult,
@@ -267,10 +279,20 @@ class UnderwritingEngine:
           - Mgmt fee is RECALCULATED each year as % of that year's income
           - Deductions (vacancy, concessions, bad debt) use per-year arrays
             applied to that year's GPI
+
+        V3 additions:
+          - Cell overrides: any computed cell can be pinned to a manual value.
+            Overrides replace the computed value for a specific (key, year).
+            Downstream calculations use the overridden value.
+            Overrides do NOT propagate to future years.
+          - Custom line items: user-defined revenue/expense rows.
         """
         inp = self.inputs
         hold = inp.hold_period_years
         units = self._total_units
+
+        # Per-scenario overrides dict: {"gpr:0": 4500000.0, ...}
+        scenario_overrides = (inp.overrides or {}).get(scenario_key, {})
 
         # Y1 base values from proforma
         y1_gpr = proforma.revenue.gpr
@@ -288,6 +310,17 @@ class UnderwritingEngine:
 
         for yr_idx in range(hold):
             yr = yr_idx + 1
+            computed_values: dict[str, float] = {}
+
+            # Override helper — checks if a manual override exists for this
+            # (line_key, year). If so, stashes the computed value and returns
+            # the override. Downstream calculations use the returned value.
+            def _ov(key: str, computed_val: float) -> float:
+                ov_key = f"{key}:{yr_idx}"
+                if ov_key in scenario_overrides:
+                    computed_values[key] = computed_val
+                    return scenario_overrides[ov_key]
+                return computed_val
 
             # ── Cumulative growth factors (year-by-year arrays) ──
             rental_gf = self._cumulative_growth(inp.rental_inflation, yr_idx)
@@ -295,57 +328,67 @@ class UnderwritingEngine:
             tax_gf = self._cumulative_growth(inp.re_tax_inflation, yr_idx)
 
             # ── Revenue ──
-            gpr = y1_gpr * rental_gf
+            gpr = _ov("gpr", y1_gpr * rental_gf)
 
             # Deductions: per-year pct arrays applied to GPI
             vi = min(yr_idx, len(inp.vacancy_pct) - 1)
             ci = min(yr_idx, len(inp.concession_pct) - 1)
             bi = min(yr_idx, len(inp.bad_debt_pct) - 1)
 
-            vacancy = gpr * inp.vacancy_pct[vi]
-            concessions_val = gpr * inp.concession_pct[ci]
-            bad_debt_val = gpr * inp.bad_debt_pct[bi]
+            vacancy = _ov("vacancy", gpr * inp.vacancy_pct[vi])
+            concessions_val = _ov("concessions", gpr * inp.concession_pct[ci])
+            bad_debt_val = _ov("bad_debt", gpr * inp.bad_debt_pct[bi])
 
             # NRU loss grows with rental inflation
             nru_avg = inp.nru_avg_rent
             if nru_avg <= 0 and inp.unit_mix:
                 nru_avg = self._avg_market_rent
-            nru_loss = inp.nru_count * nru_avg * 12 * rental_gf
+            nru_loss = _ov("nru_loss", inp.nru_count * nru_avg * 12 * rental_gf)
 
-            nri = gpr - vacancy - concessions_val - nru_loss - bad_debt_val
+            nri = _ov("nri", gpr - vacancy - concessions_val - nru_loss - bad_debt_val)
 
             # Other income grows with rental inflation
             util_reimb = y1_util * rental_gf
             parking = y1_parking * rental_gf
             other_inc = y1_other * rental_gf
-            total_income = nri + util_reimb + parking + other_inc
+
+            # Custom revenue items
+            custom_rev = self._compute_custom_line_items(
+                inp.custom_revenue_items, yr_idx,
+            )
+
+            other_income_total = _ov("other_income", util_reimb + parking + other_inc + custom_rev)
+            total_income = _ov("total_income", nri + other_income_total)
 
             # ── Expenses ──
             # Controllable: grows at expense_inflation[year]
-            controllable = y1_controllable * expense_gf
+            # Custom expense items
+            custom_exp = self._compute_custom_line_items(
+                inp.custom_expense_items, yr_idx,
+            )
+            controllable = _ov("controllable_expenses", y1_controllable * expense_gf + custom_exp)
 
             # Property taxes: grows at re_tax_inflation[year]
-            # If reassessment mode, use reassessed base from Y1 proforma
-            prop_tax = y1_tax * tax_gf
+            prop_tax = _ov("property_taxes", y1_tax * tax_gf)
 
             # Insurance: grows at expense_inflation[year]
-            insurance = y1_insurance * expense_gf
+            insurance = _ov("insurance", y1_insurance * expense_gf)
 
             # Management fee: RECALCULATED each year as % of that year's income
-            mgmt_fee = total_income * inp.mgmt_fee_pct
+            mgmt_fee = _ov("management_fee", total_income * inp.mgmt_fee_pct)
 
-            total_expenses = controllable + prop_tax + insurance + mgmt_fee
+            total_expenses = _ov("total_expenses", controllable + prop_tax + insurance + mgmt_fee)
 
             # ── Bottom line ──
-            noi = total_income - total_expenses
+            noi = _ov("noi", total_income - total_expenses)
 
             # Reserves
             if inp.reserves_inflate:
-                reserves = y1_reserves * expense_gf
+                reserves = _ov("reserves", y1_reserves * expense_gf)
             else:
-                reserves = y1_reserves
+                reserves = _ov("reserves", y1_reserves)
 
-            ncf = noi - reserves
+            ncf = _ov("ncf", noi - reserves)
 
             # Debt service
             ds = (
@@ -380,7 +423,7 @@ class UnderwritingEngine:
                 bad_debt=bad_debt_val,
                 nru_loss=nru_loss,
                 nri=nri,
-                other_income=util_reimb + parking + other_inc,
+                other_income=other_income_total,
                 total_income=total_income,
                 controllable_expenses=controllable,
                 property_taxes=prop_tax,
@@ -397,6 +440,9 @@ class UnderwritingEngine:
                 revenue_growth_rate=rev_growth,
                 noi_growth_rate=noi_growth,
                 effective_rent=eff_rent,
+                custom_revenue=custom_rev,
+                custom_expenses=custom_exp,
+                computed_values=computed_values if computed_values else None,
             ))
 
             prev_total_income = total_income

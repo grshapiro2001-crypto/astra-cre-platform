@@ -40,6 +40,15 @@ export interface ContractServiceItem {
   annual_total: number;
 }
 
+export interface CustomLineItem {
+  id: string;
+  label: string;
+  base_value: number;
+  growth_rate: number;       // decimal (0.03 = 3%)
+  start_year: number;        // 1-based
+  category: 'revenue' | 'expense';
+}
+
 // ---------------------------------------------------------------------------
 // Scenario Inputs
 // ---------------------------------------------------------------------------
@@ -117,6 +126,11 @@ export interface UWInputs {
   la_remaining_term_months: number;
   la_remaining_io_months: number;
   la_amort_years: number;
+  // Cell overrides — per-scenario, keyed by "line_key:year_index"
+  overrides: Record<string, Record<string, number>>;
+  // Custom line items
+  custom_revenue_items: CustomLineItem[];
+  custom_expense_items: CustomLineItem[];
 }
 
 // ---------------------------------------------------------------------------
@@ -199,6 +213,9 @@ export interface DCFYearResult {
   revenue_growth_rate: number | null;
   noi_growth_rate: number | null;
   effective_rent: number;
+  custom_revenue: number;
+  custom_expenses: number;
+  computed_values?: Record<string, number> | null;
 }
 
 export interface DCFResult {
@@ -350,5 +367,8 @@ export function createDefaultInputs(): UWInputs {
     la_remaining_term_months: 0,
     la_remaining_io_months: 0,
     la_amort_years: 30,
+    overrides: {},
+    custom_revenue_items: [],
+    custom_expense_items: [],
   };
 }
