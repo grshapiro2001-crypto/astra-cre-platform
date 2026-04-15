@@ -45,6 +45,16 @@ class ContractServiceItem(BaseModel):
     annual_total: float = 0.0
 
 
+class CustomLineItem(BaseModel):
+    """User-defined revenue or expense line item."""
+    id: str = ""
+    label: str = ""
+    base_value: float = 0.0       # Y1 annual amount
+    growth_rate: float = 0.0      # annual growth rate (decimal, e.g. 0.03 = 3%)
+    start_year: int = 1           # 1-based year when item begins
+    category: str = "revenue"     # "revenue" | "expense"
+
+
 # ---------------------------------------------------------------------------
 # Scenario Inputs
 # ---------------------------------------------------------------------------
@@ -143,6 +153,14 @@ class UWInputs(BaseModel):
     la_remaining_io_months: int = 0
     la_amort_years: int = 30
 
+    # Cell overrides — per-scenario, keyed by "line_key:year_index"
+    # Example: {"premium": {"gpr:2": 4500000.0}, "market": {}}
+    overrides: dict[str, dict[str, float]] = Field(default_factory=dict)
+
+    # Custom line items (user-defined revenue/expense rows)
+    custom_revenue_items: list[CustomLineItem] = Field(default_factory=list)
+    custom_expense_items: list[CustomLineItem] = Field(default_factory=list)
+
 
 # ---------------------------------------------------------------------------
 # Output Sub-Results
@@ -229,6 +247,11 @@ class DCFYearResult(BaseModel):
     revenue_growth_rate: Optional[float] = None
     noi_growth_rate: Optional[float] = None
     effective_rent: float = 0.0
+    # Custom line item totals
+    custom_revenue: float = 0.0
+    custom_expenses: float = 0.0
+    # Pre-override computed values for overridden cells (sparse — only populated for overridden keys)
+    computed_values: Optional[dict[str, float]] = None
 
 
 class DCFResult(BaseModel):

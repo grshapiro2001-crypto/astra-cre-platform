@@ -22,7 +22,11 @@ export type UWAction =
   | { type: 'SET_OTHER_INCOME_ITEMS'; payload: UWInputs['other_income_items'] }
   | { type: 'SET_PAYROLL_ITEMS'; payload: UWInputs['payroll_items'] }
   | { type: 'SET_CONTRACT_SERVICES_ITEMS'; payload: UWInputs['contract_services_items'] }
-  | { type: 'SET_UNIT_MIX'; payload: UWInputs['unit_mix'] };
+  | { type: 'SET_UNIT_MIX'; payload: UWInputs['unit_mix'] }
+  // Override actions
+  | { type: 'SET_OVERRIDE'; scenario: string; key: string; value: number }
+  | { type: 'REMOVE_OVERRIDE'; scenario: string; key: string }
+  | { type: 'CLEAR_OVERRIDES'; scenario: string };
 
 // ---------------------------------------------------------------------------
 // State
