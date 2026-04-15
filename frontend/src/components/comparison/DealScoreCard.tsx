@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom';
 import { Star, ArrowRight, Pin } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DealScoreBadge } from '@/components/scoring/DealScoreBadge';
-import type { ScoredProperty, MetricPreset, CompMetricKey } from './types';
+import type { ScoredProperty, MetricPreset } from './types';
 import type { DealScoreResult } from '@/services/scoringService';
 import { PROPERTY_COLORS, METRIC_DEFS, EM_DASH, formatPrice } from './constants';
 import { getPropertyMetric, getScoreBarBg, getRankLabel } from './utils';

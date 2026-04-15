@@ -3,7 +3,7 @@
  */
 import { useMemo, useState } from 'react';
 import type { PropertyComparisonItem } from './types';
-import { PROPERTY_COLORS, EM_DASH, METRIC_DEFS } from './constants';
+import { PROPERTY_COLORS, METRIC_DEFS } from './constants';
 import { getPropertyMetric, computeCompAverage } from './utils';
 
 interface ScatterPlotProps {
@@ -124,7 +124,7 @@ export function ScatterPlot({ properties, subjectId }: ScatterPlotProps) {
         )}
 
         {/* Data points */}
-        {points.map((pt, i) => {
+        {points.map((pt) => {
           const cx = scaleX(pt.x);
           const cy = scaleY(pt.y);
           const r = pt.isSubject ? 7 : Math.max(4, Math.min(6, pt.units / 80));

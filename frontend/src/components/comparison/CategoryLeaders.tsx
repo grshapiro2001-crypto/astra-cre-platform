@@ -9,7 +9,6 @@ import { getPropertyMetric } from './utils';
 interface CategoryLeadersProps {
   properties: PropertyComparisonItem[];
   preset: MetricPreset;
-  hoveredPropertyId: number | null;
   onHover: (id: number) => void;
   onUnhover: () => void;
 }
@@ -17,7 +16,6 @@ interface CategoryLeadersProps {
 export function CategoryLeaders({
   properties,
   preset,
-  hoveredPropertyId,
   onHover,
   onUnhover,
 }: CategoryLeadersProps) {

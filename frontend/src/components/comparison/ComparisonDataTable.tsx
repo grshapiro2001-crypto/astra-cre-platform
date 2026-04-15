@@ -15,10 +15,10 @@ import type {
   SortConfig,
   CompMetricKey,
 } from './types';
-import type { Criterion, PropertyRanking, CriteriaMetricKey } from '@/utils/criteriaEvaluation';
+import type { Criterion, PropertyRanking, MetricKey as CriteriaMetricKey } from '@/utils/criteriaEvaluation';
 import { getGradientColor } from '@/utils/criteriaEvaluation';
 import type { DealScoreResult } from '@/services/scoringService';
-import { TABLE_SECTIONS, METRIC_DEFS, EM_DASH, formatPrice, NORMALIZABLE_METRICS } from './constants';
+import { TABLE_SECTIONS, METRIC_DEFS, EM_DASH } from './constants';
 import {
   getPropertyMetric,
   isBestApiValue,
@@ -39,8 +39,8 @@ interface ComparisonDataTableProps {
   hoveredPropertyId: number | null;
   subjectId: number | null;
   normalizationMode: NormalizationMode;
-  sortConfig: SortConfig;
-  onSort: (config: SortConfig) => void;
+  sortConfig: SortConfig | null;
+  onSort: (config: SortConfig | null) => void;
   onHover: (id: number) => void;
   onUnhover: () => void;
   onScoreClick: (id: number) => void;
@@ -118,7 +118,7 @@ export function ComparisonDataTable({
       if (sortConfig.direction === 'desc') {
         onSort({ key, direction: 'asc' });
       } else {
-        onSort(null as unknown as SortConfig); // clear sort
+        onSort(null); // clear sort
       }
     } else {
       onSort({ key, direction: 'desc' });

@@ -1,7 +1,7 @@
 /**
  * ComparisonToolbar — Sticky toolbar with view toggle, normalization, save/export actions
  */
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { ArrowLeft, Zap, Layers, Bookmark, Download, ChevronDown, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatPrice } from './constants';
@@ -37,22 +37,16 @@ export function ComparisonToolbar({
   const [savedComparisons, setSavedComparisons] = useState<SavedComparisonResponse[]>([]);
   const [loadingSaved, setLoadingSaved] = useState(false);
 
-  const loadSaved = useCallback(async () => {
-    if (loadingSaved) return;
-    setLoadingSaved(true);
-    try {
-      const list = await savedComparisonService.list();
-      setSavedComparisons(list);
-    } catch {
-      /* ignore */
-    } finally {
-      setLoadingSaved(false);
-    }
-  }, [loadingSaved]);
-
   useEffect(() => {
-    if (showSaved) loadSaved();
-  }, [showSaved]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!showSaved) return;
+    let cancelled = false;
+    setLoadingSaved(true);
+    savedComparisonService.list()
+      .then((list) => { if (!cancelled) setSavedComparisons(list); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoadingSaved(false); });
+    return () => { cancelled = true; };
+  }, [showSaved]);
 
   const handleDelete = async (id: number, e: React.MouseEvent) => {
     e.stopPropagation();

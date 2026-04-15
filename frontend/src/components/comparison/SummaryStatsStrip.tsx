@@ -3,14 +3,13 @@
  */
 import { useMemo } from 'react';
 import { cn } from '@/lib/utils';
-import type { PropertyComparisonItem, NormalizationMode } from './types';
-import { EM_DASH, formatPrice, METRIC_DEFS } from './constants';
-import { getPropertyMetric, computeCompAverage, normalizeValue } from './utils';
+import type { PropertyComparisonItem } from './types';
+import { EM_DASH, METRIC_DEFS } from './constants';
+import { getPropertyMetric, computeCompAverage } from './utils';
 
 interface SummaryStatsStripProps {
   properties: PropertyComparisonItem[];
   subjectId: number | null;
-  normalizationMode: NormalizationMode;
   avgScore: number | null;
 }
 
@@ -25,7 +24,6 @@ interface StatCard {
 export function SummaryStatsStrip({
   properties,
   subjectId,
-  normalizationMode,
   avgScore,
 }: SummaryStatsStripProps) {
   const subject = useMemo(

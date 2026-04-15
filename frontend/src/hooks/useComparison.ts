@@ -131,8 +131,8 @@ export function useComparison(): UseComparisonReturn {
         if (!allProperties.length) {
           setPickerLoading(true);
           try {
-            const all = await propertyService.getProperties();
-            setAllProperties(all);
+            const result = await propertyService.listProperties();
+            setAllProperties(result.properties);
           } catch {
             /* ignore */
           } finally {

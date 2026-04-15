@@ -2,7 +2,6 @@
  * PresetSelector — Scoring template button group
  */
 import { cn } from '@/lib/utils';
-import type { MetricPreset } from './types';
 import { DEFAULT_PRESETS } from './constants';
 
 interface PresetSelectorProps {

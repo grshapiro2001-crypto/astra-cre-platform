@@ -5,7 +5,6 @@ import { useNavigate } from 'react-router-dom';
 import { Layers, Check, ArrowRight, Pin } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { PropertyListItem } from '@/services/propertyService';
-import { EM_DASH } from './constants';
 
 interface PropertyPickerProps {
   allProperties: PropertyListItem[];

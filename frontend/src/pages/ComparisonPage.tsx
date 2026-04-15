@@ -9,10 +9,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { Layers } from 'lucide-react';
 import { exportComparisonToCSV } from '@/utils/csvExport';
-import { getGradientColor } from '@/utils/criteriaEvaluation';
-import type { MetricKey as CriteriaMetricKey } from '@/utils/criteriaEvaluation';
 import { DealScoreModal } from '@/components/scoring/DealScoreModal';
 import { ComparisonSkeleton } from '@/components/ui/PageSkeleton';
 import { SlowLoadBanner } from '@/components/common/SlowLoadBanner';
@@ -58,7 +55,7 @@ export const ComparisonPage = () => {
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [normalizationMode, setNormalizationMode] = useState<NormalizationMode>('absolute');
   const [subjectId, setSubjectId] = useState<number | null>(null);
-  const [sortConfig, setSortConfig] = useState<SortConfig>(null as unknown as SortConfig);
+  const [sortConfig, setSortConfig] = useState<SortConfig | null>(null);
   const [animated, setAnimated] = useState(false);
 
   // Trigger animation after mount
@@ -228,7 +225,6 @@ export const ComparisonPage = () => {
                       <CategoryLeaders
                         properties={comp.properties}
                         preset={comp.currentPreset}
-                        hoveredPropertyId={hoveredPropertyId}
                         onHover={setHoveredPropertyId}
                         onUnhover={() => setHoveredPropertyId(null)}
                       />
@@ -248,7 +244,6 @@ export const ComparisonPage = () => {
                   <SummaryStatsStrip
                     properties={comp.properties}
                     subjectId={subjectId}
-                    normalizationMode={normalizationMode}
                     avgScore={avgScore}
                   />
 
