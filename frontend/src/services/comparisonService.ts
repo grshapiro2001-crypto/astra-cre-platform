@@ -36,6 +36,7 @@ export interface ComparisonFinancials {
 export interface ComparisonOperations {
   opex_ratio?: number;
   opex_per_unit?: number;
+  economic_occupancy?: number;
 }
 
 export interface PropertyComparisonItem {
@@ -66,6 +67,7 @@ export interface BestValues {
   best_noi_growth?: number;
   lowest_opex_ratio?: number;
   lowest_opex_per_unit?: number;
+  best_economic_occupancy?: number;
 }
 
 export interface ComparisonResponse {

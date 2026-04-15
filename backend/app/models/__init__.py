@@ -12,6 +12,7 @@ from app.models.extraction_log import ExtractionLog
 from app.models.underwriting import UnderwritingModel
 from app.models.t12_line_items import T12LineItem
 from app.models.waitlist import WaitlistEntry
+from app.models.saved_comparison import SavedComparison
 
 __all__ = [
     "User", "Property", "AnalysisLog", "PropertyUnitMix", "PropertyRentComp", "PropertyDocument", "RentRollUnit", "T12Financial",
@@ -27,4 +28,5 @@ __all__ = [
     "UnderwritingModel",
     "T12LineItem",
     "WaitlistEntry",
+    "SavedComparison",
 ]
