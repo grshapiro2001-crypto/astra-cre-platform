@@ -87,8 +87,10 @@ def calculate_retail(inp: RetailInput) -> RetailResult:
         8. Net Cash Flow (Retail!L44): sum of steps 1–7.
 
     Valuation (per scenario, Retail!L47):
-        * Reversion value = NCF[hold+1] / exit_cap
-        * NPV inputs = NCF[1..hold-1] + [NCF[hold] + reversion]
+        * Gross reversion = NCF[hold+1] / exit_cap
+        * Net reversion = gross_reversion × (1 − transaction_cost_percent)
+          (Retail!L49 — less: Transaction Costs, Valuation!$C$32)
+        * NPV inputs = NCF[1..hold-1] + [NCF[hold] + net_reversion]
         * retail_value = excel_npv(discount_rate, NPV inputs)
         * year_1_cap_rate = NCF[1] / retail_value (Retail!L48)
         * value_per_retail_sf = retail_value / total_sqft (Retail!L49)
@@ -213,7 +215,9 @@ def _compute_scenario(
     ncfs = [cf.net_cash_flow for cf in cash_flows]
 
     # Retail!L47 — Reversion from year hold+1 NCF / exit cap.
-    reversion_value = ncfs[hold] / assumptions.exit_cap
+    gross_reversion = ncfs[hold] / assumptions.exit_cap
+    # Retail!L49 — less: Transaction Costs (Valuation!$C$32).
+    reversion_value = gross_reversion * (1.0 - inp.transaction_cost_percent)
 
     # NPV inputs: years 1..hold, with reversion added to the final hold year.
     npv_inputs = list(ncfs[:hold])

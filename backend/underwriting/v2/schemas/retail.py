@@ -106,6 +106,8 @@ class RetailInput(BaseModel):
         mf_ltv_ratio: MF Loan_Amount / Pro_Forma_Price; applied to
             retail value to size implied retail debt proceeds
             (Retail!$C$52).
+        transaction_cost_percent: Sales transaction costs applied to the
+            gross reversion at exit (Valuation!$C$32, Retail!L49).
     """
 
     model_config = ConfigDict(frozen=True)
@@ -127,6 +129,17 @@ class RetailInput(BaseModel):
     premium: RetailScenarioAssumptions
     market: RetailScenarioAssumptions
     mf_ltv_ratio: float = Field(ge=0.0, le=1.5)
+    transaction_cost_percent: float = Field(
+        default=0.015,
+        ge=0.0,
+        le=0.10,
+        description=(
+            "Sales transaction costs as decimal (e.g., 0.015 = 1.50%). "
+            "Applied to the gross reversion at exit year, matching "
+            "W&D's Retail!L49 / Valuation!$C$32 convention. Default "
+            "1.50% mirrors the Prose Gainesville template."
+        ),
+    )
 
 
 class RetailAnnualCashFlow(BaseModel):
