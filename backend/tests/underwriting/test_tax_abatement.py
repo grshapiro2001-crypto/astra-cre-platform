@@ -10,14 +10,12 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
+from backend.underwriting.v2._financial import excel_npv
 from backend.underwriting.v2.schemas.tax_abatement import (
     TaxAbatementInput,
     TaxAbatementResult,
 )
-from backend.underwriting.v2.tax_abatement import (
-    _npv_end_of_period,
-    calculate_tax_abatement,
-)
+from backend.underwriting.v2.tax_abatement import calculate_tax_abatement
 
 
 def _reference_input(**overrides: object) -> TaxAbatementInput:
@@ -207,14 +205,14 @@ def test_re_tax_inflation_too_short_raises() -> None:
         )
 
 
-def test_npv_end_of_period_helper_matches_excel_semantics() -> None:
-    """Private NPV helper must match Excel NPV(): first CF at t=1."""
+def test_excel_npv_helper_matches_excel_semantics() -> None:
+    """Shared ``excel_npv`` helper must match Excel NPV(): first CF at t=1."""
     # NPV(0.10, [100, 100]) = 100/1.1 + 100/1.21 = 173.5537...
-    assert _npv_end_of_period(0.10, [100.0, 100.0]) == pytest.approx(
+    assert excel_npv(0.10, [100.0, 100.0]) == pytest.approx(
         100.0 / 1.1 + 100.0 / 1.21, abs=1e-9
     )
     # Empty stream → 0.0.
-    assert _npv_end_of_period(0.10, []) == 0.0
+    assert excel_npv(0.10, []) == 0.0
 
 
 def test_shorter_hold_period_returns_shorter_arrays() -> None:

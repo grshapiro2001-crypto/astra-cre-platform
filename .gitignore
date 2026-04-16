@@ -33,3 +33,9 @@ build/
 tmp/
 temp/
 *.tmp
+
+# Test coverage artifacts
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
