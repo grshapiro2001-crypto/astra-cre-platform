@@ -367,21 +367,31 @@ def test_enabled_path_annual_rollup_metadata_echoed() -> None:
         assert rollup.incremental_rent_growth_rate == pytest.approx(expected_rate)
 
 
-def test_enabled_path_summary_scalars_stay_zeroed_in_phase_2() -> None:
-    """Phase 2/3 contract: top-level scalars still 0.0 even on enabled path.
+def test_enabled_path_summary_scalars_populated() -> None:
+    """Phase 4 contract: top-level F-column scalars match the rollups.
 
-    Phase 4 will populate them from the annual rollups.
+    Default ``_reference_input`` is 200 2BR @ $150/mo, 1-yr / Y1 start,
+    $10k/unit, 3% growth. Hand-calc:
+      * total_units_renovated         = 200
+      * total_renovation_cost         = 200 * $10_000        = $2_000_000
+      * weighted_avg_rent_premium     = (200 * 150) / 200    = $150
+      * implied_return_on_cost        = (150 * 12) / 10_000  = 0.18
+      * avg_units_renovated_per_year  = 200 / 1              = 200
+      * stabilized_revenue_increase   = Row 43 @ rollup[0]   = $26_250
+        (Y1 identity = sum of 4 quarterly actuals
+         7500 + 6875 + 6250 + 5625)
+      * annualized_return_on_investment = 26_250 / 2_000_000 = 0.013125
     """
     result = calculate_renovation(_reference_input())
 
     assert result.enabled is True
-    assert result.total_units_renovated == 0.0
-    assert result.total_renovation_cost == 0.0
-    assert result.weighted_avg_rent_premium == 0.0
-    assert result.implied_return_on_cost == 0.0
-    assert result.avg_units_renovated_per_year == 0.0
-    assert result.stabilized_revenue_increase == 0.0
-    assert result.annualized_return_on_investment == 0.0
+    assert result.total_units_renovated == pytest.approx(200.0, abs=0.01)
+    assert result.total_renovation_cost == pytest.approx(2_000_000.0, abs=0.01)
+    assert result.weighted_avg_rent_premium == pytest.approx(150.0, abs=0.01)
+    assert result.implied_return_on_cost == pytest.approx(0.18, abs=1e-6)
+    assert result.avg_units_renovated_per_year == pytest.approx(200.0, abs=0.01)
+    assert result.stabilized_revenue_increase == pytest.approx(26_250.0, abs=0.01)
+    assert result.annualized_return_on_investment == pytest.approx(0.013125, abs=1e-6)
 
 
 # ---------------------------------------------------------------------------
@@ -659,3 +669,188 @@ def test_row43_growth_rate_indexing_uses_rollup_position() -> None:
         rollups[0].cumulative_revenue_growth - rollups[0].downtime_deduction
     ) * (1 + 0.05)
     assert rollups[1].cumulative_revenue_growth == pytest.approx(expected_y2, abs=0.01)
+
+
+# ---------------------------------------------------------------------------
+# Phase 4: Summary scalars & end-to-end reference
+# ---------------------------------------------------------------------------
+
+
+def test_end_to_end_reference_scenario() -> None:
+    """Hand-calculable regression anchor for the entire waterfall.
+
+    Scenario: 100 x 2BR units, 1-year renovation starting Y1,
+    $100/mo premium, $10k/unit, Y1 rent growth = 0% (so nothing
+    compounds in the renovation year), Y2+ rent growth = 3%.
+
+    Every intermediate value is hand-computed below. If this test
+    drifts, compare Talisman output against the W&D "Renovation"
+    tab cell-by-cell before changing assertions.
+
+    Side note: the 0.875% annualized ROI looks low because Y1
+    growth = 0% AND renovation completes in Y1, so the stabilized
+    figure is the Y1 partial-year actual ($8,750) rather than the
+    ramped-up Y2 value ($10,300 = 1.03% ROI). That is a
+    test-design artifact of pairing zero Y1 growth with same-year
+    completion, not a calculation bug.
+    """
+    result = calculate_renovation(
+        _reference_input(
+            start_year=1,
+            duration_years=1,
+            cost_per_unit=10_000.0,
+            unit_types=[
+                _single_unit_type(
+                    unit_type="2BR",
+                    units_to_renovate=100,
+                    rent_premium_per_month=100.0,
+                )
+            ],
+            incremental_rent_growth_rates=[0.0] + [0.03] * 10,
+            downtime_months_per_unit=1,
+            finance_with_loan=False,
+        )
+    )
+
+    # --- Quarterly: Y1 (qtrs 1-4) ---
+    # scheduled per qtr = 100 / (1 * 4) = 25 units.
+    # gross monthly (Row 86) = 25 * $100 = $2,500/mo.
+    # downtime factors (Row 87) = [1.0, 11/12, 10/12, 9/12].
+    # actual monthly (Row 88) = gross * factor.
+    # capex (Row 91) = 25 * $10,000 = $250,000.
+    expected_actuals = [2500.0, 2500.0 * 11 / 12, 2500.0 * 10 / 12, 2500.0 * 9 / 12]
+    expected_factors = [1.0, 11 / 12, 10 / 12, 9 / 12]
+    for q_idx in range(4):
+        qcf = result.quarterly_cash_flows[q_idx]
+        assert qcf.quarter == q_idx + 1
+        assert qcf.fiscal_year == 1
+        assert qcf.units_renovated == pytest.approx(25.0, abs=0.01)
+        assert qcf.incremental_revenue_gross_monthly == pytest.approx(2500.0, abs=0.01)
+        assert qcf.incremental_revenue_factor == pytest.approx(
+            expected_factors[q_idx], abs=1e-6
+        )
+        assert qcf.incremental_revenue_actual_monthly == pytest.approx(
+            expected_actuals[q_idx], abs=0.01
+        )
+        assert qcf.renovation_capex == pytest.approx(250_000.0, abs=0.01)
+
+    # --- Quarterly: qtrs 5-43 (post-completion, all zeros) ---
+    for q_idx in range(4, QUARTERS):
+        qcf = result.quarterly_cash_flows[q_idx]
+        assert qcf.units_renovated == pytest.approx(0.0, abs=0.01)
+        assert qcf.incremental_revenue_gross_monthly == pytest.approx(0.0, abs=0.01)
+        assert qcf.incremental_revenue_actual_monthly == pytest.approx(0.0, abs=0.01)
+        assert qcf.renovation_capex == pytest.approx(0.0, abs=0.01)
+
+    # --- Annual: Y1 (rollup index 0) ---
+    # Row 34 = 100 units, Row 36 = $1,000,000 capex.
+    # Row 38 potential = 4 * $2,500 = $10,000 (sum of monthly gross).
+    # Row 40 actual = 2500 + 2291.67 + 2083.33 + 1875 = $8,750.
+    # Row 39 downtime = actual - potential = $8,750 - $10,000 = -$1,250.
+    # Row 43 Y1 identity = Row 40 = $8,750.
+    y1 = result.annual_rollups[0]
+    assert y1.fiscal_year == 1
+    assert y1.renovations_completed == pytest.approx(100.0, abs=0.01)
+    assert y1.annual_renovation_cost == pytest.approx(1_000_000.0, abs=0.01)
+    assert y1.potential_rent_premium_annual == pytest.approx(10_000.0, abs=0.01)
+    assert y1.current_year_revenue_growth == pytest.approx(8_750.0, abs=0.01)
+    assert y1.downtime_deduction == pytest.approx(-1_250.0, abs=0.01)
+    assert y1.cumulative_revenue_growth == pytest.approx(8_750.0, abs=0.01)
+
+    # --- Annual: Y2 (no-renos branch) ---
+    # cumulative = (prior_cum - prior_downtime) * (1 + growth_rate[1])
+    #            = (8750 - (-1250)) * 1.03 = 10_000 * 1.03 = $10,300.
+    y2 = result.annual_rollups[1]
+    assert y2.renovations_completed == pytest.approx(0.0, abs=0.01)
+    assert y2.annual_renovation_cost == pytest.approx(0.0, abs=0.01)
+    assert y2.incremental_rent_growth_rate == pytest.approx(0.03, abs=1e-6)
+    assert y2.cumulative_revenue_growth == pytest.approx(10_300.0, abs=0.01)
+
+    # --- Annual: Y3 (no-renos branch, no prior downtime to strip) ---
+    # cumulative = (10_300 - 0) * 1.03 = $10,609.
+    y3 = result.annual_rollups[2]
+    assert y3.renovations_completed == pytest.approx(0.0, abs=0.01)
+    assert y3.cumulative_revenue_growth == pytest.approx(10_609.0, abs=0.01)
+
+    # --- Summary scalars (Layer 5, W&D F-column) ---
+    assert result.total_units_renovated == pytest.approx(100.0, abs=0.01)
+    assert result.total_renovation_cost == pytest.approx(1_000_000.0, abs=0.01)
+    # Weighted avg = (100 * 100) / 100 = $100/mo (single unit type).
+    assert result.weighted_avg_rent_premium == pytest.approx(100.0, abs=0.01)
+    # Implied RoC = (100 * 12) / 10_000 = 0.12 (12%).
+    assert result.implied_return_on_cost == pytest.approx(0.12, abs=1e-6)
+    # Avg units / yr = 100 / 1 = 100.
+    assert result.avg_units_renovated_per_year == pytest.approx(100.0, abs=0.01)
+    # Stabilized = Row 43 at completion fiscal year 1 (position 0) = Y1 cum.
+    assert result.stabilized_revenue_increase == pytest.approx(8_750.0, abs=0.01)
+    # Annualized RoI = 8_750 / 1_000_000 = 0.00875 (0.875%).
+    assert result.annualized_return_on_investment == pytest.approx(0.00875, abs=1e-6)
+
+
+def test_summary_stabilized_uses_rollup_position_not_fiscal_year() -> None:
+    """Stabilized index conversion must be ``duration_years - 1``.
+
+    With ``start_year=3, duration_years=2``, completion fiscal year
+    is 4, which lives at rollup position 1 (``annual_rollups[1]``),
+    not at position 3. The stabilized scalar must read the
+    position-1 cumulative, independent of ``start_year``.
+    """
+    result = calculate_renovation(
+        _reference_input(
+            start_year=3,
+            duration_years=2,
+            unit_types=[
+                _single_unit_type(units_to_renovate=100, rent_premium_per_month=100.0)
+            ],
+        )
+    )
+
+    assert result.annual_rollups[1].fiscal_year == 4
+    assert result.stabilized_revenue_increase == pytest.approx(
+        result.annual_rollups[1].cumulative_revenue_growth, abs=0.01
+    )
+
+
+def test_summary_scalars_zero_on_disabled_path() -> None:
+    """Disabled path still zeros every F-column scalar."""
+    result = calculate_renovation(_reference_input(enabled=False))
+
+    assert result.enabled is False
+    assert result.total_units_renovated == 0.0
+    assert result.total_renovation_cost == 0.0
+    assert result.weighted_avg_rent_premium == 0.0
+    assert result.implied_return_on_cost == 0.0
+    assert result.avg_units_renovated_per_year == 0.0
+    assert result.stabilized_revenue_increase == 0.0
+    assert result.annualized_return_on_investment == 0.0
+
+
+def test_summary_weighted_avg_premium_multi_unit_type() -> None:
+    """Weighted avg premium is units-weighted across unit types.
+
+    Two unit types: 100 x $50 and 300 x $150. Weighted avg =
+    (100*50 + 300*150) / 400 = (5_000 + 45_000) / 400 = $125/mo.
+    """
+    result = calculate_renovation(
+        _reference_input(
+            duration_years=2,
+            unit_types=[
+                _single_unit_type(
+                    unit_type="1BR",
+                    units_to_renovate=100,
+                    rent_premium_per_month=50.0,
+                ),
+                _single_unit_type(
+                    unit_type="2BR",
+                    units_to_renovate=300,
+                    rent_premium_per_month=150.0,
+                ),
+            ],
+        )
+    )
+
+    assert result.weighted_avg_rent_premium == pytest.approx(125.0, abs=0.01)
+    # Implied RoC = (125 * 12) / 10_000 = 0.15 sanity-check.
+    assert result.implied_return_on_cost == pytest.approx(0.15, abs=1e-6)
+    # Avg units/yr = 400 / 2 = 200.
+    assert result.avg_units_renovated_per_year == pytest.approx(200.0, abs=0.01)
