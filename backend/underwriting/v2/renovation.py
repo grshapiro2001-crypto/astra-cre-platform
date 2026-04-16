@@ -10,13 +10,30 @@ INTEGRATION CONTRACT:
     performs the CALCULATION ONLY — a separate integration step (not in
     this module) wires outputs into proforma.py / valuation.py:
 
-        * RenovationAnnualRollup.cumulative_revenue_growth (Row 43)
-              -> Valuation!C106 (added to GPR ABOVE vacancy)
+        * RenovationAnnualRollup.cumulative_revenue_growth (Row 43),
+          one value per rollup position 0..10
+              -> Valuation!C106:M106 ("Plus: Renovated Unit Premiums",
+                 added to GPR ABOVE vacancy).
+              ALREADY ANNUALIZED — each value is produced by summing
+              Row 40 (four monthly quarterly actuals) and compounding
+              via the Row 43 branches, so it represents the
+              stabilized year's incremental annual revenue. The
+              caller MUST NOT apply a further x12 conversion.
         * RenovationResult.total_renovation_cost (Row F26)
-              -> Valuation!C95 (added to purchase basis)
+              -> Valuation!C95 ("Renovation Dollars", added to
+                 purchase basis).
         * RenovationInput.finance_with_loan
-              -> Triggers LTV -> LTC conversion in the integration step
-                (NOT handled here).
+              -> Triggers Valuation!C99 LTV -> LTC mode switch in the
+                 integration step (NOT handled here).
+        * Going-in cap rate adjustment (Proforma!G53 / Proforma!J53)
+          is applied during integration, NOT here.
+
+    The F-column summary scalars on RenovationResult
+    (total_units_renovated, weighted_avg_rent_premium,
+    implied_return_on_cost, avg_units_renovated_per_year,
+    stabilized_revenue_increase, annualized_return_on_investment) are
+    for UI display / analyst quick-look only; they do NOT feed the DCF
+    directly.
 
 ROW 43 IMPLEMENTATION NOTES:
     Row 43 ("Cumulative Revenue Growth") is the single most important
@@ -393,6 +410,85 @@ def _compute_cumulative_revenue_growth(
     return cumulative
 
 
+def _compute_summary_scalars(
+    inp: RenovationInput,
+    annual: list[RenovationAnnualRollup],
+) -> dict[str, float]:
+    """Compute the W&D F-column summary scalars (Layer 5).
+
+    Only reached for the enabled / non-empty path — the disabled path
+    in :func:`_zero_result` assigns zeros directly.
+
+    W&D references:
+        F24 total_units_renovated        = SUM(Row 34)
+        F26 total_renovation_cost        = SUM(Row 36)
+        F20 weighted_avg_rent_premium    = SUMPRODUCT(E15:E19, F15:F19)
+                                           / SUM(E15:E19). Because
+                                           ``E = D / (duration * 4)``,
+                                           the ``duration * 4`` constant
+                                           cancels in numerator and
+                                           denominator, so weighting by
+                                           ``units_to_renovate`` gives
+                                           the identical result.
+        F9  implied_return_on_cost       = (weighted_avg_rent_premium
+                                            * 12) / cost_per_unit
+        F10 avg_units_renovated_per_year = total_units_renovated
+                                           / duration_years
+        F28 stabilized_revenue_increase  = OFFSET(C43, 0, (F5-1)+F6)
+                                           i.e., Row 43 read at the
+                                           completion fiscal year
+                                           (``start_year + duration_years
+                                           - 1``). Converted to a
+                                           0-indexed position within
+                                           ``annual_rollups`` this is
+                                           ``duration_years - 1``, clamped
+                                           to ``[0, ROLLUP_YEARS - 1]``.
+        F29 annualized_return_on_investment = F28 / F26
+    """
+    total_units_renovated = sum(r.renovations_completed for r in annual)
+    total_renovation_cost = sum(r.annual_renovation_cost for r in annual)
+
+    total_units_input = sum(ut.units_to_renovate for ut in inp.unit_types)
+    weighted_numerator = sum(
+        ut.units_to_renovate * ut.rent_premium_per_month for ut in inp.unit_types
+    )
+    weighted_avg_rent_premium = (
+        weighted_numerator / total_units_input if total_units_input else 0.0
+    )
+
+    implied_return_on_cost = (
+        (weighted_avg_rent_premium * 12) / inp.cost_per_unit
+        if inp.cost_per_unit
+        else 0.0
+    )
+    avg_units_renovated_per_year = (
+        total_units_renovated / inp.duration_years if inp.duration_years else 0.0
+    )
+
+    # Completion fiscal year is ``start_year + duration_years - 1`` (1-indexed).
+    # ``annual_rollups[i].fiscal_year == start_year + i`` (see
+    # ``_build_annual_rollups``), so the 0-indexed position within the
+    # rollup list is ``duration_years - 1``, independent of ``start_year``.
+    idx = max(0, min(ROLLUP_YEARS - 1, inp.duration_years - 1))
+    stabilized_revenue_increase = annual[idx].cumulative_revenue_growth
+
+    annualized_return_on_investment = (
+        stabilized_revenue_increase / total_renovation_cost
+        if total_renovation_cost
+        else 0.0
+    )
+
+    return {
+        "total_units_renovated": total_units_renovated,
+        "total_renovation_cost": total_renovation_cost,
+        "weighted_avg_rent_premium": weighted_avg_rent_premium,
+        "implied_return_on_cost": implied_return_on_cost,
+        "avg_units_renovated_per_year": avg_units_renovated_per_year,
+        "stabilized_revenue_increase": stabilized_revenue_increase,
+        "annualized_return_on_investment": annualized_return_on_investment,
+    }
+
+
 def calculate_renovation(inp: RenovationInput) -> RenovationResult:
     """Compute the Renovation waterfall per the W&D 'Renovation' tab.
 
@@ -401,11 +497,13 @@ def calculate_renovation(inp: RenovationInput) -> RenovationResult:
     :class:`RenovationResult` even when disabled or when no units are
     slated for renovation.
 
-    Phases 1-3 populate the 43-quarter cash-flow series (W&D rows 55-77
+    Layers 1-4 populate the 43-quarter cash-flow series (W&D rows 55-77
     per unit type aggregated into rows 81/86/87/88/91) and the 11
-    fiscal-year rollups (rows 34/36/38/39/40/42/43). Top-level summary
-    scalars (F-column) remain zero-valued placeholders — they are
-    populated in Phase 4.
+    fiscal-year rollups (rows 34/36/38/39/40/42/43). Layer 5
+    (:func:`_compute_summary_scalars`) derives the seven F-column
+    summary scalars from those rollups and the input. The
+    disabled / empty path (:func:`_zero_result`) returns zeros for all
+    scalars, so callers can consume the result unconditionally.
 
     Args:
         inp: Validated :class:`RenovationInput`.
@@ -440,18 +538,13 @@ def calculate_renovation(inp: RenovationInput) -> RenovationResult:
         for a, c in zip(annual, cumulative, strict=True)
     ]
 
-    # Phase 3 contract: top-level F-column scalars remain zero; Phase 4
-    # populates them from the annual rollups and the stabilized-year Row
-    # 43 value.
+    # Layer 5 (F-column) — derive the seven summary scalars from the
+    # annual rollups and the input. Spread into the result kwargs.
+    summary = _compute_summary_scalars(inp, annual)
+
     return RenovationResult(
         enabled=True,
-        total_units_renovated=0.0,
-        total_renovation_cost=0.0,
-        weighted_avg_rent_premium=0.0,
-        implied_return_on_cost=0.0,
-        avg_units_renovated_per_year=0.0,
-        stabilized_revenue_increase=0.0,
-        annualized_return_on_investment=0.0,
+        **summary,
         quarterly_cash_flows=quarterly,
         annual_rollups=annual,
     )
