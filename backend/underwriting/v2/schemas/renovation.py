@@ -102,13 +102,16 @@ class RenovationQuarterlyCashFlow(BaseModel):
         quarter_in_year: 1, 2, 3, or 4 — position within the fiscal year.
         units_renovated: Sum of scheduled renos across the 5 unit types
             for this quarter (Renovation!D81+).
-        incremental_revenue_gross_monthly: SUMPRODUCT of scheduled units
-            x rent premium across unit types — a MONTHLY $ figure
-            (Renovation!D86+).
+        incremental_revenue_gross_annual: SUMPRODUCT of scheduled units
+            x rent premium across unit types, annualized by ×12. W&D
+            Renovation!Row 86 formula ends with ``*12`` — it treats this
+            quarter's pace as a full-year run-rate in ANNUAL $ units.
         incremental_revenue_factor: Downtime factor by quarter-in-year
-            (1.0, 11/12, 10/12, 9/12) — Renovation!D87+.
-        incremental_revenue_actual_monthly: ``gross_monthly * factor``
-            when units_renovated > 0, else 0 (Renovation!D88+).
+            (1.0, 11/12, 10/12, 9/12) — Renovation!D87+. Dimensionless
+            fraction in [0.75, 1.0]; unchanged by the ×12 annualization.
+        incremental_revenue_actual_annual: ``gross_annual * factor``
+            when units_renovated > 0, else 0 (Renovation!D88+, in
+            ANNUAL $ units).
         renovation_capex: ``cost_per_unit * units_renovated``
             (Renovation!D91+).
     """
@@ -117,9 +120,9 @@ class RenovationQuarterlyCashFlow(BaseModel):
     fiscal_year: int
     quarter_in_year: int
     units_renovated: float
-    incremental_revenue_gross_monthly: float
+    incremental_revenue_gross_annual: float
     incremental_revenue_factor: float
-    incremental_revenue_actual_monthly: float
+    incremental_revenue_actual_annual: float
     renovation_capex: float
 
 
@@ -127,17 +130,23 @@ class RenovationAnnualRollup(BaseModel):
     """One fiscal year of the annual rollup (Renovation rows 32-43).
 
     Attributes:
-        fiscal_year: 1-indexed fiscal year (Renovation!C32:M32 = 1..11).
+        fiscal_year: 1-indexed PROFORMA year (Renovation!C32:M32 = 1..11).
+            Always numbered Y1..Y11 regardless of ``start_year``. Pre-
+            renovation years (rollup position < start_year - 1) contain
+            all zeros; the first reno year lives at list position
+            ``start_year - 1``.
         renovations_completed: Units renovated this year
             (Renovation!C34:M34).
         annual_renovation_cost: Total CapEx this year
             (Renovation!C36:M36).
-        potential_rent_premium_annual: Sum of monthly gross premiums
-            across the year's 4 quarters (Renovation!C38:M38).
+        potential_rent_premium_annual: Sum of annualized gross premiums
+            across the year's 4 quarters (Renovation!C38:M38). Each
+            quarterly is already ×12 (annualized pace per quarter), so
+            summing four quarterlies yields the year's potential.
         downtime_deduction: ``current_year_revenue_growth -
             potential_rent_premium_annual`` (negative or zero) —
             Renovation!C39:M39.
-        current_year_revenue_growth: Sum of monthly actual premiums
+        current_year_revenue_growth: Sum of annualized actual premiums
             across the year's 4 quarters (Renovation!C40:M40).
         incremental_rent_growth_rate: Per-year growth pulled from caller
             (Renovation!C42:M42 / Valuation!C18:M18).
