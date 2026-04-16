@@ -7,7 +7,7 @@
  * Renders 5 sub-pages: Summary, Assumptions, Proforma, Cash Flows, Detail Schedules.
  */
 
-import { useReducer, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useReducer, useEffect, useRef, useCallback, useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
 import type { PropertyDetail } from '@/types/property';
 import type { UWInputs } from '@/types/underwriting';
@@ -16,6 +16,7 @@ import {
   loadUnderwriting,
   computeUnderwriting,
   saveUnderwriting,
+  downloadUnderwritingExport,
 } from '@/services/underwritingService';
 import { GLASS_CARD } from './tabUtils';
 
@@ -297,6 +298,8 @@ interface UnderwritingTabProps {
 
 export function UnderwritingTab({ property }: UnderwritingTabProps) {
   const [state, dispatch] = useReducer(uwReducer, undefined, createInitialState);
+  const [exportScenario, setExportScenario] = useState<'premium' | 'market'>('premium');
+  const [isExporting, setIsExporting] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputVersionRef = useRef(0);
   const initialLoadDone = useRef(false);
@@ -363,6 +366,19 @@ export function UnderwritingTab({ property }: UnderwritingTabProps) {
     };
   }, [state.inputs, state.isLoading]);
 
+  // ── Export handler ──
+  const handleExport = useCallback(async () => {
+    if (isExporting) return;
+    setIsExporting(true);
+    try {
+      await downloadUnderwritingExport(property.id, exportScenario);
+    } catch (err) {
+      console.error('Export failed:', err);
+    } finally {
+      setIsExporting(false);
+    }
+  }, [property.id, exportScenario, isExporting]);
+
   // ── Save handler ──
   const handleSave = useCallback(async () => {
     dispatch({ type: 'SET_SAVE_STATUS', payload: 'Saving...' });
@@ -423,6 +439,27 @@ export function UnderwritingTab({ property }: UnderwritingTabProps) {
               {state.saveStatus}
             </span>
           )}
+          <select
+            value={exportScenario}
+            onChange={(e) => setExportScenario(e.target.value as 'premium' | 'market')}
+            className="px-2 py-1.5 rounded-lg text-xs bg-white/[0.04] border border-white/10 text-white focus:outline-none focus:border-white/20"
+            aria-label="Export scenario"
+          >
+            <option value="premium">Premium</option>
+            <option value="market">Market</option>
+          </select>
+          <button
+            onClick={handleExport}
+            disabled={isExporting || !state.outputs}
+            className={cn(
+              'px-4 py-1.5 rounded-lg text-xs font-medium transition-colors border',
+              !isExporting && state.outputs
+                ? 'border-white/20 text-white hover:bg-white/[0.04]'
+                : 'border-white/[0.04] text-muted-foreground cursor-not-allowed',
+            )}
+          >
+            {isExporting ? 'Exporting…' : 'Export to Excel'}
+          </button>
           <button
             onClick={handleSave}
             disabled={!state.hasUnsavedChanges}

@@ -33,3 +33,27 @@ export async function loadUnderwriting(
     throw err;
   }
 }
+
+export async function downloadUnderwritingExport(
+  propertyId: number,
+  scenario: 'premium' | 'market',
+): Promise<void> {
+  const response = await api.get(`/underwriting/${propertyId}/export`, {
+    params: { scenario },
+    responseType: 'blob',
+  });
+  const url = window.URL.createObjectURL(new Blob([response.data]));
+  const link = document.createElement('a');
+  link.href = url;
+  const disposition = response.headers['content-disposition'];
+  let filename = `Underwriting_${scenario}_${propertyId}.xlsx`;
+  if (disposition) {
+    const match = disposition.match(/filename="?([^"]+)"?/);
+    if (match?.[1]) filename = match[1];
+  }
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+}
