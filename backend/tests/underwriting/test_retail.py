@@ -224,6 +224,7 @@ def test_stabilized_flat_ncf_reversion_sanity() -> None:
     inp = _reference_input(
         rental_inflation=0.0,
         expense_inflation=0.0,
+        transaction_cost_percent=0.0,
         premium=RetailScenarioAssumptions(discount_rate=0.07, exit_cap=0.07),
         market=RetailScenarioAssumptions(discount_rate=0.07, exit_cap=0.07),
     )
@@ -299,4 +300,56 @@ def test_pri_grows_with_rental_inflation() -> None:
     # Year 15 (index 14): base × 1.03^14.
     assert cfs[14].potential_rental_income == pytest.approx(
         base * (1.03 ** 14), rel=1e-12
+    )
+
+
+def test_retail_matches_wd_prose_gainesville_scenario() -> None:
+    """Regression test pinning Talisman output to Walker & Dunlop's
+    Prose Gainesville Retail tab output, activated with:
+      2 tenants (Blue Bottle Coffee 1500sf @ $32, Polished Nail Bar 1200sf @ $28),
+      7-year hold, premium disc/exit 7.5%/6.5%, market 8.0%/7.0%,
+      $7.50/sf expenses at 100% recovery, $3.50/sf TI, 6% LC, 0% capex recovery,
+      3% rent inflation, 2.75% expense inflation, 5% structural vac, 5% credit loss,
+      mf_ltv_ratio = 38328131.16 / 63880218.60 = 0.60001...,
+      transaction_cost_percent = 0.015.
+    Expected values extracted from the source xlsm after LibreOffice recalc.
+    """
+    tenants = [
+        RetailTenant(
+            unit_number=1,
+            tenant_name="Blue Bottle Coffee",
+            square_feet=1500.0,
+            annual_rent_per_sf=32.0,
+        ),
+        RetailTenant(
+            unit_number=2,
+            tenant_name="Polished Nail Bar",
+            square_feet=1200.0,
+            annual_rent_per_sf=28.0,
+        ),
+    ]
+    inp = _reference_input(
+        hold_period_years=7,
+        tenants=tenants,
+        premium=RetailScenarioAssumptions(discount_rate=0.075, exit_cap=0.065),
+        market=RetailScenarioAssumptions(discount_rate=0.08, exit_cap=0.07),
+        mf_ltv_ratio=38328131.16 / 63880218.60,
+        transaction_cost_percent=0.015,
+    )
+    res = calculate_retail(inp)
+
+    assert res.total_square_feet == pytest.approx(2700.0, abs=0.0001)
+    assert res.weighted_average_rent_per_sf == pytest.approx(30.2222, abs=0.0001)
+    assert res.premium.retail_value == pytest.approx(1_005_716.97, abs=0.50)
+    assert res.premium.year_1_cap_rate == pytest.approx(0.05876, abs=0.0001)
+    assert res.market.retail_value == pytest.approx(932_439.23, abs=0.50)
+    assert res.market.year_1_cap_rate == pytest.approx(0.06338, abs=0.0001)
+    assert res.premium.annual_cash_flows[0].net_cash_flow == pytest.approx(
+        59_094.00, abs=0.50
+    )
+    assert res.premium.annual_cash_flows[1].net_cash_flow == pytest.approx(
+        60_890.45, abs=0.50
+    )
+    assert res.premium.annual_cash_flows[7].net_cash_flow == pytest.approx(
+        72_874.20, abs=0.50
     )
