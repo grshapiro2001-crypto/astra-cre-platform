@@ -22,32 +22,55 @@ ROW 43 IMPLEMENTATION NOTES:
     Row 43 ("Cumulative Revenue Growth") is the single most important
     output of this module — it is what flows into the DCF as incremental
     GPR each year. The W&D formula switches behavior based on whether
-    any units are renovated in the current year:
+    any units are renovated in the current year. Two semantics matter:
 
-      * Year 1 (column C):
-            cumulative[1] = potential_rent_premium_annual[1] +
-                            downtime_deduction[1]
-        which by identity (downtime = actual - potential) equals
-        current_year_revenue_growth[1]. We assert this identity at runtime.
+      * "rollup index ``i``" — the 0..10 position in ``annual_rollups``.
+        This is what indexes ``incremental_rent_growth_rates`` regardless
+        of ``start_year``: ``annual_rollups[0]`` always pairs with
+        ``growth_rates[0]``, even if its W&D ``fiscal_year`` is 3.
+      * "W&D fiscal_year" — the integer stamped on each rollup
+        (``start_year + i``). Used for cross-referencing the proforma
+        but NOT for indexing growth rates.
 
-      * Year 2+, NO renos this year:
-            cumulative[fy] = (cumulative[fy-1] - downtime_deduction[fy-1])
-                             * (1 + growth_rate[fy])
-        Rationale: the prior year's cumulative carried a downtime drag
-        (downtime_deduction is negative). Subtracting that drag recovers
-        the prior year's "potential" running total, which then grows by
-        the full annual rate since no new renos disturb the year.
+    Year 1 (rollup index 0):
+        cumulative[0] = potential_rent_premium_annual[0]
+                        + downtime_deduction[0]
+    By the downtime identity (``downtime = actual − potential``) this
+    simplifies to ``current_year_revenue_growth[0]``. The implementation
+    enforces this as a runtime guard — a mismatch raises ``ValueError``
+    and indicates Layer 3 / Layer 4 have drifted out of sync.
 
-      * Year 2+, WITH renos this year:
-            cumulative[fy] = (sum(potential[1..fy]) + downtime_deduction[fy])
-                             * (1 + growth_rate[fy] / 2)
-        Rationale: aggregate the running potential premium through this
-        year, add this year's (negative) downtime drag, and apply a
-        HALF-YEAR growth convention because renovations land throughout
-        the year rather than at year-start.
+    Year 2+ (rollup index ``i`` >= 1), NO renos this year
+    (``renovations_completed[i] == 0``):
+        cumulative[i] = (cumulative[i-1] − downtime_deduction[i-1])
+                        * (1 + growth_rate[i])
+    Plain English: the prior year's cumulative carried a (negative)
+    downtime drag from that year's reno work. Subtracting the drag
+    recovers the prior year's underlying "potential" running total,
+    which then grows by the FULL annual rate since no new renos
+    disturb this year.
+
+    Year 2+ (rollup index ``i`` >= 1), WITH renos this year
+    (``renovations_completed[i] > 0``):
+        cumulative[i] = (sum(potential[0..i]) + downtime_deduction[i])
+                        * (1 + growth_rate[i] / 2)
+    Plain English: aggregate the running potential premium through this
+    year, add this year's (negative) downtime drag, and apply a
+    HALF-YEAR growth convention because the renos land throughout the
+    year rather than all at year-start.
 
     The two branches must be implemented exactly as above; collapsing
     them into a single formula will misstate the DCF rent ramp.
+
+    Zero-growth subtlety: with ``growth_rate == 0`` and a single year of
+    renos in Y1, ``cumulative[1] = cumulative[0] − downtime_deduction[0]``
+    (downtime gets stripped, full-year multiplier of 1.0, no re-addition).
+    Because ``downtime_deduction[0]`` is negative, ``cumulative[1]``
+    INCREASES vs. ``cumulative[0]`` by the magnitude of Y1 downtime, then
+    holds flat thereafter (Y2+ have no new downtime to strip, multiplier
+    of 1.0). This is intentional W&D behavior — it represents the units
+    coming back online for full revenue contribution after the Y1
+    construction-disruption haircut — not a defect.
 
 DEVIATIONS FROM W&D:
     1. **Schedule tail behavior.** W&D Row N+1 uses a nested IF
@@ -72,6 +95,8 @@ DEVIATIONS FROM W&D:
 """
 
 from __future__ import annotations
+
+import math
 
 from backend.underwriting.v2.schemas.renovation import (
     RenovationAnnualRollup,
@@ -212,6 +237,162 @@ def _aggregate_quarterly(
     return quarterly
 
 
+def _build_annual_rollups(
+    quarterly: list[RenovationQuarterlyCashFlow],
+    growth_rates: list[float],
+) -> list[RenovationAnnualRollup]:
+    """Group 43 quarterly cash flows into 11 annual rollups (rows 32-42).
+
+    Implements Layer 3 of the W&D waterfall (Renovation rows 34/36/38/39/
+    40/42). Each rollup aggregates the four quarters whose
+    ``fiscal_year`` equals ``base + i`` where ``base`` is the smallest
+    ``fiscal_year`` across ``quarterly`` (i.e., ``inp.start_year``) and
+    ``i`` is the 0-indexed rollup position.
+
+    Note: the growth-rate index is the rollup POSITION (0..10), not the
+    W&D ``fiscal_year`` integer — so a non-1 ``start_year`` does not
+    shift growth-rate indexing. ``annual_rollups[0]`` always pairs with
+    ``growth_rates[0]``.
+
+    The ``cumulative_revenue_growth`` field is left at 0.0 here and
+    populated by :func:`_compute_cumulative_revenue_growth` (Layer 4).
+
+    Args:
+        quarterly: 43 :class:`RenovationQuarterlyCashFlow` entries from
+            :func:`_aggregate_quarterly` (Layer 2 output).
+        growth_rates: 11 annual incremental rent-growth rates, indexed
+            by rollup position.
+
+    Returns:
+        11 :class:`RenovationAnnualRollup` entries, indexed 0..10.
+    """
+    base_fy = quarterly[0].fiscal_year
+    rollups: list[RenovationAnnualRollup] = []
+
+    for i in range(ROLLUP_YEARS):
+        target_fy = base_fy + i
+        bucket = [q for q in quarterly if q.fiscal_year == target_fy]
+
+        # Renovation!Row 34 — units renovated this year.
+        renovations_completed = sum(q.units_renovated for q in bucket)
+        # Renovation!Row 36 — total CapEx this year.
+        annual_renovation_cost = sum(q.renovation_capex for q in bucket)
+        # Renovation!Row 38 — sum of monthly gross premiums (MONTHLY $).
+        potential_rent_premium_annual = sum(
+            q.incremental_revenue_gross_monthly for q in bucket
+        )
+        # Renovation!Row 40 — sum of monthly actual premiums (MONTHLY $).
+        current_year_revenue_growth = sum(
+            q.incremental_revenue_actual_monthly for q in bucket
+        )
+        # Renovation!Row 39 — actual minus potential (≤ 0); negative
+        # because the downtime factor is ≤ 1.
+        downtime_deduction = current_year_revenue_growth - potential_rent_premium_annual
+
+        rollups.append(
+            RenovationAnnualRollup(
+                fiscal_year=target_fy,
+                renovations_completed=renovations_completed,
+                annual_renovation_cost=annual_renovation_cost,
+                potential_rent_premium_annual=potential_rent_premium_annual,
+                downtime_deduction=downtime_deduction,
+                current_year_revenue_growth=current_year_revenue_growth,
+                # Renovation!Row 42 — pulled from Valuation!C18:M18.
+                incremental_rent_growth_rate=growth_rates[i],
+                cumulative_revenue_growth=0.0,
+            )
+        )
+
+    return rollups
+
+
+def _compute_cumulative_revenue_growth(
+    rollups: list[RenovationAnnualRollup],
+) -> list[float]:
+    """Compute Row 43 cumulative revenue growth across 11 rollups.
+
+    Implements Layer 4 — the single most important output of the module.
+    The W&D formula has two branches keyed on whether any units are
+    renovated in the current year:
+
+      Year 1 (rollup index 0):
+          cum[0] = potential_rent_premium_annual[0] + downtime_deduction[0]
+        which by the downtime identity (downtime = actual − potential)
+        equals current_year_revenue_growth[0]. This identity is enforced
+        as a runtime guard — a mismatch raises ``ValueError``.
+
+      Year 2+, NO renos this year (renovations_completed[i] == 0):
+          cum[i] = (cum[i-1] − downtime_deduction[i-1])
+                   * (1 + growth_rate[i])
+        Plain English: the prior year's cumulative carried a (negative)
+        downtime drag. Subtracting the drag recovers the prior year's
+        "potential" running total, which then grows by the FULL annual
+        rate since no new renos disturb this year.
+
+      Year 2+, WITH renos this year (renovations_completed[i] > 0):
+          cum[i] = (sum(potential[0..i]) + downtime_deduction[i])
+                   * (1 + growth_rate[i] / 2)
+        Plain English: aggregate the running potential premium through
+        this year, add this year's (negative) downtime drag, and apply
+        a HALF-YEAR growth convention because the renos land throughout
+        the year rather than all at year-start.
+
+    Growth-rate indexing uses the rollup POSITION (0..10), pulled from
+    ``rollups[i].incremental_rent_growth_rate`` (which Layer 3 already
+    stamped from ``growth_rates[i]`` regardless of ``start_year``).
+
+    Args:
+        rollups: 11 :class:`RenovationAnnualRollup` entries from
+            :func:`_build_annual_rollups`.
+
+    Returns:
+        11 cumulative-revenue-growth floats, indexed 0..10.
+
+    Raises:
+        ValueError: if the Y1 identity is violated, indicating a drift
+            between Layer 3 and Layer 4.
+    """
+    cumulative: list[float] = []
+    running_potential = 0.0
+
+    for i, rollup in enumerate(rollups):
+        running_potential += rollup.potential_rent_premium_annual
+
+        if i == 0:
+            # Renovation!C43 — =SUM($C$38:C38) + C39. By the downtime
+            # identity this equals current_year_revenue_growth[0].
+            cum_i = rollup.potential_rent_premium_annual + rollup.downtime_deduction
+            if not math.isclose(
+                cum_i,
+                rollup.current_year_revenue_growth,
+                rel_tol=1e-9,
+                abs_tol=1e-6,
+            ):
+                raise ValueError(
+                    "Row 43 Y1 identity violated: cumulative_revenue_growth[0]"
+                    f" ({cum_i}) != current_year_revenue_growth[0]"
+                    f" ({rollup.current_year_revenue_growth}). Layer 3 and"
+                    " Layer 4 have drifted out of sync."
+                )
+        elif rollup.renovations_completed == 0:
+            # Renovation!Row 43, no-renos branch — strip prior downtime
+            # drag and apply FULL annual growth.
+            prior = rollups[i - 1]
+            cum_i = (cumulative[i - 1] - prior.downtime_deduction) * (
+                1.0 + rollup.incremental_rent_growth_rate
+            )
+        else:
+            # Renovation!Row 43, active-renos branch — running potential
+            # plus this year's downtime, with HALF-YEAR growth convention.
+            cum_i = (running_potential + rollup.downtime_deduction) * (
+                1.0 + rollup.incremental_rent_growth_rate / 2.0
+            )
+
+        cumulative.append(cum_i)
+
+    return cumulative
+
+
 def calculate_renovation(inp: RenovationInput) -> RenovationResult:
     """Compute the Renovation waterfall per the W&D 'Renovation' tab.
 
@@ -220,10 +401,11 @@ def calculate_renovation(inp: RenovationInput) -> RenovationResult:
     :class:`RenovationResult` even when disabled or when no units are
     slated for renovation.
 
-    Phase 2 populates the 43-quarter cash-flow series (W&D rows 55-77 per
-    unit type aggregated into rows 81/86/87/88/91). Annual rollups (rows
-    34/36/38/39/40/42/43) and top-level summary scalars remain zero-valued
-    placeholders — they are populated in Phases 3 and 4.
+    Phases 1-3 populate the 43-quarter cash-flow series (W&D rows 55-77
+    per unit type aggregated into rows 81/86/87/88/91) and the 11
+    fiscal-year rollups (rows 34/36/38/39/40/42/43). Top-level summary
+    scalars (F-column) remain zero-valued placeholders — they are
+    populated in Phase 4.
 
     Args:
         inp: Validated :class:`RenovationInput`.
@@ -248,25 +430,19 @@ def calculate_renovation(inp: RenovationInput) -> RenovationResult:
     ]
     quarterly = _aggregate_quarterly(schedules, inp)
 
-    # Phase 2: annual rollups carry fiscal_year + echo the growth rate only;
-    # renovations_completed, CapEx, potential/actual premium sums, downtime
-    # deduction, and the Row 43 cumulative are populated in Phase 3.
+    # Layer 3 (rows 34/36/38/39/40/42) — bucket quarters into 11 rollups.
+    annual = _build_annual_rollups(quarterly, inp.incremental_rent_growth_rates)
+    # Layer 4 (Row 43) — cumulative revenue growth, the DCF integration
+    # point. Stamp the result back onto each frozen rollup.
+    cumulative = _compute_cumulative_revenue_growth(annual)
     annual = [
-        RenovationAnnualRollup(
-            fiscal_year=fy,
-            renovations_completed=0.0,
-            annual_renovation_cost=0.0,
-            potential_rent_premium_annual=0.0,
-            downtime_deduction=0.0,
-            current_year_revenue_growth=0.0,
-            incremental_rent_growth_rate=inp.incremental_rent_growth_rates[fy - 1],
-            cumulative_revenue_growth=0.0,
-        )
-        for fy in range(1, ROLLUP_YEARS + 1)
+        a.model_copy(update={"cumulative_revenue_growth": c})
+        for a, c in zip(annual, cumulative, strict=True)
     ]
 
-    # Phase 2: summary scalars remain zero; Phase 4 populates them from the
-    # annual rollups and the stabilized-year Row 43 value.
+    # Phase 3 contract: top-level F-column scalars remain zero; Phase 4
+    # populates them from the annual rollups and the stabilized-year Row
+    # 43 value.
     return RenovationResult(
         enabled=True,
         total_units_renovated=0.0,
