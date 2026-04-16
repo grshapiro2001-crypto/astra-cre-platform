@@ -18,6 +18,7 @@ Scope:
 
 from __future__ import annotations
 
+from backend.underwriting.v2._financial import excel_npv
 from backend.underwriting.v2.schemas.tax_abatement import (
     TaxAbatementInput,
     TaxAbatementResult,
@@ -52,9 +53,9 @@ def calculate_tax_abatement(inp: TaxAbatementInput) -> TaxAbatementResult:
            ``pct[i] = max(pct[i-1] - abatement_spread, 0.0)``.
         7. Savings, Row 17 ('Tax Abatement'!C17):
            ``savings[i] = total_taxes[i] * pct[i]``.
-        8. NPV, Row 19 ('Tax Abatement'!C19):
-           ``npv = Σ savings[i] / (1 + discount_rate) ** (i + 1)``
-           (end-of-period discounting — matches Excel ``NPV()``).
+        8. NPV, Row 19 ('Tax Abatement'!C19): ``npv = excel_npv(
+           discount_rate, savings)`` — end-of-period discounting that
+           matches Excel ``=NPV()`` and the W&D workbook.
         9. Taxes after abatement, Row 21 ('Tax Abatement'!C21):
            ``taxes_after_abatement[i] = total_taxes[i] - savings[i]``.
            (Storm/street-lights surcharges are NOT abated, so subtract
@@ -100,7 +101,7 @@ def calculate_tax_abatement(inp: TaxAbatementInput) -> TaxAbatementResult:
 
     savings: list[float] = [total_taxes[i] * pct[i] for i in range(n)]
 
-    npv = _npv_end_of_period(inp.discount_rate, savings)
+    npv = excel_npv(inp.discount_rate, savings)
 
     taxes_after = [total_taxes[i] - savings[i] for i in range(n)]
 
@@ -112,13 +113,3 @@ def calculate_tax_abatement(inp: TaxAbatementInput) -> TaxAbatementResult:
         npv_abatement=npv,
         taxes_after_abatement=taxes_after,
     )
-
-
-def _npv_end_of_period(rate: float, cashflows: list[float]) -> float:
-    """End-of-period NPV (Excel ``NPV()`` semantics).
-
-    The first cash flow is discounted by ``(1 + rate) ** 1``, the
-    second by ``(1 + rate) ** 2``, and so on. This matches the W&D
-    workbook's ``=NPV(rate, C17:Q17)`` formula on 'Tax Abatement'!C19.
-    """
-    return sum(cf / (1.0 + rate) ** (i + 1) for i, cf in enumerate(cashflows))
