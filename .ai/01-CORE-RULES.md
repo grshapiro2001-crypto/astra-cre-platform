@@ -370,6 +370,34 @@ When displaying extracted data, show what's available vs missing:
 - Filter all queries by `user_id` for multi-tenancy
 - JSON fields stored as strings, need `json.loads()` to parse
 
+### Render deploy — migrations must run on every deploy
+The backend Start Command on Render MUST prefix `alembic upgrade head &&` before
+uvicorn. Without it, migrations never run and the DB schema silently drifts from
+the code. This was the root cause of the 2026-04-17 property-detail outage.
+
+### Render free tier — no Pre-Deploy Command, no Shell access
+Free tier blocks the Pre-Deploy Command field and the Shell tab on web services.
+Put migrations in the Start Command instead. For ad-hoc DB fixes, use
+`psql` locally against the External Database URL from the Render Postgres dashboard.
+psql is installable via `brew install libpq && brew link --force libpq`.
+
+### NEVER use Base.metadata.create_all() in startup code
+This project's alembic_version table had to be bootstrapped manually on
+2026-04-17 because the original schema was created by create_all() rather than
+alembic. Alembic is now authoritative. If any startup code, test fixture, or
+script calls create_all() against the production or staging DB, it will
+silently re-divorce the schema from migrations. Grep the codebase for
+`create_all` and `metadata.create_all` before committing any backend change and
+flag matches to the user.
+
+### Schema/migration reconciliation debt (as of 2026-04-17)
+Some tables (saved_comparisons, t12_line_items, and likely others) exist in
+production but were not created by alembic migrations — they were born from
+create_all() drift. Their columns may match the migration's upgrade() body or
+may not. Never run `alembic downgrade` without first auditing the affected
+migration against the live schema, or it will fail on DROP TABLE of a table it
+doesn't actually own. A one-time reconciliation is a separate workstream.
+
 ---
 
 <remember>
