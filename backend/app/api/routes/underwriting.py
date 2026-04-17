@@ -4,6 +4,7 @@ Underwriting Engine API routes.
 POST /underwriting/compute — stateless computation
 POST /underwriting/save — persist inputs for a property
 GET  /underwriting/{property_id} — load saved inputs + compute outputs
+POST /underwriting/v2/integrated — compute proforma + v2 modules together
 """
 
 import json
@@ -17,6 +18,11 @@ from app.database import get_db
 from app.models.underwriting import UnderwritingModel
 from app.schemas.underwriting import UWInputs, UWOutputs, SaveRequest, SaveResponse, LoadResponse
 from app.services.underwriting_engine import UnderwritingEngine
+from backend.underwriting.v2.integration import run_integrated_underwriting
+from backend.underwriting.v2.schemas.integrated_result import (
+    IntegratedUnderwritingInput,
+    IntegratedUnderwritingResult,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +34,22 @@ def compute_underwriting(inputs: UWInputs):
     """Stateless computation endpoint. Takes complete inputs, returns complete outputs."""
     engine = UnderwritingEngine(inputs)
     return engine.compute()
+
+
+@router.post("/v2/integrated", response_model=IntegratedUnderwritingResult)
+def compute_integrated_underwriting(payload: IntegratedUnderwritingInput):
+    """Stateless integrated computation: multifamily proforma composed
+    with the v2 renovation / retail / tax-abatement modules.
+
+    Auth-parity with ``/compute`` — unauthenticated today. Mirrors the
+    existing underwriting endpoint pattern.
+    """
+    return run_integrated_underwriting(
+        deal=payload.deal,
+        renovation=payload.renovation,
+        retail=payload.retail,
+        tax_abatement=payload.tax_abatement,
+    )
 
 
 @router.post("/save", response_model=SaveResponse)
