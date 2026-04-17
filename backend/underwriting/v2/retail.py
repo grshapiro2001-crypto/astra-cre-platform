@@ -44,8 +44,8 @@ DEVIATIONS FROM W&D:
 
 from __future__ import annotations
 
-from backend.underwriting.v2._financial import excel_npv
-from backend.underwriting.v2.schemas.retail import (
+from underwriting.v2._financial import excel_npv
+from underwriting.v2.schemas.retail import (
     RetailAnnualCashFlow,
     RetailInput,
     RetailResult,

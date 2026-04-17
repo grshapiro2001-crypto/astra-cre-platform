@@ -10,12 +10,12 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from backend.underwriting.v2._financial import excel_npv
-from backend.underwriting.v2.schemas.tax_abatement import (
+from underwriting.v2._financial import excel_npv
+from underwriting.v2.schemas.tax_abatement import (
     TaxAbatementInput,
     TaxAbatementResult,
 )
-from backend.underwriting.v2.tax_abatement import calculate_tax_abatement
+from underwriting.v2.tax_abatement import calculate_tax_abatement
 
 
 def _reference_input(**overrides: object) -> TaxAbatementInput:

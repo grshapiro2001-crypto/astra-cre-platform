@@ -67,24 +67,24 @@ from app.schemas.underwriting import (
     UWInputs,
 )
 from app.services.underwriting_engine import UnderwritingEngine
-from backend.underwriting.v2.renovation import calculate_renovation
-from backend.underwriting.v2.retail import calculate_retail
-from backend.underwriting.v2.schemas.integrated_result import (
+from underwriting.v2.renovation import calculate_renovation
+from underwriting.v2.retail import calculate_retail
+from underwriting.v2.schemas.integrated_result import (
     ConvergenceReport,
     IntegratedScenarioResult,
     IntegratedUnderwritingResult,
     ModuleResultsBundle,
 )
-from backend.underwriting.v2.schemas.renovation import (
+from underwriting.v2.schemas.renovation import (
     RenovationInput,
     RenovationResult,
 )
-from backend.underwriting.v2.schemas.retail import RetailInput, RetailResult
-from backend.underwriting.v2.schemas.tax_abatement import (
+from underwriting.v2.schemas.retail import RetailInput, RetailResult
+from underwriting.v2.schemas.tax_abatement import (
     TaxAbatementInput,
     TaxAbatementResult,
 )
-from backend.underwriting.v2.tax_abatement import calculate_tax_abatement
+from underwriting.v2.tax_abatement import calculate_tax_abatement
 
 CONVERGENCE_THRESHOLD_DEFAULT: float = 1_000.0  # dollars
 MAX_ITERATIONS_DEFAULT: int = 10

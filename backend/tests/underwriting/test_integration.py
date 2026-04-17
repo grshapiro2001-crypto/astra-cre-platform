@@ -22,16 +22,16 @@ import pytest
 
 from app.schemas.underwriting import ScenarioInputs, UnitMixInput, UWInputs
 from app.services.underwriting_engine import UnderwritingEngine
-from backend.tests.underwriting.test_renovation import (
+from tests.underwriting.test_renovation import (
     _reference_input as _reno_reference,
 )
-from backend.tests.underwriting.test_retail import (
+from tests.underwriting.test_retail import (
     _reference_input as _retail_reference,
 )
-from backend.tests.underwriting.test_tax_abatement import (
+from tests.underwriting.test_tax_abatement import (
     _reference_input as _ta_reference,
 )
-from backend.underwriting.v2.integration import run_integrated_underwriting
+from underwriting.v2.integration import run_integrated_underwriting
 
 
 def _baseline_deal(**overrides: Any) -> UWInputs:
