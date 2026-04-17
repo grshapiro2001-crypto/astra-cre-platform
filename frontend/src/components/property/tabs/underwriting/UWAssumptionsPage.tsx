@@ -15,6 +15,9 @@ import {
 } from './uwFormatters';
 import type { UWSubPageProps } from './types';
 import type { UWInputs } from '@/types/underwriting';
+import { RenovationSection } from './v2/RenovationSection';
+import { RetailSection } from './v2/RetailSection';
+import { TaxAbatementSection } from './v2/TaxAbatementSection';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -519,22 +522,7 @@ function DebtSection({ inputs, dispatch }: Pick<UWSubPageProps, 'inputs' | 'disp
 }
 
 // ---------------------------------------------------------------------------
-// Section F: Renovation (collapsible)
-// ---------------------------------------------------------------------------
-
-function RenovationSection(_props: Pick<UWSubPageProps, 'inputs' | 'dispatch'>) {
-  // Renovation not yet in UWInputs type — placeholder for future Phase
-  return (
-    <CollapsibleSection title="Renovation Assumptions">
-      <p className="text-xs text-muted-foreground italic">
-        Renovation module will be enabled in a future update. The backend engine supports it — frontend inputs are pending.
-      </p>
-    </CollapsibleSection>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Section G: Loan Assumption (collapsible)
+// Section F: Loan Assumption (collapsible)
 // ---------------------------------------------------------------------------
 
 function LoanAssumptionSection({ inputs, dispatch }: Pick<UWSubPageProps, 'inputs' | 'dispatch'>) {
@@ -626,8 +614,10 @@ export function UWAssumptionsPage({ inputs, outputs, dispatch, isComputing }: UW
       <TaxSection inputs={inputs} outputs={outputs} dispatch={dispatch} />
       <GrowthSection inputs={inputs} dispatch={dispatch} />
       <DebtSection inputs={inputs} dispatch={dispatch} />
-      <RenovationSection inputs={inputs} dispatch={dispatch} />
       <LoanAssumptionSection inputs={inputs} dispatch={dispatch} />
+      <TaxAbatementSection inputs={inputs} dispatch={dispatch} />
+      <RetailSection inputs={inputs} dispatch={dispatch} />
+      <RenovationSection inputs={inputs} dispatch={dispatch} />
     </div>
   );
 }

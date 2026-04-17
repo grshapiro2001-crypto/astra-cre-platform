@@ -4,6 +4,17 @@
  * All percentages as decimals (0.05 = 5%). All monetary values as number.
  */
 
+import type {
+  RenovationInput,
+  RetailInput,
+  TaxAbatementInput,
+} from './underwritingV2';
+import {
+  createDefaultRenovationInput,
+  createDefaultRetailInput,
+  createDefaultTaxAbatementInput,
+} from './underwritingV2';
+
 // ---------------------------------------------------------------------------
 // Input Detail Items
 // ---------------------------------------------------------------------------
@@ -131,6 +142,10 @@ export interface UWInputs {
   // Custom line items
   custom_revenue_items: CustomLineItem[];
   custom_expense_items: CustomLineItem[];
+  // V2 standalone modules (optional — run in integrated orchestrator)
+  renovation: RenovationInput;
+  retail: RetailInput;
+  tax_abatement: TaxAbatementInput;
 }
 
 // ---------------------------------------------------------------------------
@@ -370,5 +385,8 @@ export function createDefaultInputs(): UWInputs {
     overrides: {},
     custom_revenue_items: [],
     custom_expense_items: [],
+    renovation: createDefaultRenovationInput(),
+    retail: createDefaultRetailInput(),
+    tax_abatement: createDefaultTaxAbatementInput(),
   };
 }
