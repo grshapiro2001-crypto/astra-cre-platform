@@ -3,6 +3,18 @@
  */
 
 import type { UWInputs, UWOutputs } from '@/types/underwriting';
+import type {
+  RenovationInput,
+  RetailInput,
+  RetailTenant,
+  TaxAbatementInput,
+} from '@/types/underwritingV2';
+
+// Field-set union of every scalar/array field for each v2 module (excluding
+// sub-lists that have dedicated actions).
+export type RenovationFieldKey = Exclude<keyof RenovationInput, 'unit_types'>;
+export type RetailFieldKey = Exclude<keyof RetailInput, 'tenants' | 'premium' | 'market'>;
+export type TaxAbatementFieldKey = keyof TaxAbatementInput;
 
 // ---------------------------------------------------------------------------
 // Reducer Actions
@@ -26,7 +38,16 @@ export type UWAction =
   // Override actions
   | { type: 'SET_OVERRIDE'; scenario: string; key: string; value: number }
   | { type: 'REMOVE_OVERRIDE'; scenario: string; key: string }
-  | { type: 'CLEAR_OVERRIDES'; scenario: string };
+  | { type: 'CLEAR_OVERRIDES'; scenario: string }
+  // V2 module actions (Renovation / Retail / Tax Abatement)
+  | { type: 'SET_RENOVATION_FIELD'; field: RenovationFieldKey; value: RenovationInput[RenovationFieldKey] }
+  | { type: 'SET_RENOVATION_UNIT_TYPE'; index: number; patch: Partial<RenovationInput['unit_types'][number]> }
+  | { type: 'SET_RETAIL_FIELD'; field: RetailFieldKey; value: RetailInput[RetailFieldKey] }
+  | { type: 'SET_RETAIL_SCENARIO'; scenario: 'premium' | 'market'; patch: Partial<RetailInput['premium']> }
+  | { type: 'ADD_RETAIL_TENANT' }
+  | { type: 'REMOVE_RETAIL_TENANT'; index: number }
+  | { type: 'SET_RETAIL_TENANT'; index: number; patch: Partial<RetailTenant> }
+  | { type: 'SET_TAX_ABATEMENT_FIELD'; field: TaxAbatementFieldKey; value: TaxAbatementInput[TaxAbatementFieldKey] };
 
 // ---------------------------------------------------------------------------
 // State

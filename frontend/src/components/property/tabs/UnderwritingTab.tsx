@@ -18,6 +18,8 @@ import {
   saveUnderwriting,
   downloadUnderwritingExport,
 } from '@/services/underwritingService';
+import { runIntegratedUnderwriting } from '@/services/integratedUnderwritingService';
+import { createDefaultRetailTenant } from '@/types/underwritingV2';
 import { GLASS_CARD } from './tabUtils';
 
 import type { UWState, UWAction } from './underwriting/types';
@@ -173,6 +175,111 @@ function uwReducer(state: UWState, action: UWAction): UWState {
         hasUnsavedChanges: true,
       };
     }
+
+    case 'SET_RENOVATION_FIELD':
+      return {
+        ...state,
+        inputs: {
+          ...state.inputs,
+          renovation: { ...state.inputs.renovation, [action.field]: action.value },
+        },
+        hasUnsavedChanges: true,
+      };
+
+    case 'SET_RENOVATION_UNIT_TYPE': {
+      const next = state.inputs.renovation.unit_types.map((u, i) =>
+        i === action.index ? { ...u, ...action.patch } : u,
+      );
+      return {
+        ...state,
+        inputs: {
+          ...state.inputs,
+          renovation: { ...state.inputs.renovation, unit_types: next },
+        },
+        hasUnsavedChanges: true,
+      };
+    }
+
+    case 'SET_RETAIL_FIELD':
+      return {
+        ...state,
+        inputs: {
+          ...state.inputs,
+          retail: { ...state.inputs.retail, [action.field]: action.value },
+        },
+        hasUnsavedChanges: true,
+      };
+
+    case 'SET_RETAIL_SCENARIO':
+      return {
+        ...state,
+        inputs: {
+          ...state.inputs,
+          retail: {
+            ...state.inputs.retail,
+            [action.scenario]: {
+              ...state.inputs.retail[action.scenario],
+              ...action.patch,
+            },
+          },
+        },
+        hasUnsavedChanges: true,
+      };
+
+    case 'ADD_RETAIL_TENANT': {
+      const tenants = state.inputs.retail.tenants;
+      const nextUnit = tenants.length
+        ? Math.max(...tenants.map((t) => t.unit_number)) + 1
+        : 1;
+      return {
+        ...state,
+        inputs: {
+          ...state.inputs,
+          retail: {
+            ...state.inputs.retail,
+            tenants: [...tenants, createDefaultRetailTenant(nextUnit)],
+          },
+        },
+        hasUnsavedChanges: true,
+      };
+    }
+
+    case 'REMOVE_RETAIL_TENANT':
+      return {
+        ...state,
+        inputs: {
+          ...state.inputs,
+          retail: {
+            ...state.inputs.retail,
+            tenants: state.inputs.retail.tenants.filter((_, i) => i !== action.index),
+          },
+        },
+        hasUnsavedChanges: true,
+      };
+
+    case 'SET_RETAIL_TENANT': {
+      const next = state.inputs.retail.tenants.map((t, i) =>
+        i === action.index ? { ...t, ...action.patch } : t,
+      );
+      return {
+        ...state,
+        inputs: {
+          ...state.inputs,
+          retail: { ...state.inputs.retail, tenants: next },
+        },
+        hasUnsavedChanges: true,
+      };
+    }
+
+    case 'SET_TAX_ABATEMENT_FIELD':
+      return {
+        ...state,
+        inputs: {
+          ...state.inputs,
+          tax_abatement: { ...state.inputs.tax_abatement, [action.field]: action.value },
+        },
+        hasUnsavedChanges: true,
+      };
 
     default:
       return state;
@@ -358,6 +465,25 @@ export function UnderwritingTab({ property }: UnderwritingTabProps) {
       } catch (err) {
         console.error('Compute failed:', err);
         dispatch({ type: 'SET_COMPUTING', payload: false });
+      }
+
+      // V2 integrated modules — fire in parallel when any module is enabled.
+      // Mocked for now; swap the fetch URL in integratedUnderwritingService.ts
+      // when the backend integration endpoint lands.
+      const { renovation, retail, tax_abatement } = state.inputs;
+      if (renovation.enabled || retail.enabled || tax_abatement.enabled) {
+        try {
+          const result = await runIntegratedUnderwriting({
+            renovation: renovation.enabled ? renovation : undefined,
+            retail: retail.enabled ? retail : undefined,
+            tax_abatement: tax_abatement.enabled ? tax_abatement : undefined,
+          });
+          if (inputVersionRef.current === currentVersion) {
+            console.log('[runIntegratedUnderwriting] mock response', result);
+          }
+        } catch (err) {
+          console.error('Integrated compute failed:', err);
+        }
       }
     }, 500);
 
