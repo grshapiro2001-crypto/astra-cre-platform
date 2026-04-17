@@ -60,7 +60,12 @@ and demands W&D parity, a follow-up is to add a joint solver.
 
 from __future__ import annotations
 
-from app.schemas.underwriting import ScenarioResult, UWInputs
+from app.schemas.underwriting import (
+    DCFResult,
+    DCFYearResult,
+    ScenarioResult,
+    UWInputs,
+)
 from app.services.underwriting_engine import UnderwritingEngine
 from backend.underwriting.v2.renovation import calculate_renovation
 from backend.underwriting.v2.retail import calculate_retail
@@ -188,6 +193,131 @@ def _target_cap(deal: UWInputs) -> float:
     return deal.premium.target_cap_rate or 0.0
 
 
+def _inject_renovation_into_year(
+    year: DCFYearResult,
+    year_idx: int,
+    renovation_result: RenovationResult,
+    equity: float,
+) -> DCFYearResult:
+    """Return a new ``DCFYearResult`` with the year's renovation premium
+    layered into GPR, re-deriving every GPR-dependent line.
+
+    Placement mirrors W&D's Valuation!C106 ("Plus: Renovated Unit
+    Premiums", above the vacancy line) — vacancy / concessions /
+    bad_debt are therefore applied to the lifted GPR. To respect any
+    per-scenario overrides the engine may have applied, rates are
+    back-derived from the existing year (``vacancy / gpr`` etc.) rather
+    than recomputed from ``UWInputs``.
+
+    Unchanged lines: ``nru_loss``, ``other_income``,
+    ``controllable_expenses``, ``property_taxes``, ``insurance``,
+    ``reserves``, ``debt_service``, ``custom_revenue``,
+    ``custom_expenses``, ``computed_values``.
+
+    Growth-rate metrics (``revenue_growth_rate``, ``noi_growth_rate``)
+    are left unchanged on a per-year basis; if the caller needs
+    integrated CAGRs they should derive them from the returned DCF.
+    """
+    if (
+        year_idx >= len(renovation_result.annual_rollups)
+        or year.gpr <= 0
+    ):
+        return year
+
+    premium = renovation_result.annual_rollups[year_idx].cumulative_revenue_growth
+    if premium == 0.0:
+        return year
+
+    vacancy_rate = year.vacancy / year.gpr
+    concession_rate = year.concessions / year.gpr
+    bad_debt_rate = year.bad_debt / year.gpr
+    mgmt_rate = (
+        year.management_fee / year.total_income if year.total_income > 0 else 0.0
+    )
+
+    new_gpr = year.gpr + premium
+    new_vacancy = new_gpr * vacancy_rate
+    new_concessions = new_gpr * concession_rate
+    new_bad_debt = new_gpr * bad_debt_rate
+    new_nri = (
+        new_gpr - new_vacancy - new_concessions - year.nru_loss - new_bad_debt
+    )
+    new_total_income = new_nri + year.other_income
+    new_mgmt_fee = new_total_income * mgmt_rate
+    new_total_expenses = (
+        year.controllable_expenses
+        + year.property_taxes
+        + year.insurance
+        + new_mgmt_fee
+    )
+    new_noi = new_total_income - new_total_expenses
+    new_ncf = new_noi - year.reserves
+    new_ncf_after_debt = new_ncf - year.debt_service
+    new_coc = new_ncf_after_debt / equity if equity > 0 else None
+    new_dscr = new_noi / year.debt_service if year.debt_service > 0 else None
+    new_eff_rent = (
+        year.effective_rent * (new_total_income / year.total_income)
+        if year.total_income > 0
+        else year.effective_rent
+    )
+
+    return year.model_copy(
+        update={
+            "gpr": new_gpr,
+            "vacancy": new_vacancy,
+            "concessions": new_concessions,
+            "bad_debt": new_bad_debt,
+            "nri": new_nri,
+            "total_income": new_total_income,
+            "management_fee": new_mgmt_fee,
+            "total_expenses": new_total_expenses,
+            "noi": new_noi,
+            "ncf": new_ncf,
+            "ncf_after_debt": new_ncf_after_debt,
+            "cash_on_cash": new_coc,
+            "dscr": new_dscr,
+            "effective_rent": new_eff_rent,
+        }
+    )
+
+
+def _apply_renovation_to_scenario(
+    scenario: ScenarioResult,
+    renovation_result: RenovationResult | None,
+) -> ScenarioResult:
+    """Layer renovation premium into every DCF year of ``scenario``.
+
+    Returns a new ``ScenarioResult`` with the DCF replaced. ``proforma``,
+    ``debt``, ``returns``, and ``valuation_summary`` are UNCHANGED here —
+    basis adjustments (LTC, purchase-price bump, IRR re-solve) are
+    layered by downstream helpers in later commits so this function
+    stays focused on the GPR / NOI / NCF re-derivation.
+    """
+    if (
+        renovation_result is None
+        or not renovation_result.enabled
+        or not scenario.dcf.years
+    ):
+        return scenario
+
+    equity = scenario.debt.equity
+    new_years = [
+        _inject_renovation_into_year(
+            year=y,
+            year_idx=i,
+            renovation_result=renovation_result,
+            equity=equity,
+        )
+        for i, y in enumerate(scenario.dcf.years)
+    ]
+    new_dcf = DCFResult(
+        years=new_years,
+        revenue_cagr=scenario.dcf.revenue_cagr,
+        noi_cagr=scenario.dcf.noi_cagr,
+    )
+    return scenario.model_copy(update={"dcf": new_dcf})
+
+
 def _build_scenario_placeholder(
     scenario: ScenarioResult,
     pro_forma_price: float,
@@ -295,9 +425,9 @@ def run_integrated_underwriting(
 
     # Per-scenario integrated results.
     #
-    # Placeholder composition only — subsequent commits layer GPR
-    # re-derivation (renovation), combined-CF assembly (retail +
-    # tax-abatement), and adjusted going-in cap rate on top of these.
+    # Renovation GPR injection is applied here. Combined-CF assembly
+    # (retail + tax-abatement) and adjusted going-in cap rate layer on
+    # top in a subsequent commit.
     integrated_scenarios: dict[str, IntegratedScenarioResult] = {}
     for scn_key, scn in base_uw.scenarios.items():
         scn_price = (
@@ -305,8 +435,9 @@ def run_integrated_underwriting(
             if scn_key == "premium"
             else scn.valuation_summary.purchase_price
         )
+        integrated_scn = _apply_renovation_to_scenario(scn, renovation_result)
         integrated_scenarios[scn_key] = _build_scenario_placeholder(
-            scenario=scn,
+            scenario=integrated_scn,
             pro_forma_price=scn_price,
         )
 
