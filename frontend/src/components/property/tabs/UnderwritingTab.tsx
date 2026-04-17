@@ -7,7 +7,7 @@
  * Renders 5 sub-pages: Summary, Assumptions, Proforma, Cash Flows, Detail Schedules.
  */
 
-import { useReducer, useEffect, useRef, useCallback, useMemo, useState } from 'react';
+import { useReducer, useEffect, useRef, useCallback, useState } from 'react';
 import { cn } from '@/lib/utils';
 import type { PropertyDetail } from '@/types/property';
 import type { UWInputs } from '@/types/underwriting';
@@ -28,26 +28,7 @@ import {
 import { GLASS_CARD } from './tabUtils';
 
 import type { UWState, UWAction } from './underwriting/types';
-import { UWSummaryPage } from './underwriting/UWSummaryPage';
-import { UWAssumptionsPage } from './underwriting/UWAssumptionsPage';
-import { UWProformaPage } from './underwriting/UWProformaPage';
-import { UWCashFlowsPage } from './underwriting/UWCashFlowsPage';
-import { UWDetailSchedulesPage } from './underwriting/UWDetailSchedulesPage';
-import { UWT12MappingPage } from './underwriting/UWT12MappingPage';
-
-// ---------------------------------------------------------------------------
-// Sub-tab definitions
-// ---------------------------------------------------------------------------
-
-const UW_SUB_TABS_BASE: { key: string; label: string }[] = [
-  { key: 'summary', label: 'Summary' },
-  { key: 'assumptions', label: 'Assumptions' },
-  { key: 'proforma', label: 'Proforma' },
-  { key: 'cashflows', label: 'Cash Flows' },
-  { key: 'details', label: 'Detail Schedules' },
-];
-
-const T12_MAPPING_TAB = { key: 't12mapping', label: 'T12 Mapping' };
+import { UnderwritingStageManager } from './underwriting/stage/UnderwritingStageManager';
 
 // ---------------------------------------------------------------------------
 // Backfill V2 module slices that may be missing from server-persisted inputs
@@ -432,18 +413,6 @@ export function UnderwritingTab({ property }: UnderwritingTabProps) {
   const inputVersionRef = useRef(0);
   const initialLoadDone = useRef(false);
 
-  // Build sub-tabs dynamically — include T12 Mapping if property has line items
-  const hasT12LineItems = property.financial_data_source === 't12_excel';
-  const uwSubTabs = useMemo(() => {
-    if (!hasT12LineItems) return UW_SUB_TABS_BASE;
-    // Insert T12 Mapping between Assumptions and Proforma
-    const tabs = [...UW_SUB_TABS_BASE];
-    const proformaIdx = tabs.findIndex((t) => t.key === 'proforma');
-    const insertIdx = proformaIdx >= 0 ? proformaIdx : 2;
-    tabs.splice(insertIdx, 0, T12_MAPPING_TAB);
-    return tabs;
-  }, [hasT12LineItems]);
-
   // ── Load saved model or seed from property ──
   useEffect(() => {
     if (initialLoadDone.current) return;
@@ -553,127 +522,19 @@ export function UnderwritingTab({ property }: UnderwritingTabProps) {
 
   // ── Render ──
   return (
-    <div className="space-y-4">
-      {/* Sub-tab bar */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center rounded-lg p-1 bg-white/[0.04]">
-          {uwSubTabs.map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => dispatch({ type: 'SET_ACTIVE_SUB_TAB', payload: tab.key })}
-              className={cn(
-                'px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
-                state.activeSubTab === tab.key
-                  ? 'bg-white/[0.08] text-white'
-                  : 'text-muted-foreground hover:text-foreground',
-              )}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex items-center gap-3">
-          {state.saveStatus && (
-            <span
-              className={cn(
-                'text-xs',
-                state.saveStatus === 'Saved'
-                  ? 'text-emerald-500'
-                  : state.saveStatus === 'Save failed'
-                    ? 'text-destructive'
-                    : 'text-muted-foreground',
-              )}
-            >
-              {state.saveStatus}
-            </span>
-          )}
-          <select
-            value={exportScenario}
-            onChange={(e) => setExportScenario(e.target.value as 'premium' | 'market')}
-            className="px-2 py-1.5 rounded-lg text-xs bg-white/[0.04] border border-white/10 text-white focus:outline-none focus:border-white/20"
-            aria-label="Export scenario"
-          >
-            <option value="premium">Premium</option>
-            <option value="market">Market</option>
-          </select>
-          <button
-            onClick={handleExport}
-            disabled={isExporting || !state.outputs}
-            className={cn(
-              'px-4 py-1.5 rounded-lg text-xs font-medium transition-colors border',
-              !isExporting && state.outputs
-                ? 'border-white/20 text-white hover:bg-white/[0.04]'
-                : 'border-white/[0.04] text-muted-foreground cursor-not-allowed',
-            )}
-          >
-            {isExporting ? 'Exporting…' : 'Export to Excel'}
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={!state.hasUnsavedChanges}
-            className={cn(
-              'px-4 py-1.5 rounded-lg text-xs font-medium transition-colors border',
-              state.hasUnsavedChanges
-                ? 'border-white/20 text-white hover:bg-white/[0.04]'
-                : 'border-white/[0.04] text-muted-foreground cursor-not-allowed',
-            )}
-          >
-            Save
-          </button>
-        </div>
-      </div>
-
-      {/* Active sub-page */}
-      {state.activeSubTab === 'summary' && (
-        <UWSummaryPage
-          inputs={state.inputs}
-          outputs={state.outputs}
-          dispatch={dispatch}
-          isComputing={state.isComputing}
-        />
-      )}
-      {state.activeSubTab === 'assumptions' && (
-        <UWAssumptionsPage
-          inputs={state.inputs}
-          outputs={state.outputs}
-          dispatch={dispatch}
-          isComputing={state.isComputing}
-        />
-      )}
-      {state.activeSubTab === 't12mapping' && hasT12LineItems && (
-        <UWT12MappingPage
-          inputs={state.inputs}
-          outputs={state.outputs}
-          dispatch={dispatch}
-          isComputing={state.isComputing}
-          property={property}
-        />
-      )}
-      {state.activeSubTab === 'proforma' && (
-        <UWProformaPage
-          inputs={state.inputs}
-          outputs={state.outputs}
-          dispatch={dispatch}
-          isComputing={state.isComputing}
-        />
-      )}
-      {state.activeSubTab === 'cashflows' && (
-        <UWCashFlowsPage
-          inputs={state.inputs}
-          outputs={state.outputs}
-          dispatch={dispatch}
-          isComputing={state.isComputing}
-        />
-      )}
-      {state.activeSubTab === 'details' && (
-        <UWDetailSchedulesPage
-          inputs={state.inputs}
-          outputs={state.outputs}
-          dispatch={dispatch}
-          isComputing={state.isComputing}
-        />
-      )}
-    </div>
+    <UnderwritingStageManager
+      property={property}
+      inputs={state.inputs}
+      outputs={state.outputs}
+      dispatch={dispatch}
+      isComputing={state.isComputing}
+      hasUnsavedChanges={state.hasUnsavedChanges}
+      saveStatus={state.saveStatus}
+      exportScenario={exportScenario}
+      onExportScenarioChange={setExportScenario}
+      isExporting={isExporting}
+      onExport={handleExport}
+      onSave={handleSave}
+    />
   );
 }
