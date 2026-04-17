@@ -318,34 +318,220 @@ def _apply_renovation_to_scenario(
     return scenario.model_copy(update={"dcf": new_dcf})
 
 
-def _build_scenario_placeholder(
-    scenario: ScenarioResult,
-    pro_forma_price: float,
-) -> IntegratedScenarioResult:
-    """Pass-through scenario result — no module integration applied.
+def _retail_scenario(
+    retail_result: RetailResult | None, scenario_key: str
+) -> RetailResult | None:
+    """Return the matching retail scenario result, if available.
 
-    Used as a stepping stone: subsequent commits add GPR re-derivation,
-    combined-CF assembly, and going-in cap rate adjustment. For now the
-    combined CF arrays mirror the baseline NCF / NCF_after_debt, and
-    the adjusted cap rate equals the standard one. Populating real
-    values is safe because callers that do NOT enable modules see the
-    unmodified engine behaviour by construction (no module = no-op).
+    ``RetailResult`` carries both ``premium`` and ``market`` scenarios
+    side-by-side; we pick whichever matches the MF scenario key.
+    """
+    if retail_result is None:
+        return retail_result
+    return retail_result  # scoping handled by caller via ``.premium`` / ``.market``
+
+
+def _retail_annual_ncf(
+    retail_result: RetailResult | None,
+    scenario_key: str,
+    year_idx: int,
+) -> float:
+    """Year-``year_idx`` retail NCF for the given MF scenario key."""
+    if retail_result is None:
+        return 0.0
+    rs = (
+        retail_result.premium
+        if scenario_key == "premium"
+        else retail_result.market
+    )
+    if year_idx >= len(rs.annual_cash_flows):
+        return 0.0
+    return rs.annual_cash_flows[year_idx].net_cash_flow
+
+
+def _retail_scenario_value(
+    retail_result: RetailResult | None, scenario_key: str
+) -> float:
+    """Retail value for the given MF scenario key."""
+    if retail_result is None:
+        return 0.0
+    return (
+        retail_result.premium.retail_value
+        if scenario_key == "premium"
+        else retail_result.market.retail_value
+    )
+
+
+def _ta_savings_at(
+    ta_result: TaxAbatementResult | None, year_idx: int
+) -> float:
+    """Tax-abatement savings for a given year, or 0."""
+    if ta_result is None or year_idx >= len(ta_result.annual_abatement_savings):
+        return 0.0
+    return ta_result.annual_abatement_savings[year_idx]
+
+
+def _combined_cash_flows(
+    scenario: ScenarioResult,
+    retail_result: RetailResult | None,
+    ta_result: TaxAbatementResult | None,
+    scenario_key: str,
+) -> tuple[list[float], list[float]]:
+    """Assemble combined unlevered / levered cash flows for one scenario.
+
+    Mirrors W&D Valuation!C167/C169 (retail NCF added to Annual Unlevered
+    Project CF) and Valuation!C165 (tax-abatement savings added), plus
+    Valuation!C178 for the levered variant. Tax-abatement and retail
+    debt-service lines are NOT subtracted today — neither module output
+    exposes them (see open-question notes in the module docstring). If
+    those are required for full W&D parity the caller should either
+    supply debt parameters via a follow-up extension or accept cash-flow-
+    only treatment.
     """
     years = scenario.dcf.years
-    combined_unlev = [y.ncf for y in years]
-    combined_lev = [y.ncf_after_debt for y in years]
+    combined_unlev: list[float] = []
+    combined_lev: list[float] = []
+    for i, year in enumerate(years):
+        ta = _ta_savings_at(ta_result, i)
+        retail_ncf = _retail_annual_ncf(retail_result, scenario_key, i)
+        combined_unlev.append(year.ncf + ta + retail_ncf)
+        combined_lev.append(year.ncf_after_debt + ta + retail_ncf)
+    return combined_unlev, combined_lev
+
+
+def _going_in_cap_rates(
+    scenario: ScenarioResult,
+    pro_forma_price: float,
+    renovation_result: RenovationResult | None,
+    retail_result: RetailResult | None,
+    ta_result: TaxAbatementResult | None,
+    scenario_key: str,
+) -> tuple[float, float]:
+    """Standard and module-adjusted going-in cap rates.
+
+    Standard mirrors the engine: ``Y1_NOI_base / Pro_Forma_Price_base``
+    (the engine's ``cap_rates.y1_cap_rate``; baseline NOI is used
+    because ``valuation_summary`` is copied through unchanged by the
+    renovation-injection helper).
+
+    Adjusted mirrors W&D Proforma!K46/L46:
+
+        adjusted_numerator   = Y1_NOI_base
+                             + renovation.stabilized_revenue_increase
+                             + Y1_TA_savings
+                             + Y1_retail_NCF
+        adjusted_denominator = Pro_Forma_Price
+                             + renovation.total_renovation_cost
+                             + tax_abatement.npv_abatement
+                             + retail.<scn>.retail_value
+    """
     y1_cap = scenario.valuation_summary.cap_rates.y1_cap_rate or 0.0
+    y1_noi_base = scenario.proforma.noi
+
+    reno_premium = (
+        renovation_result.stabilized_revenue_increase
+        if renovation_result is not None and renovation_result.enabled
+        else 0.0
+    )
+    reno_cost = (
+        renovation_result.total_renovation_cost
+        if renovation_result is not None and renovation_result.enabled
+        else 0.0
+    )
+    ta_npv = ta_result.npv_abatement if ta_result is not None else 0.0
+    y1_ta = _ta_savings_at(ta_result, 0)
+    y1_retail = _retail_annual_ncf(retail_result, scenario_key, 0)
+    retail_value = _retail_scenario_value(retail_result, scenario_key)
+
+    numerator = y1_noi_base + reno_premium + y1_ta + y1_retail
+    denominator = pro_forma_price + reno_cost + ta_npv + retail_value
+    adjusted = numerator / denominator if denominator > 0 else y1_cap
+    return y1_cap, adjusted
+
+
+def _ltv_or_ltc(
+    scenario: ScenarioResult,
+    pro_forma_price: float,
+    renovation_input: RenovationInput | None,
+    renovation_result: RenovationResult | None,
+) -> tuple[float, bool]:
+    """LTC when renovation is loan-financed; otherwise LTV.
+
+    When renovation is enabled AND ``finance_with_loan=True``, the loan
+    is conceptually increased by ``total_renovation_cost * actual_ltv``
+    and the effective basis is ``price + total_renovation_cost``. The
+    returned ratio is ``new_loan / effective_basis`` — mathematically
+    equal to ``scenario.debt.actual_ltv`` in the standard case (same
+    ratio applied to both numerator and denominator), so the exposed
+    value is informational today. Re-sizing the loan and re-running the
+    DCF with the larger debt service is a separate follow-up.
+    """
+    base_ltv = scenario.debt.actual_ltv
+    is_ltc = (
+        renovation_input is not None
+        and renovation_result is not None
+        and renovation_result.enabled
+        and renovation_input.finance_with_loan
+    )
+    if not is_ltc:
+        return base_ltv, False
+
+    reno_cost = renovation_result.total_renovation_cost if renovation_result else 0.0
+    loan = scenario.debt.loan_amount + reno_cost * base_ltv
+    effective_basis = pro_forma_price + reno_cost
+    ltc = loan / effective_basis if effective_basis > 0 else 0.0
+    return ltc, True
+
+
+def _build_integrated_scenario(
+    scenario: ScenarioResult,
+    pro_forma_price: float,
+    scenario_key: str,
+    renovation_input: RenovationInput | None,
+    renovation_result: RenovationResult | None,
+    retail_result: RetailResult | None,
+    ta_result: TaxAbatementResult | None,
+) -> IntegratedScenarioResult:
+    """Compose one scenario's integrated result.
+
+    ``scenario`` is expected to already carry renovation GPR injection
+    when renovation is enabled (applied by
+    :func:`_apply_renovation_to_scenario` before this helper is called).
+    """
+    combined_unlev, combined_lev = _combined_cash_flows(
+        scenario=scenario,
+        retail_result=retail_result,
+        ta_result=ta_result,
+        scenario_key=scenario_key,
+    )
+    going_in, going_in_adj = _going_in_cap_rates(
+        scenario=scenario,
+        pro_forma_price=pro_forma_price,
+        renovation_result=renovation_result,
+        retail_result=retail_result,
+        ta_result=ta_result,
+        scenario_key=scenario_key,
+    )
+    ltv_or_ltc, is_ltc = _ltv_or_ltc(
+        scenario=scenario,
+        pro_forma_price=pro_forma_price,
+        renovation_input=renovation_input,
+        renovation_result=renovation_result,
+    )
+    combined_value = pro_forma_price + _retail_scenario_value(
+        retail_result, scenario_key
+    )
 
     return IntegratedScenarioResult(
         scenario=scenario,
         pro_forma_price=pro_forma_price,
         combined_unlevered_cf=combined_unlev,
         combined_levered_cf=combined_lev,
-        going_in_cap_rate=y1_cap,
-        going_in_cap_rate_adjusted=y1_cap,
-        combined_value=pro_forma_price,
-        ltv_or_ltc=scenario.valuation_summary.ltv,
-        is_ltc=False,
+        going_in_cap_rate=going_in,
+        going_in_cap_rate_adjusted=going_in_adj,
+        combined_value=combined_value,
+        ltv_or_ltc=ltv_or_ltc,
+        is_ltc=is_ltc,
     )
 
 
@@ -423,11 +609,10 @@ def run_integrated_underwriting(
         convergence_threshold=convergence_threshold,
     )
 
-    # Per-scenario integrated results.
-    #
-    # Renovation GPR injection is applied here. Combined-CF assembly
-    # (retail + tax-abatement) and adjusted going-in cap rate layer on
-    # top in a subsequent commit.
+    # Per-scenario integrated results. Renovation GPR injection happens
+    # first (it modifies the DCF), then combined-CF assembly / going-in
+    # cap adjustment / LTC selection run on the renovation-adjusted
+    # scenario.
     integrated_scenarios: dict[str, IntegratedScenarioResult] = {}
     for scn_key, scn in base_uw.scenarios.items():
         scn_price = (
@@ -436,9 +621,14 @@ def run_integrated_underwriting(
             else scn.valuation_summary.purchase_price
         )
         integrated_scn = _apply_renovation_to_scenario(scn, renovation_result)
-        integrated_scenarios[scn_key] = _build_scenario_placeholder(
+        integrated_scenarios[scn_key] = _build_integrated_scenario(
             scenario=integrated_scn,
             pro_forma_price=scn_price,
+            scenario_key=scn_key,
+            renovation_input=renovation,
+            renovation_result=renovation_result,
+            retail_result=retail_result,
+            ta_result=ta_result,
         )
 
     return IntegratedUnderwritingResult(
