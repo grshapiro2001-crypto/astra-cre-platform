@@ -40,6 +40,23 @@ class RejectedRow(BaseModel):
     raw: dict[str, Any] = Field(default_factory=dict)
 
 
+class FutureLeaseRecord(BaseModel):
+    """A pre-lease captured from the Future Residents/Applicants section.
+
+    Persisted to `property_documents.future_leases` (JSONB) so downstream
+    rollover / notice-to-commit analytics can consume it. Never counted as
+    a physical unit — the `unit_number` typically duplicates an existing
+    Current-section unit.
+    """
+
+    unit_number: Optional[str] = None
+    resident_name: Optional[str] = None
+    market_rent: Optional[float] = None
+    lease_start: Optional[datetime] = None
+    lease_end: Optional[datetime] = None
+    raw_row: dict[str, Any] = Field(default_factory=dict)
+
+
 class IngestionSummary(BaseModel):
     """Structured result surfaced to the API client after rent roll ingest."""
 
@@ -52,3 +69,6 @@ class IngestionSummary(BaseModel):
     header_row_detected_at: int = -1
     total_rows_scanned: int = 0
     error: Optional[str] = None
+    future_leases_detected: int = 0
+    future_leases: list[FutureLeaseRecord] = Field(default_factory=list)
+    sections_detected: dict[str, int] = Field(default_factory=dict)

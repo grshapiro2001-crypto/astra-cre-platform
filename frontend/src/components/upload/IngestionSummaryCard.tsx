@@ -63,6 +63,12 @@ const SingleSummary = ({ summary }: { summary: RentRollIngestionSummary }) => {
             {' · '}
             {summary.total_rows_scanned} rows scanned
           </p>
+          {summary.future_leases_detected > 0 && (
+            <p className="mt-2 text-xs text-zinc-400">
+              {summary.future_leases_detected} pre-lease
+              {summary.future_leases_detected === 1 ? '' : 's'} on existing units detected. Stored separately from unit count.
+            </p>
+          )}
         </div>
         <div className="shrink-0">
           {hasIssue ? (
