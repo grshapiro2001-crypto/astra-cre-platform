@@ -1,0 +1,518 @@
+"""PMS-agnostic rent roll normalizer.
+
+Takes raw tabular data from any rent roll export (RealPage, Yardi, Entrata, etc.)
+and returns a `NormalizationResult` with clean rows ready for
+`bulk_insert_mappings` into `rent_roll_units`.
+
+Designed to run without pandas — the Render backend is memory-constrained
+(256 MB) and openpyxl already returns native Python row iterables.
+
+Pipeline:
+    1. Header detection  -- score each of the first N rows against known signal
+       tokens, pick the highest scorer (must exceed min_score).
+    2. Column aliasing   -- normalize header strings and match against
+       COLUMN_ALIASES to build `column_mapping`.
+    3. Row filtering     -- drop section banners (e.g. "Current/Notice/Vacant
+       Residents"), totals, subtotals, and blank rows with a recorded reason.
+    4. Coercion          -- parse dates, strip currency formatting, derive
+       `is_occupied` from `status`, truncate strings to column maxes with
+       warnings.
+
+The result is PURE DATA — no DB writes. The caller Pydantic-validates each
+row and inserts with savepoint fallbacks.
+"""
+from __future__ import annotations
+
+import logging
+import re
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Any, Iterable, Optional
+
+logger = logging.getLogger(__name__)
+
+
+# ─── Header detection ────────────────────────────────────────────────────────
+
+STRONG_SIGNALS = (
+    "unit", "apt", "resident", "tenant", "market rent", "lease", "sqft",
+    "sq ft", "floor plan", "move in", "move-in",
+)
+WEAK_SIGNALS = (
+    "rent", "status", "occupancy", "bed", "bath",
+)
+STRONG_POINTS = 3
+WEAK_POINTS = 1
+MIN_HEADER_SCORE = 6
+HEADER_SCAN_ROWS = 20
+
+
+# ─── Column aliasing ─────────────────────────────────────────────────────────
+
+COLUMN_ALIASES: dict[str, list[str]] = {
+    "unit_number": [
+        "unit", "unit #", "unit number", "apt", "apt #", "apt number",
+        "unit no", "bldg-unit", "unit id", "apartment", "apartment #",
+    ],
+    "unit_type": [
+        "unit type", "floor plan", "floorplan", "plan", "type", "unit style",
+        "bed/bath", "floor plan code",
+    ],
+    "sqft": [
+        "sqft", "sq ft", "square feet", "size", "sf", "unit sqft", "sq. ft.",
+    ],
+    "resident_name": [
+        "resident", "tenant", "resident name", "tenant name", "name",
+        "occupant", "primary resident",
+    ],
+    "status": [
+        "status", "unit status", "occupancy", "occ", "lease status",
+    ],
+    "market_rent": [
+        "market rent", "market", "asking rent", "gpr", "scheduled rent",
+        "gross potential",
+    ],
+    "in_place_rent": [
+        "in place rent", "actual rent", "current rent", "lease rent",
+        "charged rent", "rent", "effective rent",
+    ],
+    "move_in_date": [
+        "move in", "move-in", "move in date", "movein", "occupied date",
+    ],
+    "lease_start": [
+        "lease start", "lease from", "lease begin", "start date",
+        "lease start date",
+    ],
+    "lease_end": [
+        "lease end", "lease to", "lease expiration", "expiration",
+        "end date", "lease expires", "lease end date",
+    ],
+}
+
+
+# ─── Row filtering ───────────────────────────────────────────────────────────
+
+SECTION_HEADER_PATTERNS = (
+    "current", "notice", "vacant", "resident",
+    "future", "applicant", "model", "down", "admin", "employee",
+    "total", "subtotal", "summary", "average", "avg", "count",
+    "grand total", "report", "property", "building",
+)
+
+
+# ─── Column max lengths (must match the SQLAlchemy model) ────────────────────
+
+COLUMN_MAX_LENGTHS: dict[str, int] = {
+    "unit_number": 50,
+    "unit_type": 50,
+    "status": 100,
+    "resident_name": 255,
+}
+
+
+# ─── Occupancy derivation ────────────────────────────────────────────────────
+
+OCCUPIED_STATUSES = ("occupied", "current", "notice")
+VACANT_STATUSES = ("vacant", "down", "model", "admin", "employee")
+
+
+# ─── Result dataclass ────────────────────────────────────────────────────────
+
+@dataclass
+class NormalizationResult:
+    units: list[dict[str, Any]] = field(default_factory=list)
+    skipped_rows: list[dict[str, Any]] = field(default_factory=list)
+    unmapped_columns: list[str] = field(default_factory=list)
+    column_mapping: dict[str, str] = field(default_factory=dict)
+    warnings: list[str] = field(default_factory=list)
+    header_row_index: int = -1
+    total_rows_scanned: int = 0
+    error: Optional[str] = None
+
+
+# ─── Helpers ─────────────────────────────────────────────────────────────────
+
+_WHITESPACE_RE = re.compile(r"\s+")
+_TRAILING_PUNCT_RE = re.compile(r"[:;,.\-]+$")
+
+
+def _normalize_header(name: Any) -> str:
+    if name is None:
+        return ""
+    s = str(name).strip().lower()
+    s = _WHITESPACE_RE.sub(" ", s)
+    s = _TRAILING_PUNCT_RE.sub("", s)
+    return s
+
+
+def _is_blank(value: Any) -> bool:
+    if value is None:
+        return True
+    s = str(value).strip()
+    return s == "" or s.lower() in {"n/a", "na", "-", "--", "none", "null"}
+
+
+def _score_header_row(row: Iterable[Any]) -> int:
+    score = 0
+    for cell in row:
+        header = _normalize_header(cell)
+        if not header:
+            continue
+        if any(tok in header for tok in STRONG_SIGNALS):
+            score += STRONG_POINTS
+        elif any(tok in header for tok in WEAK_SIGNALS):
+            score += WEAK_POINTS
+    return score
+
+
+def detect_header_row(
+    rows: list[list[Any]], max_scan: int = HEADER_SCAN_ROWS
+) -> int:
+    """Return the 0-indexed row number of the best header candidate, or -1."""
+    best_idx = -1
+    best_score = 0
+    for i, row in enumerate(rows[:max_scan]):
+        score = _score_header_row(row)
+        if score > best_score:
+            best_score = score
+            best_idx = i
+    if best_score < MIN_HEADER_SCORE:
+        return -1
+    return best_idx
+
+
+def build_column_mapping(
+    headers: list[Any],
+) -> tuple[dict[str, str], dict[int, str], list[str]]:
+    """Match normalized headers against COLUMN_ALIASES.
+
+    Returns:
+        internal_to_original:   {"unit_number": "Apt #", ...}
+        col_index_to_internal:  {3: "unit_number", ...}
+        unmapped_columns:       list of original headers we didn't recognize
+    """
+    internal_to_original: dict[str, str] = {}
+    col_index_to_internal: dict[int, str] = {}
+    unmapped: list[str] = []
+
+    for idx, raw in enumerate(headers):
+        norm = _normalize_header(raw)
+        if not norm:
+            continue
+        original = str(raw).strip()
+        matched: Optional[str] = None
+        # exact alias match first
+        for internal, aliases in COLUMN_ALIASES.items():
+            if internal in internal_to_original:
+                continue
+            if norm in {a.lower() for a in aliases}:
+                matched = internal
+                break
+        # substring fallback (e.g. "Unit #" matching "unit")
+        if matched is None:
+            for internal, aliases in COLUMN_ALIASES.items():
+                if internal in internal_to_original:
+                    continue
+                for alias in aliases:
+                    if alias.lower() == norm:
+                        matched = internal
+                        break
+                    # prefer exact > starts-with > contains
+                    if matched is None and norm.startswith(alias.lower() + " "):
+                        matched = internal
+                if matched:
+                    break
+        if matched:
+            internal_to_original[matched] = original
+            col_index_to_internal[idx] = matched
+        else:
+            unmapped.append(original)
+
+    return internal_to_original, col_index_to_internal, unmapped
+
+
+# ─── Coercion ────────────────────────────────────────────────────────────────
+
+_CURRENCY_STRIP_RE = re.compile(r"[\$,\s]")
+
+
+def coerce_currency(value: Any) -> Optional[float]:
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    s = str(value).strip()
+    if _is_blank(s):
+        return None
+    negative = False
+    if s.startswith("(") and s.endswith(")"):
+        negative = True
+        s = s[1:-1]
+    s = _CURRENCY_STRIP_RE.sub("", s)
+    if s == "" or s == "-":
+        return None
+    try:
+        val = float(s)
+    except ValueError:
+        return None
+    return -val if negative else val
+
+
+def coerce_int(value: Any) -> Optional[int]:
+    if value is None:
+        return None
+    if isinstance(value, int) and not isinstance(value, bool):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    s = str(value).strip()
+    if _is_blank(s):
+        return None
+    s = _CURRENCY_STRIP_RE.sub("", s)
+    try:
+        return int(float(s))
+    except ValueError:
+        return None
+
+
+_DATE_FORMATS = (
+    "%Y-%m-%d",
+    "%m/%d/%Y",
+    "%m/%d/%y",
+    "%m-%d-%Y",
+    "%m-%d-%y",
+    "%d-%b-%Y",
+    "%d-%b-%y",
+    "%Y/%m/%d",
+)
+
+
+def coerce_date(value: Any) -> Optional[datetime]:
+    """Parse dates defensively. Excel serial ints, common US formats, ISO."""
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value
+    # Excel serial date (int or float) — 1900-based
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        try:
+            # Excel serial 60 is the phantom 1900-02-29; anything reasonable
+            # for rent roll dates is > 25000 (1968-07-26).
+            if 10000 < float(value) < 80000:
+                from datetime import timedelta
+                # Excel's 1900 bug: treat 1899-12-30 as epoch.
+                epoch = datetime(1899, 12, 30)
+                return epoch + timedelta(days=float(value))
+        except (OverflowError, ValueError):
+            return None
+        return None
+    s = str(value).strip()
+    if _is_blank(s):
+        return None
+    for fmt in _DATE_FORMATS:
+        try:
+            return datetime.strptime(s, fmt)
+        except ValueError:
+            continue
+    return None
+
+
+def derive_is_occupied(status: Any) -> Optional[bool]:
+    if status is None:
+        return None
+    s = str(status).strip().lower()
+    if not s:
+        return None
+    if any(tok in s for tok in OCCUPIED_STATUSES):
+        return True
+    if any(tok in s for tok in VACANT_STATUSES):
+        return False
+    return None
+
+
+def truncate_string(
+    value: Any,
+    max_length: int,
+    field_name: str,
+    row_context: str,
+    warnings: list[str],
+) -> Optional[str]:
+    if value is None:
+        return None
+    s = str(value).strip()
+    if s == "":
+        return None
+    if len(s) > max_length:
+        warnings.append(
+            f"{field_name} truncated on {row_context}: "
+            f"original length {len(s)} -> {max_length}"
+        )
+        return s[:max_length]
+    return s
+
+
+# ─── Junk-row filter ─────────────────────────────────────────────────────────
+
+def is_junk_row(unit: dict[str, Any]) -> tuple[bool, str]:
+    """Returns (is_junk, reason)."""
+    unit_num = unit.get("unit_number")
+
+    if _is_blank(unit_num):
+        return True, "no unit_number"
+
+    unit_num_str = str(unit_num).strip().lower()
+    if any(p in unit_num_str for p in SECTION_HEADER_PATTERNS):
+        return True, f"unit_number looks like section header: {unit_num_str!r}"
+
+    resident = str(unit.get("resident_name") or "").lower()
+    if "/" in resident and any(p in resident for p in SECTION_HEADER_PATTERNS):
+        return True, f"resident_name is section banner: {resident!r}"
+
+    key_fields = ("unit_number", "resident_name", "market_rent", "in_place_rent")
+    if all(_is_blank(unit.get(f)) for f in key_fields):
+        return True, "all key fields blank"
+
+    return False, ""
+
+
+# ─── Entry points ────────────────────────────────────────────────────────────
+
+def normalize_rows(rows: list[list[Any]]) -> NormalizationResult:
+    """Full pipeline: detect header, alias columns, filter junk, coerce.
+
+    `rows` is a list of rows; each row is a list of cell values in column order.
+    """
+    result = NormalizationResult(total_rows_scanned=len(rows))
+
+    if not rows:
+        result.error = "empty input: no rows"
+        return result
+
+    header_idx = detect_header_row(rows)
+    result.header_row_index = header_idx
+    if header_idx < 0:
+        result.error = (
+            "could not identify header row — no row scored above "
+            f"{MIN_HEADER_SCORE}. "
+            "Check that the file contains columns like 'Unit', 'Resident', "
+            "'Market Rent', 'Lease Start'."
+        )
+        return result
+
+    header_row = rows[header_idx]
+    internal_to_original, col_to_internal, unmapped = build_column_mapping(
+        list(header_row)
+    )
+    result.column_mapping = internal_to_original
+    result.unmapped_columns = unmapped
+
+    logger.info(
+        "Rent roll header detected at row %d; mapping=%s; unmapped=%s",
+        header_idx, internal_to_original, unmapped,
+    )
+
+    data_rows = rows[header_idx + 1:]
+    for offset, raw_row in enumerate(data_rows):
+        row_index = header_idx + 1 + offset
+        raw_dict: dict[str, Any] = {}
+        for col_idx, internal in col_to_internal.items():
+            if col_idx < len(raw_row):
+                raw_dict[internal] = raw_row[col_idx]
+
+        coerced = _coerce_unit(raw_dict, result.warnings, row_index)
+
+        junk, reason = is_junk_row(coerced)
+        if junk:
+            result.skipped_rows.append(
+                {"row_index": row_index, "reason": reason, "raw": raw_dict}
+            )
+            continue
+
+        result.units.append(coerced)
+
+    return result
+
+
+def normalize_units(
+    units: list[dict[str, Any]],
+    column_mapping: Optional[dict[str, str]] = None,
+) -> NormalizationResult:
+    """Partial pipeline: no header detection, operates on already-extracted dicts.
+
+    Used to wrap the legacy openpyxl-based extractor
+    (`excel_extraction_service.extract_rent_roll`) so this PR doesn't have to
+    rewrite the Excel parser. The rows already have internal field names, so
+    this only does junk filtering, coercion, and truncation.
+    """
+    result = NormalizationResult(
+        total_rows_scanned=len(units),
+        column_mapping=column_mapping or {},
+        header_row_index=-1 if column_mapping is None else 0,
+    )
+
+    for i, raw in enumerate(units):
+        coerced = _coerce_unit(raw, result.warnings, i)
+        junk, reason = is_junk_row(coerced)
+        if junk:
+            result.skipped_rows.append(
+                {"row_index": i, "reason": reason, "raw": raw}
+            )
+            continue
+        result.units.append(coerced)
+
+    return result
+
+
+def _coerce_unit(
+    raw: dict[str, Any], warnings: list[str], row_index: int
+) -> dict[str, Any]:
+    """Apply per-field coercion to a raw row dict keyed by internal field names."""
+    unit_number_raw = raw.get("unit_number")
+    row_context = f"row {row_index} (unit={unit_number_raw!r})"
+
+    out: dict[str, Any] = {}
+    out["unit_number"] = truncate_string(
+        raw.get("unit_number"),
+        COLUMN_MAX_LENGTHS["unit_number"],
+        "unit_number", row_context, warnings,
+    )
+    out["unit_type"] = truncate_string(
+        raw.get("unit_type"),
+        COLUMN_MAX_LENGTHS["unit_type"],
+        "unit_type", row_context, warnings,
+    )
+    out["sqft"] = coerce_int(raw.get("sqft"))
+
+    status_val = truncate_string(
+        raw.get("status"),
+        COLUMN_MAX_LENGTHS["status"],
+        "status", row_context, warnings,
+    )
+    out["status"] = status_val
+
+    # Prefer explicit is_occupied if the raw row already has it; otherwise derive.
+    if "is_occupied" in raw and raw["is_occupied"] is not None:
+        out["is_occupied"] = bool(raw["is_occupied"])
+    else:
+        out["is_occupied"] = derive_is_occupied(status_val)
+
+    out["resident_name"] = truncate_string(
+        raw.get("resident_name"),
+        COLUMN_MAX_LENGTHS["resident_name"],
+        "resident_name", row_context, warnings,
+    )
+
+    out["move_in_date"] = coerce_date(raw.get("move_in_date"))
+    out["lease_start"] = coerce_date(raw.get("lease_start"))
+    out["lease_end"] = coerce_date(raw.get("lease_end"))
+
+    out["market_rent"] = coerce_currency(raw.get("market_rent"))
+    out["in_place_rent"] = coerce_currency(raw.get("in_place_rent"))
+
+    charge_details = raw.get("charge_details")
+    if isinstance(charge_details, dict):
+        out["charge_details"] = charge_details
+    else:
+        out["charge_details"] = None
+
+    return out
