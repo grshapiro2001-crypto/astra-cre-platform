@@ -23,6 +23,8 @@ export interface RentRollIngestionSummary {
   header_row_detected_at: number;
   total_rows_scanned: number;
   error: string | null;
+  future_leases_detected: number;
+  sections_detected: Record<string, number>;
 }
 
 export interface ExcelAnalysisResponse {

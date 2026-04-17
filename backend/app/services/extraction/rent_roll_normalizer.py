@@ -27,9 +27,80 @@ import logging
 import re
 from dataclasses import dataclass, field
 from datetime import datetime
+from enum import Enum
 from typing import Any, Iterable, Optional
 
 logger = logging.getLogger(__name__)
+
+
+# ─── Section taxonomy ────────────────────────────────────────────────────────
+
+class RentRollSection(str, Enum):
+    """The logical section a row belongs to in a rent roll export.
+
+    PMS exports (RealPage, Yardi, Entrata) group rows into sections separated
+    by banner rows. The authoritative unit list lives under
+    `CURRENT_NOTICE_VACANT`; rows under `FUTURE_APPLICANTS` are pre-leases on
+    units that already exist in the current section — NOT additional physical
+    units, and must be excluded from unit counts / occupancy math.
+    """
+
+    CURRENT_NOTICE_VACANT = "current_notice_vacant"
+    FUTURE_APPLICANTS = "future_applicants"
+    SUMMARY = "summary"
+    UNKNOWN = "unknown"
+
+
+# Ordered most-specific-first. Each entry: (predicate(lower_stripped_str), section).
+# `future` must be checked before the bare `applicant` / `resident` rules since
+# "Future Residents/Applicants" would otherwise misroute to CURRENT.
+_BANNER_MATCHERS: tuple[tuple[Any, RentRollSection], ...] = (
+    (lambda s: "future" in s and ("resident" in s or "applicant" in s),
+     RentRollSection.FUTURE_APPLICANTS),
+    (lambda s: "applicant" in s,
+     RentRollSection.FUTURE_APPLICANTS),
+    (lambda s: any(k in s for k in (
+        "summary", "totals:", "total non rev", "total vacant",
+        "charge code", "grand total", "summary of charges",
+    )), RentRollSection.SUMMARY),
+    (lambda s: "resident" in s and "/" in s and "applicant" not in s,
+     RentRollSection.CURRENT_NOTICE_VACANT),
+    (lambda s: "current" in s and (
+        "notice" in s or "vacant" in s or "resident" in s
+    ), RentRollSection.CURRENT_NOTICE_VACANT),
+)
+
+
+def classify_banner(cell_value: Any) -> Optional[RentRollSection]:
+    """Return the section a banner cell introduces, or None if not a banner.
+
+    Only non-empty strings are considered banners. Numbers, dates, None all
+    return None.
+    """
+    if not isinstance(cell_value, str):
+        return None
+    s = cell_value.strip().lower()
+    if not s:
+        return None
+    for matcher, section in _BANNER_MATCHERS:
+        if matcher(s):
+            return section
+    return None
+
+
+def classify_banner_row(cells: Iterable[Any]) -> Optional[RentRollSection]:
+    """Scan a row of cells and return the banner classification, or None.
+
+    Only rows with a single non-empty cell are treated as banners. Real
+    banner rows in RealPage/Yardi exports are always lone-cell rows spanning
+    the table; requiring this avoids misclassifying a legitimate unit row
+    where e.g. `unit_number="APPLICANT-A1"` or `resident_name="Summer Applegate"`.
+    """
+    cells_list = list(cells)
+    non_empty = [c for c in cells_list if not _is_blank(c)]
+    if len(non_empty) != 1:
+        return None
+    return classify_banner(non_empty[0])
 
 
 # ─── Header detection ────────────────────────────────────────────────────────
@@ -119,8 +190,29 @@ VACANT_STATUSES = ("vacant", "down", "model", "admin", "employee")
 # ─── Result dataclass ────────────────────────────────────────────────────────
 
 @dataclass
+class FutureLease:
+    """A pre-lease row captured from the Future Residents/Applicants section.
+
+    These are incoming residents who've signed a lease but haven't moved in.
+    The `unit_number` almost always duplicates an existing Current-section
+    unit — this is the same physical unit, just with a future move-in.
+    Captured so downstream analytics (rollover, notice-to-commit cycle time)
+    can use them, but NEVER added to the physical unit count.
+    """
+
+    unit_number: Optional[str] = None
+    resident_name: Optional[str] = None
+    market_rent: Optional[float] = None
+    lease_start: Optional[datetime] = None
+    lease_end: Optional[datetime] = None
+    raw_row: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
 class NormalizationResult:
     units: list[dict[str, Any]] = field(default_factory=list)
+    future_leases: list[FutureLease] = field(default_factory=list)
+    sections_detected: dict[str, int] = field(default_factory=dict)
     skipped_rows: list[dict[str, Any]] = field(default_factory=list)
     unmapped_columns: list[str] = field(default_factory=list)
     column_mapping: dict[str, str] = field(default_factory=dict)
@@ -412,6 +504,7 @@ def normalize_rows(rows: list[list[Any]]) -> NormalizationResult:
     )
 
     data_rows = rows[header_idx + 1:]
+    current_section = RentRollSection.UNKNOWN
     for offset, raw_row in enumerate(data_rows):
         row_index = header_idx + 1 + offset
         raw_dict: dict[str, Any] = {}
@@ -419,18 +512,111 @@ def normalize_rows(rows: list[list[Any]]) -> NormalizationResult:
             if col_idx < len(raw_row):
                 raw_dict[internal] = raw_row[col_idx]
 
-        coerced = _coerce_unit(raw_dict, result.warnings, row_index)
-
-        junk, reason = is_junk_row(coerced)
-        if junk:
-            result.skipped_rows.append(
-                {"row_index": row_index, "reason": reason, "raw": raw_dict}
-            )
+        banner = classify_banner_row(raw_row)
+        if banner is not None:
+            current_section = banner
+            result.skipped_rows.append({
+                "row_index": row_index,
+                "reason": f"section header banner: {banner.value}",
+                "raw": raw_dict,
+            })
             continue
 
-        result.units.append(coerced)
+        _dispatch_row(result, raw_dict, row_index, current_section)
 
+    _finalize_section_warnings(result)
     return result
+
+
+def _dispatch_row(
+    result: NormalizationResult,
+    raw_dict: dict[str, Any],
+    row_index: int,
+    section: RentRollSection,
+) -> None:
+    """Coerce a data row and route it by section.
+
+    Section policy:
+      - CURRENT_NOTICE_VACANT: accept unless the content-level `is_junk_row`
+        check rejects it.
+      - FUTURE_APPLICANTS: capture as a FutureLease (if it has a unit_number);
+        never add to `units`. This is what keeps pre-leases out of unit counts.
+      - SUMMARY: skip entirely.
+      - UNKNOWN: fall back to content-level junk filtering. Preserves
+        backward-compat with files that don't use standard banner language.
+    """
+    coerced = _coerce_unit(raw_dict, result.warnings, row_index)
+
+    if section == RentRollSection.SUMMARY:
+        result.skipped_rows.append({
+            "row_index": row_index,
+            "reason": "summary_section",
+            "raw": raw_dict,
+        })
+        _bump_section(result, section)
+        return
+
+    if section == RentRollSection.FUTURE_APPLICANTS:
+        if _is_blank(coerced.get("unit_number")):
+            result.skipped_rows.append({
+                "row_index": row_index,
+                "reason": "future_applicants_section_blank_row",
+                "raw": raw_dict,
+            })
+        else:
+            result.future_leases.append(FutureLease(
+                unit_number=coerced.get("unit_number"),
+                resident_name=coerced.get("resident_name"),
+                market_rent=coerced.get("market_rent"),
+                lease_start=coerced.get("lease_start"),
+                lease_end=coerced.get("lease_end"),
+                raw_row=dict(raw_dict),
+            ))
+            result.skipped_rows.append({
+                "row_index": row_index,
+                "reason": "future_resident_pre_lease",
+                "raw": raw_dict,
+            })
+        _bump_section(result, section)
+        return
+
+    # CURRENT_NOTICE_VACANT and UNKNOWN share the content-level junk gate.
+    junk, reason = is_junk_row(coerced)
+    if junk:
+        result.skipped_rows.append({
+            "row_index": row_index,
+            "reason": reason,
+            "raw": raw_dict,
+        })
+        _bump_section(result, section)
+        return
+
+    result.units.append(coerced)
+    _bump_section(result, section)
+
+
+def _bump_section(result: NormalizationResult, section: RentRollSection) -> None:
+    result.sections_detected[section.value] = (
+        result.sections_detected.get(section.value, 0) + 1
+    )
+
+
+def _finalize_section_warnings(result: NormalizationResult) -> None:
+    """Emit a warning if any units were accepted before a section banner was seen.
+
+    Signals that either the file lacks standard banner language (harmless) or
+    header detection picked up the wrong row (worth investigating).
+    """
+    unknown_count = result.sections_detected.get(
+        RentRollSection.UNKNOWN.value, 0
+    )
+    if unknown_count > 0 and result.sections_detected.get(
+        RentRollSection.CURRENT_NOTICE_VACANT.value, 0
+    ) == 0:
+        result.warnings.append(
+            f"{unknown_count} rows ingested before any section banner was seen "
+            "— header/banner detection may be off."
+        )
 
 
 def normalize_units(
@@ -450,17 +636,37 @@ def normalize_units(
         header_row_index=-1 if column_mapping is None else 0,
     )
 
+    current_section = RentRollSection.UNKNOWN
     for i, raw in enumerate(units):
-        coerced = _coerce_unit(raw, result.warnings, i)
-        junk, reason = is_junk_row(coerced)
-        if junk:
-            result.skipped_rows.append(
-                {"row_index": i, "reason": reason, "raw": raw}
-            )
+        # Banner rows arrive as unit dicts with the banner text in
+        # unit_number or resident_name. Require no numeric data to be present
+        # — a real unit row always has rent or sqft and should never be
+        # reclassified as a banner even if the text happens to match.
+        banner = (
+            classify_banner(raw.get("unit_number"))
+            or classify_banner(raw.get("resident_name"))
+        )
+        if banner is not None and _is_banner_shaped_dict(raw):
+            current_section = banner
+            result.skipped_rows.append({
+                "row_index": i,
+                "reason": f"section header banner: {banner.value}",
+                "raw": raw,
+            })
             continue
-        result.units.append(coerced)
 
+        _dispatch_row(result, raw, i, current_section)
+
+    _finalize_section_warnings(result)
     return result
+
+
+def _is_banner_shaped_dict(raw: dict[str, Any]) -> bool:
+    """True if the row dict looks like a banner (no numeric rent/sqft data)."""
+    return all(
+        _is_blank(raw.get(f))
+        for f in ("market_rent", "in_place_rent", "sqft")
+    )
 
 
 def _coerce_unit(

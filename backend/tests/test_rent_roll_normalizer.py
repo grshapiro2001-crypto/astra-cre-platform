@@ -14,12 +14,17 @@ Covers the eight assertions from the task spec:
   9. Currency with `$`, `,`, `()` parses correctly.
 """
 from datetime import datetime
+from pathlib import Path
 
+import openpyxl
 import pytest
 
 from app.services.extraction.rent_roll_normalizer import (
     COLUMN_MAX_LENGTHS,
+    FutureLease,
     NormalizationResult,
+    RentRollSection,
+    classify_banner,
     coerce_currency,
     coerce_date,
     derive_is_occupied,
@@ -322,3 +327,199 @@ def test_normalization_result_defaults():
     assert r.header_row_index == -1
     assert r.total_rows_scanned == 0
     assert r.error is None
+    assert r.future_leases == []
+    assert r.sections_detected == {}
+
+
+# ─── Section-aware filtering (v2) ────────────────────────────────────────────
+
+def _banner_row(text: str) -> list:
+    """Build a 9-wide row with only cell 0 populated — matches REALPAGE_HEADER width."""
+    return [text, "", "", "", "", "", "", "", ""]
+
+
+def test_classify_banner_basic():
+    assert classify_banner("Current/Notice/Vacant Residents") == RentRollSection.CURRENT_NOTICE_VACANT
+    assert classify_banner("Future Residents/Applicants") == RentRollSection.FUTURE_APPLICANTS
+    assert classify_banner("Summary Groups") == RentRollSection.SUMMARY
+    assert classify_banner("Total Vacant Units") == RentRollSection.SUMMARY
+    assert classify_banner("Grand Total") == RentRollSection.SUMMARY
+    assert classify_banner("Summary of Charges by Charge Code") == RentRollSection.SUMMARY
+    # Non-banner strings
+    assert classify_banner("101") is None
+    assert classify_banner("") is None
+    assert classify_banner(None) is None
+    assert classify_banner(1200) is None
+    # Resident names that contain banner-adjacent words must NOT classify.
+    assert classify_banner("Currentin Jones") is None  # "current" but no notice/vacant/resident/slash
+    assert classify_banner("Summer Applegate") is None  # "applegate" != "applicant"
+
+
+def test_section_tagging_splits_current_and_future():
+    """Spec test 1: section tagging separates Current vs Future into distinct buckets."""
+    table = realpage_table([
+        _banner_row("Current/Notice/Vacant Residents"),
+        ["101", "A1", 800, "Jane", "Occupied", 1200, 1150, "2025-01-01", "2026-01-01"],
+        ["102", "A1", 800, "John", "Occupied", 1200, 1170, "2025-02-01", "2026-02-01"],
+        ["103", "A2", 900, None, "Vacant", 1300, None, None, None],
+        _banner_row("Future Residents/Applicants"),
+        ["201", "B1", 1000, "Alice Incoming", "Applicant", 1500, 1400, "2025-06-01", "2026-06-01"],
+        ["202", "B1", 1000, "Bob Pending", "Applicant", 1500, 1400, "2025-07-01", "2026-07-01"],
+    ])
+    result = normalize_rows(table)
+    assert len(result.units) == 3
+    assert [u["unit_number"] for u in result.units] == ["101", "102", "103"]
+    assert len(result.future_leases) == 2
+    assert [fl.unit_number for fl in result.future_leases] == ["201", "202"]
+    assert result.sections_detected == {
+        "current_notice_vacant": 3,
+        "future_applicants": 2,
+    }
+
+
+def test_future_unit_numbers_duplicating_current_are_not_counted():
+    """Spec test 2: duplicate unit numbers in Future section do NOT inflate the unit count."""
+    table = realpage_table([
+        _banner_row("Current/Notice/Vacant Residents"),
+        ["101", "A1", 800, "Jane", "Occupied", 1200, 1150, "2025-01-01", "2026-01-01"],
+        ["102", "A1", 800, "John", "Occupied", 1200, 1170, "2025-02-01", "2026-02-01"],
+        ["103", "A2", 900, None, "Vacant", 1300, None, None, None],
+        _banner_row("Future Residents/Applicants"),
+        # These duplicate unit_numbers from Current — pre-leases on existing units.
+        ["102", "A1", 800, "New Incoming Tenant", "Applicant", 1250, 1250, "2025-06-01", "2026-06-01"],
+        ["103", "A2", 900, "Another Incoming", "Applicant", 1350, 1350, "2025-07-01", "2026-07-01"],
+    ])
+    result = normalize_rows(table)
+    assert [u["unit_number"] for u in result.units] == ["101", "102", "103"]
+    assert len(result.units) == 3
+    assert len(result.future_leases) == 2
+
+
+def test_summary_sections_are_filtered():
+    """Spec test 3: Summary Groups / Total Non Rev / Summary of Charges all skip."""
+    table = realpage_table([
+        _banner_row("Current/Notice/Vacant Residents"),
+        ["101", "A1", 800, "Jane", "Occupied", 1200, 1150, "2025-01-01", "2026-01-01"],
+        _banner_row("Summary Groups"),
+        ["Summary Group Alpha", "", "", "", "", 1200, 1150, "", ""],
+        _banner_row("Total Non Rev Units"),
+        ["Non Rev Row", "", "", "", "", "", "", "", ""],
+        _banner_row("Summary of Charges by Charge Code"),
+        ["Rent", "", "", "", "", 1150, "", "", ""],
+    ])
+    result = normalize_rows(table)
+    assert len(result.units) == 1
+    assert result.units[0]["unit_number"] == "101"
+    # Each of the three summary banners should appear in skipped_rows as a banner.
+    banner_reasons = [
+        s["reason"] for s in result.skipped_rows
+        if "section header banner" in s["reason"]
+    ]
+    assert sum("summary" in r for r in banner_reasons) >= 3
+    # Rows UNDER summary banners are marked summary_section.
+    assert any(s["reason"] == "summary_section" for s in result.skipped_rows)
+    assert result.sections_detected.get("summary", 0) >= 3
+
+
+def test_future_lease_payload_preserved():
+    """Spec test 4: future_leases captures resident_name, rents, and lease dates."""
+    # Use a header that has explicit Lease Start and Lease End columns to exercise
+    # the lease_start capture path.
+    table = [
+        ["Rent Roll", "", "", "", "", "", "", "", ""],
+        ["", "", "", "", "", "", "", "", ""],
+        ["Unit", "Floor Plan", "SqFt", "Resident", "Status",
+         "Market Rent", "Lease Rent", "Lease Start", "Lease End"],
+        ["Current/Notice/Vacant Residents", "", "", "", "", "", "", "", ""],
+        ["101", "A1", 800, "Jane", "Occupied", 1200, 1150, "2025-01-01", "2026-01-01"],
+        ["Future Residents/Applicants", "", "", "", "", "", "", "", ""],
+        ["201", "B1", 1000, "Alice Incoming", "Applicant", 1500, 1400, "2025-06-15", "2026-06-15"],
+        ["202", "B1", 1000, "Bob Pending", "Applicant", 1500, 1400, "2025-07-20", "2026-07-20"],
+    ]
+    result = normalize_rows(table)
+    assert len(result.future_leases) == 2
+    first = result.future_leases[0]
+    assert first.unit_number == "201"
+    assert first.resident_name == "Alice Incoming"
+    assert first.lease_start == datetime(2025, 6, 15)
+    assert first.lease_end == datetime(2026, 6, 15)
+    assert first.market_rent == 1500.0
+    assert isinstance(first.raw_row, dict)
+    # Second lease too.
+    assert result.future_leases[1].resident_name == "Bob Pending"
+    assert result.future_leases[1].lease_start == datetime(2025, 7, 20)
+
+
+def test_resident_name_containing_banner_word_is_not_filtered():
+    """Spec test 5: `Currentin Jones` / `Summer Applegate` must pass through as real units."""
+    table = realpage_table([
+        _banner_row("Current/Notice/Vacant Residents"),
+        ["101", "A1", 800, "Currentin Jones", "Occupied", 1200, 1150,
+         "2025-01-01", "2026-01-01"],
+        ["102", "A1", 800, "Summer Applegate", "Occupied", 1200, 1170,
+         "2025-02-01", "2026-02-01"],
+    ])
+    result = normalize_rows(table)
+    assert len(result.units) == 2
+    assert result.units[0]["resident_name"] == "Currentin Jones"
+    assert result.units[1]["resident_name"] == "Summer Applegate"
+    # Neither should appear in skipped_rows.
+    skipped_residents = [
+        str(s["raw"].get("resident_name", "")) for s in result.skipped_rows
+    ]
+    assert "Currentin Jones" not in skipped_residents
+    assert "Summer Applegate" not in skipped_residents
+
+
+def test_normalize_units_preserves_future_leases():
+    """normalize_units (legacy wrapper) also tags sections when banners come through as dicts."""
+    units = [
+        {"unit_number": "Current/Notice/Vacant Residents",
+         "resident_name": None, "market_rent": None, "in_place_rent": None,
+         "sqft": None},
+        {"unit_number": "101", "unit_type": "A1", "sqft": 800,
+         "resident_name": "Jane Doe", "status": "Occupied",
+         "market_rent": 1200, "in_place_rent": 1150,
+         "lease_start": "2025-01-01", "lease_end": "2026-01-01"},
+        {"unit_number": "Future Residents/Applicants",
+         "resident_name": None, "market_rent": None, "in_place_rent": None,
+         "sqft": None},
+        {"unit_number": "202", "unit_type": "B1", "sqft": 1000,
+         "resident_name": "Alice Incoming", "status": "Applicant",
+         "market_rent": 1500, "in_place_rent": 1400,
+         "lease_start": "2025-06-01", "lease_end": "2026-06-01"},
+    ]
+    result = normalize_units(units, {"unit_number": "Unit"})
+    assert len(result.units) == 1
+    assert result.units[0]["unit_number"] == "101"
+    assert len(result.future_leases) == 1
+    assert result.future_leases[0].unit_number == "202"
+    assert result.future_leases[0].resident_name == "Alice Incoming"
+    assert result.sections_detected.get("current_notice_vacant") == 1
+    assert result.sections_detected.get("future_applicants") == 1
+
+
+# ─── End-to-end: synthetic RealPage fixture with 320 units + 10 pre-leases ───
+
+def test_realpage_with_future_residents_end_to_end(realpage_with_future_residents_xlsx: Path):
+    """The reference failing case: 320-unit property with 10 future pre-leases.
+
+    Before the v2 fix the normalizer returned 330 units; after the fix it
+    returns exactly 320 units plus 10 future_leases.
+    """
+    wb = openpyxl.load_workbook(str(realpage_with_future_residents_xlsx), data_only=True)
+    ws = wb.worksheets[0]
+    rows = [list(row) for row in ws.iter_rows(values_only=True)]
+    wb.close()
+
+    result = normalize_rows(rows)
+    assert result.error is None
+    assert len(result.units) == 320
+    assert len(result.future_leases) == 10
+    assert result.sections_detected.get("current_notice_vacant") == 320
+    assert result.sections_detected.get("future_applicants") == 10
+    assert result.sections_detected.get("summary", 0) >= 7
+    # Future-lease unit_numbers duplicate the first 10 Current units.
+    current_first_10 = [u["unit_number"] for u in result.units[:10]]
+    future_unit_numbers = [fl.unit_number for fl in result.future_leases]
+    assert future_unit_numbers == current_first_10

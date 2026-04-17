@@ -24,7 +24,12 @@ from app.utils.file_handler import validate_pdf_file, save_uploaded_file
 from app.services.pdf_service import process_pdf_upload
 from app.services import excel_extraction_service
 from app.services.extraction import rent_roll_normalizer
-from app.schemas.rent_roll import IngestionSummary, RejectedRow, RentRollUnitCreate
+from app.schemas.rent_roll import (
+    FutureLeaseRecord,
+    IngestionSummary,
+    RejectedRow,
+    RentRollUnitCreate,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -359,6 +364,18 @@ def _process_rent_roll(
     column_mapping = extraction.get("column_mapping") or {}
     norm = rent_roll_normalizer.normalize_units(raw_units, column_mapping)
 
+    future_lease_records = [
+        FutureLeaseRecord(
+            unit_number=fl.unit_number,
+            resident_name=fl.resident_name,
+            market_rent=fl.market_rent,
+            lease_start=fl.lease_start,
+            lease_end=fl.lease_end,
+            raw_row=dict(fl.raw_row),
+        )
+        for fl in norm.future_leases
+    ]
+
     ingestion = IngestionSummary(
         units_rejected=len(norm.skipped_rows),
         rejected_rows=[
@@ -375,7 +392,14 @@ def _process_rent_roll(
         header_row_detected_at=norm.header_row_index,
         total_rows_scanned=norm.total_rows_scanned,
         error=norm.error,
+        future_leases_detected=len(future_lease_records),
+        future_leases=future_lease_records,
+        sections_detected=dict(norm.sections_detected),
     )
+
+    # Persist future leases on the document row (JSONB). model_dump(mode="json")
+    # serializes datetime fields to ISO strings for clean JSONB storage.
+    doc.future_leases = [fl.model_dump(mode="json") for fl in future_lease_records]
 
     # Pydantic-validate each row against the final DB schema constraints.
     clean_rows: list[dict[str, Any]] = []

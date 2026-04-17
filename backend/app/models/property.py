@@ -1,7 +1,8 @@
 """
 Property model for storing analyzed property data
 """
-from sqlalchemy import Column, Integer, String, Text, Float, Numeric, Boolean, DateTime, ForeignKey, JSON
+from sqlalchemy import Column, Integer, String, Text, Float, Numeric, Boolean, DateTime, ForeignKey, JSON, text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
@@ -275,6 +276,15 @@ class PropertyDocument(Base):
     analyzed_at = Column(DateTime(timezone=True), nullable=True)
     extraction_status = Column(String(20), default="pending")  # "pending", "processing", "completed", "failed"
     extraction_summary = Column(Text, nullable=True)  # Brief summary of what was extracted
+
+    # Pre-leases captured from the Future Residents/Applicants section of rent
+    # roll exports. List of FutureLeaseRecord dicts. Not counted as units.
+    future_leases = Column(
+        JSONB,
+        nullable=False,
+        server_default=text("'[]'::jsonb"),
+        default=list,
+    )
 
     # Relationship
     property = relationship("Property", back_populates="documents")
