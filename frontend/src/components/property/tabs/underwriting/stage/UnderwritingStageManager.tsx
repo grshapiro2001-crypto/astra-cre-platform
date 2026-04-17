@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { LayoutGroup } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import type { PropertyDetail } from '@/types/property';
 import type { UWInputs, UWOutputs } from '@/types/underwriting';
@@ -37,12 +38,35 @@ export function UnderwritingStageManager({
   onSave,
 }: UnderwritingStageManagerProps) {
   const reset = useUnderwritingStageStore((s) => s.reset);
+  const activePane2 = useUnderwritingStageStore((s) => s.activePane2);
+  const pickingSecond = useUnderwritingStageStore((s) => s.pickingSecond);
+  const startPicker = useUnderwritingStageStore((s) => s.startPicker);
+  const closeSplit = useUnderwritingStageStore((s) => s.closeSplit);
+  const cancelPicker = useUnderwritingStageStore((s) => s.cancelPicker);
+
+  const splitMode = activePane2 !== null;
 
   useEffect(() => {
     reset();
   }, [property.id, reset]);
 
+  useEffect(() => {
+    if (!pickingSecond) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') cancelPicker();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [pickingSecond, cancelPicker]);
+
   const showT12Mapping = property.financial_data_source === 't12_excel';
+
+  const splitButtonLabel = splitMode
+    ? 'Exit Split'
+    : pickingSecond
+      ? 'Pick Second Page…'
+      : 'Split View';
+  const splitButtonActive = splitMode || pickingSecond;
 
   return (
     <div className="flex flex-col h-full min-h-[600px]">
@@ -103,27 +127,34 @@ export function UnderwritingStageManager({
           </button>
           <button
             type="button"
-            disabled
-            aria-label="Toggle split view"
-            title="Split view coming soon"
-            className="px-3 py-1.5 rounded-lg text-xs font-medium border border-white/[0.04] text-muted-foreground cursor-not-allowed"
+            onClick={() => (splitMode ? closeSplit() : startPicker())}
+            aria-pressed={splitButtonActive}
+            aria-label={splitButtonLabel}
+            className={cn(
+              'px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors [transition-duration:180ms]',
+              splitButtonActive
+                ? 'border-white/30 bg-white/[0.08] text-white'
+                : 'border-white/15 bg-white/[0.02] text-white/60 hover:bg-white/[0.04]',
+            )}
           >
-            Split
+            {splitButtonLabel}
           </button>
         </div>
       </div>
 
       {/* Main area */}
-      <div className="flex flex-1 overflow-hidden">
-        <StageSidebar showT12Mapping={showT12Mapping} />
-        <StageCanvas
-          property={property}
-          inputs={inputs}
-          outputs={outputs}
-          dispatch={dispatch}
-          isComputing={isComputing}
-        />
-      </div>
+      <LayoutGroup>
+        <div className="flex flex-1 overflow-hidden">
+          <StageSidebar showT12Mapping={showT12Mapping} />
+          <StageCanvas
+            property={property}
+            inputs={inputs}
+            outputs={outputs}
+            dispatch={dispatch}
+            isComputing={isComputing}
+          />
+        </div>
+      </LayoutGroup>
     </div>
   );
 }
