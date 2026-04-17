@@ -22,7 +22,10 @@ import {
 } from '../uwFormatters';
 import type { UWSubPageProps } from '../types';
 import type { RenovationInput } from '@/types/underwritingV2';
-import { RENOVATION_UNIT_TYPE_LABELS } from '@/types/underwritingV2';
+import {
+  RENOVATION_UNIT_TYPE_LABELS,
+  createDefaultRenovationInput,
+} from '@/types/underwritingV2';
 import {
   EM_DASH,
   EnableToggle,
@@ -31,12 +34,19 @@ import {
   PreviewStat,
 } from './shared';
 
-type Props = Pick<UWSubPageProps, 'inputs' | 'dispatch'>;
+type Props = Partial<Pick<UWSubPageProps, 'inputs' | 'dispatch'>>;
 
 const YEAR_OPTIONS = [1, 2, 3, 4, 5];
 
-export function RenovationSection({ inputs, dispatch }: Props) {
-  const reno = inputs.renovation;
+// Defense-in-depth: if the reducer slice is missing (e.g. loaded state from a
+// model saved before PR #155), fall back to defaults so the section renders
+// collapsed and disabled instead of crashing the error boundary.
+const noopDispatch: UWSubPageProps['dispatch'] = () => undefined;
+
+export function RenovationSection({ inputs, dispatch = noopDispatch }: Props) {
+  const reno = inputs?.renovation ?? createDefaultRenovationInput();
+  const unitTypes = reno.unit_types ?? [];
+  const growthRates = reno.incremental_rent_growth_rates ?? [];
 
   const setField = useCallback(
     <K extends Exclude<keyof RenovationInput, 'unit_types'>>(
@@ -46,7 +56,7 @@ export function RenovationSection({ inputs, dispatch }: Props) {
     [dispatch],
   );
 
-  const growthSingle = reno.incremental_rent_growth_rates[0] ?? 0;
+  const growthSingle = growthRates[0] ?? 0;
   const setGrowth = useCallback(
     (v: number) =>
       setField('incremental_rent_growth_rates', Array(11).fill(v)),
@@ -55,7 +65,7 @@ export function RenovationSection({ inputs, dispatch }: Props) {
 
   // Computed preview: total units, total cost, weighted avg premium, RoC.
   const { totalUnits, totalCost, wtdAvgPremium, impliedRoC } = useMemo(() => {
-    const units = reno.unit_types.reduce(
+    const units = unitTypes.reduce(
       (sum, u) => sum + (u.units_to_renovate || 0),
       0,
     );
@@ -63,7 +73,7 @@ export function RenovationSection({ inputs, dispatch }: Props) {
     if (units === 0) {
       return { totalUnits: 0, totalCost: 0, wtdAvgPremium: 0, impliedRoC: 0 };
     }
-    const weighted = reno.unit_types.reduce(
+    const weighted = unitTypes.reduce(
       (sum, u) =>
         sum + (u.units_to_renovate || 0) * (u.rent_premium_per_month || 0),
       0,
@@ -76,7 +86,7 @@ export function RenovationSection({ inputs, dispatch }: Props) {
       wtdAvgPremium: avg,
       impliedRoC: roc,
     };
-  }, [reno.unit_types, reno.cost_per_unit]);
+  }, [unitTypes, reno.cost_per_unit]);
 
   return (
     <V2CollapsibleSection title="Renovation Assumptions">
@@ -212,7 +222,7 @@ export function RenovationSection({ inputs, dispatch }: Props) {
             </thead>
             <tbody>
               {RENOVATION_UNIT_TYPE_LABELS.map((label, i) => {
-                const row = reno.unit_types[i];
+                const row = unitTypes[i];
                 if (!row) return null;
                 const empty = (row.units_to_renovate || 0) === 0;
                 return (

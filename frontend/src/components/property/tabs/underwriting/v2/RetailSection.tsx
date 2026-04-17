@@ -18,7 +18,10 @@ import {
 } from '../uwFormatters';
 import type { UWSubPageProps } from '../types';
 import type { RetailInput, RetailLeaseType } from '@/types/underwritingV2';
-import { RETAIL_LEASE_TYPES } from '@/types/underwritingV2';
+import {
+  RETAIL_LEASE_TYPES,
+  createDefaultRetailInput,
+} from '@/types/underwritingV2';
 import {
   EM_DASH,
   EnableToggle,
@@ -27,10 +30,16 @@ import {
   PreviewStat,
 } from './shared';
 
-type Props = Pick<UWSubPageProps, 'inputs' | 'dispatch'>;
+type Props = Partial<Pick<UWSubPageProps, 'inputs' | 'dispatch'>>;
 
-export function RetailSection({ inputs, dispatch }: Props) {
-  const retail = inputs.retail;
+// Defense-in-depth: if the reducer slice is missing (e.g. loaded state from a
+// model saved before PR #155), fall back to defaults so the section renders
+// collapsed and disabled instead of crashing the error boundary.
+const noopDispatch: UWSubPageProps['dispatch'] = () => undefined;
+
+export function RetailSection({ inputs, dispatch = noopDispatch }: Props) {
+  const retail = inputs?.retail ?? createDefaultRetailInput();
+  const tenants = retail.tenants ?? [];
 
   type RetailScalarKey = Exclude<keyof RetailInput, 'tenants' | 'premium' | 'market'>;
   const setField = useCallback(
@@ -57,14 +66,14 @@ export function RetailSection({ inputs, dispatch }: Props) {
   );
 
   const { totalSf, wtdAvgRent } = useMemo(() => {
-    const total = retail.tenants.reduce((sum, t) => sum + (t.square_feet || 0), 0);
+    const total = tenants.reduce((sum, t) => sum + (t.square_feet || 0), 0);
     if (total === 0) return { totalSf: 0, wtdAvgRent: 0 };
-    const weighted = retail.tenants.reduce(
+    const weighted = tenants.reduce(
       (sum, t) => sum + (t.square_feet || 0) * (t.annual_rent_per_sf || 0),
       0,
     );
     return { totalSf: total, wtdAvgRent: weighted / total };
-  }, [retail.tenants]);
+  }, [tenants]);
 
   return (
     <V2CollapsibleSection title="Retail Assumptions">
@@ -210,7 +219,7 @@ export function RetailSection({ inputs, dispatch }: Props) {
             </button>
           </div>
 
-          {retail.tenants.length === 0 ? (
+          {tenants.length === 0 ? (
             <p className="text-xs text-muted-foreground italic py-2">
               No tenants added yet. Click "Add Tenant" to begin the rent roll.
             </p>
@@ -231,7 +240,7 @@ export function RetailSection({ inputs, dispatch }: Props) {
                   </tr>
                 </thead>
                 <tbody>
-                  {retail.tenants.map((t, idx) => (
+                  {tenants.map((t, idx) => (
                     <tr key={idx} className="border-b border-white/[0.04]">
                       <td className="py-1.5 pr-2">
                         <NumericInput
@@ -395,7 +404,7 @@ export function RetailSection({ inputs, dispatch }: Props) {
           />
           <PreviewStat
             label="Tenant Count"
-            value={retail.tenants.length > 0 ? String(retail.tenants.length) : EM_DASH}
+            value={tenants.length > 0 ? String(tenants.length) : EM_DASH}
           />
         </div>
       </div>
