@@ -17,12 +17,19 @@ import {
 } from '../uwFormatters';
 import type { UWSubPageProps } from '../types';
 import type { TaxAbatementInput } from '@/types/underwritingV2';
+import { createDefaultTaxAbatementInput } from '@/types/underwritingV2';
 import { EM_DASH, EnableToggle, FieldRow, V2CollapsibleSection, PreviewStat } from './shared';
 
-type Props = Pick<UWSubPageProps, 'inputs' | 'dispatch'>;
+type Props = Partial<Pick<UWSubPageProps, 'inputs' | 'dispatch'>>;
 
-export function TaxAbatementSection({ inputs, dispatch }: Props) {
-  const ta = inputs.tax_abatement;
+// Defense-in-depth: if the reducer slice is missing (e.g. loaded state from a
+// model saved before PR #155), fall back to defaults so the section renders
+// collapsed and disabled instead of crashing the error boundary.
+const noopDispatch: UWSubPageProps['dispatch'] = () => undefined;
+
+export function TaxAbatementSection({ inputs, dispatch = noopDispatch }: Props) {
+  const ta = inputs?.tax_abatement ?? createDefaultTaxAbatementInput();
+  const reTaxInflation = ta.re_tax_inflation ?? [];
 
   const setField = useCallback(
     <K extends keyof TaxAbatementInput>(field: K, value: TaxAbatementInput[K]) =>
@@ -31,7 +38,7 @@ export function TaxAbatementSection({ inputs, dispatch }: Props) {
   );
 
   // Single inflation input — replicate across hold_period_years.
-  const reTaxInflationSingle = ta.re_tax_inflation[0] ?? 0;
+  const reTaxInflationSingle = reTaxInflation[0] ?? 0;
   const setReTaxInflation = useCallback(
     (v: number) => {
       setField('re_tax_inflation', Array(Math.max(ta.hold_period_years, 1)).fill(v));
@@ -43,7 +50,7 @@ export function TaxAbatementSection({ inputs, dispatch }: Props) {
   //   fmv × sales_pct × assessment_ratio × millage_rate × abatement_y1_percent
   // Uses tax_abatement.fair_market_value when set; else falls back to the
   // premium scenario purchase_price; else shows an em dash.
-  const fmv = ta.fair_market_value || inputs.premium.purchase_price || 0;
+  const fmv = ta.fair_market_value || inputs?.premium?.purchase_price || 0;
   const impliedY1Savings = useMemo(() => {
     if (!fmv) return null;
     return (

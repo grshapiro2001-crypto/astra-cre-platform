@@ -19,7 +19,12 @@ import {
   downloadUnderwritingExport,
 } from '@/services/underwritingService';
 import { runIntegratedUnderwriting } from '@/services/integratedUnderwritingService';
-import { createDefaultRetailTenant } from '@/types/underwritingV2';
+import {
+  createDefaultRetailTenant,
+  createDefaultRenovationInput,
+  createDefaultRetailInput,
+  createDefaultTaxAbatementInput,
+} from '@/types/underwritingV2';
 import { GLASS_CARD } from './tabUtils';
 
 import type { UWState, UWAction } from './underwriting/types';
@@ -43,6 +48,22 @@ const UW_SUB_TABS_BASE: { key: string; label: string }[] = [
 ];
 
 const T12_MAPPING_TAB = { key: 't12mapping', label: 'T12 Mapping' };
+
+// ---------------------------------------------------------------------------
+// Backfill V2 module slices that may be missing from server-persisted inputs
+// saved before PR #155 introduced them. Without this, LOAD_SAVED would hand
+// the Assumptions page `inputs.renovation === undefined` and crash the first
+// render of the three v2 sections.
+// ---------------------------------------------------------------------------
+
+function backfillV2Slices(loaded: UWInputs): UWInputs {
+  return {
+    ...loaded,
+    renovation: loaded.renovation ?? createDefaultRenovationInput(),
+    retail: loaded.retail ?? createDefaultRetailInput(),
+    tax_abatement: loaded.tax_abatement ?? createDefaultTaxAbatementInput(),
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Reducer
@@ -122,7 +143,7 @@ function uwReducer(state: UWState, action: UWAction): UWState {
     case 'SEED_FROM_PROPERTY':
       return {
         ...state,
-        inputs: action.inputs,
+        inputs: backfillV2Slices(action.inputs),
         isLoading: false,
         hasUnsavedChanges: false,
       };
@@ -130,7 +151,7 @@ function uwReducer(state: UWState, action: UWAction): UWState {
     case 'LOAD_SAVED':
       return {
         ...state,
-        inputs: action.inputs,
+        inputs: backfillV2Slices(action.inputs),
         outputs: action.outputs,
         isLoading: false,
         hasUnsavedChanges: false,
@@ -470,13 +491,15 @@ export function UnderwritingTab({ property }: UnderwritingTabProps) {
       // V2 integrated modules — fire in parallel when any module is enabled.
       // Mocked for now; swap the fetch URL in integratedUnderwritingService.ts
       // when the backend integration endpoint lands.
-      const { renovation, retail, tax_abatement } = state.inputs;
-      if (renovation.enabled || retail.enabled || tax_abatement.enabled) {
+      const renovation = state.inputs.renovation;
+      const retail = state.inputs.retail;
+      const tax_abatement = state.inputs.tax_abatement;
+      if (renovation?.enabled || retail?.enabled || tax_abatement?.enabled) {
         try {
           const result = await runIntegratedUnderwriting({
-            renovation: renovation.enabled ? renovation : undefined,
-            retail: retail.enabled ? retail : undefined,
-            tax_abatement: tax_abatement.enabled ? tax_abatement : undefined,
+            renovation: renovation?.enabled ? renovation : undefined,
+            retail: retail?.enabled ? retail : undefined,
+            tax_abatement: tax_abatement?.enabled ? tax_abatement : undefined,
           });
           if (inputVersionRef.current === currentVersion) {
             console.log('[runIntegratedUnderwriting] mock response', result);
