@@ -13,8 +13,8 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from backend.underwriting.v2.retail import calculate_retail
-from backend.underwriting.v2.schemas.retail import (
+from underwriting.v2.retail import calculate_retail
+from underwriting.v2.schemas.retail import (
     RetailInput,
     RetailResult,
     RetailScenarioAssumptions,

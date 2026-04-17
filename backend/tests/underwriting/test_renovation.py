@@ -12,14 +12,14 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from backend.underwriting.v2.renovation import (
+from underwriting.v2.renovation import (
     QUARTER_IN_YEAR_FACTORS,
     QUARTERS,
     ROLLUP_YEARS,
     _downtime_factor,
     calculate_renovation,
 )
-from backend.underwriting.v2.schemas.renovation import (
+from underwriting.v2.schemas.renovation import (
     RenovationInput,
     RenovationResult,
     RenovationUnitType,

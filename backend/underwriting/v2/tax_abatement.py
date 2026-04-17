@@ -18,8 +18,8 @@ Scope:
 
 from __future__ import annotations
 
-from backend.underwriting.v2._financial import excel_npv
-from backend.underwriting.v2.schemas.tax_abatement import (
+from underwriting.v2._financial import excel_npv
+from underwriting.v2.schemas.tax_abatement import (
     TaxAbatementInput,
     TaxAbatementResult,
 )

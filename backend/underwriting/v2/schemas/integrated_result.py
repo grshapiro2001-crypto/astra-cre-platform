@@ -21,15 +21,15 @@ from app.schemas.underwriting import (
     ScenarioResult,
     UWInputs,
 )
-from backend.underwriting.v2.schemas.renovation import (
+from underwriting.v2.schemas.renovation import (
     RenovationInput,
     RenovationResult,
 )
-from backend.underwriting.v2.schemas.retail import (
+from underwriting.v2.schemas.retail import (
     RetailInput,
     RetailResult,
 )
-from backend.underwriting.v2.schemas.tax_abatement import (
+from underwriting.v2.schemas.tax_abatement import (
     TaxAbatementInput,
     TaxAbatementResult,
 )

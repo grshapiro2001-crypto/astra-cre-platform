@@ -18,8 +18,8 @@ from app.database import get_db
 from app.models.underwriting import UnderwritingModel
 from app.schemas.underwriting import UWInputs, UWOutputs, SaveRequest, SaveResponse, LoadResponse
 from app.services.underwriting_engine import UnderwritingEngine
-from backend.underwriting.v2.integration import run_integrated_underwriting
-from backend.underwriting.v2.schemas.integrated_result import (
+from underwriting.v2.integration import run_integrated_underwriting
+from underwriting.v2.schemas.integrated_result import (
     IntegratedUnderwritingInput,
     IntegratedUnderwritingResult,
 )
