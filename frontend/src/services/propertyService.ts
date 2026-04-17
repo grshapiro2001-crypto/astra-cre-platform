@@ -5,6 +5,44 @@ import { api } from './api';
 import type { UploadResponse, PropertyDetail, PropertyListItem } from '../types/property';
 export type { PropertyDetail, PropertyListItem } from '../types/property';
 
+export interface RejectedRentRollRow {
+  row_index: number | null;
+  reason: string;
+  raw: Record<string, unknown>;
+}
+
+export interface RentRollIngestionSummary {
+  filename: string;
+  document_id: number;
+  units_ingested: number;
+  units_rejected: number;
+  rejected_rows: RejectedRentRollRow[];
+  unmapped_columns: string[];
+  column_mapping: Record<string, string>;
+  warnings: string[];
+  header_row_detected_at: number;
+  total_rows_scanned: number;
+  error: string | null;
+}
+
+export interface ExcelAnalysisResponse {
+  success: boolean;
+  property_id: number;
+  deal_folder_id: number;
+  documents_processed: Array<{
+    filename: string;
+    doc_category: string;
+    extraction_status: string;
+  }>;
+  extracted_summary: {
+    t12_noi?: number;
+    total_units?: number;
+    avg_in_place_rent?: number;
+    physical_occupancy?: number;
+  };
+  ingestion_summaries: RentRollIngestionSummary[];
+}
+
 export const propertyService = {
   /**
    * Upload a PDF file for analysis
@@ -228,22 +266,7 @@ export const propertyService = {
       submarket?: string;
       metro?: string;
     }
-  ): Promise<{
-    success: boolean;
-    property_id: number;
-    deal_folder_id: number;
-    documents_processed: Array<{
-      filename: string;
-      doc_category: string;
-      extraction_status: string;
-    }>;
-    extracted_summary: {
-      t12_noi?: number;
-      total_units?: number;
-      avg_in_place_rent?: number;
-      physical_occupancy?: number;
-    };
-  }> {
+  ): Promise<ExcelAnalysisResponse> {
     const formData = new FormData();
     files.forEach(file => formData.append('files', file));
     formData.append('property_name', propertyInfo.property_name);

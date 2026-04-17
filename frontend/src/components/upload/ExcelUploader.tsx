@@ -2,9 +2,11 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { FileSpreadsheet, AlertCircle, X, ChevronDown, Loader2 } from 'lucide-react';
 import { propertyService } from '../../services/propertyService';
+import type { RentRollIngestionSummary } from '../../services/propertyService';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { IngestionSummaryCard } from './IngestionSummaryCard';
 
 interface ExcelUploaderProps {
   onSuccess: (propertyId: number) => void;
@@ -61,6 +63,8 @@ export const ExcelUploader = ({ onSuccess }: ExcelUploaderProps) => {
   const [fileEntries, setFileEntries] = useState<FileEntry[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [ingestionSummaries, setIngestionSummaries] = useState<RentRollIngestionSummary[]>([]);
+  const [pendingPropertyId, setPendingPropertyId] = useState<number | null>(null);
 
   // Form state
   const [propertyName, setPropertyName] = useState('');
@@ -168,6 +172,8 @@ export const ExcelUploader = ({ onSuccess }: ExcelUploaderProps) => {
 
     setIsUploading(true);
     setError(null);
+    setIngestionSummaries([]);
+    setPendingPropertyId(null);
 
     try {
       const result = await propertyService.uploadExcelAnalysis(
@@ -182,7 +188,20 @@ export const ExcelUploader = ({ onSuccess }: ExcelUploaderProps) => {
       );
 
       if (result.success && result.property_id) {
-        onSuccess(result.property_id);
+        const summaries = result.ingestion_summaries ?? [];
+        const hasIssues = summaries.some(
+          (s) =>
+            s.units_rejected > 0 ||
+            s.unmapped_columns.length > 0 ||
+            s.warnings.length > 0 ||
+            s.error !== null,
+        );
+        if (summaries.length > 0 && hasIssues) {
+          setIngestionSummaries(summaries);
+          setPendingPropertyId(result.property_id);
+        } else {
+          onSuccess(result.property_id);
+        }
       } else {
         setError('Upload completed but no property was created. Please try again.');
       }
@@ -397,15 +416,22 @@ export const ExcelUploader = ({ onSuccess }: ExcelUploaderProps) => {
         </div>
       )}
 
-      {/* Submit Button */}
-      <Button
-        onClick={handleSubmit}
-        disabled={!canSubmit}
-        size="xl"
-        className="w-full"
-      >
-        {isUploading ? 'Extracting data...' : 'Start Analysis'}
-      </Button>
+      {/* Ingestion Summary — shown when upload succeeded but had rejects/warnings */}
+      {ingestionSummaries.length > 0 && pendingPropertyId !== null ? (
+        <IngestionSummaryCard
+          summaries={ingestionSummaries}
+          onContinue={() => onSuccess(pendingPropertyId)}
+        />
+      ) : (
+        <Button
+          onClick={handleSubmit}
+          disabled={!canSubmit}
+          size="xl"
+          className="w-full"
+        >
+          {isUploading ? 'Extracting data...' : 'Start Analysis'}
+        </Button>
+      )}
     </div>
   );
 };

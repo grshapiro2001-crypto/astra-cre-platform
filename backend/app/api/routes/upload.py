@@ -11,6 +11,8 @@ from typing import Dict, Any, List, Optional
 from fastapi import APIRouter, File, Form, UploadFile, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from pydantic import ValidationError
+
 from app.database import get_db
 from app.models.user import User
 from app.models.property import Property, PropertyDocument, RentRollUnit, T12Financial
@@ -21,6 +23,8 @@ from app.api.routes.organizations import _get_user_org_id
 from app.utils.file_handler import validate_pdf_file, save_uploaded_file
 from app.services.pdf_service import process_pdf_upload
 from app.services import excel_extraction_service
+from app.services.extraction import rent_roll_normalizer
+from app.schemas.rent_roll import IngestionSummary, RejectedRow, RentRollUnitCreate
 
 logger = logging.getLogger(__name__)
 
@@ -197,6 +201,7 @@ async def upload_excel_analysis(
 
     documents_processed = []
     extracted_summary: Dict[str, Any] = {}
+    ingestion_summaries: List[Dict[str, Any]] = []
 
     try:
         for upload_file in files:
@@ -235,9 +240,15 @@ async def upload_excel_analysis(
             extraction_summary_text = ""
 
             if doc_category == "rent_roll":
-                extraction_summary_text = _process_rent_roll(
+                extraction_summary_text, rr_summary = _process_rent_roll(
                     db, property_obj, doc, file_path, document_date, extracted_summary
                 )
+                if rr_summary is not None:
+                    ingestion_summaries.append({
+                        "filename": filename,
+                        "document_id": doc.id,
+                        **rr_summary.model_dump(),
+                    })
             elif doc_category == "t12":
                 extraction_summary_text = _process_t12(
                     db, property_obj, doc, file_path, extracted_summary
@@ -286,6 +297,7 @@ async def upload_excel_analysis(
             "deal_folder_id": folder.id,
             "documents_processed": documents_processed,
             "extracted_summary": extracted_summary,
+            "ingestion_summaries": ingestion_summaries,
         }
 
     except HTTPException:
@@ -299,6 +311,9 @@ async def upload_excel_analysis(
         )
 
 
+_RENT_ROLL_CHUNK_SIZE = 100
+
+
 def _process_rent_roll(
     db: Session,
     property_obj: Property,
@@ -306,8 +321,14 @@ def _process_rent_roll(
     file_path: str,
     document_date: Optional[datetime],
     extracted_summary: Dict[str, Any],
-) -> str:
-    """Process a rent roll file and update property record. Returns extraction summary text."""
+) -> tuple[str, Optional[IngestionSummary]]:
+    """Parse, normalize, validate, and insert a rent roll with per-row resilience.
+
+    Returns a (human-readable summary text, structured IngestionSummary) tuple.
+    Only raises HTTPException for fatal errors (extractor failure, missing
+    header). A bad individual row never crashes the batch — it's recorded in
+    `rejected_rows`.
+    """
     extraction = excel_extraction_service.extract_rent_roll(file_path)
 
     if extraction.get("error"):
@@ -318,60 +339,168 @@ def _process_rent_roll(
             detail=f"Rent roll extraction failed: {extraction['error']}",
         )
 
-    # Use extracted date if available
     if extraction.get("document_date") and not document_date:
         try:
             doc.document_date = datetime.fromisoformat(extraction["document_date"])
         except (ValueError, TypeError):
             pass
 
-    # Save unit-level data
-    for unit in extraction.get("units", []):
+    # Fill in_place_rent from charge_details before normalization so the base
+    # rent heuristic runs on the richest data.
+    raw_units = extraction.get("units", []) or []
+    for unit in raw_units:
         cd = unit.get("charge_details") or {}
         ipr = unit.get("in_place_rent") or 0
         if cd and not ipr:
             base = excel_extraction_service.find_base_rent(cd)
             unit["in_place_rent"] = base if base > 0 else sum(cd.values())
 
-        rr_unit = RentRollUnit(
-            property_id=property_obj.id,
-            document_id=doc.id,
-            unit_number=unit.get("unit_number"),
-            unit_type=unit.get("unit_type"),
-            sqft=unit.get("sqft"),
-            status=unit.get("status"),
-            is_occupied=unit.get("is_occupied", True),
-            resident_name=unit.get("resident_name"),
-            move_in_date=unit.get("move_in_date"),
-            lease_start=unit.get("lease_start"),
-            lease_end=unit.get("lease_end"),
-            market_rent=unit.get("market_rent"),
-            in_place_rent=unit.get("in_place_rent"),
-            charge_details=unit.get("charge_details"),
-        )
-        db.add(rr_unit)
+    # Junk filter + per-field coercion (truncation, date parsing, etc.)
+    column_mapping = extraction.get("column_mapping") or {}
+    norm = rent_roll_normalizer.normalize_units(raw_units, column_mapping)
 
-    # Update property summary fields
-    summary = extraction.get("summary", {})
-    if summary:
-        property_obj.rr_total_units = summary.get("total_units")
-        property_obj.rr_occupied_units = summary.get("occupied_units")
-        property_obj.rr_vacancy_count = summary.get("vacant_units")
-        property_obj.rr_physical_occupancy_pct = summary.get("physical_occupancy_pct")
-        property_obj.rr_avg_market_rent = summary.get("avg_market_rent")
-        property_obj.rr_avg_in_place_rent = summary.get("avg_in_place_rent")
-        property_obj.rr_avg_sqft = summary.get("avg_sqft")
-        property_obj.rr_loss_to_lease_pct = summary.get("loss_to_lease_pct")
-        property_obj.rr_as_of_date = doc.document_date
+    ingestion = IngestionSummary(
+        units_rejected=len(norm.skipped_rows),
+        rejected_rows=[
+            RejectedRow(
+                row_index=s.get("row_index"),
+                reason=s.get("reason", ""),
+                raw={k: v for k, v in (s.get("raw") or {}).items()},
+            )
+            for s in norm.skipped_rows
+        ],
+        unmapped_columns=list(norm.unmapped_columns),
+        column_mapping=dict(norm.column_mapping),
+        warnings=list(norm.warnings),
+        header_row_detected_at=norm.header_row_index,
+        total_rows_scanned=norm.total_rows_scanned,
+        error=norm.error,
+    )
 
-        property_obj.total_units = summary.get("total_units")
-        property_obj.average_inplace_rent = summary.get("avg_in_place_rent")
-        property_obj.average_market_rent = summary.get("avg_market_rent")
-        property_obj.financial_data_source = "rent_roll_excel"
-        property_obj.financial_data_updated_at = datetime.utcnow()
+    # Pydantic-validate each row against the final DB schema constraints.
+    clean_rows: list[dict[str, Any]] = []
+    for i, raw in enumerate(norm.units):
+        payload = {
+            "property_id": property_obj.id,
+            "document_id": doc.id,
+            **raw,
+        }
+        try:
+            validated = RentRollUnitCreate(**payload).model_dump()
+            clean_rows.append(validated)
+        except ValidationError as exc:
+            ingestion.rejected_rows.append(
+                RejectedRow(
+                    row_index=i,
+                    reason=f"pydantic validation: {exc.errors()[0].get('msg', str(exc))}",
+                    raw=raw,
+                )
+            )
+            ingestion.units_rejected += 1
 
-    unit_count = len(extraction.get("units", []))
-    return f"Extracted {unit_count} units. Occupancy: {summary.get('physical_occupancy_pct')}%"
+    inserted = 0
+    occupied = 0
+    vacant = 0
+    sqft_sum = 0
+    sqft_n = 0
+    market_sum = 0.0
+    market_n = 0
+    in_place_sum = 0.0
+    in_place_n = 0
+
+    def _update_aggregates(row: dict[str, Any]) -> None:
+        nonlocal inserted, occupied, vacant, sqft_sum, sqft_n
+        nonlocal market_sum, market_n, in_place_sum, in_place_n
+        inserted += 1
+        is_occ = row.get("is_occupied")
+        if is_occ is True:
+            occupied += 1
+        elif is_occ is False:
+            vacant += 1
+        if row.get("sqft"):
+            sqft_sum += row["sqft"]
+            sqft_n += 1
+        if row.get("market_rent"):
+            market_sum += row["market_rent"]
+            market_n += 1
+        if row.get("in_place_rent"):
+            in_place_sum += row["in_place_rent"]
+            in_place_n += 1
+
+    # Chunked insert with savepoint fallback — a bad row isolates to itself.
+    for start in range(0, len(clean_rows), _RENT_ROLL_CHUNK_SIZE):
+        chunk = clean_rows[start:start + _RENT_ROLL_CHUNK_SIZE]
+        savepoint = db.begin_nested()
+        try:
+            db.bulk_insert_mappings(RentRollUnit, chunk)
+            savepoint.commit()
+            for row in chunk:
+                _update_aggregates(row)
+        except Exception as chunk_err:
+            savepoint.rollback()
+            logger.warning(
+                "Rent roll chunk %d-%d bulk insert failed (%s); falling back to per-row",
+                start, start + len(chunk), chunk_err,
+            )
+            for row in chunk:
+                sp = db.begin_nested()
+                try:
+                    db.add(RentRollUnit(**row))
+                    sp.commit()
+                    _update_aggregates(row)
+                except Exception as row_err:
+                    sp.rollback()
+                    ingestion.rejected_rows.append(
+                        RejectedRow(
+                            row_index=None,
+                            reason=f"db insert failed: {row_err}",
+                            raw=row,
+                        )
+                    )
+                    ingestion.units_rejected += 1
+
+    ingestion.units_ingested = inserted
+
+    # Recompute property summary from what actually landed in the DB, so
+    # downstream analytics reflect reality rather than the raw extractor count.
+    property_obj.rr_total_units = inserted
+    property_obj.rr_occupied_units = occupied
+    property_obj.rr_vacancy_count = vacant
+    if inserted:
+        property_obj.rr_physical_occupancy_pct = round(
+            100.0 * occupied / inserted, 2
+        ) if (occupied + vacant) else None
+    property_obj.rr_avg_market_rent = (
+        round(market_sum / market_n, 2) if market_n else None
+    )
+    property_obj.rr_avg_in_place_rent = (
+        round(in_place_sum / in_place_n, 2) if in_place_n else None
+    )
+    property_obj.rr_avg_sqft = (
+        round(sqft_sum / sqft_n, 1) if sqft_n else None
+    )
+    if property_obj.rr_avg_market_rent and property_obj.rr_avg_in_place_rent:
+        mkt = property_obj.rr_avg_market_rent
+        ipr = property_obj.rr_avg_in_place_rent
+        if mkt > 0:
+            property_obj.rr_loss_to_lease_pct = round(
+                100.0 * (mkt - ipr) / mkt, 2
+            )
+    property_obj.rr_as_of_date = doc.document_date
+
+    property_obj.total_units = inserted or property_obj.total_units
+    property_obj.average_inplace_rent = property_obj.rr_avg_in_place_rent
+    property_obj.average_market_rent = property_obj.rr_avg_market_rent
+    property_obj.financial_data_source = "rent_roll_excel"
+    property_obj.financial_data_updated_at = datetime.utcnow()
+
+    pct = property_obj.rr_physical_occupancy_pct
+    text = (
+        f"Ingested {inserted} units ({ingestion.units_rejected} rejected). "
+        f"Occupancy: {pct}%" if pct is not None
+        else f"Ingested {inserted} units ({ingestion.units_rejected} rejected)."
+    )
+    return text, ingestion
 
 
 def _process_t12(

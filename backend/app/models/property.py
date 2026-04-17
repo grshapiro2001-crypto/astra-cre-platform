@@ -289,8 +289,8 @@ class RentRollUnit(Base):
     document_id = Column(Integer, ForeignKey("property_documents.id", ondelete="CASCADE"), nullable=False)
 
     # Unit identification
-    unit_number = Column(String(20), nullable=True)
-    unit_type = Column(String(20), nullable=True)  # e.g., "A9", "B3B", "S5"
+    unit_number = Column(String(50), nullable=True)
+    unit_type = Column(String(50), nullable=True)  # e.g., "A9", "B3B", "S5"
     sqft = Column(Integer, nullable=True)
 
     # Occupancy
