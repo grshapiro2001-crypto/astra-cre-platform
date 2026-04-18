@@ -1,3 +1,6 @@
+// StageTile — single tile in the sidebar stage rail. Renders the SVG thumb,
+// the label row, and the active-pane rail. Handles click dispatch into the
+// Zustand stage store (promote pane 1, or pick pane 2 during picker mode).
 import { motion } from 'framer-motion';
 import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -28,6 +31,14 @@ export function StageTile({ pageId, label, icon: Icon, Thumb }: StageTileProps) 
   const dimmedForPicker = pickingSecond && isActiveInPane1;
   const pulsing = pickingSecond && !isActiveInPane1;
 
+  const ariaState = isActiveInPane1
+    ? 'currently active'
+    : isActiveInPane2
+      ? 'currently active in second pane'
+      : pickingSecond
+        ? 'click to open alongside'
+        : 'not active';
+
   const handleClick = () => {
     if (pickingSecond) {
       if (pageId !== activePane1) openSplit(pageId);
@@ -44,50 +55,59 @@ export function StageTile({ pageId, label, icon: Icon, Thumb }: StageTileProps) 
       type="button"
       onClick={handleClick}
       aria-current={isActiveInPane1 ? 'page' : undefined}
-      aria-label={label}
+      aria-label={`${label}, ${ariaState}`}
       disabled={dimmedForPicker}
       className={cn(
-        'relative block w-full text-left group focus:outline-none focus-visible:ring-1 focus-visible:ring-white/30 rounded-lg',
+        'relative block w-full text-left group rounded-lg',
+        'focus:outline-none focus-visible:ring-1 focus-visible:ring-white/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#060608]',
         'transition-opacity [transition-duration:220ms]',
         dimmedForPicker && 'opacity-[0.35] pointer-events-none',
       )}
     >
-      {isActiveInPane1 && (
-        <span
-          aria-hidden
-          className="absolute -left-3 top-[42px] w-[2px] h-10 -translate-y-1/2 bg-white/90 rounded-sm"
-        />
-      )}
-      <motion.div
-        layoutId={isActiveInPane1 ? `uw-pane-${pageId}` : undefined}
-        whileHover={{ scale: isActiveInAny ? 1 : 1.035 }}
-        whileTap={{ scale: 0.98 }}
-        animate={
-          pulsing
-            ? {
-                boxShadow: [
-                  '0 0 0 0 rgba(255,255,255,0.25)',
-                  '0 0 0 6px rgba(255,255,255,0)',
-                  '0 0 0 0 rgba(255,255,255,0.0)',
-                ],
-              }
-            : { boxShadow: '0 0 0 0 rgba(255,255,255,0)' }
-        }
-        transition={
-          pulsing
-            ? { duration: 1.6, repeat: Infinity, ease: 'easeOut' }
-            : { duration: 0.18, ease: EASE_OUT_QUART }
-        }
-        className={cn(
-          'aspect-[120/84] rounded-lg border overflow-hidden [transition:border-color_180ms,background-color_180ms]',
-          isActiveInPane1
-            ? 'border-white/25 bg-white/[0.06]'
-            : 'border-white/10 bg-white/[0.02] group-hover:border-white/20 group-hover:bg-white/[0.04]',
-          pulsing && 'ring-2 ring-white/30',
+      <div className="relative">
+        {isActiveInPane1 && (
+          <span
+            aria-hidden
+            className="absolute -left-3 top-1/2 -translate-y-1/2 w-[2px] h-10 bg-white/90 rounded-sm"
+          />
         )}
-      >
-        <Thumb />
-      </motion.div>
+        <motion.div
+          layoutId={isActiveInAny ? `uw-pane-${pageId}` : undefined}
+          whileHover={{ scale: isActiveInAny ? 1 : 1.035 }}
+          whileTap={{ scale: 0.98 }}
+          animate={
+            pulsing
+              ? {
+                  boxShadow: [
+                    '0 0 0 0 rgba(255,255,255,0.25)',
+                    '0 0 0 6px rgba(255,255,255,0)',
+                    '0 0 0 0 rgba(255,255,255,0.0)',
+                  ],
+                }
+              : { boxShadow: '0 0 0 0 rgba(255,255,255,0)' }
+          }
+          transition={
+            pulsing
+              ? { duration: 1.6, repeat: Infinity, ease: 'easeOut' }
+              : { duration: 0.18, ease: EASE_OUT_QUART }
+          }
+          className={cn(
+            'relative aspect-[120/84] rounded-lg border overflow-hidden [transition:border-color_180ms,background-color_180ms]',
+            isActiveInPane1
+              ? 'border-white/25 bg-white/[0.06]'
+              : 'border-white/10 bg-white/[0.02] group-hover:border-white/20 group-hover:bg-white/[0.04]',
+            pulsing && 'ring-2 ring-white/30',
+          )}
+        >
+          <Thumb />
+          {isActiveInPane1 && (
+            <span
+              aria-hidden
+              className="pointer-events-none absolute inset-x-0 top-0 h-[30%] bg-gradient-to-b from-white/[0.08] to-transparent"
+            />
+          )}
+        </motion.div>
+      </div>
       <div className="mt-2 flex items-center gap-1.5">
         <Icon
           className={cn(

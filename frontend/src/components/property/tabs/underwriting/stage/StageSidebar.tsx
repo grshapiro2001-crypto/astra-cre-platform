@@ -1,3 +1,6 @@
+// StageSidebar — vertical tile rail on the left edge of the Underwriting
+// canvas. Composes StageTile instances and the picker-aware eyebrow label.
+import { AnimatePresence, motion } from 'framer-motion';
 import {
   LayoutDashboard,
   SlidersHorizontal,
@@ -8,6 +11,7 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { UWSubPage } from '@/store/underwritingStageStore';
+import { useUnderwritingStageStore } from '@/store/underwritingStageStore';
 import { StageTile } from './StageTile';
 import { SummaryThumb } from './thumbs/SummaryThumb';
 import { AssumptionsThumb } from './thumbs/AssumptionsThumb';
@@ -38,11 +42,15 @@ const T12_TILE: TileDef = {
   Thumb: T12MappingThumb,
 };
 
+const EASE_OUT_QUART: [number, number, number, number] = [0.22, 1, 0.36, 1];
+
 export interface StageSidebarProps {
   showT12Mapping: boolean;
 }
 
 export function StageSidebar({ showT12Mapping }: StageSidebarProps) {
+  const pickingSecond = useUnderwritingStageStore((s) => s.pickingSecond);
+
   const tiles = showT12Mapping
     ? [
         ...BASE_TILES.slice(0, 3), // summary, assumptions, proforma
@@ -53,8 +61,32 @@ export function StageSidebar({ showT12Mapping }: StageSidebarProps) {
 
   return (
     <aside className="liquid-glass w-[148px] shrink-0 border-r border-white/10 px-4 py-6">
-      <div className="mb-4 text-[10px] font-medium uppercase tracking-[0.18em] text-white/45">
-        Pages
+      <div className="mb-4 relative h-[14px] overflow-hidden">
+        <AnimatePresence mode="wait" initial={false}>
+          {pickingSecond ? (
+            <motion.div
+              key="picker"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.22, ease: EASE_OUT_QUART }}
+              className="absolute inset-0 text-[10px] font-medium uppercase tracking-[0.18em] text-white/55"
+            >
+              Select second page
+            </motion.div>
+          ) : (
+            <motion.div
+              key="pages"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.22, ease: EASE_OUT_QUART }}
+              className="absolute inset-0 text-[10px] font-medium uppercase tracking-[0.18em] text-white/45"
+            >
+              Pages
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
       <div className="flex flex-col gap-4">
         {tiles.map((t) => (
