@@ -1,3 +1,6 @@
+// StageCanvas — renders the main canvas for the Underwriting stage manager.
+// Owns the flight-into-pane layoutId animation, single/split pane sizing,
+// and the picker-mode backdrop.
 import { useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { X } from 'lucide-react';
@@ -25,8 +28,8 @@ export interface StageCanvasProps {
 const FLIGHT_EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
 const PANE_TRANSITION = {
   type: 'spring' as const,
-  stiffness: 200,
-  damping: 26,
+  stiffness: 280,
+  damping: 22,
   layout: { duration: 0.42, ease: FLIGHT_EASE },
 };
 
@@ -55,6 +58,7 @@ export function StageCanvas({
       >
         <motion.div
           layoutId={`uw-pane-${activePane1}`}
+          initial={false}
           animate={{
             width: splitMode
               ? `calc(${splitRatio * 100}% - 4px)`
@@ -92,8 +96,8 @@ export function StageCanvas({
                   <button
                     type="button"
                     onClick={closeSplit}
-                    aria-label="Close split pane"
-                    className="absolute top-3 right-3 z-10 inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-black/30 text-white/70 transition-colors [transition-duration:180ms] hover:border-white/25 hover:text-white"
+                    aria-label="Close second pane"
+                    className="absolute top-3 right-3 z-10 inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-black/30 text-white/70 transition-colors [transition-duration:180ms] hover:border-white/25 hover:text-white focus:outline-none focus-visible:ring-1 focus-visible:ring-white/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#060608]"
                   >
                     <X className="h-3.5 w-3.5" />
                   </button>

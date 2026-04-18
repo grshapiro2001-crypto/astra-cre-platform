@@ -1,3 +1,7 @@
+// UnderwritingStageManager — top-level shell for the stage-manager feature.
+// Owns the breadcrumb bar (save/export/split toggle), resets stage state on
+// property change, and wires the sidebar + canvas under a shared LayoutGroup
+// so framer-motion can fly tiles into pane positions via matching layoutIds.
 import { useEffect } from 'react';
 import { LayoutGroup } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -7,6 +11,7 @@ import type { UWAction } from '../types';
 import { useUnderwritingStageStore } from '@/store/underwritingStageStore';
 import { StageSidebar } from './StageSidebar';
 import { StageCanvas } from './StageCanvas';
+import { StageAnnouncer } from './StageAnnouncer';
 
 export interface UnderwritingStageManagerProps {
   property: PropertyDetail;
@@ -68,8 +73,14 @@ export function UnderwritingStageManager({
       : 'Split View';
   const splitButtonActive = splitMode || pickingSecond;
 
+  const onSplitToggle = () => {
+    if (splitMode || pickingSecond) closeSplit();
+    else startPicker();
+  };
+
   return (
     <div className="flex flex-col h-full min-h-[600px]">
+      <StageAnnouncer />
       {/* Breadcrumb bar */}
       <div className="flex items-center justify-between border-b border-white/[0.04] px-4 py-2">
         <div className="text-xs text-muted-foreground font-sans tracking-wide">
@@ -95,17 +106,18 @@ export function UnderwritingStageManager({
             onChange={(e) =>
               onExportScenarioChange(e.target.value as 'premium' | 'market')
             }
-            className="px-2 py-1.5 rounded-lg text-xs bg-white/[0.04] border border-white/10 text-white focus:outline-none focus:border-white/20"
+            className="px-2 py-1.5 rounded-lg text-xs bg-white/[0.04] border border-white/10 text-white focus:outline-none focus-visible:ring-1 focus-visible:ring-white/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#060608]"
             aria-label="Export scenario"
           >
             <option value="premium">Premium</option>
             <option value="market">Market</option>
           </select>
           <button
+            type="button"
             onClick={onExport}
             disabled={isExporting || !outputs}
             className={cn(
-              'px-4 py-1.5 rounded-lg text-xs font-medium transition-colors border',
+              'px-4 py-1.5 rounded-lg text-xs font-medium transition-colors border focus:outline-none focus-visible:ring-1 focus-visible:ring-white/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#060608]',
               !isExporting && outputs
                 ? 'border-white/20 text-white hover:bg-white/[0.04]'
                 : 'border-white/[0.04] text-muted-foreground cursor-not-allowed',
@@ -114,10 +126,11 @@ export function UnderwritingStageManager({
             {isExporting ? 'Exporting…' : 'Export to Excel'}
           </button>
           <button
+            type="button"
             onClick={onSave}
             disabled={!hasUnsavedChanges}
             className={cn(
-              'px-4 py-1.5 rounded-lg text-xs font-medium transition-colors border',
+              'px-4 py-1.5 rounded-lg text-xs font-medium transition-colors border focus:outline-none focus-visible:ring-1 focus-visible:ring-white/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#060608]',
               hasUnsavedChanges
                 ? 'border-white/20 text-white hover:bg-white/[0.04]'
                 : 'border-white/[0.04] text-muted-foreground cursor-not-allowed',
@@ -127,11 +140,12 @@ export function UnderwritingStageManager({
           </button>
           <button
             type="button"
-            onClick={() => (splitMode ? closeSplit() : startPicker())}
+            onClick={onSplitToggle}
             aria-pressed={splitButtonActive}
             aria-label={splitButtonLabel}
             className={cn(
               'px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors [transition-duration:180ms]',
+              'focus:outline-none focus-visible:ring-1 focus-visible:ring-white/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#060608]',
               splitButtonActive
                 ? 'border-white/30 bg-white/[0.08] text-white'
                 : 'border-white/15 bg-white/[0.02] text-white/60 hover:bg-white/[0.04]',
