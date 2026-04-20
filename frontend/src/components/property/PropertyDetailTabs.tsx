@@ -77,7 +77,7 @@ export function PropertyDetailTabs(props: PropertyDetailTabsProps) {
     <div>
       {/* ─── Tab Bar ─── */}
       <div className="sticky top-[calc(4rem+73px)] z-10 bg-background/90 backdrop-blur-xl border-b border-white/[0.04]">
-        <div className="max-w-6xl mx-auto px-6 lg:px-8">
+        <div className="max-w-screen-2xl mx-auto px-6 lg:px-8">
           <nav className="overflow-x-auto whitespace-nowrap -mb-px" role="tablist">
             <div className="flex" style={{ gap: 28 }}>
               {TABS.map((tab) => (
@@ -102,7 +102,7 @@ export function PropertyDetailTabs(props: PropertyDetailTabsProps) {
       </div>
 
       {/* ─── Tab Content ─── */}
-      <div className="max-w-6xl mx-auto px-6 lg:px-8 py-8">
+      <div className="px-6 lg:px-8 xl:px-12 py-8">
         <AnimatePresence mode="wait">
           <motion.div
             key={activeTab}

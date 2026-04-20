@@ -511,7 +511,7 @@ export const PropertyDetail = () => {
       {/* HEADER                                                              */}
       {/* ================================================================= */}
       <div className="sticky top-16 z-20 bg-background/90 backdrop-blur-xl border-b border-white/[0.04]">
-        <div className="max-w-6xl mx-auto px-6 lg:px-8 py-3">
+        <div className="max-w-screen-2xl mx-auto px-6 lg:px-8 py-3">
           {/* Row 1 — Property Identity + Actions */}
           <div className="flex items-center justify-between mb-3">
             {/* Left: back + name + score + badges */}
