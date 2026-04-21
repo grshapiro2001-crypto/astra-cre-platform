@@ -859,22 +859,40 @@ def _parse_realpage_summary_groups(ws: Worksheet) -> Optional[Dict[str, Any]]:
     if header_row_idx is None:
         return None
 
-    # Map header labels on the Summary Groups row to column indices.
+    # RealPage wraps long labels like "# Of Units" and "Square Footage"
+    # across two physical rows. Merge the header row with the row below
+    # by column index so the label match sees the full string.
+    header_rows = [ws[header_row_idx]]
+    if header_row_idx + 1 <= ws.max_row:
+        header_rows.append(ws[header_row_idx + 1])
+    merged: Dict[int, str] = {}
+    for hrow in header_rows:
+        for cell in hrow:
+            if not isinstance(cell.value, str):
+                continue
+            piece = cell.value.strip()
+            if not piece:
+                continue
+            prior = merged.get(cell.column, "")
+            merged[cell.column] = f"{prior} {piece}".strip() if prior else piece
+
     col_idx: Dict[str, int] = {}
-    for cell in ws[header_row_idx]:
-        if not isinstance(cell.value, str):
-            continue
-        label = cell.value.strip().lower()
+    for col, label_raw in merged.items():
+        label = label_raw.lower()
         if "square footage" in label or label in ("sqft", "sq ft"):
-            col_idx["sqft"] = cell.column
+            col_idx["sqft"] = col
         elif "market rent" in label:
-            col_idx["market_rent"] = cell.column
+            col_idx["market_rent"] = col
         elif "lease charges" in label or "actual rent" in label:
-            col_idx["lease_charges"] = cell.column
-        elif "# units" in label or label in ("units", "# of units", "unit count"):
-            col_idx["units"] = cell.column
+            col_idx["lease_charges"] = col
+        elif (
+            "# of units" in label
+            or "# units" in label
+            or label in ("units", "unit count")
+        ):
+            col_idx["units"] = col
         elif "% occupied" in label or "occupancy" in label or "% occ" in label:
-            col_idx["occupancy_pct"] = cell.column
+            col_idx["occupancy_pct"] = col
 
     if "units" not in col_idx:
         logger.warning(
@@ -883,8 +901,10 @@ def _parse_realpage_summary_groups(ws: Worksheet) -> Optional[Dict[str, Any]]:
         )
         return None
 
+    # Skip over the continuation header row when one was consumed.
+    data_start = header_row_idx + len(header_rows)
     rows_by_key: Dict[str, Dict[str, Any]] = {}
-    for row_idx in range(header_row_idx + 1, min(header_row_idx + 30, ws.max_row + 1)):
+    for row_idx in range(data_start, min(data_start + 30, ws.max_row + 1)):
         row = ws[row_idx]
 
         label = None
