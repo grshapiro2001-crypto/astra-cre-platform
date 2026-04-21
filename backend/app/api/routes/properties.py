@@ -39,7 +39,9 @@ from app.schemas.property import (
 )
 from app.services import property_service
 from app.services import excel_extraction_service
+from app.services.extraction import rent_roll_normalizer
 from app.services.rent_roll_aggregates import compute_aggregates_from_rows
+from app.schemas.rent_roll import FutureLeaseRecord
 
 logger = logging.getLogger(__name__)
 
@@ -1329,15 +1331,40 @@ async def upload_document_to_property(
                     RentRollUnit.property_id == property_id
                 ).delete()
 
-                # Save unit-level data
-                for unit in extraction.get("units", []):
-                    # Defensive: ensure in_place_rent derived from charge_details
-                    cd = unit.get("charge_details") or {}
-                    ipr = unit.get("in_place_rent") or 0
+                # Defensive: fill in_place_rent from charge_details on raw
+                # extractor output before normalization so the base-rent
+                # heuristic runs on the richest data.
+                raw_units = extraction.get("units", []) or []
+                for u in raw_units:
+                    cd = u.get("charge_details") or {}
+                    ipr = u.get("in_place_rent") or 0
                     if cd and not ipr:
                         base = excel_extraction_service.find_base_rent(cd)
-                        unit["in_place_rent"] = base if base > 0 else sum(cd.values())
+                        u["in_place_rent"] = base if base > 0 else sum(cd.values())
 
+                # Route through the shared normalizer so section banners
+                # (e.g. "Future Residents/Applicants") are filtered and
+                # future pre-leases are diverted to `future_leases` instead
+                # of being counted as physical units.
+                column_mapping = extraction.get("column_mapping") or {}
+                norm = rent_roll_normalizer.normalize_units(raw_units, column_mapping)
+
+                future_lease_records = [
+                    FutureLeaseRecord(
+                        unit_number=fl.unit_number,
+                        resident_name=fl.resident_name,
+                        market_rent=fl.market_rent,
+                        lease_start=fl.lease_start,
+                        lease_end=fl.lease_end,
+                        raw_row=dict(fl.raw_row),
+                    )
+                    for fl in norm.future_leases
+                ]
+                doc.future_leases = [
+                    fl.model_dump(mode="json") for fl in future_lease_records
+                ]
+
+                for unit in norm.units:
                     rr_unit = RentRollUnit(
                         property_id=property_id,
                         document_id=doc.id,
@@ -1352,7 +1379,7 @@ async def upload_document_to_property(
                         lease_end=unit.get("lease_end"),
                         market_rent=unit.get("market_rent"),
                         in_place_rent=unit.get("in_place_rent"),
-                        charge_details=unit.get("charge_details")
+                        charge_details=unit.get("charge_details"),
                     )
                     db.add(rr_unit)
 
