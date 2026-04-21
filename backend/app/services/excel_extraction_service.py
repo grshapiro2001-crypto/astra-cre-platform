@@ -590,7 +590,14 @@ def _parse_rent_roll_units(ws: Worksheet, header_row: int, headers: Dict[int, st
             continue
 
         # ── Summary row → stop parsing ──
-        if unit_val and any(kw in unit_val.lower() for kw in ["total", "summary", "grand total", "property"]):
+        # "charge code" catches the "Summary of Charges by Charge Code"
+        # banner that precedes the per-code summary block at the end of
+        # RealPage rent rolls; without it, short-alpha codes like `aprk`
+        # or `mtm` can slip through as fake unit rows.
+        if unit_val and any(
+            kw in unit_val.lower()
+            for kw in ["total", "summary", "grand total", "property", "charge code"]
+        ):
             break
 
         # ── Charge detail sub-row: blank unit col, charge code populated ──

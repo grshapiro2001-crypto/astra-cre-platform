@@ -445,6 +445,27 @@ def truncate_string(
 
 # ─── Junk-row filter ─────────────────────────────────────────────────────────
 
+_CHARGE_CODE_SHAPE_RE = re.compile(r"^[a-z]{2,6}$")
+
+
+def _looks_like_charge_code(unit: dict[str, Any]) -> bool:
+    """True if the row is shaped like a charge-code summary entry.
+
+    The RealPage "Summary of Charges by Charge Code" block emits rows whose
+    col-A value is a short lowercase token (`aprk`, `atra`, `mtm`, `con`,
+    `arnt`, `astg`, `rrins`, `prnt`, ...) and whose other unit-defining
+    fields (unit_type, sqft, resident_name, market_rent) are all blank.
+    Real unit numbers are numeric / digit-bearing (`101`, `A-2`, `B-304`).
+    """
+    unit_num_str = str(unit.get("unit_number", "")).strip()
+    if not _CHARGE_CODE_SHAPE_RE.match(unit_num_str.lower()):
+        return False
+    if unit_num_str != unit_num_str.lower():
+        return False
+    other_unit_fields = ("unit_type", "sqft", "resident_name", "market_rent")
+    return all(_is_blank(unit.get(f)) for f in other_unit_fields)
+
+
 def is_junk_row(unit: dict[str, Any]) -> tuple[bool, str]:
     """Returns (is_junk, reason)."""
     unit_num = unit.get("unit_number")
@@ -459,6 +480,9 @@ def is_junk_row(unit: dict[str, Any]) -> tuple[bool, str]:
     resident = str(unit.get("resident_name") or "").lower()
     if "/" in resident and any(p in resident for p in SECTION_HEADER_PATTERNS):
         return True, f"resident_name is section banner: {resident!r}"
+
+    if _looks_like_charge_code(unit):
+        return True, f"charge_code_shaped row (unit_number={unit_num_str!r})"
 
     key_fields = ("unit_number", "resident_name", "market_rent", "in_place_rent")
     if all(_is_blank(unit.get(f)) for f in key_fields):
