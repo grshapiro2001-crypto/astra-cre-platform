@@ -662,9 +662,19 @@ def normalize_units(
 
 
 def _is_banner_shaped_dict(raw: dict[str, Any]) -> bool:
-    """True if the row dict looks like a banner (no numeric rent/sqft data)."""
+    """True if the row dict looks like a banner (no numeric rent/sqft data).
+
+    The upstream openpyxl extractor initializes `in_place_rent` to 0 on
+    every emitted dict; treat 0 as blank so the Future Residents banner
+    still qualifies.
+    """
+    def _blank_or_zero(v: Any) -> bool:
+        if _is_blank(v):
+            return True
+        return isinstance(v, (int, float)) and not isinstance(v, bool) and v == 0
+
     return all(
-        _is_blank(raw.get(f))
+        _blank_or_zero(raw.get(f))
         for f in ("market_rent", "in_place_rent", "sqft")
     )
 

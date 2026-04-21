@@ -26,7 +26,9 @@
       "Bash(npx shadcn@latest add button card input label dialog select checkbox badge separator table tabs alert skeleton radio-group alert-dialog --yes)",
       "Bash(npx shadcn@latest init:*)",
       "Bash(npx shadcn@latest add:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(mkdir -p .claude/plans)",
+      "Bash(cp /root/.claude/plans/talisman-io-foamy-frost.md .claude/plans/fix-realpage-normalizer-overcount.md)"
     ]
   }
 }
