@@ -39,6 +39,7 @@ from app.schemas.property import (
 )
 from app.services import property_service
 from app.services import excel_extraction_service
+from app.services.rent_roll_aggregates import compute_aggregates_from_rows
 
 logger = logging.getLogger(__name__)
 
@@ -1355,8 +1356,34 @@ async def upload_document_to_property(
                     )
                     db.add(rr_unit)
 
+                # Flush pending RentRollUnit inserts so we can aggregate
+                # from the rows that actually landed (matches v2 handler
+                # semantics; guards against Sixty 11th regression where the
+                # extractor's _calculate_rent_roll_summary returned zeros
+                # while rows committed fine).
+                db.flush()
+                inserted_rows = (
+                    db.query(RentRollUnit)
+                    .filter(
+                        RentRollUnit.property_id == property_id,
+                        RentRollUnit.document_id == doc.id,
+                    )
+                    .all()
+                )
+                row_dicts = [
+                    {
+                        "is_occupied": r.is_occupied,
+                        "sqft": r.sqft,
+                        "market_rent": r.market_rent,
+                        "in_place_rent": r.in_place_rent,
+                        "status": r.status,
+                    }
+                    for r in inserted_rows
+                ]
+                summary = compute_aggregates_from_rows(row_dicts)
+                inserted = len(inserted_rows)
+
                 # Check if this is the most recent rent roll
-                summary = extraction.get("summary", {})
                 existing_rr_date = property_obj.rr_as_of_date
                 is_most_recent = True
 
@@ -1366,15 +1393,14 @@ async def upload_document_to_property(
                 # Update property summary fields if this is the most recent.
                 # Guarded writes: null-overwrite of total_units / rr_* on
                 # re-upload was the Sixty 11th production regression.
-                if is_most_recent and summary:
-                    inserted = len(extraction.get("units", []))
+                if is_most_recent and inserted > 0:
                     _apply_rent_roll_summary_to_property(
                         property_obj, summary, inserted, document_id=doc.id,
                     )
                     if doc.document_date:
                         property_obj.rr_as_of_date = doc.document_date
 
-                extraction_summary = f"Extracted {len(extraction.get('units', []))} units. " + \
+                extraction_summary = f"Extracted {inserted} units. " + \
                                     f"Occupancy: {summary.get('physical_occupancy_pct')}%"
 
             elif doc_category == "t12":
