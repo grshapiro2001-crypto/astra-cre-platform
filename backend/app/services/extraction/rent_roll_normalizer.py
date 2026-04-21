@@ -422,6 +422,43 @@ def derive_is_occupied(status: Any) -> Optional[bool]:
     return None
 
 
+def derive_status_from_dates(
+    move_out_date: Any,
+    lease_end: Any,
+    resident_name: Any,
+    today: Optional[datetime] = None,
+) -> tuple[Optional[str], Optional[bool]]:
+    """Derive (status_label, is_occupied) from lease date signals.
+
+    RealPage rent rolls without a Status column use Move Out / Lease
+    Expiration / Resident Name to indicate occupancy:
+      * populated Move Out in the past  → vacant
+      * populated Move Out in the future → notice (still occupied today)
+      * blank Move Out + populated Lease Expiration + resident → current
+      * all three blank                 → vacant (no lease, no resident)
+
+    Returns (None, None) when signals are ambiguous so callers can fall
+    back to their own defaults.
+    """
+    now = today or datetime.utcnow()
+    mo = coerce_date(move_out_date)
+    le = coerce_date(lease_end)
+    has_resident = not _is_blank(resident_name)
+
+    if mo is not None:
+        if mo <= now:
+            return "vacant", False
+        return "notice", True
+
+    if le is not None and has_resident:
+        return "current", True
+
+    if le is None and not has_resident:
+        return "vacant", False
+
+    return None, None
+
+
 def truncate_string(
     value: Any,
     max_length: int,
@@ -445,6 +482,27 @@ def truncate_string(
 
 # ─── Junk-row filter ─────────────────────────────────────────────────────────
 
+_CHARGE_CODE_SHAPE_RE = re.compile(r"^[a-z]{2,6}$")
+
+
+def _looks_like_charge_code(unit: dict[str, Any]) -> bool:
+    """True if the row is shaped like a charge-code summary entry.
+
+    The RealPage "Summary of Charges by Charge Code" block emits rows whose
+    col-A value is a short lowercase token (`aprk`, `atra`, `mtm`, `con`,
+    `arnt`, `astg`, `rrins`, `prnt`, ...) and whose other unit-defining
+    fields (unit_type, sqft, resident_name, market_rent) are all blank.
+    Real unit numbers are numeric / digit-bearing (`101`, `A-2`, `B-304`).
+    """
+    unit_num_str = str(unit.get("unit_number", "")).strip()
+    if not _CHARGE_CODE_SHAPE_RE.match(unit_num_str.lower()):
+        return False
+    if unit_num_str != unit_num_str.lower():
+        return False
+    other_unit_fields = ("unit_type", "sqft", "resident_name", "market_rent")
+    return all(_is_blank(unit.get(f)) for f in other_unit_fields)
+
+
 def is_junk_row(unit: dict[str, Any]) -> tuple[bool, str]:
     """Returns (is_junk, reason)."""
     unit_num = unit.get("unit_number")
@@ -459,6 +517,9 @@ def is_junk_row(unit: dict[str, Any]) -> tuple[bool, str]:
     resident = str(unit.get("resident_name") or "").lower()
     if "/" in resident and any(p in resident for p in SECTION_HEADER_PATTERNS):
         return True, f"resident_name is section banner: {resident!r}"
+
+    if _looks_like_charge_code(unit):
+        return True, f"charge_code_shaped row (unit_number={unit_num_str!r})"
 
     key_fields = ("unit_number", "resident_name", "market_rent", "in_place_rent")
     if all(_is_blank(unit.get(f)) for f in key_fields):
@@ -662,9 +723,19 @@ def normalize_units(
 
 
 def _is_banner_shaped_dict(raw: dict[str, Any]) -> bool:
-    """True if the row dict looks like a banner (no numeric rent/sqft data)."""
+    """True if the row dict looks like a banner (no numeric rent/sqft data).
+
+    The upstream openpyxl extractor initializes `in_place_rent` to 0 on
+    every emitted dict; treat 0 as blank so the Future Residents banner
+    still qualifies.
+    """
+    def _blank_or_zero(v: Any) -> bool:
+        if _is_blank(v):
+            return True
+        return isinstance(v, (int, float)) and not isinstance(v, bool) and v == 0
+
     return all(
-        _is_blank(raw.get(f))
+        _blank_or_zero(raw.get(f))
         for f in ("market_rent", "in_place_rent", "sqft")
     )
 
@@ -694,13 +765,25 @@ def _coerce_unit(
         COLUMN_MAX_LENGTHS["status"],
         "status", row_context, warnings,
     )
-    out["status"] = status_val
 
-    # Prefer explicit is_occupied if the raw row already has it; otherwise derive.
-    if "is_occupied" in raw and raw["is_occupied"] is not None:
-        out["is_occupied"] = bool(raw["is_occupied"])
+    move_out_raw = raw.get("move_out_date")
+    explicit_occ = raw.get("is_occupied") if "is_occupied" in raw else None
+
+    if explicit_occ is not None:
+        out["is_occupied"] = bool(explicit_occ)
     else:
-        out["is_occupied"] = derive_is_occupied(status_val)
+        occ = derive_is_occupied(status_val)
+        if occ is None:
+            derived_status, occ = derive_status_from_dates(
+                move_out_raw,
+                raw.get("lease_end"),
+                raw.get("resident_name"),
+            )
+            if _is_blank(status_val) and derived_status is not None:
+                status_val = derived_status
+        out["is_occupied"] = occ
+
+    out["status"] = status_val
 
     out["resident_name"] = truncate_string(
         raw.get("resident_name"),

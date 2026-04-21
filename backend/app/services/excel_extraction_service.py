@@ -362,13 +362,19 @@ def extract_rent_roll(filepath: str) -> Dict[str, Any]:
         # Step 5: Calculate summary
         summary = _calculate_rent_roll_summary(units)
 
+        # Step 6: Parse RealPage "Summary Groups" block if present —
+        # authoritative aggregates straight from the PMS, used by the
+        # upload handler to cross-check the row-level counts.
+        realpage_summary = _parse_realpage_summary_groups(ws)
+
         wb.close()
 
         return {
             "document_date": document_date.isoformat() if document_date else None,
             "property_name": property_name,
             "units": units,
-            "summary": summary
+            "summary": summary,
+            "realpage_summary": realpage_summary,
         }
 
     except Exception as e:
@@ -590,7 +596,14 @@ def _parse_rent_roll_units(ws: Worksheet, header_row: int, headers: Dict[int, st
             continue
 
         # ── Summary row → stop parsing ──
-        if unit_val and any(kw in unit_val.lower() for kw in ["total", "summary", "grand total", "property"]):
+        # "charge code" catches the "Summary of Charges by Charge Code"
+        # banner that precedes the per-code summary block at the end of
+        # RealPage rent rolls; without it, short-alpha codes like `aprk`
+        # or `mtm` can slip through as fake unit rows.
+        if unit_val and any(
+            kw in unit_val.lower()
+            for kw in ["total", "summary", "grand total", "property", "charge code"]
+        ):
             break
 
         # ── Charge detail sub-row: blank unit col, charge code populated ──
@@ -682,8 +695,12 @@ def _map_rent_roll_columns(headers: Dict[int, str]) -> Dict[str, int]:
                 col_map["resident"] = col_idx
 
         # Move in date
-        if "move in" in header_lower:
+        if "move in" in header_lower or "move-in" in header_lower:
             col_map["move_in"] = col_idx
+
+        # Move out date — used to derive occupancy for exports without a Status column
+        if "move out" in header_lower or "move-out" in header_lower:
+            col_map["move_out"] = col_idx
 
         # Lease dates
         if "lease" in header_lower:
@@ -691,6 +708,9 @@ def _map_rent_roll_columns(headers: Dict[int, str]) -> Dict[str, int]:
                 col_map["lease_start"] = col_idx
             elif "end" in header_lower or "to" in header_lower or "expire" in header_lower:
                 col_map["lease_end"] = col_idx
+        # "Lease Expiration" without the word "lease end" — RealPage uses this header
+        if "expiration" in header_lower and "lease_end" not in col_map:
+            col_map["lease_end"] = col_idx
 
         # Rents
         if "market" in header_lower and "rent" in header_lower:
@@ -716,15 +736,23 @@ def _map_rent_roll_columns(headers: Dict[int, str]) -> Dict[str, int]:
 
 
 def _parse_unit_row(row, col_map: Dict[str, int]) -> Dict[str, Any]:
-    """Parse a single unit row"""
+    """Parse a single unit row.
+
+    `is_occupied` is left as `None` when the source has no Status column
+    and no Move Out date — the downstream normalizer then derives
+    occupancy from the date fields and resident_name.
+    """
+    status_val = _get_cell_value(row, col_map.get("status"))
+    move_out_val = _get_date_value(row, col_map.get("move_out"))
     unit = {
         "unit_number": _get_cell_value(row, col_map.get("unit", 1)),
         "unit_type": _get_cell_value(row, col_map.get("unit_type")),
         "sqft": _get_numeric_value(row, col_map.get("sqft")),
-        "status": _get_cell_value(row, col_map.get("status")),
-        "is_occupied": True,  # Will be determined below
+        "status": status_val,
+        "is_occupied": None,  # derived below or in the normalizer
         "resident_name": _get_cell_value(row, col_map.get("resident")),
         "move_in_date": _get_date_value(row, col_map.get("move_in")),
+        "move_out_date": move_out_val,
         "lease_start": _get_date_value(row, col_map.get("lease_start")),
         "lease_end": _get_date_value(row, col_map.get("lease_end")),
         "market_rent": _get_numeric_value(row, col_map.get("market_rent")),
@@ -732,10 +760,14 @@ def _parse_unit_row(row, col_map: Dict[str, int]) -> Dict[str, Any]:
         "charge_details": {}
     }
 
-    # Determine occupancy from status
-    status_lower = str(unit["status"]).lower() if unit["status"] else ""
-    if any(kw in status_lower for kw in ["vacant", "unrented", "model", "employee"]):
-        unit["is_occupied"] = False
+    status_lower = str(status_val).lower() if status_val else ""
+    if status_lower:
+        if any(kw in status_lower for kw in ["vacant", "unrented", "model", "employee", "down", "admin"]):
+            unit["is_occupied"] = False
+        elif any(kw in status_lower for kw in ["occupied", "current", "notice"]):
+            unit["is_occupied"] = True
+    # Leave is_occupied=None if status is missing or unmatched — the
+    # normalizer will derive from move_out_date / lease_end / resident_name.
 
     return unit
 
@@ -793,6 +825,143 @@ def _get_date_value(row, col_idx: Optional[int]) -> Optional[datetime]:
             continue
 
     return None
+
+
+_SUMMARY_LABEL_KEYS = {
+    "current/notice/vacant residents": "current_notice_vacant",
+    "future residents/applicants": "future_applicants",
+    "occupied units": "occupied",
+    "total non rev units": "non_rev",
+    "non rev units": "non_rev",
+    "total vacant units": "vacant",
+    "totals:": "totals",
+    "grand total": "totals",
+}
+
+
+def _parse_realpage_summary_groups(ws: Worksheet) -> Optional[Dict[str, Any]]:
+    """Locate and parse the RealPage 'Summary Groups' block.
+
+    The block sits near the foot of the sheet and carries the authoritative
+    aggregates straight from RealPage: total units, occupied, vacant,
+    non-rev, future applicants, total sqft / market rent / lease charges,
+    and physical occupancy %. Returns None when the block is absent.
+    """
+    header_row_idx: Optional[int] = None
+    for row_idx in range(1, ws.max_row + 1):
+        for cell in ws[row_idx]:
+            if isinstance(cell.value, str) and "summary groups" in cell.value.strip().lower():
+                header_row_idx = row_idx
+                break
+        if header_row_idx is not None:
+            break
+
+    if header_row_idx is None:
+        return None
+
+    # Map header labels on the Summary Groups row to column indices.
+    col_idx: Dict[str, int] = {}
+    for cell in ws[header_row_idx]:
+        if not isinstance(cell.value, str):
+            continue
+        label = cell.value.strip().lower()
+        if "square footage" in label or label in ("sqft", "sq ft"):
+            col_idx["sqft"] = cell.column
+        elif "market rent" in label:
+            col_idx["market_rent"] = cell.column
+        elif "lease charges" in label or "actual rent" in label:
+            col_idx["lease_charges"] = cell.column
+        elif "# units" in label or label in ("units", "# of units", "unit count"):
+            col_idx["units"] = cell.column
+        elif "% occupied" in label or "occupancy" in label or "% occ" in label:
+            col_idx["occupancy_pct"] = cell.column
+
+    if "units" not in col_idx:
+        logger.warning(
+            "RealPage Summary Groups at row %d found, but could not map '# Units' column; skipping",
+            header_row_idx,
+        )
+        return None
+
+    rows_by_key: Dict[str, Dict[str, Any]] = {}
+    for row_idx in range(header_row_idx + 1, min(header_row_idx + 30, ws.max_row + 1)):
+        row = ws[row_idx]
+
+        label = None
+        for cell in row:
+            if isinstance(cell.value, str) and cell.value.strip():
+                label = cell.value.strip().lower()
+                break
+        if not label:
+            continue
+
+        # Stop at the charge-code block.
+        if "summary of charges" in label or "charge code" in label:
+            break
+
+        key = None
+        for pat, mapped in _SUMMARY_LABEL_KEYS.items():
+            if pat in label:
+                key = mapped
+                break
+        if key is None:
+            continue
+
+        def _num(col: Optional[int]) -> Optional[float]:
+            if col is None:
+                return None
+            cell = row[col - 1] if col - 1 < len(row) else None
+            v = cell.value if cell is not None else None
+            if isinstance(v, (int, float)) and not isinstance(v, bool):
+                return float(v)
+            if isinstance(v, str):
+                s = v.strip().replace(",", "").replace("$", "").replace("%", "")
+                try:
+                    return float(s)
+                except ValueError:
+                    return None
+            return None
+
+        rows_by_key[key] = {
+            "sqft": _num(col_idx.get("sqft")),
+            "market_rent": _num(col_idx.get("market_rent")),
+            "lease_charges": _num(col_idx.get("lease_charges")),
+            "units": _num(col_idx.get("units")),
+            "occupancy_pct": _num(col_idx.get("occupancy_pct")),
+        }
+
+    if not rows_by_key:
+        return None
+
+    totals = rows_by_key.get("totals") or rows_by_key.get("current_notice_vacant")
+    occupied = rows_by_key.get("occupied", {}) or {}
+    vacant = rows_by_key.get("vacant", {}) or {}
+    non_rev = rows_by_key.get("non_rev", {}) or {}
+    future = rows_by_key.get("future_applicants", {}) or {}
+
+    def _as_int(v: Any) -> Optional[int]:
+        if v is None:
+            return None
+        try:
+            return int(round(float(v)))
+        except (TypeError, ValueError):
+            return None
+
+    return {
+        "source_row": header_row_idx,
+        "total_units": _as_int((totals or {}).get("units")),
+        "occupied_units": _as_int(occupied.get("units")),
+        "vacant_units": _as_int(vacant.get("units")),
+        "non_rev_units": _as_int(non_rev.get("units")),
+        "future_leases": _as_int(future.get("units")),
+        "total_sqft": _as_int((totals or {}).get("sqft")),
+        "total_market_rent": (totals or {}).get("market_rent"),
+        "total_lease_charges": (totals or {}).get("lease_charges"),
+        "physical_occupancy_pct": (
+            occupied.get("occupancy_pct")
+            or (rows_by_key.get("current_notice_vacant", {}) or {}).get("occupancy_pct")
+        ),
+    }
 
 
 def _calculate_rent_roll_summary(units: List[Dict[str, Any]]) -> Dict[str, Any]:
