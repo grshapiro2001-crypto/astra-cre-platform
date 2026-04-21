@@ -28,6 +28,7 @@ from app.services.extraction.rent_roll_normalizer import (
     coerce_currency,
     coerce_date,
     derive_is_occupied,
+    derive_status_from_dates,
     detect_header_row,
     is_junk_row,
     normalize_rows,
@@ -523,3 +524,165 @@ def test_realpage_with_future_residents_end_to_end(realpage_with_future_resident
     current_first_10 = [u["unit_number"] for u in result.units[:10]]
     future_unit_numbers = [fl.unit_number for fl in result.future_leases]
     assert future_unit_numbers == current_first_10
+
+
+# ─── Regressions for the 332-unit RealPage overcount bug ─────────────────────
+
+def test_future_residents_banner_detected_with_zero_in_place_rent():
+    """The extractor emits `in_place_rent=0` on every dict including banners.
+
+    Before the fix, `_is_banner_shaped_dict` rejected such rows (since 0 is
+    not blank), so the section state never advanced into FUTURE_APPLICANTS
+    and pre-lease rows leaked into result.units.
+    """
+    units = [
+        {"unit_number": "101", "unit_type": "A1", "sqft": 800,
+         "resident_name": "Jane Doe", "status": "Occupied",
+         "market_rent": 1200, "in_place_rent": 1150},
+        # Banner row as emitted by the legacy extractor: text in unit_number,
+        # in_place_rent defaulted to 0, everything else None.
+        {"unit_number": "Future Residents/Applicants",
+         "unit_type": None, "sqft": None, "resident_name": None,
+         "status": None, "market_rent": None, "in_place_rent": 0,
+         "charge_details": {}},
+        {"unit_number": "202", "unit_type": "B1", "sqft": 1000,
+         "resident_name": "Alice Incoming", "status": None,
+         "market_rent": 1500, "in_place_rent": 0,
+         "lease_start": "2025-06-01", "lease_end": "2026-06-01"},
+    ]
+    result = normalize_units(units, {"unit_number": "Unit"})
+    assert len(result.units) == 1
+    assert result.units[0]["unit_number"] == "101"
+    assert len(result.future_leases) == 1
+    assert result.future_leases[0].unit_number == "202"
+    assert result.sections_detected.get("future_applicants") == 1
+
+
+def test_charge_code_short_tokens_rejected():
+    """The RealPage Summary of Charges block emits rows whose col-A value is
+    a short lowercase token (aprk, atra, mtm, ...). is_junk_row must reject
+    all of them — `emp` and `Total` were already caught via substring match
+    with `employee` / `total`, but the others slipped through.
+    """
+    leak_candidates = [
+        "aprk", "atra", "arnt", "astg", "rrins", "con", "mtm", "prnt",
+    ]
+    for code in leak_candidates:
+        unit = {
+            "unit_number": code,
+            "unit_type": None,
+            "sqft": None,
+            "resident_name": None,
+            "market_rent": None,
+            "in_place_rent": 1234.56,
+        }
+        junk, reason = is_junk_row(unit)
+        assert junk is True, f"{code!r} slipped past is_junk_row"
+        assert "charge_code" in reason or "section header" in reason
+
+    # Existing rejections continue to work.
+    for code in ["emp", "Total"]:
+        unit = {
+            "unit_number": code, "unit_type": None, "sqft": None,
+            "resident_name": None, "market_rent": None, "in_place_rent": 0,
+        }
+        junk, reason = is_junk_row(unit)
+        assert junk is True, f"{code!r} no longer rejected"
+
+    # A legitimate short unit number (has digits or uppercase) must still pass.
+    real_unit = {
+        "unit_number": "A-2",
+        "unit_type": "A1",
+        "sqft": 800,
+        "resident_name": "Jane Doe",
+        "market_rent": 1200,
+        "in_place_rent": 1150,
+    }
+    junk, reason = is_junk_row(real_unit)
+    assert junk is False, f"real unit rejected: {reason}"
+
+
+def test_status_assignment_from_move_out():
+    """With no Status column, occupancy derives from Move Out / Lease End."""
+    past = datetime(2025, 1, 1)
+    future = datetime(2099, 1, 1)
+
+    # Past Move Out → vacant.
+    label, occ = derive_status_from_dates(past, future, "Former Tenant")
+    assert occ is False
+    assert label == "vacant"
+
+    # Future Move Out → notice, still occupied.
+    label, occ = derive_status_from_dates(future, future, "Jane Doe")
+    assert occ is True
+    assert label == "notice"
+
+    # No Move Out, active lease + resident → current.
+    label, occ = derive_status_from_dates(None, future, "Jane Doe")
+    assert occ is True
+    assert label == "current"
+
+    # No lease, no Move Out, no resident → vacant.
+    label, occ = derive_status_from_dates(None, None, None)
+    assert occ is False
+    assert label == "vacant"
+
+
+def test_status_derived_through_normalize_units():
+    """End-to-end: the derivation flows through normalize_units + _coerce_unit."""
+    units = [
+        # Occupied: resident, lease end in future, no move out, no status.
+        {"unit_number": "101", "unit_type": "A1", "sqft": 800,
+         "resident_name": "Jane Doe", "status": None,
+         "move_out_date": None, "lease_end": datetime(2099, 1, 1),
+         "market_rent": 1200, "in_place_rent": 1150, "is_occupied": None},
+        # Vacant: resident moved out in the past.
+        {"unit_number": "102", "unit_type": "A1", "sqft": 800,
+         "resident_name": "Former Tenant", "status": None,
+         "move_out_date": datetime(2025, 1, 1),
+         "lease_end": datetime(2025, 1, 1),
+         "market_rent": 1200, "in_place_rent": 0, "is_occupied": None},
+        # Truly empty unit: no resident, no lease, no move out.
+        {"unit_number": "103", "unit_type": "A2", "sqft": 900,
+         "resident_name": None, "status": None,
+         "move_out_date": None, "lease_end": None,
+         "market_rent": 1300, "in_place_rent": 0, "is_occupied": None},
+    ]
+    result = normalize_units(units, {"unit_number": "Unit"})
+    assert len(result.units) == 3
+    by_num = {u["unit_number"]: u for u in result.units}
+    assert by_num["101"]["is_occupied"] is True
+    assert by_num["101"]["status"] == "current"
+    assert by_num["102"]["is_occupied"] is False
+    assert by_num["102"]["status"] == "vacant"
+    assert by_num["103"]["is_occupied"] is False
+    assert by_num["103"]["status"] == "vacant"
+
+
+def test_realpage_summary_groups_parser():
+    """The Summary Groups block at the foot of a RealPage sheet should
+    surface as extraction["realpage_summary"]."""
+    from openpyxl import Workbook
+    from app.services.excel_extraction_service import _parse_realpage_summary_groups
+
+    wb = Workbook()
+    ws = wb.active
+    # Headers
+    ws.append(["Summary Groups", "Square Footage", "Market Rent",
+               "Lease Charges", "# Units", "% Occupied"])
+    ws.append(["Current/Notice/Vacant Residents", 303721, 863176, 819968.50, 320, 95.62])
+    ws.append(["Future Residents/Applicants", 9243, 26422, 0.00, 10, None])
+    ws.append(["Occupied Units", 288796, 821104, None, 306, 95.62])
+    ws.append(["Total Non Rev Units", 1921, 5662, None, 2, None])
+    ws.append(["Total Vacant Units", 13004, 36410, None, 12, None])
+    ws.append(["Totals:", 303721, 863176, 819968.50, 320, 100.00])
+
+    summary = _parse_realpage_summary_groups(ws)
+    assert summary is not None
+    assert summary["total_units"] == 320
+    assert summary["occupied_units"] == 306
+    assert summary["vacant_units"] == 12
+    assert summary["non_rev_units"] == 2
+    assert summary["future_leases"] == 10
+    assert summary["total_sqft"] == 303721
+    assert abs(summary["physical_occupancy_pct"] - 95.62) < 0.01
