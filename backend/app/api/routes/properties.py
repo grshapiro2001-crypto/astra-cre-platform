@@ -46,6 +46,58 @@ logger = logging.getLogger(__name__)
 # This prevents accidental LLM calls in read-only operations
 
 
+def _apply_rent_roll_summary_to_property(
+    property_obj: Property,
+    summary: dict,
+    inserted: int,
+    document_id: Optional[int] = None,
+) -> None:
+    """Apply rent-roll summary values to property with truthy guards.
+
+    Mirrors the v2 handler semantics at upload.py:487-519: only overwrite each
+    field when the incoming value is truthy. For total_units, additionally
+    require inserted > 0 — matches the `inserted or property_obj.total_units`
+    idiom at upload.py:515. Blocked writes emit a WARNING log so we can
+    observe how often the legacy re-upload path ingests empty/partial summaries.
+    """
+    blocked: list[tuple[str, object, object]] = []
+
+    def _set_if_truthy(field: str, incoming):
+        existing = getattr(property_obj, field)
+        if incoming:
+            setattr(property_obj, field, incoming)
+        else:
+            blocked.append((field, incoming, existing))
+
+    incoming_total = summary.get("total_units")
+    if inserted > 0 and incoming_total:
+        property_obj.total_units = incoming_total
+        property_obj.rr_total_units = incoming_total
+    else:
+        blocked.append(("total_units", incoming_total, property_obj.total_units))
+        blocked.append(("rr_total_units", incoming_total, property_obj.rr_total_units))
+
+    _set_if_truthy("rr_occupied_units", summary.get("occupied_units"))
+    _set_if_truthy("rr_vacancy_count", summary.get("vacant_units"))
+    _set_if_truthy("rr_physical_occupancy_pct", summary.get("physical_occupancy_pct"))
+    _set_if_truthy("rr_avg_market_rent", summary.get("avg_market_rent"))
+    _set_if_truthy("rr_avg_in_place_rent", summary.get("avg_in_place_rent"))
+    _set_if_truthy("rr_avg_sqft", summary.get("avg_sqft"))
+    _set_if_truthy("rr_loss_to_lease_pct", summary.get("loss_to_lease_pct"))
+    _set_if_truthy("average_inplace_rent", summary.get("avg_in_place_rent"))
+    _set_if_truthy("average_market_rent", summary.get("avg_market_rent"))
+
+    property_obj.financial_data_source = "rent_roll_excel"
+    property_obj.financial_data_updated_at = datetime.utcnow()
+
+    for field, incoming, existing in blocked:
+        logger.warning(
+            "rr_reupload: blocked null overwrite property_id=%s field=%s "
+            "incoming=%r existing=%r inserted=%s document_id=%s",
+            property_obj.id, field, incoming, existing, inserted, document_id,
+        )
+
+
 # ---------------------------------------------------------------------------
 # Background task helper for re-analysis
 # ---------------------------------------------------------------------------
@@ -1311,24 +1363,16 @@ async def upload_document_to_property(
                 if existing_rr_date and doc.document_date:
                     is_most_recent = doc.document_date >= existing_rr_date
 
-                # Update property summary fields if this is the most recent
+                # Update property summary fields if this is the most recent.
+                # Guarded writes: null-overwrite of total_units / rr_* on
+                # re-upload was the Sixty 11th production regression.
                 if is_most_recent and summary:
-                    property_obj.rr_total_units = summary.get("total_units")
-                    property_obj.rr_occupied_units = summary.get("occupied_units")
-                    property_obj.rr_vacancy_count = summary.get("vacant_units")
-                    property_obj.rr_physical_occupancy_pct = summary.get("physical_occupancy_pct")
-                    property_obj.rr_avg_market_rent = summary.get("avg_market_rent")
-                    property_obj.rr_avg_in_place_rent = summary.get("avg_in_place_rent")
-                    property_obj.rr_avg_sqft = summary.get("avg_sqft")
-                    property_obj.rr_loss_to_lease_pct = summary.get("loss_to_lease_pct")
-                    property_obj.rr_as_of_date = doc.document_date
-
-                    # Also override these existing property fields (Excel > OM)
-                    property_obj.total_units = summary.get("total_units")
-                    property_obj.average_inplace_rent = summary.get("avg_in_place_rent")
-                    property_obj.average_market_rent = summary.get("avg_market_rent")
-                    property_obj.financial_data_source = "rent_roll_excel"
-                    property_obj.financial_data_updated_at = datetime.utcnow()
+                    inserted = len(extraction.get("units", []))
+                    _apply_rent_roll_summary_to_property(
+                        property_obj, summary, inserted, document_id=doc.id,
+                    )
+                    if doc.document_date:
+                        property_obj.rr_as_of_date = doc.document_date
 
                 extraction_summary = f"Extracted {len(extraction.get('units', []))} units. " + \
                                     f"Occupancy: {summary.get('physical_occupancy_pct')}%"
