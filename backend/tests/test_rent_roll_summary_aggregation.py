@@ -306,3 +306,110 @@ def test_recompute_endpoint_before_after_diff_shape():
     for field in _RECOMPUTE_FIELDS:
         assert field in result["before"]
         assert field in result["after"]
+
+
+# ---------------------------------------------------------------------------
+# _build_rent_roll_summary — Sixty 11th surgical follow-up
+# ---------------------------------------------------------------------------
+
+
+def test_build_summary_prefers_realpage_when_present():
+    """When the RealPage Summary Groups block was parsed, the legacy
+    handler's summary uses it as authoritative — total_units, occupied,
+    vacant, occupancy%, avg market rent and avg sqft all come from the
+    block even if row-level would differ."""
+    from app.api.routes.properties import _build_rent_roll_summary
+
+    # Row-level simulates the 320 real units landing in rent_roll_units
+    # after the normalizer filtered the banner and future pre-leases.
+    row_summary = compute_aggregates_from_rows([
+        {"is_occupied": True, "sqft": 900, "market_rent": 2500.0, "in_place_rent": 2400.0}
+        for _ in range(306)
+    ] + [
+        {"is_occupied": False, "sqft": 900, "market_rent": 2500.0, "in_place_rent": None}
+        for _ in range(14)
+    ])
+
+    rp = {
+        "total_units": 320,
+        "occupied_units": 306,
+        "vacant_units": 12,
+        "non_rev_units": 2,
+        "physical_occupancy_pct": 95.62,
+        "total_sqft": 303721,
+        "total_market_rent": 863176.0,
+        "total_lease_charges": 819968.50,
+    }
+
+    summary = _build_rent_roll_summary(row_summary, rp)
+
+    assert summary["total_units"] == 320
+    assert summary["occupied_units"] == 306
+    assert summary["vacant_units"] == 12
+    assert summary["physical_occupancy_pct"] == pytest.approx(95.62, abs=0.01)
+    # 863_176 / 320 = 2697.425 → 2697.43
+    assert summary["avg_market_rent"] == pytest.approx(2697.43, abs=0.01)
+    # 303_721 / 320 = 949.128 → 949.1
+    assert summary["avg_sqft"] == pytest.approx(949.1, abs=0.05)
+    # in-place rent is never from the summary block — row-level wins.
+    assert summary["avg_in_place_rent"] == pytest.approx(2400.0, rel=1e-3)
+    # loss-to-lease derived from avg_market_rent and avg_in_place_rent.
+    assert summary["loss_to_lease_pct"] == pytest.approx(
+        100.0 * (2697.43 - 2400.0) / 2697.43, abs=0.05
+    )
+
+
+def test_build_summary_falls_back_to_row_level_when_summary_absent():
+    """No RealPage summary → the helper returns row-level aggregates
+    unchanged. Covers rent rolls without a Summary Groups block
+    (Yardi, Entrata, sanitized samples)."""
+    from app.api.routes.properties import _build_rent_roll_summary
+
+    row_summary = compute_aggregates_from_rows([
+        {"is_occupied": True, "sqft": 950, "market_rent": 2100.0, "in_place_rent": 2000.0}
+        for _ in range(10)
+    ])
+
+    summary = _build_rent_roll_summary(row_summary, None)
+    assert summary is row_summary
+
+    # Also falls back when the dict is present but total_units is zero/None.
+    summary2 = _build_rent_roll_summary(row_summary, {"total_units": 0})
+    assert summary2 is row_summary
+
+    summary3 = _build_rent_roll_summary(row_summary, {"total_units": None})
+    assert summary3 is row_summary
+
+
+def test_build_summary_logs_warning_on_row_pms_disagreement(caplog):
+    """If row-level and PMS disagree by >1%, a warning is emitted so we
+    can spot drift in production."""
+    from app.api.routes.properties import _build_rent_roll_summary
+
+    # Row-level says 332 (banner + pre-leases leaked), PMS says 320.
+    row_summary = compute_aggregates_from_rows([
+        {"is_occupied": True, "sqft": 900, "market_rent": 2500.0, "in_place_rent": 2400.0}
+        for _ in range(332)
+    ])
+    rp = {
+        "total_units": 320,
+        "occupied_units": 306,
+        "vacant_units": 12,
+        "physical_occupancy_pct": 95.62,
+        "total_sqft": 303721,
+        "total_market_rent": 863176.0,
+    }
+
+    with caplog.at_level(logging.WARNING, logger="app.api.routes.properties"):
+        summary = _build_rent_roll_summary(
+            row_summary, rp, property_id=10, document_id=32,
+        )
+
+    assert summary["total_units"] == 320
+    warn_msgs = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
+    assert any(
+        "Rent roll aggregate mismatch" in m
+        and "property_id=10" in m
+        and "document_id=32" in m
+        for m in warn_msgs
+    )

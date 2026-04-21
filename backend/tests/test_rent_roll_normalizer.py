@@ -686,3 +686,125 @@ def test_realpage_summary_groups_parser():
     assert summary["future_leases"] == 10
     assert summary["total_sqft"] == 303721
     assert abs(summary["physical_occupancy_pct"] - 95.62) < 0.01
+
+
+# ─── Sixty 11th surgical follow-up regressions ───────────────────────────────
+
+
+def test_future_residents_banner_not_ingested_as_unit():
+    """Regression for Sixty 11th: banner row with unit_number literal
+    'Future Residents/Applicants' must never appear in result.units.
+    """
+    units = [
+        {"unit_number": "101", "unit_type": "A1", "sqft": 800,
+         "resident_name": "Jane Doe", "status": "Occupied",
+         "market_rent": 1200, "in_place_rent": 1150},
+        {"unit_number": "Future Residents/Applicants",
+         "unit_type": None, "sqft": None, "resident_name": None,
+         "status": None, "market_rent": None, "in_place_rent": 0,
+         "charge_details": {}},
+    ]
+    result = normalize_units(units, {"unit_number": "Unit"})
+    unit_numbers = [u["unit_number"] for u in result.units]
+    assert "Future Residents/Applicants" not in unit_numbers
+
+
+def test_future_residents_sixty_11th_ten_preleases_routed_to_future_leases():
+    """Regression for Sixty 11th: the 10 pre-lease rows under the Future
+    Residents banner (unit numbers 0614, 0711, 0907, 1010, 1113, 1213,
+    1417, 1618, 1721, 1818) must land in result.future_leases, NOT
+    result.units.
+    """
+    future_unit_numbers = [
+        "0614", "0711", "0907", "1010", "1113",
+        "1213", "1417", "1618", "1721", "1818",
+    ]
+    # 2 current units, then banner, then 10 future pre-leases.
+    units = [
+        {"unit_number": "101", "unit_type": "A1", "sqft": 800,
+         "resident_name": "Tenant One", "status": "Current",
+         "market_rent": 2500, "in_place_rent": 2400},
+        {"unit_number": "102", "unit_type": "A1", "sqft": 800,
+         "resident_name": "Tenant Two", "status": "Current",
+         "market_rent": 2500, "in_place_rent": 2400},
+        {"unit_number": "Future Residents/Applicants",
+         "unit_type": None, "sqft": None, "resident_name": None,
+         "status": None, "market_rent": None, "in_place_rent": 0,
+         "charge_details": {}},
+    ]
+    for un in future_unit_numbers:
+        units.append({
+            "unit_number": un, "unit_type": "A1", "sqft": 900,
+            "resident_name": f"Incoming {un}", "status": None,
+            "market_rent": 2700, "in_place_rent": 0,
+            "lease_start": datetime(2026, 6, 1),
+            "lease_end": datetime(2027, 6, 1),
+        })
+
+    result = normalize_units(units, {"unit_number": "Unit"})
+
+    assert len(result.units) == 2
+    assert [u["unit_number"] for u in result.units] == ["101", "102"]
+    assert len(result.future_leases) == 10
+    captured = [fl.unit_number for fl in result.future_leases]
+    assert captured == future_unit_numbers
+
+
+def test_summary_groups_multi_row_header_parsed():
+    """Regression for Sixty 11th Bug 2: RealPage wraps '# Of Units'
+    across two rows — 'Summary Groups' row has '# Of' at column K and
+    the next row has 'Units' at column K. The parser must concatenate
+    them to match the label."""
+    from openpyxl import Workbook
+    from app.services.excel_extraction_service import _parse_realpage_summary_groups
+
+    wb = Workbook()
+    ws = wb.active
+    # Header row 1: 'Summary Groups' in col A, partial labels elsewhere.
+    ws.append([
+        "Summary Groups", None, None, None, None,
+        "Square", "Market", "Lease", "Security", "Other",
+        "# Of", "% Unit", "% Sqft", "Balance",
+    ])
+    # Header row 2: continuation labels at the same columns.
+    ws.append([
+        None, None, None, None, None,
+        "Footage", "Rent", "Charges", "Deposit", "Deposits",
+        "Units", "Occupancy", "Occupied", None,
+    ])
+    # Data rows (mirrors the Sixty 11th Summary Groups block).
+    ws.append([
+        "Current/Notice/Vacant Residents", None, None, None, None,
+        303721, 863176, 819968.50, None, None, 320, 95.62, 95.00, None,
+    ])
+    ws.append([
+        "Future Residents/Applicants", None, None, None, None,
+        9243, 26422, 0.00, None, None, 10, None, None, None,
+    ])
+    ws.append([
+        "Occupied Units", None, None, None, None,
+        288796, 821104, None, None, None, 306, 95.62, None, None,
+    ])
+    ws.append([
+        "Total Non Rev Units", None, None, None, None,
+        1921, 5662, None, None, None, 2, None, None, None,
+    ])
+    ws.append([
+        "Total Vacant Units", None, None, None, None,
+        13004, 36410, None, None, None, 12, None, None, None,
+    ])
+    ws.append([
+        "Totals:", None, None, None, None,
+        303721, 863176, 819968.50, None, None, 320, 100.00, 100.00, None,
+    ])
+
+    summary = _parse_realpage_summary_groups(ws)
+    assert summary is not None, "multi-row header should now parse"
+    assert summary["total_units"] == 320
+    assert summary["occupied_units"] == 306
+    assert summary["vacant_units"] == 12
+    assert summary["non_rev_units"] == 2
+    assert summary["future_leases"] == 10
+    assert summary["total_sqft"] == 303721
+    assert summary["total_market_rent"] == 863176
+    assert abs(summary["physical_occupancy_pct"] - 95.62) < 0.01
