@@ -689,8 +689,12 @@ def _map_rent_roll_columns(headers: Dict[int, str]) -> Dict[str, int]:
                 col_map["resident"] = col_idx
 
         # Move in date
-        if "move in" in header_lower:
+        if "move in" in header_lower or "move-in" in header_lower:
             col_map["move_in"] = col_idx
+
+        # Move out date — used to derive occupancy for exports without a Status column
+        if "move out" in header_lower or "move-out" in header_lower:
+            col_map["move_out"] = col_idx
 
         # Lease dates
         if "lease" in header_lower:
@@ -698,6 +702,9 @@ def _map_rent_roll_columns(headers: Dict[int, str]) -> Dict[str, int]:
                 col_map["lease_start"] = col_idx
             elif "end" in header_lower or "to" in header_lower or "expire" in header_lower:
                 col_map["lease_end"] = col_idx
+        # "Lease Expiration" without the word "lease end" — RealPage uses this header
+        if "expiration" in header_lower and "lease_end" not in col_map:
+            col_map["lease_end"] = col_idx
 
         # Rents
         if "market" in header_lower and "rent" in header_lower:
@@ -723,15 +730,23 @@ def _map_rent_roll_columns(headers: Dict[int, str]) -> Dict[str, int]:
 
 
 def _parse_unit_row(row, col_map: Dict[str, int]) -> Dict[str, Any]:
-    """Parse a single unit row"""
+    """Parse a single unit row.
+
+    `is_occupied` is left as `None` when the source has no Status column
+    and no Move Out date — the downstream normalizer then derives
+    occupancy from the date fields and resident_name.
+    """
+    status_val = _get_cell_value(row, col_map.get("status"))
+    move_out_val = _get_date_value(row, col_map.get("move_out"))
     unit = {
         "unit_number": _get_cell_value(row, col_map.get("unit", 1)),
         "unit_type": _get_cell_value(row, col_map.get("unit_type")),
         "sqft": _get_numeric_value(row, col_map.get("sqft")),
-        "status": _get_cell_value(row, col_map.get("status")),
-        "is_occupied": True,  # Will be determined below
+        "status": status_val,
+        "is_occupied": None,  # derived below or in the normalizer
         "resident_name": _get_cell_value(row, col_map.get("resident")),
         "move_in_date": _get_date_value(row, col_map.get("move_in")),
+        "move_out_date": move_out_val,
         "lease_start": _get_date_value(row, col_map.get("lease_start")),
         "lease_end": _get_date_value(row, col_map.get("lease_end")),
         "market_rent": _get_numeric_value(row, col_map.get("market_rent")),
@@ -739,10 +754,14 @@ def _parse_unit_row(row, col_map: Dict[str, int]) -> Dict[str, Any]:
         "charge_details": {}
     }
 
-    # Determine occupancy from status
-    status_lower = str(unit["status"]).lower() if unit["status"] else ""
-    if any(kw in status_lower for kw in ["vacant", "unrented", "model", "employee"]):
-        unit["is_occupied"] = False
+    status_lower = str(status_val).lower() if status_val else ""
+    if status_lower:
+        if any(kw in status_lower for kw in ["vacant", "unrented", "model", "employee", "down", "admin"]):
+            unit["is_occupied"] = False
+        elif any(kw in status_lower for kw in ["occupied", "current", "notice"]):
+            unit["is_occupied"] = True
+    # Leave is_occupied=None if status is missing or unmatched — the
+    # normalizer will derive from move_out_date / lease_end / resident_name.
 
     return unit
 
