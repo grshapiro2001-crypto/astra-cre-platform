@@ -485,12 +485,53 @@ def _process_rent_roll(
 
     ingestion.units_ingested = inserted
 
-    # Recompute property summary from what actually landed in the DB, so
-    # downstream analytics reflect reality rather than the raw extractor count.
-    property_obj.rr_total_units = inserted
-    property_obj.rr_occupied_units = occupied
-    property_obj.rr_vacancy_count = vacant
-    if inserted:
+    # Cross-check against RealPage "Summary Groups" block when the PMS
+    # provided one. That block is authoritative (same numbers the UI shows
+    # in the PMS), so prefer it for the property aggregates and log a
+    # warning when row-level counts disagree by >1%.
+    rp_summary = extraction.get("realpage_summary") or {}
+    rp_total = rp_summary.get("total_units")
+    rp_occupied = rp_summary.get("occupied_units")
+    rp_vacant = rp_summary.get("vacant_units")
+    rp_occupancy_pct = rp_summary.get("physical_occupancy_pct")
+
+    def _disagrees(row_val: float, pms_val: Optional[float], tol_pct: float = 1.0) -> bool:
+        if pms_val is None or pms_val == 0:
+            return False
+        return abs(row_val - pms_val) / pms_val * 100.0 > tol_pct
+
+    use_pms_aggregates = (
+        rp_total is not None
+        and rp_total > 0
+        and (
+            _disagrees(inserted, rp_total)
+            or _disagrees(occupied, rp_occupied)
+            or _disagrees(vacant, rp_vacant)
+        )
+    )
+    if use_pms_aggregates:
+        logger.warning(
+            "Rent roll aggregate mismatch: row-level (inserted=%s, occupied=%s, vacant=%s) "
+            "vs PMS Summary Groups (total=%s, occupied=%s, vacant=%s). Using PMS values.",
+            inserted, occupied, vacant, rp_total, rp_occupied, rp_vacant,
+        )
+        ingestion.warnings.append(
+            f"Row-level aggregates (inserted={inserted}, occupied={occupied}, vacant={vacant}) "
+            f"diverged from RealPage Summary Groups (total={rp_total}, occupied={rp_occupied}, "
+            f"vacant={rp_vacant}) by >1%. Using PMS values for property aggregates."
+        )
+
+    property_obj.rr_total_units = rp_total if use_pms_aggregates else inserted
+    property_obj.rr_occupied_units = rp_occupied if use_pms_aggregates else occupied
+    property_obj.rr_vacancy_count = rp_vacant if use_pms_aggregates else vacant
+
+    if use_pms_aggregates and rp_occupancy_pct is not None:
+        property_obj.rr_physical_occupancy_pct = round(float(rp_occupancy_pct), 2)
+    elif use_pms_aggregates and rp_total:
+        property_obj.rr_physical_occupancy_pct = round(
+            100.0 * (rp_occupied or 0) / rp_total, 2
+        )
+    elif inserted:
         property_obj.rr_physical_occupancy_pct = round(
             100.0 * occupied / inserted, 2
         ) if (occupied + vacant) else None

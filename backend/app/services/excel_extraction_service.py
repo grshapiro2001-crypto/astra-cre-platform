@@ -362,13 +362,19 @@ def extract_rent_roll(filepath: str) -> Dict[str, Any]:
         # Step 5: Calculate summary
         summary = _calculate_rent_roll_summary(units)
 
+        # Step 6: Parse RealPage "Summary Groups" block if present —
+        # authoritative aggregates straight from the PMS, used by the
+        # upload handler to cross-check the row-level counts.
+        realpage_summary = _parse_realpage_summary_groups(ws)
+
         wb.close()
 
         return {
             "document_date": document_date.isoformat() if document_date else None,
             "property_name": property_name,
             "units": units,
-            "summary": summary
+            "summary": summary,
+            "realpage_summary": realpage_summary,
         }
 
     except Exception as e:
@@ -819,6 +825,143 @@ def _get_date_value(row, col_idx: Optional[int]) -> Optional[datetime]:
             continue
 
     return None
+
+
+_SUMMARY_LABEL_KEYS = {
+    "current/notice/vacant residents": "current_notice_vacant",
+    "future residents/applicants": "future_applicants",
+    "occupied units": "occupied",
+    "total non rev units": "non_rev",
+    "non rev units": "non_rev",
+    "total vacant units": "vacant",
+    "totals:": "totals",
+    "grand total": "totals",
+}
+
+
+def _parse_realpage_summary_groups(ws: Worksheet) -> Optional[Dict[str, Any]]:
+    """Locate and parse the RealPage 'Summary Groups' block.
+
+    The block sits near the foot of the sheet and carries the authoritative
+    aggregates straight from RealPage: total units, occupied, vacant,
+    non-rev, future applicants, total sqft / market rent / lease charges,
+    and physical occupancy %. Returns None when the block is absent.
+    """
+    header_row_idx: Optional[int] = None
+    for row_idx in range(1, ws.max_row + 1):
+        for cell in ws[row_idx]:
+            if isinstance(cell.value, str) and "summary groups" in cell.value.strip().lower():
+                header_row_idx = row_idx
+                break
+        if header_row_idx is not None:
+            break
+
+    if header_row_idx is None:
+        return None
+
+    # Map header labels on the Summary Groups row to column indices.
+    col_idx: Dict[str, int] = {}
+    for cell in ws[header_row_idx]:
+        if not isinstance(cell.value, str):
+            continue
+        label = cell.value.strip().lower()
+        if "square footage" in label or label in ("sqft", "sq ft"):
+            col_idx["sqft"] = cell.column
+        elif "market rent" in label:
+            col_idx["market_rent"] = cell.column
+        elif "lease charges" in label or "actual rent" in label:
+            col_idx["lease_charges"] = cell.column
+        elif "# units" in label or label in ("units", "# of units", "unit count"):
+            col_idx["units"] = cell.column
+        elif "% occupied" in label or "occupancy" in label or "% occ" in label:
+            col_idx["occupancy_pct"] = cell.column
+
+    if "units" not in col_idx:
+        logger.warning(
+            "RealPage Summary Groups at row %d found, but could not map '# Units' column; skipping",
+            header_row_idx,
+        )
+        return None
+
+    rows_by_key: Dict[str, Dict[str, Any]] = {}
+    for row_idx in range(header_row_idx + 1, min(header_row_idx + 30, ws.max_row + 1)):
+        row = ws[row_idx]
+
+        label = None
+        for cell in row:
+            if isinstance(cell.value, str) and cell.value.strip():
+                label = cell.value.strip().lower()
+                break
+        if not label:
+            continue
+
+        # Stop at the charge-code block.
+        if "summary of charges" in label or "charge code" in label:
+            break
+
+        key = None
+        for pat, mapped in _SUMMARY_LABEL_KEYS.items():
+            if pat in label:
+                key = mapped
+                break
+        if key is None:
+            continue
+
+        def _num(col: Optional[int]) -> Optional[float]:
+            if col is None:
+                return None
+            cell = row[col - 1] if col - 1 < len(row) else None
+            v = cell.value if cell is not None else None
+            if isinstance(v, (int, float)) and not isinstance(v, bool):
+                return float(v)
+            if isinstance(v, str):
+                s = v.strip().replace(",", "").replace("$", "").replace("%", "")
+                try:
+                    return float(s)
+                except ValueError:
+                    return None
+            return None
+
+        rows_by_key[key] = {
+            "sqft": _num(col_idx.get("sqft")),
+            "market_rent": _num(col_idx.get("market_rent")),
+            "lease_charges": _num(col_idx.get("lease_charges")),
+            "units": _num(col_idx.get("units")),
+            "occupancy_pct": _num(col_idx.get("occupancy_pct")),
+        }
+
+    if not rows_by_key:
+        return None
+
+    totals = rows_by_key.get("totals") or rows_by_key.get("current_notice_vacant")
+    occupied = rows_by_key.get("occupied", {}) or {}
+    vacant = rows_by_key.get("vacant", {}) or {}
+    non_rev = rows_by_key.get("non_rev", {}) or {}
+    future = rows_by_key.get("future_applicants", {}) or {}
+
+    def _as_int(v: Any) -> Optional[int]:
+        if v is None:
+            return None
+        try:
+            return int(round(float(v)))
+        except (TypeError, ValueError):
+            return None
+
+    return {
+        "source_row": header_row_idx,
+        "total_units": _as_int((totals or {}).get("units")),
+        "occupied_units": _as_int(occupied.get("units")),
+        "vacant_units": _as_int(vacant.get("units")),
+        "non_rev_units": _as_int(non_rev.get("units")),
+        "future_leases": _as_int(future.get("units")),
+        "total_sqft": _as_int((totals or {}).get("sqft")),
+        "total_market_rent": (totals or {}).get("market_rent"),
+        "total_lease_charges": (totals or {}).get("lease_charges"),
+        "physical_occupancy_pct": (
+            occupied.get("occupancy_pct")
+            or (rows_by_key.get("current_notice_vacant", {}) or {}).get("occupancy_pct")
+        ),
+    }
 
 
 def _calculate_rent_roll_summary(units: List[Dict[str, Any]]) -> Dict[str, Any]:
