@@ -21,7 +21,7 @@ from app.database import get_db, SessionLocal
 from app.models.user import User
 from app.models.property import Property, AnalysisLog, PropertyDocument, RentRollUnit, T12Financial
 from app.models.t12_line_items import T12LineItem
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, get_admin_user
 from app.api.routes.organizations import _get_user_org_id
 from pydantic import BaseModel
 from app.schemas.property import (
@@ -39,6 +39,7 @@ from app.schemas.property import (
 )
 from app.services import property_service
 from app.services import excel_extraction_service
+from app.services.rent_roll_aggregates import compute_aggregates_from_rows
 
 logger = logging.getLogger(__name__)
 
@@ -1355,8 +1356,34 @@ async def upload_document_to_property(
                     )
                     db.add(rr_unit)
 
+                # Flush pending RentRollUnit inserts so we can aggregate
+                # from the rows that actually landed (matches v2 handler
+                # semantics; guards against Sixty 11th regression where the
+                # extractor's _calculate_rent_roll_summary returned zeros
+                # while rows committed fine).
+                db.flush()
+                inserted_rows = (
+                    db.query(RentRollUnit)
+                    .filter(
+                        RentRollUnit.property_id == property_id,
+                        RentRollUnit.document_id == doc.id,
+                    )
+                    .all()
+                )
+                row_dicts = [
+                    {
+                        "is_occupied": r.is_occupied,
+                        "sqft": r.sqft,
+                        "market_rent": r.market_rent,
+                        "in_place_rent": r.in_place_rent,
+                        "status": r.status,
+                    }
+                    for r in inserted_rows
+                ]
+                summary = compute_aggregates_from_rows(row_dicts)
+                inserted = len(inserted_rows)
+
                 # Check if this is the most recent rent roll
-                summary = extraction.get("summary", {})
                 existing_rr_date = property_obj.rr_as_of_date
                 is_most_recent = True
 
@@ -1366,15 +1393,14 @@ async def upload_document_to_property(
                 # Update property summary fields if this is the most recent.
                 # Guarded writes: null-overwrite of total_units / rr_* on
                 # re-upload was the Sixty 11th production regression.
-                if is_most_recent and summary:
-                    inserted = len(extraction.get("units", []))
+                if is_most_recent and inserted > 0:
                     _apply_rent_roll_summary_to_property(
                         property_obj, summary, inserted, document_id=doc.id,
                     )
                     if doc.document_date:
                         property_obj.rr_as_of_date = doc.document_date
 
-                extraction_summary = f"Extracted {len(extraction.get('units', []))} units. " + \
+                extraction_summary = f"Extracted {inserted} units. " + \
                                     f"Occupancy: {summary.get('physical_occupancy_pct')}%"
 
             elif doc_category == "t12":
@@ -1780,6 +1806,78 @@ def backfill_rent(
         "units_updated": len(units),
         "units_with_in_place_rent": units_with_rent,
         "avg_in_place_rent": summary.get("avg_in_place_rent"),
+    }
+
+
+_RECOMPUTE_FIELDS = (
+    "total_units",
+    "rr_total_units",
+    "rr_occupied_units",
+    "rr_vacancy_count",
+    "rr_physical_occupancy_pct",
+    "rr_avg_market_rent",
+    "rr_avg_in_place_rent",
+    "rr_avg_sqft",
+    "rr_loss_to_lease_pct",
+    "average_inplace_rent",
+    "average_market_rent",
+)
+
+
+@router.post("/{property_id}/recompute-rent-roll-aggregates")
+def recompute_rent_roll_aggregates(
+    property_id: int,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_admin_user),
+):
+    """Admin: recompute Property rent-roll aggregates from the rent_roll_units
+    rows currently in the DB. Writes through _apply_rent_roll_summary_to_property
+    so the A1 null-overwrite guard applies. Returns a before/after diff.
+    """
+    property_obj = db.query(Property).filter(Property.id == property_id).first()
+    if not property_obj:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Property not found",
+        )
+
+    before = {f: getattr(property_obj, f) for f in _RECOMPUTE_FIELDS}
+
+    rows = (
+        db.query(RentRollUnit)
+        .filter(RentRollUnit.property_id == property_id)
+        .all()
+    )
+    row_dicts = [
+        {
+            "is_occupied": r.is_occupied,
+            "sqft": r.sqft,
+            "market_rent": r.market_rent,
+            "in_place_rent": r.in_place_rent,
+            "status": r.status,
+        }
+        for r in rows
+    ]
+    summary = compute_aggregates_from_rows(row_dicts)
+
+    _apply_rent_roll_summary_to_property(
+        property_obj, summary, inserted=len(row_dicts), document_id=None,
+    )
+    db.commit()
+    db.refresh(property_obj)
+
+    after = {f: getattr(property_obj, f) for f in _RECOMPUTE_FIELDS}
+
+    logger.info(
+        "recompute_rent_roll_aggregates: property_id=%s row_count=%s admin_id=%s",
+        property_id, len(row_dicts), admin.id,
+    )
+
+    return {
+        "property_id": property_id,
+        "row_count": len(row_dicts),
+        "before": before,
+        "after": after,
     }
 
 
