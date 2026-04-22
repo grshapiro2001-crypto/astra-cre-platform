@@ -485,31 +485,32 @@ def _process_rent_roll(
 
     ingestion.units_ingested = inserted
 
-    # Cross-check against RealPage "Summary Groups" block when the PMS
-    # provided one. That block is authoritative (same numbers the UI shows
-    # in the PMS), so prefer it for the property aggregates and log a
-    # warning when row-level counts disagree by >1%.
+    # Prefer the RealPage "Summary Groups" block as the authoritative
+    # source for totals / occupied / vacant / occupancy% and for
+    # market-rent & sqft averages whenever it's present — the numbers
+    # match what the PMS UI reports and survive cases where per-row
+    # parsing is unreliable. In-place rent is not carried in the block
+    # so it always comes from row-level data. Row-level disagreement
+    # still logs a warning so we can spot drift.
     rp_summary = extraction.get("realpage_summary") or {}
     rp_total = rp_summary.get("total_units")
     rp_occupied = rp_summary.get("occupied_units")
     rp_vacant = rp_summary.get("vacant_units")
     rp_occupancy_pct = rp_summary.get("physical_occupancy_pct")
+    rp_total_market = rp_summary.get("total_market_rent")
+    rp_total_sqft = rp_summary.get("total_sqft")
 
     def _disagrees(row_val: float, pms_val: Optional[float], tol_pct: float = 1.0) -> bool:
         if pms_val is None or pms_val == 0:
             return False
         return abs(row_val - pms_val) / pms_val * 100.0 > tol_pct
 
-    use_pms_aggregates = (
-        rp_total is not None
-        and rp_total > 0
-        and (
-            _disagrees(inserted, rp_total)
-            or _disagrees(occupied, rp_occupied)
-            or _disagrees(vacant, rp_vacant)
-        )
-    )
-    if use_pms_aggregates:
+    use_pms_aggregates = bool(rp_total and rp_total > 0)
+    if use_pms_aggregates and (
+        _disagrees(inserted, rp_total)
+        or _disagrees(occupied, rp_occupied)
+        or _disagrees(vacant, rp_vacant)
+    ):
         logger.warning(
             "Rent roll aggregate mismatch: row-level (inserted=%s, occupied=%s, vacant=%s) "
             "vs PMS Summary Groups (total=%s, occupied=%s, vacant=%s). Using PMS values.",
@@ -535,15 +536,23 @@ def _process_rent_roll(
         property_obj.rr_physical_occupancy_pct = round(
             100.0 * occupied / inserted, 2
         ) if (occupied + vacant) else None
-    property_obj.rr_avg_market_rent = (
-        round(market_sum / market_n, 2) if market_n else None
-    )
+
+    if use_pms_aggregates and rp_total_market and rp_total:
+        property_obj.rr_avg_market_rent = round(rp_total_market / rp_total, 2)
+    else:
+        property_obj.rr_avg_market_rent = (
+            round(market_sum / market_n, 2) if market_n else None
+        )
+    # in-place rent is not in the Summary Groups block; always row-level.
     property_obj.rr_avg_in_place_rent = (
         round(in_place_sum / in_place_n, 2) if in_place_n else None
     )
-    property_obj.rr_avg_sqft = (
-        round(sqft_sum / sqft_n, 1) if sqft_n else None
-    )
+    if use_pms_aggregates and rp_total_sqft and rp_total:
+        property_obj.rr_avg_sqft = round(rp_total_sqft / rp_total, 1)
+    else:
+        property_obj.rr_avg_sqft = (
+            round(sqft_sum / sqft_n, 1) if sqft_n else None
+        )
     if property_obj.rr_avg_market_rent and property_obj.rr_avg_in_place_rent:
         mkt = property_obj.rr_avg_market_rent
         ipr = property_obj.rr_avg_in_place_rent
@@ -553,7 +562,9 @@ def _process_rent_roll(
             )
     property_obj.rr_as_of_date = doc.document_date
 
-    property_obj.total_units = inserted or property_obj.total_units
+    property_obj.total_units = (
+        property_obj.rr_total_units or inserted or property_obj.total_units
+    )
     property_obj.average_inplace_rent = property_obj.rr_avg_in_place_rent
     property_obj.average_market_rent = property_obj.rr_avg_market_rent
     property_obj.financial_data_source = "rent_roll_excel"

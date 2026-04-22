@@ -39,12 +39,93 @@ from app.schemas.property import (
 )
 from app.services import property_service
 from app.services import excel_extraction_service
+from app.services.extraction import rent_roll_normalizer
 from app.services.rent_roll_aggregates import compute_aggregates_from_rows
+from app.schemas.rent_roll import FutureLeaseRecord
 
 logger = logging.getLogger(__name__)
 
 # LLM service is ONLY imported in reanalyze endpoint
 # This prevents accidental LLM calls in read-only operations
+
+
+def _build_rent_roll_summary(
+    row_summary: dict,
+    realpage_summary: Optional[dict],
+    property_id: Optional[int] = None,
+    document_id: Optional[int] = None,
+) -> dict:
+    """Build the rent-roll summary dict consumed by
+    `_apply_rent_roll_summary_to_property`, preferring the RealPage
+    "Summary Groups" block when present.
+
+    When `realpage_summary` carries a positive `total_units`, it's
+    authoritative for totals/occupied/vacant/occupancy% and for market
+    rent & sqft averages (derived as total_X / total_units). In-place
+    rent is never in the block, so it always comes from `row_summary`.
+    A >1% disagreement between row-level and PMS counts logs a warning.
+
+    When the summary block is absent, falls through to `row_summary`
+    unchanged.
+    """
+    rp = realpage_summary or {}
+    rp_total = rp.get("total_units") or 0
+    if rp_total <= 0:
+        return row_summary
+
+    def _disagree(row_v, pms_v, tol=1.0):
+        if not pms_v:
+            return False
+        return abs((row_v or 0) - pms_v) / pms_v * 100.0 > tol
+
+    if (
+        _disagree(row_summary["total_units"], rp_total)
+        or _disagree(row_summary["occupied_units"], rp.get("occupied_units"))
+        or _disagree(row_summary["vacant_units"], rp.get("vacant_units"))
+    ):
+        logger.warning(
+            "Rent roll aggregate mismatch (legacy path) property_id=%s "
+            "document_id=%s: row-level (total=%s, occupied=%s, vacant=%s) "
+            "vs PMS (total=%s, occupied=%s, vacant=%s)",
+            property_id, document_id,
+            row_summary["total_units"], row_summary["occupied_units"],
+            row_summary["vacant_units"],
+            rp_total, rp.get("occupied_units"), rp.get("vacant_units"),
+        )
+
+    rp_total_market = rp.get("total_market_rent")
+    rp_total_sqft = rp.get("total_sqft")
+    rp_occ_pct = rp.get("physical_occupancy_pct")
+
+    avg_market_rent = (
+        round(rp_total_market / rp_total, 2)
+        if rp_total_market else row_summary["avg_market_rent"]
+    )
+    avg_sqft = (
+        round(rp_total_sqft / rp_total, 1)
+        if rp_total_sqft else row_summary["avg_sqft"]
+    )
+    avg_in_place_rent = row_summary["avg_in_place_rent"]
+    loss_to_lease_pct = None
+    if avg_market_rent and avg_in_place_rent and avg_market_rent > 0:
+        loss_to_lease_pct = round(
+            100.0 * (avg_market_rent - avg_in_place_rent) / avg_market_rent, 2
+        )
+
+    return {
+        "total_units": rp_total,
+        "occupied_units": rp.get("occupied_units") or row_summary["occupied_units"],
+        "vacant_units": rp.get("vacant_units") or row_summary["vacant_units"],
+        "physical_occupancy_pct": (
+            round(float(rp_occ_pct), 2)
+            if rp_occ_pct is not None
+            else row_summary["physical_occupancy_pct"]
+        ),
+        "avg_market_rent": avg_market_rent,
+        "avg_in_place_rent": avg_in_place_rent,
+        "avg_sqft": avg_sqft,
+        "loss_to_lease_pct": loss_to_lease_pct,
+    }
 
 
 def _apply_rent_roll_summary_to_property(
@@ -1329,15 +1410,40 @@ async def upload_document_to_property(
                     RentRollUnit.property_id == property_id
                 ).delete()
 
-                # Save unit-level data
-                for unit in extraction.get("units", []):
-                    # Defensive: ensure in_place_rent derived from charge_details
-                    cd = unit.get("charge_details") or {}
-                    ipr = unit.get("in_place_rent") or 0
+                # Defensive: fill in_place_rent from charge_details on raw
+                # extractor output before normalization so the base-rent
+                # heuristic runs on the richest data.
+                raw_units = extraction.get("units", []) or []
+                for u in raw_units:
+                    cd = u.get("charge_details") or {}
+                    ipr = u.get("in_place_rent") or 0
                     if cd and not ipr:
                         base = excel_extraction_service.find_base_rent(cd)
-                        unit["in_place_rent"] = base if base > 0 else sum(cd.values())
+                        u["in_place_rent"] = base if base > 0 else sum(cd.values())
 
+                # Route through the shared normalizer so section banners
+                # (e.g. "Future Residents/Applicants") are filtered and
+                # future pre-leases are diverted to `future_leases` instead
+                # of being counted as physical units.
+                column_mapping = extraction.get("column_mapping") or {}
+                norm = rent_roll_normalizer.normalize_units(raw_units, column_mapping)
+
+                future_lease_records = [
+                    FutureLeaseRecord(
+                        unit_number=fl.unit_number,
+                        resident_name=fl.resident_name,
+                        market_rent=fl.market_rent,
+                        lease_start=fl.lease_start,
+                        lease_end=fl.lease_end,
+                        raw_row=dict(fl.raw_row),
+                    )
+                    for fl in norm.future_leases
+                ]
+                doc.future_leases = [
+                    fl.model_dump(mode="json") for fl in future_lease_records
+                ]
+
+                for unit in norm.units:
                     rr_unit = RentRollUnit(
                         property_id=property_id,
                         document_id=doc.id,
@@ -1352,7 +1458,7 @@ async def upload_document_to_property(
                         lease_end=unit.get("lease_end"),
                         market_rent=unit.get("market_rent"),
                         in_place_rent=unit.get("in_place_rent"),
-                        charge_details=unit.get("charge_details")
+                        charge_details=unit.get("charge_details"),
                     )
                     db.add(rr_unit)
 
@@ -1380,8 +1486,18 @@ async def upload_document_to_property(
                     }
                     for r in inserted_rows
                 ]
-                summary = compute_aggregates_from_rows(row_dicts)
+                row_summary = compute_aggregates_from_rows(row_dicts)
                 inserted = len(inserted_rows)
+
+                # Prefer the RealPage Summary Groups block when the
+                # extractor captured it — that's the authoritative PMS
+                # view. Falls back to row-level aggregation otherwise.
+                summary = _build_rent_roll_summary(
+                    row_summary,
+                    extraction.get("realpage_summary"),
+                    property_id=property_id,
+                    document_id=doc.id,
+                )
 
                 # Check if this is the most recent rent roll
                 existing_rr_date = property_obj.rr_as_of_date
