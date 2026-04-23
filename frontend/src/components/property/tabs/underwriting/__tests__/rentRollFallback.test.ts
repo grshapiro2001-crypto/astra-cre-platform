@@ -99,14 +99,12 @@ describe('rentRollFallbackMissingSqft', () => {
 });
 
 describe('seedInputsFromProperty — rent-roll-only fallback', () => {
-  let warnSpy: ReturnType<typeof vi.spyOn>;
-
   beforeEach(() => {
-    warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
   });
 
   afterEach(() => {
-    warnSpy.mockRestore();
+    vi.restoreAllMocks();
   });
 
   it('synthesizes one aggregate unit_mix row from rr_* when PropertyUnitMix is empty', () => {
@@ -134,7 +132,7 @@ describe('seedInputsFromProperty — rent-roll-only fallback', () => {
     });
     expect(inputs.total_units).toBe(332);
     expect(inputs.total_sf).toBe(332 * 850);
-    expect(warnSpy).not.toHaveBeenCalled();
+    expect(vi.mocked(console.warn)).not.toHaveBeenCalled();
   });
 
   it('still emits the row with sf=0 and logs a warning when rr_avg_sqft is null', () => {
@@ -157,8 +155,9 @@ describe('seedInputsFromProperty — rent-roll-only fallback', () => {
     expect(inputs.total_units).toBe(100);
     // total_sf cannot be derived without rr_avg_sqft — stays 0 (unreliable, banner warns).
     expect(inputs.total_sf).toBe(0);
-    expect(warnSpy).toHaveBeenCalledTimes(1);
-    expect(String(warnSpy.mock.calls[0][0])).toMatch(/rr_avg_sqft is null/);
+    const warnMock = vi.mocked(console.warn);
+    expect(warnMock).toHaveBeenCalledTimes(1);
+    expect(String(warnMock.mock.calls[0][0])).toMatch(/rr_avg_sqft is null/);
   });
 
   it('does not overwrite an existing OM-sourced unit_mix', () => {
