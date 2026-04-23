@@ -293,7 +293,7 @@ function uwReducer(state: UWState, action: UWAction): UWState {
 // Seed inputs from property data
 // ---------------------------------------------------------------------------
 
-function seedInputsFromProperty(property: PropertyDetail): UWInputs {
+export function seedInputsFromProperty(property: PropertyDetail): UWInputs {
   const defaults = createDefaultInputs();
   let units = property.total_units ?? 0;
   let sf = property.total_residential_sf ?? 0;
