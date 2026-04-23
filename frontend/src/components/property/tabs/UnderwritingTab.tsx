@@ -29,6 +29,7 @@ import { GLASS_CARD } from './tabUtils';
 
 import type { UWState, UWAction } from './underwriting/types';
 import { UnderwritingStageManager } from './underwriting/stage/UnderwritingStageManager';
+import { isRentRollFallbackActive } from './underwriting/rentRollFallback';
 
 // ---------------------------------------------------------------------------
 // Backfill V2 module slices that may be missing from server-persisted inputs
@@ -292,19 +293,50 @@ function uwReducer(state: UWState, action: UWAction): UWState {
 // Seed inputs from property data
 // ---------------------------------------------------------------------------
 
-function seedInputsFromProperty(property: PropertyDetail): UWInputs {
+export function seedInputsFromProperty(property: PropertyDetail): UWInputs {
   const defaults = createDefaultInputs();
-  const units = property.total_units ?? 0;
-  const sf = property.total_residential_sf ?? 0;
+  let units = property.total_units ?? 0;
+  let sf = property.total_residential_sf ?? 0;
 
   // Unit mix mapping
-  const unitMix = (property.unit_mix ?? []).map((um) => ({
+  let unitMix = (property.unit_mix ?? []).map((um) => ({
     floorplan: um.floorplan_name ?? '',
     units: um.num_units ?? 0,
     sf: um.unit_sf ?? 0,
     market_rent: um.proforma_rent ?? 0,
     inplace_rent: um.in_place_rent ?? 0,
   }));
+
+  // TODO: Remove this fallback when rent roll extraction writes to
+  // PropertyUnitMix directly with source='rent_roll' tag.
+  // See https://github.com/grshapiro2001-crypto/astra-cre-platform/issues/170
+  if (isRentRollFallbackActive(property)) {
+    const rrUnits = property.rr_total_units ?? 0;
+    const rrSqft = property.rr_avg_sqft;
+    const rrMarketRent = property.rr_avg_market_rent ?? 0;
+    const rrInPlaceRent = property.rr_avg_in_place_rent ?? 0;
+
+    if (rrSqft == null) {
+      console.warn(
+        `[underwriting] Rent roll fallback for property ${property.id}: ` +
+          `rr_avg_sqft is null, emitting unit_mix row with sf=0. ` +
+          `Price/SF and per-SF metrics will be unreliable until the rent roll is reparsed with SF data.`,
+      );
+    }
+
+    unitMix = [
+      {
+        floorplan: 'Rent Roll Aggregate',
+        units: rrUnits,
+        sf: rrSqft ?? 0,
+        market_rent: rrMarketRent,
+        inplace_rent: rrInPlaceRent,
+      },
+    ];
+
+    if (!units) units = rrUnits;
+    if (!sf && rrSqft != null) sf = rrUnits * rrSqft;
+  }
 
   // T12 financials for expense seeding
   const t12 = property.t12_financials;

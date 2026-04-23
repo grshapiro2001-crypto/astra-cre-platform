@@ -18,6 +18,10 @@ import type { UWInputs } from '@/types/underwriting';
 import { RenovationSection } from './v2/RenovationSection';
 import { RetailSection } from './v2/RetailSection';
 import { TaxAbatementSection } from './v2/TaxAbatementSection';
+import {
+  isRentRollFallbackActive,
+  rentRollFallbackMissingSqft,
+} from './rentRollFallback';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -599,13 +603,40 @@ function LoanAssumptionSection({ inputs, dispatch }: Pick<UWSubPageProps, 'input
 // UWAssumptionsPage
 // ---------------------------------------------------------------------------
 
-export function UWAssumptionsPage({ inputs, outputs, dispatch, isComputing }: UWSubPageProps) {
+export function UWAssumptionsPage({ inputs, outputs, dispatch, isComputing, property }: UWSubPageProps) {
+  const fallbackActive = isRentRollFallbackActive(property);
+  const fallbackMissingSqft = rentRollFallbackMissingSqft(property);
+
   return (
     <div className="space-y-6">
       {isComputing && (
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
           Computing...
+        </div>
+      )}
+
+      {fallbackActive && (
+        <div
+          className="rounded-md border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-xs text-amber-200"
+          role="status"
+        >
+          <div className="font-medium text-amber-100">Unit mix seeded from rent roll aggregates</div>
+          <div className="mt-1">
+            This property has no OM/BOV-extracted unit mix, so the Assumptions unit mix was
+            synthesized from rent roll aggregates (rr_total_units, rr_avg_market_rent,
+            rr_avg_in_place_rent, rr_avg_sqft). Revenue math is usable, but floorplan-level
+            detail is not.
+            {fallbackMissingSqft && (
+              <>
+                {' '}
+                <span className="font-medium text-amber-100">
+                  Rent roll imported without square footage — using market comp fallback; price/SF
+                  metrics will be unreliable until the rent roll is reparsed with SF data.
+                </span>
+              </>
+            )}
+          </div>
         </div>
       )}
 
