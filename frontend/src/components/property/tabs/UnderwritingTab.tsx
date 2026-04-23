@@ -29,6 +29,7 @@ import { GLASS_CARD } from './tabUtils';
 
 import type { UWState, UWAction } from './underwriting/types';
 import { UnderwritingStageManager } from './underwriting/stage/UnderwritingStageManager';
+import { isRentRollFallbackActive } from './underwriting/rentRollFallback';
 
 // ---------------------------------------------------------------------------
 // Backfill V2 module slices that may be missing from server-persisted inputs
@@ -292,12 +293,6 @@ function uwReducer(state: UWState, action: UWAction): UWState {
 // Seed inputs from property data
 // ---------------------------------------------------------------------------
 
-export function isRentRollFallbackActive(property: PropertyDetail): boolean {
-  const hasUnitMix = (property.unit_mix?.length ?? 0) > 0;
-  const hasRentRoll = (property.rr_total_units ?? 0) > 0;
-  return !hasUnitMix && hasRentRoll;
-}
-
 function seedInputsFromProperty(property: PropertyDetail): UWInputs {
   const defaults = createDefaultInputs();
   let units = property.total_units ?? 0;
@@ -315,7 +310,7 @@ function seedInputsFromProperty(property: PropertyDetail): UWInputs {
   // TODO: Remove this fallback when rent roll extraction writes to
   // PropertyUnitMix directly with source='rent_roll' tag.
   // See https://github.com/grshapiro2001-crypto/astra-cre-platform/issues/170
-  if (unitMix.length === 0 && (property.rr_total_units ?? 0) > 0) {
+  if (isRentRollFallbackActive(property)) {
     const rrUnits = property.rr_total_units ?? 0;
     const rrSqft = property.rr_avg_sqft;
     const rrMarketRent = property.rr_avg_market_rent ?? 0;

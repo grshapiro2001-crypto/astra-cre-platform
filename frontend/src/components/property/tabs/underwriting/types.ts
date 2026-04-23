@@ -3,6 +3,7 @@
  */
 
 import type { UWInputs, UWOutputs } from '@/types/underwriting';
+import type { PropertyDetail } from '@/types/property';
 import type {
   RenovationInput,
   RetailInput,
@@ -72,4 +73,5 @@ export interface UWSubPageProps {
   outputs: UWOutputs | null;
   dispatch: React.Dispatch<UWAction>;
   isComputing: boolean;
+  property?: PropertyDetail;
 }

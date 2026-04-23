@@ -190,7 +190,7 @@ function ActivePage({
     case 'summary':
       return <UWSummaryPage {...shared} />;
     case 'assumptions':
-      return <UWAssumptionsPage {...shared} />;
+      return <UWAssumptionsPage {...shared} property={property} />;
     case 'proforma':
       return <UWProformaPage {...shared} />;
     case 'cashflows':
