@@ -264,7 +264,12 @@ def _run_reanalyze_background(property_id: int, user_id: str) -> None:
                 )
                 del periods['t12']
 
-        update_property_from_extraction(property_obj, extraction_result, db=db)
+        update_property_from_extraction(
+            property_obj,
+            extraction_result,
+            db=db,
+            document_type=extraction_result.get('document_type'),
+        )
         property_obj.analysis_count = (property_obj.analysis_count or 0) + 1
         property_obj.last_analyzed_at = datetime.now(timezone.utc)
         property_obj.analysis_status = "completed"
@@ -1099,8 +1104,24 @@ def build_property_detail_response(property_obj: Property, db: Session) -> Prope
     )
 
 
-def update_property_from_extraction(property_obj: Property, extraction_result: dict, db: Session = None):
-    """Update property with new extraction data"""
+def _has_t12_excel_priority(property_obj) -> bool:
+    """True if this property already has authoritative T12 Excel data that
+    must not be downgraded to OM/BOV-derived provenance."""
+    return getattr(property_obj, "financial_data_source", None) == "t12_excel"
+
+
+def update_property_from_extraction(
+    property_obj: Property,
+    extraction_result: dict,
+    db: Session = None,
+    document_type: Optional[str] = None,
+):
+    """Update property with new extraction data.
+
+    document_type: one of "OM", "BOV", "T12", "RR", or None. Used to tag
+    `financial_data_source` for provenance and to gate the OM/BOV trailing-
+    financial guard. See docs/audits/extraction-methodology-audit.md.
+    """
     import json
     from app.models.property import PropertyUnitMix, PropertyRentComp, PropertySalesComp
 
@@ -1135,66 +1156,24 @@ def update_property_from_extraction(property_obj: Property, extraction_result: d
     if "financials_by_period" in extraction_result:
         periods = extraction_result["financials_by_period"]
 
-        # Helper: check if a period dict has any real numeric data (not just period_label)
-        def _has_numeric_data(period_dict: dict) -> bool:
-            return any(
-                isinstance(v, (int, float))
-                for k, v in period_dict.items()
-                if k not in ("period_label", "opex_components")
+        # Defense-in-depth: if this property already has authoritative T12 Excel
+        # data, log the no-op and continue. OM/BOV extraction owns Y1 only post
+        # Sprint 1 — t12/t3 write branches were deleted from this function.
+        # Future writers MUST check this flag before reintroducing any t12_* /
+        # t3_* writes from non-Excel sources.
+        if _has_t12_excel_priority(property_obj):
+            logger.info(
+                "Property %s has authoritative T12 Excel data; %s extraction "
+                "will skip any t12_* / t3_* writes (none expected post Sprint 1).",
+                property_obj.id,
+                document_type or "OM/BOV",
             )
 
-        if periods.get("t12"):
-            t12 = periods["t12"]
-            if not _has_numeric_data(t12):
-                logger.warning(
-                    "Discarding empty-shell T12 for property %s — all numeric fields are null",
-                    property_obj.id,
-                )
-            else:
-                property_obj.t12_financials_json = json.dumps(t12)
-                property_obj.t12_noi = t12.get("noi")
-                # Granular T12 fields
-                property_obj.t12_loss_to_lease = t12.get("loss_to_lease")
-                property_obj.t12_vacancy_rate_pct = t12.get("vacancy_rate_pct")
-                property_obj.t12_concessions = t12.get("concessions")
-                property_obj.t12_credit_loss = t12.get("credit_loss")
-                property_obj.t12_net_rental_income = t12.get("net_rental_income")
-                property_obj.t12_utility_reimbursements = t12.get("utility_reimbursements")
-                property_obj.t12_parking_storage_income = t12.get("parking_storage_income")
-                property_obj.t12_other_income = t12.get("other_income")
-                property_obj.t12_management_fee_pct = t12.get("management_fee_pct")
-                property_obj.t12_real_estate_taxes = t12.get("real_estate_taxes")
-                property_obj.t12_insurance = t12.get("insurance_amount")
-                property_obj.t12_replacement_reserves = t12.get("replacement_reserves")
-                property_obj.t12_net_cash_flow = t12.get("net_cash_flow")
-                property_obj.t12_expense_ratio_pct = t12.get("expense_ratio_pct")
-
-        if periods.get("t3"):
-            t3 = periods["t3"]
-            if not _has_numeric_data(t3):
-                logger.warning(
-                    "Discarding empty-shell T3 for property %s — all numeric fields are null",
-                    property_obj.id,
-                )
-            else:
-                property_obj.t3_financials_json = json.dumps(t3)
-                property_obj.t3_noi = t3.get("noi")
-                # Granular T3 fields
-                property_obj.t3_loss_to_lease = t3.get("loss_to_lease")
-                property_obj.t3_vacancy_rate_pct = t3.get("vacancy_rate_pct")
-                property_obj.t3_concessions = t3.get("concessions")
-                property_obj.t3_credit_loss = t3.get("credit_loss")
-                property_obj.t3_net_rental_income = t3.get("net_rental_income")
-                property_obj.t3_utility_reimbursements = t3.get("utility_reimbursements")
-                property_obj.t3_parking_storage_income = t3.get("parking_storage_income")
-                property_obj.t3_other_income = t3.get("other_income")
-                property_obj.t3_management_fee_pct = t3.get("management_fee_pct")
-                property_obj.t3_real_estate_taxes = t3.get("real_estate_taxes")
-                property_obj.t3_insurance = t3.get("insurance_amount")
-                property_obj.t3_replacement_reserves = t3.get("replacement_reserves")
-                property_obj.t3_net_cash_flow = t3.get("net_cash_flow")
-                property_obj.t3_expense_ratio_pct = t3.get("expense_ratio_pct")
-
+        # OM/BOV extraction owns Y1 proforma only. T12 and T3 are extracted
+        # from T12 Excel uploads (see upload.py:_process_t12 and
+        # properties.py T12 Excel write site). If you find yourself adding a
+        # t12 or t3 branch here, see docs/audits/extraction-methodology-audit.md
+        # before doing so.
         if periods.get("y1"):
             property_obj.y1_financials_json = json.dumps(periods["y1"])
             property_obj.y1_noi = periods["y1"].get("noi")
@@ -1213,6 +1192,14 @@ def update_property_from_extraction(property_obj: Property, extraction_result: d
             property_obj.y1_replacement_reserves = periods["y1"].get("replacement_reserves")
             property_obj.y1_net_cash_flow = periods["y1"].get("net_cash_flow")
             property_obj.y1_expense_ratio_pct = periods["y1"].get("expense_ratio_pct")
+
+    # Provenance: tag this property's financial state as OM/BOV-derived. Lets
+    # downstream guards distinguish OM/BOV re-extraction from authoritative
+    # T12 Excel uploads. Skip when the property already has T12 Excel data so
+    # we don't downgrade `t12_excel` -> `om`/`bov`.
+    if document_type in ("OM", "BOV") and not _has_t12_excel_priority(property_obj):
+        property_obj.financial_data_source = document_type.lower()
+        property_obj.financial_data_updated_at = datetime.utcnow()
 
     # Geocode updated address
     if property_obj.property_address:
