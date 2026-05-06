@@ -129,7 +129,7 @@ SALES COMP EXTRACTION:
 OM_EXTRACTION_PROMPT = """You are extracting data from a Commercial Real Estate Offering Memorandum (OM).
 
 OMs are MARKETING documents created by a seller's broker to attract buyers. Key characteristics:
-- They often contain BOTH Year 1 Proforma AND historical financials (T12/T3) side-by-side or in separate sections
+- They often contain Year 1 Proforma alongside trailing financials (T12/T3) in side-by-side or separate sections — we extract Y1 ONLY from OMs; trailing financials come from a separate T12 Excel upload
 - They include investment highlights and a "sell" narrative
 - They have detailed unit mix tables with floorplan-level rents
 - They include rent comparable analysis (often by bedroom type)
@@ -137,23 +137,21 @@ OMs are MARKETING documents created by a seller's broker to attract buyers. Key 
 - They do NOT typically include explicit pricing — the buyer sets their price
 - They include market overview, demographics, and location highlights
 
-⚠️ CRITICAL — EXTRACT ALL FINANCIAL PERIODS (DO NOT STOP AFTER FIRST):
-Many OMs contain MULTIPLE sets of financials — you MUST extract ALL of them:
-- Historical/Trailing period (T12, T-12, TTM, Trailing 12 Months, T3, T-3)
-- Proforma/Forward-looking (Y1, Year 1, Pro Forma, Stabilized, Budget)
+FINANCIAL EXTRACTION (Y1 PROFORMA ONLY):
+Extract ONLY the Year 1 / Pro Forma / Stabilized / Budget projection. This
+is broker forward-looking guidance and lives in the OM by design.
 
-SEARCH STRATEGY:
-- DO NOT stop after finding the first financial table
-- Scan the ENTIRE document for all financial periods
-- Look in multiple sections: Executive Summary, Financial Analysis, Operating Statement, Investment Summary
-- Common structure: Historical data comes first, then Proforma/Y1 appears later in document
-- Pattern A: Side-by-side columns in same table (T12 | Y1) — Extract BOTH columns
-- Pattern B: Separate tables/sections (first table = T12, later section = Proforma) — Extract from BOTH
-- Pattern C: Multiple periods in one table (T12 | T3 | Y1) — Extract ALL three
+DO NOT extract T12, T-12, TTM, Trailing 12 Months, T3, T-3, or any
+historical/trailing operating statement data from the OM. Trailing
+financials come from the T12 Excel upload, not from the OM PDF.
+
+If the OM contains side-by-side T12/Y1 columns, extract ONLY the Y1
+column. If the OM contains a standalone T12 table, ignore it entirely.
+Return null for any T12/T3 fields in the schema.
 
 EXTRACTION PRIORITIES FOR OMs:
 1. Property basics (name, address, metro, submarket, units, year built, SF)
-2. ALL financial periods — Y1 Proforma AND T12/T3 historical (extract every line item for each)
+2. Y1 Proforma financials (extract every line item — see waterfall below)
 3. Unit mix (CRITICAL — every floorplan with units, SF, in-place rent, proforma rent)
 4. Rent comps (extract the "All Unit" summary table AND per-bedroom tables if present)
 5. Sales comps (if present in "Investment Sales" or "Sales Comparison" section)
@@ -171,7 +169,7 @@ Extract the FULL income waterfall:
 - Less: Replacement Reserves
 - = Net Cash Flow
 
-For each financial period found (Y1 is primary, T12/T3 if present):
+For the Y1 proforma period:
 - gsr: Gross Scheduled Rent
 - vacancy: Vacancy loss amount
 - concessions: Concessions amount
@@ -216,13 +214,13 @@ AVERAGE RENTS:
 {shared_instructions}
 
 VERIFICATION - CRITICAL STEP:
-- ⚠️ VERIFY YOU EXTRACTED ALL PERIODS:
-  * Did you find a historical period (T12/T3/T1)? YES/NO
-  * Did you find a proforma period (Y1/Pro Forma)? YES/NO
-  * If you only found ONE period, scan the document again more thoroughly — most OMs have BOTH
-- For EACH period found, verify numeric values are populated (not null) — read the actual numbers from the document
-- Omit a period key entirely if that period truly does not exist in the document
+- ⚠️ VERIFY YOU EXTRACTED THE Y1 PROFORMA:
+  * Did you find a proforma period (Y1/Pro Forma/Stabilized/Budget)? YES/NO
+  * If NO, scan the document again — OMs almost always include Y1 forward-looking guidance
+- Verify Y1 numeric values are populated (not null) — read the actual numbers from the document
+- Omit the y1 key entirely if the proforma truly does not exist in the document
 - Do NOT return a period with all null numeric values — either extract the real values or omit the period
+- DO NOT return t12 or t3 entries — those come from a separate T12 Excel upload
 
 Return JSON format:
 {{
@@ -252,64 +250,6 @@ Return JSON format:
   }},
   "financials_by_period": {{
     "y1": {{
-      "period_label": "exact label from doc",
-      "gsr": number or null,
-      "vacancy": number or null,
-      "concessions": number or null,
-      "bad_debt": number or null,
-      "non_revenue_units": number or null,
-      "loss_to_lease": number or null,
-      "net_rental_income": number or null,
-      "utility_reimbursements": number or null,
-      "parking_storage_income": number or null,
-      "other_income": number or null,
-      "total_opex": number or null,
-      "opex_components": {{
-        "controllable_expenses": number or null,
-        "management_fee": number or null,
-        "insurance": number or null,
-        "property_taxes": number or null
-      }},
-      "noi": number or null,
-      "replacement_reserves": number or null,
-      "net_cash_flow": number or null,
-      "vacancy_rate_pct": number or null,
-      "expense_ratio_pct": number or null,
-      "management_fee_pct": number or null,
-      "real_estate_taxes": number or null,
-      "insurance_amount": number or null,
-      "credit_loss": number or null
-    }},
-    "t12": {{
-      "period_label": "exact label from doc",
-      "gsr": number or null,
-      "vacancy": number or null,
-      "concessions": number or null,
-      "bad_debt": number or null,
-      "non_revenue_units": number or null,
-      "loss_to_lease": number or null,
-      "net_rental_income": number or null,
-      "utility_reimbursements": number or null,
-      "parking_storage_income": number or null,
-      "other_income": number or null,
-      "total_opex": number or null,
-      "opex_components": {{
-        "controllable_expenses": number or null,
-        "management_fee": number or null,
-        "insurance": number or null,
-        "property_taxes": number or null
-      }},
-      "noi": number or null,
-      "replacement_reserves": number or null,
-      "net_cash_flow": number or null,
-      "vacancy_rate_pct": number or null,
-      "expense_ratio_pct": number or null,
-      "management_fee_pct": number or null,
-      "real_estate_taxes": number or null,
-      "insurance_amount": number or null,
-      "credit_loss": number or null
-    }},
-    "t3": {{
       "period_label": "exact label from doc",
       "gsr": number or null,
       "vacancy": number or null,
@@ -397,16 +337,17 @@ PDF TEXT:
 BOV_EXTRACTION_PROMPT = """You are extracting data from a Broker Opinion of Value (BOV).
 
 BOVs are VALUATION documents that provide pricing guidance. Key characteristics:
-- They contain MULTIPLE financial periods (T3, T12, AND Y1 Proforma)
+- They contain Y1 Proforma alongside trailing financials (T3/T12) — we extract Y1 ONLY from BOVs; trailing financials come from a separate T12 Excel upload
 - They include explicit pricing scenarios (Premium, Market, As-Is, Stabilized, etc.)
 - They include cap rates with specific qualifiers (Tax-Adjusted, Vac/Con/BD Adjusted, etc.)
+  Note: cap rate *qualifiers* may reference T3/T12 as a valuation basis (broker's pricing methodology) — that metadata is fine to capture; raw T3/T12 financial line items are NOT.
 - They include return metrics (IRR, Cash-on-Cash, Equity Multiple)
 - They include terminal/exit assumptions
 - They may include debt/leverage assumptions
 
 EXTRACTION PRIORITIES FOR BOVs:
 1. Property basics (name, address, metro, submarket, units, year built, SF)
-2. ALL financial periods (T3, T12, AND Y1 — extract every one that exists)
+2. Y1 Proforma financials (extract every line item)
 3. Pricing tiers (CRITICAL — extract each scenario with: price, price/unit, price/SF)
 4. Cap rates for each tier (with qualifiers: "Tax Adjusted", "Vac/Con/BD Adjusted", etc.)
 5. Return metrics per tier (levered IRR, unlevered IRR, cash-on-cash, equity multiple)
@@ -416,8 +357,19 @@ EXTRACTION PRIORITIES FOR BOVs:
 9. Sales comps (if present in "Investment Sales" or "Sales Comparison" section)
 10. Renovation assumptions (if present)
 
-FINANCIAL EXTRACTION FOR EACH PERIOD (T3, T12, Y1):
-Extract the FULL income waterfall for EACH period:
+FINANCIAL EXTRACTION (Y1 PROFORMA ONLY):
+Extract ONLY the Year 1 / Pro Forma / Stabilized projection. This is broker
+forward-looking guidance and lives in the BOV by design.
+
+DO NOT extract T12, T-12, TTM, Trailing 12 Months, T3, T-3, or any
+historical/trailing operating statement data from the BOV. Trailing
+financials come from the T12 Excel upload, not from the BOV PDF.
+
+If the BOV contains side-by-side T12/Y1 columns, extract ONLY the Y1
+column. If the BOV contains standalone T3 or T12 tables, ignore them
+entirely. Return null for any T12/T3 fields in the schema.
+
+Extract the FULL income waterfall for the Y1 proforma:
 - Gross Scheduled Rent
 - Less: Vacancy, Concessions, Bad Debt, Non-Revenue Units, Loss to Lease
 - Plus: Utility Reimbursements, Parking/Storage Income, Other Income
@@ -427,7 +379,7 @@ Extract the FULL income waterfall for EACH period:
 - Less: Replacement Reserves
 - = Net Cash Flow
 
-For each period extract:
+For the Y1 proforma extract:
 - period_label: Exact label from document
 - gsr, vacancy, concessions, bad_debt, non_revenue_units
 - loss_to_lease, net_rental_income
@@ -514,7 +466,7 @@ Return JSON format:
     "renovation_stabilized_revenue": number or null
   }},
   "financials_by_period": {{
-    "t3": {{
+    "y1": {{
       "period_label": "exact label from doc",
       "gsr": number or null,
       "vacancy": number or null,
@@ -542,9 +494,7 @@ Return JSON format:
       "real_estate_taxes": number or null,
       "insurance_amount": number or null,
       "credit_loss": number or null
-    }},
-    "t12": {{...same structure as t3...}},
-    "y1": {{...same structure as t3...}}
+    }}
   }},
   "unit_mix": [
     {{
