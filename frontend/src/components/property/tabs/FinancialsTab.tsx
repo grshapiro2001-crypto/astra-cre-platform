@@ -13,6 +13,7 @@ import type { PropertyDetail } from '@/types/property';
 import {
   fmtCurrency,
   fmtPerUnit,
+  fmtDate,
   periodLabel,
   periodDescription,
   financialSourceBadge,
@@ -295,6 +296,20 @@ export function FinancialsTab({
 
   const monthlyTrend = useMemo(() => computeMonthlyEGI(property), [property]);
 
+  // T12 provenance warning — fires when the user is viewing T12, T12 data is
+  // actually being rendered (no fallback active), and the source is something
+  // other than an authoritative T12 Excel upload.
+  const t12ProvenanceWarning = useMemo(() => {
+    if (financialPeriod !== 't12' || resolvedData.period !== 't12') return null;
+    const src = property.financial_data_source;
+    if (!src || src === 't12_excel') return null;
+    const badge = financialSourceBadge(src);
+    return {
+      label: badge?.label ?? src,
+      updatedAt: property.financial_data_updated_at,
+    };
+  }, [financialPeriod, resolvedData.period, property.financial_data_source, property.financial_data_updated_at]);
+
   const hasFinancials = availablePeriods.length > 0;
 
   if (!hasFinancials) {
@@ -388,6 +403,22 @@ export function FinancialsTab({
         <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium border bg-white/5 text-zinc-300 border-white/10">
           <Info className="w-4 h-4 shrink-0" />
           {resolvedData.banner}
+        </div>
+      )}
+
+      {/* T12 source-quality warning — T12 view rendered from non-authoritative data */}
+      {t12ProvenanceWarning && (
+        <div className="flex items-start gap-2 px-4 py-3 rounded-xl text-sm border bg-amber-500/[0.04] border-amber-500/20">
+          <Info className="w-4 h-4 shrink-0 mt-0.5 text-amber-300" />
+          <div>
+            <p className="text-amber-200">
+              T12 view derived from {t12ProvenanceWarning.label}
+              {t12ProvenanceWarning.updatedAt && ` (updated ${fmtDate(t12ProvenanceWarning.updatedAt)})`}.
+            </p>
+            <p className="text-amber-200/70 mt-1">
+              Upload a T12 operating statement (Excel) for authoritative trailing financials.
+            </p>
+          </div>
         </div>
       )}
 

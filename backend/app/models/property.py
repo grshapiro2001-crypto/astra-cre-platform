@@ -140,8 +140,8 @@ class Property(Base):
     pipeline_updated_at = Column(DateTime(timezone=True), nullable=True)
 
     # Source tracking — which document last updated these financials
-    financial_data_source = Column(String(50), nullable=True)  # "om", "bov", "t12_excel", "rent_roll_excel"
-    financial_data_updated_at = Column(DateTime(timezone=True), nullable=True)
+    financial_data_source = Column(Text, nullable=True)  # "om", "bov", "t12_excel", "rent_roll_excel"
+    financial_data_updated_at = Column(DateTime(timezone=False), nullable=True)
 
     # Rent roll summary fields (populated from latest rent roll)
     rr_total_units = Column(Integer, nullable=True)
