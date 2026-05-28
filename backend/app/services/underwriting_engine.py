@@ -14,6 +14,7 @@ V2 improvements over V1:
 
 from __future__ import annotations
 
+import math
 from typing import Optional
 
 from app.schemas.underwriting import (
@@ -34,6 +35,7 @@ from app.schemas.underwriting import (
     OperatingStatementLine,
 )
 from app.services.irr_solver import solve_irr
+from underwriting.v2.waterfall import compute_waterfall
 
 
 class UnderwritingEngine:
@@ -780,6 +782,21 @@ class UnderwritingEngine:
     # Returns (IRR, Cash-on-Cash, Equity Multiple)
     # ------------------------------------------------------------------
 
+    def _levered_equity_cfs(
+        self,
+        dcf: DCFResult,
+        debt: DebtResult,
+        reversion: ReversionResult,
+    ) -> list[float]:
+        """Levered equity cash flows: [−Equity, NCF_after_debt₁…ₙ₋₁, NCFₙ + net_proceeds]."""
+        lev_cfs = [-debt.equity]
+        for i, yr in enumerate(dcf.years):
+            cf = yr.ncf_after_debt
+            if i == len(dcf.years) - 1:
+                cf += reversion.net_proceeds
+            lev_cfs.append(cf)
+        return lev_cfs
+
     def _compute_returns(
         self,
         dcf: DCFResult,
@@ -797,12 +814,7 @@ class UnderwritingEngine:
         net_proceeds = reversion.net_proceeds
 
         # Levered IRR: [−Equity, NCF_after_debt₁…ₙ₋₁, NCFₙ + net_proceeds]
-        lev_cfs = [-equity]
-        for i, yr in enumerate(dcf.years):
-            cf = yr.ncf_after_debt
-            if i == len(dcf.years) - 1:
-                cf += net_proceeds
-            lev_cfs.append(cf)
+        lev_cfs = self._levered_equity_cfs(dcf, debt, reversion)
         levered_irr = solve_irr(lev_cfs)
 
         # Unlevered IRR: [−Price, NCF₁…ₙ₋₁, NCFₙ + GSP − sales_exp]
@@ -1102,12 +1114,29 @@ class UnderwritingEngine:
             proforma, debt, dcf, returns, cap_rates, purchase_price,
         )
 
+        waterfall = None
+        if inp.waterfall_terms is not None:
+            lev_cfs = self._levered_equity_cfs(dcf, debt, reversion)
+            try:
+                wf = compute_waterfall(lev_cfs, inp.waterfall_terms)
+            except ValueError:
+                # Cash flows incompatible with the waterfall (e.g. a negative
+                # distribution year or non-positive equity) — not computable.
+                wf = None
+            if wf is not None and not (
+                math.isfinite(wf.lp_irr) and math.isfinite(wf.gp_irr)
+            ):
+                # Undefined IRR sentinel (-inf) is not JSON-serializable.
+                wf = None
+            waterfall = wf
+
         return ScenarioResult(
             proforma=proforma,
             debt=debt,
             dcf=dcf,
             returns=returns,
             valuation_summary=val_summary,
+            waterfall=waterfall,
         )
 
     # ------------------------------------------------------------------
