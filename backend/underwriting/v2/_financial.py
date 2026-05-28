@@ -8,9 +8,38 @@ audited entry point rather than hand-rolling its own version.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Iterable
 
 import numpy_financial as npf
+
+
+def irr(cashflows: Iterable[float]) -> float | None:
+    """Internal rate of return of an annual cash-flow stream.
+
+    Solves for the rate ``r`` such that ``sum(cf_t / (1+r)**t) == 0``,
+    with ``cashflows[0]`` at ``t=0``. Because equity LP/GP streams have a
+    single sign change (negative year-0 contribution, non-negative
+    distributions after), the IRR is unique and well defined.
+
+    Cash flows are annual (period ``t`` occurs at time ``t``), so this is
+    equivalently the XIRR for equally spaced yearly dates.
+
+    Returns:
+        The IRR as a decimal, or ``None`` when it is undefined — fewer
+        than two flows, no sign change, or a non-finite solver result.
+    """
+    cfs = list(cashflows)
+    if len(cfs) < 2:
+        return None
+    if not (any(cf > 0 for cf in cfs) and any(cf < 0 for cf in cfs)):
+        return None
+
+    result = npf.irr(cfs)
+    rate = float(result)
+    if not math.isfinite(rate):
+        return None
+    return rate
 
 
 def excel_npv(rate: float, cashflows: Iterable[float]) -> float:
