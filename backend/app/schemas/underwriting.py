@@ -8,6 +8,8 @@ from __future__ import annotations
 from typing import Optional
 from pydantic import BaseModel, Field
 
+from underwriting.v2.schemas.waterfall import WaterfallTerms
+
 
 # ---------------------------------------------------------------------------
 # Input Detail Items
@@ -160,6 +162,9 @@ class UWInputs(BaseModel):
     # Custom line items (user-defined revenue/expense rows)
     custom_revenue_items: list[CustomLineItem] = Field(default_factory=list)
     custom_expense_items: list[CustomLineItem] = Field(default_factory=list)
+
+    # Partnership / Equity Waterfall (optional; module off by default)
+    waterfall_terms: Optional[WaterfallTerms] = None
 
 
 # ---------------------------------------------------------------------------
