@@ -3,7 +3,7 @@
  * Shows pricing mode selector and side-by-side Premium / Market cards.
  */
 
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { GLASS_CARD, STAT_BOX, SECTION_LABEL } from '../tabUtils';
 import { cn } from '@/lib/utils';
 import {
@@ -18,6 +18,11 @@ import type { UWSubPageProps } from './types';
 // ---------------------------------------------------------------------------
 // Metric display helpers
 // ---------------------------------------------------------------------------
+
+/** Treat non-finite IRRs (backend may emit -Infinity when undefined) as missing. */
+function finiteOrNull(v: number | null | undefined): number | null {
+  return v != null && Number.isFinite(v) ? v : null;
+}
 
 function MetricRow({ label, value }: { label: string; value: string }) {
   return (
@@ -38,18 +43,21 @@ function ScenarioCard({
   inputs,
   outputs,
   dispatch,
+  irrView,
 }: {
   scenario: 'premium' | 'market';
   label: string;
   inputs: UWSubPageProps['inputs'];
   outputs: UWSubPageProps['outputs'];
   dispatch: UWSubPageProps['dispatch'];
+  irrView: 'project' | 'lp';
 }) {
   const scenarioInputs = inputs[scenario];
   const scenarioResult = outputs?.scenarios?.[scenario];
   const vs = scenarioResult?.valuation_summary;
   const debt = scenarioResult?.debt;
   const returns = scenarioResult?.returns;
+  const waterfall = scenarioResult?.waterfall;
   const pricingMode = scenarioInputs.pricing_mode;
 
   const updateScenario = useCallback(
@@ -133,7 +141,14 @@ function ScenarioCard({
         <h4 className={SECTION_LABEL}>Returns</h4>
         <div className="border-t border-white/10">
           <MetricRow label="Leveraged IRR" value={formatPct(returns?.levered_irr)} />
-          <MetricRow label="Unlevered IRR" value={formatPct(returns?.unlevered_irr)} />
+          <MetricRow
+            label={irrView === 'lp' ? 'LP IRR' : 'Project IRR'}
+            value={
+              irrView === 'lp'
+                ? formatPct(finiteOrNull(waterfall?.lp_irr))
+                : formatPct(returns?.unlevered_irr)
+            }
+          />
           <MetricRow label="Y1 Cash-on-Cash" value={formatPct(returns?.y1_cash_on_cash)} />
           <MetricRow label="Avg Cash-on-Cash" value={formatPct(returns?.avg_cash_on_cash)} />
           <MetricRow label="Equity Multiple" value={formatMultiple(returns?.equity_multiple)} />
@@ -196,6 +211,14 @@ export function UWSummaryPage({ inputs, outputs, dispatch, isComputing }: UWSubP
   // Both scenarios share the same pricing mode
   const pricingMode = inputs.premium.pricing_mode;
 
+  // Returns-IRR view toggle. LP IRR is only meaningful once a waterfall has been
+  // computed on the response; lock to Project IRR otherwise.
+  const [irrView, setIrrView] = useState<'project' | 'lp'>('project');
+  const waterfallAvailable = (['premium', 'market'] as const).some(
+    (s) => outputs?.scenarios?.[s]?.waterfall != null,
+  );
+  const effectiveIrrView = waterfallAvailable ? irrView : 'project';
+
   const setPricingMode = useCallback(
     (mode: 'target_irr' | 'direct_cap' | 'manual') => {
       dispatch({ type: 'SET_SCENARIO_INPUT', scenario: 'premium', payload: { pricing_mode: mode } });
@@ -235,6 +258,36 @@ export function UWSummaryPage({ inputs, outputs, dispatch, isComputing }: UWSubP
         </div>
       </div>
 
+      {/* Returns IRR view toggle (Project vs LP) */}
+      <div className="flex items-center gap-2">
+        <span className={cn(SECTION_LABEL, 'mr-2')}>Returns IRR</span>
+        <div
+          className={cn(
+            'flex items-center rounded-lg p-1 bg-white/[0.04]',
+            !waterfallAvailable && 'opacity-50',
+          )}
+          title={waterfallAvailable ? undefined : 'Add partnership terms to compare LP IRR'}
+        >
+          {(['project', 'lp'] as const).map((view) => (
+            <button
+              key={view}
+              type="button"
+              disabled={!waterfallAvailable}
+              onClick={() => setIrrView(view)}
+              className={cn(
+                'px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
+                !waterfallAvailable && 'cursor-not-allowed',
+                effectiveIrrView === view
+                  ? 'bg-white/[0.08] text-white'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              {view === 'project' ? 'Project IRR' : 'LP IRR'}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Side-by-side scenario cards */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <ScenarioCard
@@ -243,6 +296,7 @@ export function UWSummaryPage({ inputs, outputs, dispatch, isComputing }: UWSubP
           inputs={inputs}
           outputs={outputs}
           dispatch={dispatch}
+          irrView={effectiveIrrView}
         />
         <ScenarioCard
           scenario="market"
@@ -250,6 +304,7 @@ export function UWSummaryPage({ inputs, outputs, dispatch, isComputing }: UWSubP
           inputs={inputs}
           outputs={outputs}
           dispatch={dispatch}
+          irrView={effectiveIrrView}
         />
       </div>
     </div>
