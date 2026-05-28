@@ -14,6 +14,7 @@ import { UWAssumptionsPage } from '../UWAssumptionsPage';
 import { UWProformaPage } from '../UWProformaPage';
 import { UWCashFlowsPage } from '../UWCashFlowsPage';
 import { UWDetailSchedulesPage } from '../UWDetailSchedulesPage';
+import { UWPartnershipReturnsPage } from '../UWPartnershipReturnsPage';
 import { UWT12MappingPage } from '../UWT12MappingPage';
 import { SplitDivider } from './SplitDivider';
 
@@ -197,6 +198,8 @@ function ActivePage({
       return <UWCashFlowsPage {...shared} />;
     case 'schedules':
       return <UWDetailSchedulesPage {...shared} />;
+    case 'partnership':
+      return <UWPartnershipReturnsPage {...shared} />;
     case 't12mapping':
       return <UWT12MappingPage {...shared} property={property} />;
     default:

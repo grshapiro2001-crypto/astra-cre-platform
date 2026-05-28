@@ -6,6 +6,7 @@ export type UWSubPage =
   | 'proforma'
   | 'cashflows'
   | 'schedules'
+  | 'partnership'
   | 't12mapping';
 
 interface UnderwritingStageState {
