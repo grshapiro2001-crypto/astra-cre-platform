@@ -10,6 +10,7 @@ const UW_PAGE_LABELS: Record<UWSubPage, string> = {
   proforma: 'Proforma',
   cashflows: 'Cash Flows',
   schedules: 'Schedules',
+  partnership: 'Partnership',
   t12mapping: 'T12 Mapping',
 };
 

@@ -323,12 +323,41 @@ export interface ValuationSummary {
   noi_cagr: number | null;
 }
 
+// ---------------------------------------------------------------------------
+// Partnership / Waterfall Results
+// Mirrors backend WaterfallResult / WaterfallTier (underwriting/v2/schemas/waterfall.py).
+// ---------------------------------------------------------------------------
+
+export interface WaterfallTier {
+  year: number;
+  tier: string;
+  cash_in: number;
+  lp_amount: number;
+  gp_amount: number;
+  cash_out: number;
+  pref_balance_after?: number | null;
+  lp_capital_returned_to_date?: number | null;
+  catch_up_target?: number | null;
+  lp_irr_after?: number | null;
+}
+
+export interface WaterfallResult {
+  lp_cash_flows: number[];
+  gp_cash_flows: number[];
+  lp_irr: number;
+  lp_equity_multiple: number;
+  gp_irr: number;
+  total_promote: number;
+  tier_schedule: WaterfallTier[];
+}
+
 export interface ScenarioResult {
   proforma: ProformaResult;
   debt: DebtResult;
   dcf: DCFResult;
   returns: ReturnsResult;
   valuation_summary: ValuationSummary;
+  waterfall?: WaterfallResult | null;
 }
 
 export interface OperatingStatementLine {

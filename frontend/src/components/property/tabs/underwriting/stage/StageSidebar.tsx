@@ -7,6 +7,7 @@ import {
   Table2,
   BarChart3,
   ListTree,
+  Handshake,
   FileSpreadsheet,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -18,6 +19,7 @@ import { AssumptionsThumb } from './thumbs/AssumptionsThumb';
 import { ProformaThumb } from './thumbs/ProformaThumb';
 import { CashFlowsThumb } from './thumbs/CashFlowsThumb';
 import { SchedulesThumb } from './thumbs/SchedulesThumb';
+import { PartnershipReturnsThumb } from './thumbs/PartnershipReturnsThumb';
 import { T12MappingThumb } from './thumbs/T12MappingThumb';
 
 interface TileDef {
@@ -33,6 +35,7 @@ const BASE_TILES: TileDef[] = [
   { pageId: 'proforma', label: 'Proforma', icon: Table2, Thumb: ProformaThumb },
   { pageId: 'cashflows', label: 'Cash Flows', icon: BarChart3, Thumb: CashFlowsThumb },
   { pageId: 'schedules', label: 'Schedules', icon: ListTree, Thumb: SchedulesThumb },
+  { pageId: 'partnership', label: 'Partnership', icon: Handshake, Thumb: PartnershipReturnsThumb },
 ];
 
 const T12_TILE: TileDef = {
