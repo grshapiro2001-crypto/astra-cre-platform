@@ -8,7 +8,7 @@ from __future__ import annotations
 from typing import Optional
 from pydantic import BaseModel, Field
 
-from underwriting.v2.schemas.waterfall import WaterfallTerms
+from underwriting.v2.schemas.waterfall import WaterfallTerms, WaterfallResult
 
 
 # ---------------------------------------------------------------------------
@@ -313,6 +313,7 @@ class ScenarioResult(BaseModel):
     dcf: DCFResult = Field(default_factory=DCFResult)
     returns: ReturnsResult = Field(default_factory=ReturnsResult)
     valuation_summary: ValuationSummary = Field(default_factory=ValuationSummary)
+    waterfall: Optional[WaterfallResult] = None
 
 
 # ---------------------------------------------------------------------------
