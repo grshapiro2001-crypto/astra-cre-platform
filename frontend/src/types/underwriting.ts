@@ -73,6 +73,46 @@ export interface ScenarioInputs {
 }
 
 // ---------------------------------------------------------------------------
+// Partnership / Waterfall Terms
+// Mirrors backend WaterfallTerms (app/schemas + underwriting/v2/schemas/waterfall.py).
+// All percentages as decimals. lp+gp and each split's lp+gp must each sum to 1.0.
+// ---------------------------------------------------------------------------
+
+export interface WaterfallTerms {
+  lp_equity_pct: number;
+  gp_equity_pct: number;
+  pref_rate: number;
+  pref_base: 'original' | 'remaining';
+  pref_compounds: boolean;
+  catch_up_enabled: boolean;
+  catch_up_pct: number;
+  hurdle_1_irr: number;
+  split_1_lp: number;
+  split_1_gp: number;
+  hurdle_2_irr: number;
+  split_2_lp: number;
+  split_2_gp: number;
+}
+
+export function createDefaultWaterfallTerms(): WaterfallTerms {
+  return {
+    lp_equity_pct: 0.9,
+    gp_equity_pct: 0.1,
+    pref_rate: 0.08,
+    pref_base: 'original',
+    pref_compounds: false,
+    catch_up_enabled: true,
+    catch_up_pct: 0.2,
+    hurdle_1_irr: 0.12,
+    split_1_lp: 0.8,
+    split_1_gp: 0.2,
+    hurdle_2_irr: 0.18,
+    split_2_lp: 0.7,
+    split_2_gp: 0.3,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Complete Input Schema
 // ---------------------------------------------------------------------------
 
@@ -146,6 +186,8 @@ export interface UWInputs {
   renovation: RenovationInput;
   retail: RetailInput;
   tax_abatement: TaxAbatementInput;
+  // Partnership / waterfall promote terms (optional on the backend)
+  waterfall_terms?: WaterfallTerms;
 }
 
 // ---------------------------------------------------------------------------
@@ -388,5 +430,6 @@ export function createDefaultInputs(): UWInputs {
     renovation: createDefaultRenovationInput(),
     retail: createDefaultRetailInput(),
     tax_abatement: createDefaultTaxAbatementInput(),
+    waterfall_terms: createDefaultWaterfallTerms(),
   };
 }

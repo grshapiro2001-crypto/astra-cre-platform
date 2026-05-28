@@ -12,12 +12,15 @@ import {
   NumericInput,
   T12Ref,
   formatCurrency,
+  formatPct,
 } from './uwFormatters';
 import type { UWSubPageProps } from './types';
-import type { UWInputs } from '@/types/underwriting';
+import type { UWInputs, WaterfallTerms } from '@/types/underwriting';
+import { createDefaultWaterfallTerms } from '@/types/underwriting';
 import { RenovationSection } from './v2/RenovationSection';
 import { RetailSection } from './v2/RetailSection';
 import { TaxAbatementSection } from './v2/TaxAbatementSection';
+import { EnableToggle } from './v2/shared';
 import {
   isRentRollFallbackActive,
   rentRollFallbackMissingSqft,
@@ -600,6 +603,91 @@ function LoanAssumptionSection({ inputs, dispatch }: Pick<UWSubPageProps, 'input
 }
 
 // ---------------------------------------------------------------------------
+// Section G: Partnership Terms (collapsible)
+// ---------------------------------------------------------------------------
+
+function WaterfallTermsSection({ inputs, dispatch }: Pick<UWSubPageProps, 'inputs' | 'dispatch'>) {
+  const wf = inputs.waterfall_terms ?? createDefaultWaterfallTerms();
+
+  const update = useCallback(
+    (patch: Partial<WaterfallTerms>) =>
+      dispatch({ type: 'SET_INPUTS', payload: { waterfall_terms: { ...wf, ...patch } } }),
+    [dispatch, wf],
+  );
+
+  return (
+    <CollapsibleSection title="Partnership Terms">
+      {/* Equity split — LP entered, GP derived */}
+      <InputRow label="LP Equity Split">
+        <PercentInput
+          value={wf.lp_equity_pct}
+          onChange={(v) => update({ lp_equity_pct: v ?? 0, gp_equity_pct: 1 - (v ?? 0) })}
+        />
+      </InputRow>
+      <InputRow label="GP Equity Split">
+        <span className="font-mono text-sm text-foreground">{formatPct(wf.gp_equity_pct)}</span>
+      </InputRow>
+
+      {/* Preferred return */}
+      <InputRow label="Preferred Return">
+        <PercentInput value={wf.pref_rate} onChange={(v) => update({ pref_rate: v ?? 0 })} />
+      </InputRow>
+      <InputRow label="Pref Base">
+        <select
+          value={wf.pref_base}
+          onChange={(e) => update({ pref_base: e.target.value as WaterfallTerms['pref_base'] })}
+          className="w-full h-8 px-2 rounded-md border border-white/10 bg-white/[0.03] text-foreground text-xs focus:outline-none focus:ring-1 focus:ring-white/20"
+        >
+          <option value="original">Original Capital</option>
+          <option value="remaining">Remaining Capital</option>
+        </select>
+      </InputRow>
+
+      {/* GP catch-up */}
+      <EnableToggle
+        id="wf-catch-up"
+        label="GP Catch-Up"
+        enabled={wf.catch_up_enabled}
+        onChange={(next) => update({ catch_up_enabled: next })}
+      />
+      {wf.catch_up_enabled && (
+        <InputRow label="Catch-Up %">
+          <PercentInput value={wf.catch_up_pct} onChange={(v) => update({ catch_up_pct: v ?? 0 })} />
+        </InputRow>
+      )}
+
+      {/* Tier 1 */}
+      <InputRow label="Hurdle 1 (IRR)">
+        <PercentInput value={wf.hurdle_1_irr} onChange={(v) => update({ hurdle_1_irr: v ?? 0 })} />
+      </InputRow>
+      <InputRow label="Tier 1 Split (LP)">
+        <PercentInput
+          value={wf.split_1_lp}
+          onChange={(v) => update({ split_1_lp: v ?? 0, split_1_gp: 1 - (v ?? 0) })}
+        />
+      </InputRow>
+      <InputRow label="Tier 1 Split (GP)">
+        <span className="font-mono text-sm text-foreground">{formatPct(wf.split_1_gp)}</span>
+      </InputRow>
+
+      {/* Tier 2 */}
+      <InputRow label="Hurdle 2 (IRR)">
+        <PercentInput value={wf.hurdle_2_irr} onChange={(v) => update({ hurdle_2_irr: v ?? 0 })} />
+      </InputRow>
+      <InputRow label="Tier 2 Split (LP)">
+        <PercentInput
+          value={wf.split_2_lp}
+          onChange={(v) => update({ split_2_lp: v ?? 0, split_2_gp: 1 - (v ?? 0) })}
+        />
+      </InputRow>
+      <InputRow label="Tier 2 Split (GP)">
+        <span className="font-mono text-sm text-foreground">{formatPct(wf.split_2_gp)}</span>
+      </InputRow>
+    </CollapsibleSection>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // UWAssumptionsPage
 // ---------------------------------------------------------------------------
 
@@ -646,6 +734,7 @@ export function UWAssumptionsPage({ inputs, outputs, dispatch, isComputing, prop
       <GrowthSection inputs={inputs} dispatch={dispatch} />
       <DebtSection inputs={inputs} dispatch={dispatch} />
       <LoanAssumptionSection inputs={inputs} dispatch={dispatch} />
+      <WaterfallTermsSection inputs={inputs} dispatch={dispatch} />
       <TaxAbatementSection inputs={inputs} dispatch={dispatch} />
       <RetailSection inputs={inputs} dispatch={dispatch} />
       <RenovationSection inputs={inputs} dispatch={dispatch} />
